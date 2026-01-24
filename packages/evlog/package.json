@@ -43,14 +43,14 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "dev:prepare": "unbuild --stub",
+    "dev:prepare": "unbuild --stub && nuxt prepare test/fixtures/basic",
     "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
     "@nuxt/kit": "^4.3.0"

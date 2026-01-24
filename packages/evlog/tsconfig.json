@@ -1,7 +1,12 @@
 {
   "extends": "./.nuxt/tsconfig.json",
-  "exclude": [
-    "dist",
-    "node_modules"
-  ]
+  "compilerOptions": {
+    "paths": {
+      "evlog": ["./src/index.ts"],
+      "evlog/nuxt": ["./src/nuxt/module.ts"],
+      "evlog/nitro": ["./src/nitro/plugin.ts"]
+    }
+  },
+  "include": ["src/**/*", "test/**/*"],
+  "exclude": ["dist", "node_modules"]
 }
