@@ -43,7 +43,7 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "dev:prepare": "unbuild --stub && nuxt prepare test/fixtures/basic",
+    "dev:prepare": "unbuild --stub",
     "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
