@@ -63,7 +63,7 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Prepare
         run: bun run dev:prepare
-      - name: Test
+      - name: Run tests
         run: bun run test
 
   publish:
@@ -83,5 +83,5 @@ jobs:
         run: bun run dev:prepare
       - name: Build module
         run: bun run build:module
-      - name: Publish
-        run: bunx pkg-pr-new publish --compact --no-template './packages/my-module'
+      - name: Publish preview
+        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog'
