@@ -74,14 +74,14 @@
     "@nuxt/schema": "^4.3.0",
     "@nuxt/test-utils": "^3.23.0",
     "changelogen": "^0.6.2",
-    "h3": "^1.15.0",
-    "nitropack": "^2.13.0",
+    "h3": "^1.15.5",
+    "nitropack": "^2.13.1",
     "nuxt": "^4.3.0",
     "typescript": "^5.9.3",
-    "unbuild": "^3.5.0"
+    "unbuild": "^3.6.1"
   },
   "peerDependencies": {
-    "h3": "^1.13.0",
+    "h3": "^1.15.5",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1"
   },
