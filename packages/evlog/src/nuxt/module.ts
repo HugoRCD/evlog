@@ -60,6 +60,7 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
       pretty: options.pretty,
+      sampling: options.sampling,
     }
 
     addServerPlugin(resolver.resolve('../nitro/plugin'))
