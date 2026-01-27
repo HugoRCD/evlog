@@ -4,9 +4,6 @@ export default defineAppConfig({
     title: 'evlog',
     description: 'Wide events and structured errors for TypeScript. One log per request, full context, errors that explain why and how to fix.',
   },
-  socials: {
-    github: 'https://github.com/hugorcd/evlog',
-  },
   ui: {
     colors: {
       primary: 'blue',
