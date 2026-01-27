@@ -5,7 +5,7 @@ export default defineBuildConfig({
     { input: 'src/index', name: 'index' },
     { input: 'src/nuxt/module', name: 'nuxt/module' },
     { input: 'src/nitro/plugin', name: 'nitro/plugin' },
-    { input: 'src/nitrov3/plugin', name: 'nitrov3/plugin' },
+    { input: 'src/nitrov3/plugin', name: 'nitro/v3/plugin' },
     { input: 'src/runtime/client/log', name: 'runtime/client/log' },
     { input: 'src/runtime/client/plugin', name: 'runtime/client/plugin' },
     { input: 'src/runtime/server/useLogger', name: 'runtime/server/useLogger' },

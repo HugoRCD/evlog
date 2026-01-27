@@ -35,9 +35,9 @@
       "types": "./dist/nitro/plugin.d.mts",
       "import": "./dist/nitro/plugin.mjs"
     },
-    "./nitrov3": {
-      "types": "./dist/nitro3/plugin.d.mts",
-      "import": "./dist/nitro3/plugin.mjs"
+    "./nitro/v3": {
+      "types": "./dist/nitro/v3/plugin.d.mts",
+      "import": "./dist/nitro/v3/plugin.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -53,8 +53,8 @@
       "nitro": [
         "./dist/nitro/plugin.d.mts"
       ],
-      "nitrov3": [
-        "./dist/nitro3/plugin.d.mts"
+      "nitro/v3": [
+        "./dist/nitro/v3/plugin.d.mts"
       ]
     }
   },
@@ -86,7 +86,8 @@
     "nuxt": "^4.3.0",
     "typescript": "^5.9.3",
     "unbuild": "^3.6.1",
-    "nitro": "^3.0.1-alpha.2"
+    "nitro": "^3.0.1-alpha.2",
+    "ufo": "^1.6.3"
   },
   "peerDependencies": {
     "h3": "^1.15.5",
