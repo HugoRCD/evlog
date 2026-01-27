@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Nitro Starter</title>
+  <title>evlog Nitro v3 Playground</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap" rel="stylesheet">
@@ -11,10 +11,103 @@
 </head>
 <body>
   <main class="card">
-    <h1>This is your brand new Nitro project 🚀</h1>
-    <p>Get started by editing the <code>index.html</code> and <code>routes/api/index.ts</code> files.</p>
-    <p>Learn more from 📖 <a href="https://v3.nitro.build/docs" target="_blank" rel="noopener noreferrer">Nitro Documentation</a></p>
-    <pre class="api"><code>{{{ serverFetch("/api") }}}</code></pre>
+    <h1><code>evlog</code> Nitro v3 Playground 🚀</h1>
+    <p>Test the evlog integration with different HTTP methods. Check your terminal for wide event logs!</p>
+        <div class="separator"></div>
+        <div class="demo-section">
+      <h2>Test API Endpoints</h2>
+      
+      <div class="input-group">
+        <label for="itemName">Item Name (for POST request)</label>
+        <input type="text" id="itemName" placeholder="Enter item name" value="My Item">
+      </div>
+      
+      <div class="buttons">
+        <button class="btn-get" onclick="testGet()">GET /api/test/success</button>
+        <button class="btn-post" onclick="testPost()">POST /api/test/create</button>
+        <button class="btn-delete" onclick="testPut()">PUT /api/test/update (Error Demo)</button>
+        <button class="btn-delete" onclick="testDelete()">DELETE /api/test/delete</button>
+      </div>
+      
+      <div class="buttons">
+        <button class="btn-wide" onclick="testWide()">GET /api/test/wide-event (Full Wide Event Example)</button>
+      </div>
+      
+      <div id="result"></div>
+    </div>
+
   </main>
+
+  <script>
+    const resultEl = document.getElementById('result');
+
+    function showResult(data, status) {
+      resultEl.textContent = `Status: ${status}\n\n${JSON.stringify(data, null, 2)}`;
+      resultEl.classList.add('show');
+    }
+
+    async function testGet() {
+      try {
+        const response = await fetch('/api/test/success');
+        const data = await response.json();
+        showResult(data, response.status);
+      } catch (error) {
+        showResult({ error: error.message }, 'error');
+      }
+    }
+
+    async function testPost() {
+      try {
+        const itemName = document.getElementById('itemName').value;
+        const response = await fetch('/api/test/create', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: itemName, type: 'demo' })
+        });
+        const data = await response.json();
+        showResult(data, response.status);
+      } catch (error) {
+        showResult({ error: error.message }, 'error');
+      }
+    }
+
+    async function testPut() {
+      try {
+        const itemName = document.getElementById('itemName').value;
+        const response = await fetch('/api/test/update', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ name: itemName, version: '2.0' })
+        });
+        const data = await response.json();
+        showResult(data, response.status);
+      } catch (error) {
+        showResult({ error: error.message }, 'error');
+      }
+    }
+
+    async function testDelete() {
+      try {
+        const response = await fetch('/api/test/delete', {
+          method: 'DELETE'
+        });
+        const data = await response.json();
+        showResult(data, response.status);
+      } catch (error) {
+        const errorData = error.data || error;
+        showResult(errorData, 'error');
+      }
+    }
+
+    async function testWide() {
+      try {
+        const response = await fetch('/api/test/wide-event');
+        const data = await response.json();
+        showResult(data, response.status);
+      } catch (error) {
+        showResult({ error: error.message }, 'error');
+      }
+    }
+  </script>
 </body>
 </html>
