@@ -1,6 +1,8 @@
 import type { Log, LogLevel } from '../../types'
 import { getConsoleMethod } from '../../utils'
 
+const isClient = typeof window !== 'undefined'
+
 let clientPretty = true
 let clientService = 'client'
 
@@ -44,7 +46,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
 
 function createLogMethod(level: LogLevel) {
   return function logMethod(tagOrEvent: string | Record<string, unknown>, message?: string): void {
-    if (!import.meta.client) {
+    if (!(import.meta.client ?? isClient)) {
       return
     }
 
