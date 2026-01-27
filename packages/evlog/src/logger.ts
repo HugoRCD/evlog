@@ -71,6 +71,9 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>): void {
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (globalPretty) {
+    if (!shouldSample(level)) {
+      return
+    }
     const color = getLevelColor(level)
     const timestamp = new Date().toISOString().slice(11, 23)
     console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)

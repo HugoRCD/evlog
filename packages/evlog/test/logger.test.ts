@@ -1,6 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRequestLogger, getEnvironment, initLogger, log } from '../src/logger'
-import type { SamplingConfig } from '../src/types'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -358,5 +357,29 @@ describe('sampling', () => {
     expect(consoleSpy).toHaveBeenCalledTimes(1) // Still 1, not logged
 
     randomSpy.mockRestore()
+  })
+
+  it('applies sampling to tagged logs in pretty mode', () => {
+    initLogger({
+      pretty: true,
+      sampling: {
+        rates: { info: 0 },
+      },
+    })
+
+    log.info('test', 'should not log')
+    expect(consoleSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it('logs tagged messages in pretty mode when sampling rate is 100%', () => {
+    initLogger({
+      pretty: true,
+      sampling: {
+        rates: { info: 100 },
+      },
+    })
+
+    log.info('test', 'should log')
+    expect(consoleSpy).toHaveBeenCalledTimes(1)
   })
 })
