@@ -91,7 +91,7 @@ export default defineNuxtModule<ModuleOptions>({
       },
       {
         name: 'log',
-        from: resolver.resolve('../runtime/client/log'),
+        from: resolver.resolve('../logger'),
       },
       {
         name: 'createEvlogError',
