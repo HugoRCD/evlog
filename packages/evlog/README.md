@@ -94,13 +94,23 @@ export default defineNuxtConfig({
   evlog: {
     env: {
       service: 'my-app',
-      environment: process.env.NODE_ENV,
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
   },
 })
 ```
+
+> **Tip:** Use `$production` to enable [sampling](#sampling) only in production:
+> ```typescript
+> export default defineNuxtConfig({
+>   modules: ['evlog/nuxt'],
+>   evlog: { env: { service: 'my-app' } },
+>   $production: {
+>     evlog: { sampling: { rates: { info: 10, warn: 50, debug: 0 } } },
+>   },
+> })
+> ```
 
 That's it. Now use `useLogger(event)` in any API route:
 
@@ -353,6 +363,31 @@ initLogger({
   },
   pretty?: boolean       // Pretty print (default: true in dev)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
+  sampling?: {
+    rates?: {
+      info?: number      // 0-100, default 100
+      warn?: number      // 0-100, default 100
+      debug?: number     // 0-100, default 100
+      error?: number     // 0-100, default 100 (always logged unless set to 0)
+    }
+  }
+})
+```
+
+### Sampling
+
+At scale, logging everything can become expensive. Use sampling to keep only a percentage of logs per level:
+
+```typescript
+initLogger({
+  sampling: {
+    rates: {
+      info: 10,   // Keep 10% of info logs
+      warn: 50,   // Keep 50% of warning logs
+      debug: 0,   // Disable debug logs
+      // error defaults to 100% (always logged)
+    },
+  },
 })
 ```
 
