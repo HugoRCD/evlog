@@ -163,7 +163,47 @@ export default defineNuxtConfig({
 | `env.environment` | `string` | Auto-detected | Environment name |
 | `include` | `string[]` | `undefined` | Route patterns to log (glob). If not set, all routes are logged |
 | `pretty` | `boolean` | `true` in dev | Pretty print logs with tree formatting |
-| `sampling.rates` | `object` | `undefined` | Sampling rates per log level (0-100%). Error defaults to 100% |
+| `sampling.rates` | `object` | `undefined` | Head sampling rates per log level (0-100%). Error defaults to 100% |
+| `sampling.keep` | `array` | `undefined` | Tail sampling conditions to force-keep logs (see below) |
+
+#### Sampling Configuration
+
+evlog supports two sampling strategies:
+
+**Head Sampling (rates)**: Random sampling based on log level, decided before request completes.
+
+**Tail Sampling (keep)**: Force-keep logs based on request outcome, evaluated after request completes.
+
+```typescript
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    sampling: {
+      // Head sampling: random percentage per level
+      rates: { info: 10, warn: 50, debug: 0 },
+      // Tail sampling: force keep based on outcome (OR logic)
+      keep: [
+        { duration: 1000 },           // Keep if duration >= 1000ms
+        { status: 400 },              // Keep if status >= 400
+        { path: '/api/critical/**' }, // Keep if path matches
+      ],
+    },
+  },
+})
+```
+
+**Custom Tail Sampling Hook**: For business-specific conditions, use the `evlog:emit:keep` Nitro hook:
+
+```typescript
+// server/plugins/evlog-custom.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+    if (ctx.context.user?.premium) {
+      ctx.shouldKeep = true
+    }
+  })
+})
+```
 
 **Tip:** Use `$production` to sample only in production:
 
@@ -173,7 +213,10 @@ export default defineNuxtConfig({
   evlog: { env: { service: 'my-app' } },
   $production: {
     evlog: {
-      sampling: { rates: { info: 10, warn: 50, debug: 0 } },
+      sampling: {
+        rates: { info: 10, warn: 50, debug: 0 },
+        keep: [{ duration: 1000 }, { status: 400 }],
+      },
     },
   },
 })

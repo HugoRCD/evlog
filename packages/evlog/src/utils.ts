@@ -72,3 +72,19 @@ export function getLevelColor(level: string): string {
       return colors.white
   }
 }
+
+/**
+ * Match a path against a glob pattern.
+ * Supports * (any chars except /) and ** (any chars including /).
+ */
+export function matchesPattern(path: string, pattern: string): boolean {
+  const regexPattern = pattern
+    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars except * and ?
+    .replace(/\*\*/g, '{{GLOBSTAR}}') // Temp placeholder for **
+    .replace(/\*/g, '[^/]*') // * matches anything except /
+    .replace(/{{GLOBSTAR}}/g, '.*') // ** matches anything including /
+    .replace(/\?/g, '[^/]') // ? matches single char except /
+
+  const regex = new RegExp(`^${regexPattern}$`)
+  return regex.test(path)
+}

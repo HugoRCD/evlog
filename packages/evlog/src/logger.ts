@@ -1,5 +1,5 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig } from './types'
-import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev } from './utils'
+import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext } from './types'
+import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 let globalEnv: EnvironmentContext = {
   service: 'app',
@@ -50,8 +50,30 @@ function shouldSample(level: LogLevel): boolean {
   return Math.random() * 100 < percentage
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>): void {
-  if (!shouldSample(level)) {
+/**
+ * Evaluate tail sampling conditions to determine if a log should be force-kept.
+ * Returns true if ANY condition matches (OR logic).
+ */
+export function shouldKeep(ctx: TailSamplingContext): boolean {
+  const { keep } = globalSampling
+  if (!keep?.length) return false
+
+  return keep.some((condition) => {
+    if (condition.status !== undefined && ctx.status !== undefined && ctx.status >= condition.status) {
+      return true
+    }
+    if (condition.duration !== undefined && ctx.duration !== undefined && ctx.duration >= condition.duration) {
+      return true
+    }
+    if (condition.path && ctx.path && matchesPattern(ctx.path, condition.path)) {
+      return true
+    }
+    return false
+  })
+}
+
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): void {
+  if (!skipSamplingCheck && !shouldSample(level)) {
     return
   }
 
@@ -210,15 +232,36 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       }
     },
 
-    emit(overrides?: Record<string, unknown>): void {
-      const duration = formatDuration(Date.now() - startTime)
+    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): void {
+      const durationMs = Date.now() - startTime
+      const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'
+
+      // Extract _forceKeep from overrides (set by evlog:emit:keep hook)
+      const { _forceKeep, ...restOverrides } = overrides ?? {}
+
+      // Build tail sampling context
+      const tailCtx: TailSamplingContext = {
+        status: (context.status ?? restOverrides.status) as number | undefined,
+        duration: durationMs,
+        path: context.path as string | undefined,
+        method: context.method as string | undefined,
+        context: { ...context, ...restOverrides },
+      }
+
+      // Tail sampling: force keep if hook or built-in conditions match
+      const forceKeep = _forceKeep || shouldKeep(tailCtx)
+
+      // Apply head sampling only if not force-kept
+      if (!forceKeep && !shouldSample(level)) {
+        return
+      }
 
       emitWideEvent(level, {
         ...context,
-        ...overrides,
+        ...restOverrides,
         duration,
-      })
+      }, true) // Skip head sampling check (already done above)
     },
 
     getContext(): Record<string, unknown> {

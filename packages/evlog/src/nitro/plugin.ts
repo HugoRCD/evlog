@@ -1,25 +1,13 @@
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, SamplingConfig, ServerEvent } from '../types'
+import type { RequestLogger, SamplingConfig, ServerEvent, TailSamplingContext } from '../types'
+import { matchesPattern } from '../utils'
 
 interface EvlogConfig {
   env?: Record<string, unknown>
   pretty?: boolean
   include?: string[]
   sampling?: SamplingConfig
-}
-
-function matchesPattern(path: string, pattern: string): boolean {
-  // Convert glob pattern to regex
-  const regexPattern = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars except * and ?
-    .replace(/\*\*/g, '{{GLOBSTAR}}') // Temp placeholder for **
-    .replace(/\*/g, '[^/]*') // * matches anything except /
-    .replace(/{{GLOBSTAR}}/g, '.*') // ** matches anything including /
-    .replace(/\?/g, '[^/]') // ? matches single char except /
-
-  const regex = new RegExp(`^${regexPattern}$`)
-  return regex.test(path)
 }
 
 function shouldLog(path: string, include?: string[]): boolean {
@@ -68,6 +56,9 @@ export default defineNitroPlugin((nitroApp) => {
       return
     }
 
+    // Store start time for duration calculation in tail sampling
+    e.context._evlogStartTime = Date.now()
+
     const log = createRequestLogger({
       method: e.method,
       path: e.path,
@@ -76,20 +67,67 @@ export default defineNitroPlugin((nitroApp) => {
     e.context.log = log
   })
 
-  nitroApp.hooks.hook('afterResponse', (event) => {
-    const e = event as ServerEvent
+  nitroApp.hooks.hook('error', async (error, { event }) => {
+    const e = event as ServerEvent | undefined
+    if (!e) return
+
     const log = e.context.log as RequestLogger | undefined
     if (log) {
-      log.set({ status: getResponseStatus(e) })
-      log.emit()
+      log.error(error as Error)
+
+      // Get the actual error status code
+      const errorStatus = (error as { statusCode?: number }).statusCode ?? 500
+      log.set({ status: errorStatus })
+
+      // Build tail sampling context
+      const startTime = e.context._evlogStartTime as number | undefined
+      const durationMs = startTime ? Date.now() - startTime : undefined
+
+      const tailCtx: TailSamplingContext = {
+        status: errorStatus,
+        duration: durationMs,
+        path: e.path,
+        method: e.method,
+        context: log.getContext(),
+        shouldKeep: false,
+      }
+
+      // Call evlog:emit:keep hook
+      await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
+
+      // Emit immediately since afterResponse might not run on errors
+      log.emit({ _forceKeep: tailCtx.shouldKeep })
+
+      // Mark as emitted to prevent double emission
+      e.context._evlogEmitted = true
     }
   })
 
-  nitroApp.hooks.hook('error', (error, { event }) => {
-    const e = event as ServerEvent | undefined
-    const log = e?.context.log as RequestLogger | undefined
+  nitroApp.hooks.hook('afterResponse', async (event) => {
+    const e = event as ServerEvent
+    // Skip if already emitted by error hook
+    if (e.context._evlogEmitted) return
+
+    const log = e.context.log as RequestLogger | undefined
     if (log) {
-      log.error(error as Error)
+      const status = getResponseStatus(e)
+      log.set({ status })
+
+      const startTime = e.context._evlogStartTime as number | undefined
+      const durationMs = startTime ? Date.now() - startTime : undefined
+
+      const tailCtx: TailSamplingContext = {
+        status,
+        duration: durationMs,
+        path: e.path,
+        method: e.method,
+        context: log.getContext(),
+        shouldKeep: false,
+      }
+
+      await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
+
+      log.emit({ _forceKeep: tailCtx.shouldKeep })
     }
   })
 })

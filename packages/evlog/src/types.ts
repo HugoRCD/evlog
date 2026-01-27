@@ -1,3 +1,24 @@
+import type { NitroRuntimeHooks } from 'nitropack/types'
+
+declare module 'nitropack/types' {
+  interface NitroRuntimeHooks {
+    /**
+     * Tail sampling hook - called before emitting a log.
+     * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
+     *
+     * @example
+     * ```ts
+     * nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+     *   if (ctx.context.user?.premium) {
+     *     ctx.shouldKeep = true
+     *   }
+     * })
+     * ```
+     */
+    'evlog:emit:keep': (ctx: TailSamplingContext) => void | Promise<void>
+  }
+}
+
 /**
  * Sampling rates per log level (0-100 percentage)
  */
@@ -10,6 +31,41 @@ export interface SamplingRates {
   debug?: number
   /** Percentage of error logs to keep (0-100). Default: 100 */
   error?: number
+}
+
+/**
+ * Tail sampling condition for forcing log retention based on request outcome.
+ * All conditions use >= comparison (e.g., status: 400 means status >= 400).
+ */
+export interface TailSamplingCondition {
+  /** Keep if HTTP status >= this value (e.g., 400 for all errors) */
+  status?: number
+  /** Keep if request duration >= this value in milliseconds */
+  duration?: number
+  /** Keep if path matches this glob pattern (e.g., '/api/critical/**') */
+  path?: string
+}
+
+/**
+ * Context passed to tail sampling evaluation and hooks.
+ * Contains request outcome information for sampling decisions.
+ */
+export interface TailSamplingContext {
+  /** HTTP response status code */
+  status?: number
+  /** Request duration in milliseconds (raw number) */
+  duration?: number
+  /** Request path */
+  path?: string
+  /** HTTP method */
+  method?: string
+  /** Full accumulated context from the request logger */
+  context: Record<string, unknown>
+  /**
+   * Set to true in evlog:emit:keep hook to force keep this log.
+   * Multiple hooks can set this - if any sets it to true, the log is kept.
+   */
+  shouldKeep?: boolean
 }
 
 /**
@@ -35,6 +91,25 @@ export interface SamplingConfig {
    * ```
    */
   rates?: SamplingRates
+
+  /**
+   * Tail sampling conditions for forcing log retention (OR logic).
+   * If ANY condition matches, the log is kept regardless of head sampling.
+   * Use the `evlog:emit:keep` Nitro hook for custom conditions.
+   *
+   * @example
+   * ```ts
+   * sampling: {
+   *   rates: { info: 10 },  // Head sampling: keep 10% of info logs
+   *   keep: [
+   *     { status: 400 },     // Always keep if status >= 400
+   *     { duration: 1000 },  // Always keep if duration >= 1000ms
+   *     { path: '/api/critical/**' },  // Always keep critical paths
+   *   ]
+   * }
+   * ```
+   */
+  keep?: TailSamplingCondition[]
 }
 
 /**
@@ -198,6 +273,10 @@ export interface H3EventContext {
   log?: RequestLogger
   requestId?: string
   status?: number
+  /** Internal: start time for duration calculation in tail sampling */
+  _evlogStartTime?: number
+  /** Internal: flag to prevent double emission on errors */
+  _evlogEmitted?: boolean
   [key: string]: unknown
 }
 
