@@ -1,11 +1,12 @@
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, ServerEvent } from '../types'
+import type { RequestLogger, SamplingConfig, ServerEvent } from '../types'
 
 interface EvlogConfig {
   env?: Record<string, unknown>
   pretty?: boolean
   include?: string[]
+  sampling?: SamplingConfig
 }
 
 function matchesPattern(path: string, pattern: string): boolean {
@@ -56,6 +57,7 @@ export default defineNitroPlugin((nitroApp) => {
   initLogger({
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
+    sampling: evlogConfig?.sampling,
   })
 
   nitroApp.hooks.hook('request', (event) => {

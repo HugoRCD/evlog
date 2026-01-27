@@ -6,7 +6,7 @@ import {
   createResolver,
   defineNuxtModule,
 } from '@nuxt/kit'
-import type { EnvironmentContext } from '../types'
+import type { EnvironmentContext, SamplingConfig } from '../types'
 
 export interface ModuleOptions {
   /**
@@ -27,6 +27,24 @@ export interface ModuleOptions {
    * @example ['/api/**', '/auth/**']
    */
   include?: string[]
+
+  /**
+   * Sampling configuration for filtering logs.
+   * Allows configuring what percentage of logs to keep per level.
+   *
+   * @example
+   * ```ts
+   * sampling: {
+   *   rates: {
+   *     info: 10,    // Keep 10% of info logs
+   *     warn: 50,    // Keep 50% of warning logs
+   *     debug: 5,    // Keep 5% of debug logs
+   *     error: 100,  // Always keep errors (default)
+   *   }
+   * }
+   * ```
+   */
+  sampling?: SamplingConfig
 }
 
 export default defineNuxtModule<ModuleOptions>({

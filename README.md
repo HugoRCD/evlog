@@ -98,6 +98,10 @@ export default defineNuxtConfig({
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
+    // Optional: sample logs to reduce volume at scale
+    sampling: {
+      rates: { info: 10, warn: 50, debug: 5 }, // error defaults to 100%
+    },
   },
 })
 ```
@@ -353,6 +357,14 @@ initLogger({
   },
   pretty?: boolean       // Pretty print (default: true in dev)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
+  sampling?: {
+    rates?: {
+      info?: number      // 0-100, default 100
+      warn?: number      // 0-100, default 100
+      debug?: number     // 0-100, default 100
+      error?: number     // 0-100, default 100 (always logged unless set to 0)
+    }
+  }
 })
 ```
 

@@ -1,4 +1,43 @@
 /**
+ * Sampling rates per log level (0-100 percentage)
+ */
+export interface SamplingRates {
+  /** Percentage of info logs to keep (0-100). Default: 100 */
+  info?: number
+  /** Percentage of warn logs to keep (0-100). Default: 100 */
+  warn?: number
+  /** Percentage of debug logs to keep (0-100). Default: 100 */
+  debug?: number
+  /** Percentage of error logs to keep (0-100). Default: 100 */
+  error?: number
+}
+
+/**
+ * Sampling configuration for filtering logs
+ */
+export interface SamplingConfig {
+  /**
+   * Sampling rates per log level (head sampling).
+   * Values are percentages from 0 to 100.
+   * Default: 100 for all levels (log everything).
+   * Error defaults to 100 even if not specified.
+   *
+   * @example
+   * ```ts
+   * sampling: {
+   *   rates: {
+   *     info: 10,    // Keep 10% of info logs
+   *     warn: 50,    // Keep 50% of warning logs
+   *     debug: 5,    // Keep 5% of debug logs
+   *     error: 100,  // Always keep errors (default)
+   *   }
+   * }
+   * ```
+   */
+  rates?: SamplingRates
+}
+
+/**
  * Environment context automatically included in every log event
  */
 export interface EnvironmentContext {
@@ -22,6 +61,8 @@ export interface LoggerConfig {
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
+  /** Sampling configuration for filtering logs */
+  sampling?: SamplingConfig
 }
 
 /**

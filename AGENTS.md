@@ -154,6 +154,15 @@ export default defineNuxtConfig({
     include: ['/api/**'],
     // Optional: force pretty printing (default: true in dev, false in prod)
     pretty: true,
+    // Optional: sample logs to reduce volume at scale
+    sampling: {
+      rates: {
+        info: 10,   // Keep 10% of info logs
+        warn: 50,   // Keep 50% of warning logs
+        debug: 5,   // Keep 5% of debug logs
+        // error defaults to 100% (always logged)
+      },
+    },
   },
 })
 ```
@@ -166,6 +175,7 @@ export default defineNuxtConfig({
 | `env.environment` | `string` | Auto-detected | Environment name |
 | `include` | `string[]` | `undefined` | Route patterns to log (glob). If not set, all routes are logged |
 | `pretty` | `boolean` | `true` in dev | Pretty print logs with tree formatting |
+| `sampling.rates` | `object` | `undefined` | Sampling rates per log level (0-100%). Error defaults to 100% |
 
 ### Nitro
 

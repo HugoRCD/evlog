@@ -14,6 +14,8 @@ export type {
   ParsedError,
   RequestLogger,
   RequestLoggerOptions,
+  SamplingConfig,
+  SamplingRates,
   ServerEvent,
   WideEvent,
 } from './types'

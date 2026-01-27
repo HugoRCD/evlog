@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createRequestLogger, getEnvironment, initLogger, log } from '../src/logger'
+import type { SamplingConfig } from '../src/types'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -224,5 +225,138 @@ describe('createRequestLogger', () => {
     const [[output]] = consoleSpy.mock.calls
     expect(output).toContain('"original":true')
     expect(output).toContain('"override":true')
+  })
+})
+
+describe('sampling', () => {
+  let consoleSpy: ReturnType<typeof vi.spyOn>
+  let errorSpy: ReturnType<typeof vi.spyOn>
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('logs everything when no sampling configured', () => {
+    initLogger({ pretty: false })
+
+    log.info('test', 'info message')
+    log.warn('test', 'warn message')
+    log.error('test', 'error message')
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('logs everything when sampling rates are 100%', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 100, warn: 100, debug: 100, error: 100 },
+      },
+    })
+
+    log.info('test', 'info message')
+    log.warn('test', 'warn message')
+    log.error('test', 'error message')
+
+    expect(consoleSpy).toHaveBeenCalledTimes(1)
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('skips all logs when sampling rate is 0%', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 0, warn: 0, debug: 0, error: 0 },
+      },
+    })
+
+    log.info('test', 'info message')
+    log.warn('test', 'warn message')
+    log.debug('test', 'debug message')
+    log.error('test', 'error message')
+
+    expect(consoleSpy).toHaveBeenCalledTimes(0)
+    expect(warnSpy).toHaveBeenCalledTimes(0)
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it('always logs errors by default even when other levels are sampled', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 0, warn: 0, debug: 0 }, // error not specified, should default to 100%
+      },
+    })
+
+    log.info('test', 'info message')
+    log.warn('test', 'warn message')
+    log.error('test', 'error message')
+
+    expect(consoleSpy).toHaveBeenCalledTimes(0)
+    expect(warnSpy).toHaveBeenCalledTimes(0)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('applies sampling to request logger emit', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 0 },
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.emit()
+
+    expect(consoleSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it('respects error rate for request logger with errors', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { error: 0 }, // Explicitly set error to 0%
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.error(new Error('test error'))
+    logger.emit()
+
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
+
+  it('samples probabilistically for rates between 0 and 100', () => {
+    // Mock Math.random to control the sampling outcome
+    const randomSpy = vi.spyOn(Math, 'random')
+
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 50 },
+      },
+    })
+
+    // Simulate random returning 0.3 (30%) - should log (30 < 50)
+    randomSpy.mockReturnValueOnce(0.3)
+    log.info('test', 'should log')
+    expect(consoleSpy).toHaveBeenCalledTimes(1)
+
+    // Simulate random returning 0.7 (70%) - should not log (70 >= 50)
+    randomSpy.mockReturnValueOnce(0.7)
+    log.info('test', 'should not log')
+    expect(consoleSpy).toHaveBeenCalledTimes(1) // Still 1, not logged
+
+    randomSpy.mockRestore()
   })
 })

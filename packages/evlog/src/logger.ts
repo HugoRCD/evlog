@@ -1,4 +1,4 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions } from './types'
+import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev } from './utils'
 
 let globalEnv: EnvironmentContext = {
@@ -7,6 +7,7 @@ let globalEnv: EnvironmentContext = {
 }
 
 let globalPretty = isDev()
+let globalSampling: SamplingConfig = {}
 
 /**
  * Initialize the logger with configuration.
@@ -24,9 +25,36 @@ export function initLogger(config: LoggerConfig = {}): void {
   }
 
   globalPretty = config.pretty ?? isDev()
+  globalSampling = config.sampling ?? {}
+}
+
+/**
+ * Determine if a log at the given level should be emitted based on sampling config.
+ * Error level defaults to 100% (always logged) unless explicitly configured otherwise.
+ */
+function shouldSample(level: LogLevel): boolean {
+  const { rates } = globalSampling
+  if (!rates) {
+    return true // No sampling configured, log everything
+  }
+
+  // Error defaults to 100% unless explicitly set
+  const percentage = level === 'error' && rates.error === undefined
+    ? 100
+    : rates[level] ?? 100
+
+  // 0% = never log, 100% = always log
+  if (percentage <= 0) return false
+  if (percentage >= 100) return true
+
+  return Math.random() * 100 < percentage
 }
 
 function emitWideEvent(level: LogLevel, event: Record<string, unknown>): void {
+  if (!shouldSample(level)) {
+    return
+  }
+
   const formatted = {
     timestamp: new Date().toISOString(),
     level,
