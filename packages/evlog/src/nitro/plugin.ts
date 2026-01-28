@@ -95,11 +95,10 @@ export default defineNitroPlugin((nitroApp) => {
       // Call evlog:emit:keep hook
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
+      e.context._evlogEmitted = true
+
       // Emit immediately since afterResponse might not run on errors
       log.emit({ _forceKeep: tailCtx.shouldKeep })
-
-      // Mark as emitted to prevent double emission
-      e.context._evlogEmitted = true
     }
   })
 

@@ -577,4 +577,40 @@ describe('tail sampling', () => {
 
     randomSpy.mockRestore()
   })
+
+  it('tail sampling keeps error-level logs that would be dropped by head sampling', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { error: 0 }, // Explicitly drop all error logs via head sampling
+        keep: [{ status: 500 }], // But keep via tail sampling if status >= 500
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.error(new Error('test error')) // Sets hasError = true, level = error
+    logger.set({ status: 500 })
+    logger.emit()
+
+    // Should be logged because tail sampling rescues it (status >= 500)
+    expect(errorSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('error-level logs respect head sampling when no tail conditions match', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { error: 0 }, // Drop all error logs
+        keep: [{ status: 500 }], // Only keep if status >= 500
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.error(new Error('test error'))
+    logger.set({ status: 400 }) // Status < 500, won't match tail condition
+    logger.emit()
+
+    // Should NOT be logged because head sampling drops it and tail condition doesn't match
+    expect(errorSpy).toHaveBeenCalledTimes(0)
+  })
 })
