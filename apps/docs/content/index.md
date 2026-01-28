@@ -8,9 +8,6 @@ seo:
 ::landing-hero
 ::
 
-::landing-comparison
-::
-
 ::landing-features
 ::
 

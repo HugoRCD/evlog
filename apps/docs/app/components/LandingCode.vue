@@ -1,140 +1,190 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
 
-const activeTab = ref<'code' | 'output'>('code')
-const activeErrorTab = ref<'code' | 'output'>('code')
+const prefersReducedMotion = ref(false)
+
+onMounted(() => {
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+})
 </script>
 
 <template>
-  <section class="relative py-32">
-    <div class="mx-auto max-w-5xl px-6">
+  <section class="bg-[#09090b] py-24 lg:py-32">
+    <div class="mx-auto w-full max-w-6xl px-6">
       <Motion
-        :initial="{ opacity: 0, y: 20 }"
+        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
         :in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5 }"
         :in-view-options="{ once: true }"
-        class="mb-16 text-center"
+        class="mb-12"
       >
-        <h2 class="editorial-title mb-6 text-3xl font-bold text-highlighted md:text-4xl">
-          Simple API<span class="evlog-dot">.</span>
+        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">Simple API</p>
+        <h2 class="editorial-title text-3xl font-bold text-white md:text-4xl max-w-lg">
+          Three lines of code.<br>Full observability<span class="evlog-dot">.</span>
         </h2>
-        <p class="mx-auto max-w-xl text-base text-muted">
-          Wide events with <code class="rounded bg-zinc-100 px-1 py-0.5 text-sm dark:bg-zinc-800">useLogger</code>. Structured errors with <code class="rounded bg-zinc-100 px-1 py-0.5 text-sm dark:bg-zinc-800">why</code>, <code class="rounded bg-zinc-100 px-1 py-0.5 text-sm dark:bg-zinc-800">fix</code>, and <code class="rounded bg-zinc-100 px-1 py-0.5 text-sm dark:bg-zinc-800">link</code>.
-        </p>
       </Motion>
 
-      <div class="grid gap-8 lg:grid-cols-2">
+      <div class="grid gap-6 lg:grid-cols-2">
         <Motion
-          :initial="{ opacity: 0, y: 20 }"
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
           :in-view="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.5 }"
+          :transition="{ duration: 0.5, delay: 0.1 }"
           :in-view-options="{ once: true }"
-          class="min-w-0"
         >
-          <div class="overflow-hidden border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
-              <div class="flex">
-                <button
-                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
-                  :class="activeTab === 'code' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
-                  @click="activeTab = 'code'"
-                >
-                  Code
-                </button>
-                <button
-                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
-                  :class="activeTab === 'output' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
-                  @click="activeTab = 'output'"
-                >
-                  Output
-                </button>
+          <div class="h-full overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
+            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div class="flex gap-1.5">
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
               </div>
-              <span class="px-4 text-xs text-muted">Wide Events</span>
+              <span class="ml-3 font-mono text-xs text-zinc-600">checkout.post.ts</span>
             </div>
+            <div class="p-5 font-mono text-sm leading-relaxed">
+              <pre><code><span class="text-violet-400">export default</span> <span class="text-amber-400">defineEventHandler</span>(<span class="text-violet-400">async</span> (event) => {
+  <span class="text-violet-400">const</span> log = <span class="text-amber-400">useLogger</span>(event)
 
-            <div class="overflow-hidden p-4">
-              <div v-show="activeTab === 'code'" class="overflow-x-auto">
-                <pre class="text-[13px] leading-relaxed"><code class="text-highlighted"><span class="text-zinc-500">// server/api/checkout.post.ts</span>
-<span class="text-violet-500">export default</span> <span class="text-amber-500">defineEventHandler</span>(<span class="text-violet-500">async</span> (event) => {
-  <span class="text-violet-500">const</span> log = <span class="text-amber-500">useLogger</span>(event)
+  log.<span class="text-amber-400">set</span>({ <span class="text-sky-400">user</span>: { <span class="text-sky-400">id</span>: user.id, <span class="text-sky-400">plan</span>: user.plan } })
+  log.<span class="text-amber-400">set</span>({ <span class="text-sky-400">cart</span>: { <span class="text-sky-400">items</span>: <span class="text-pink-400">3</span>, <span class="text-sky-400">total</span>: <span class="text-pink-400">9999</span> } })
 
-  log.<span class="text-amber-500">set</span>({ <span class="text-sky-400">user</span>: { <span class="text-sky-400">id</span>: <span class="text-pink-400">1</span>, <span class="text-sky-400">plan</span>: <span class="text-emerald-400">'pro'</span> } })
-  log.<span class="text-amber-500">set</span>({ <span class="text-sky-400">cart</span>: { <span class="text-sky-400">items</span>: <span class="text-pink-400">3</span>, <span class="text-sky-400">total</span>: <span class="text-pink-400">9999</span> } })
-
-  <span class="text-violet-500">return</span> { <span class="text-sky-400">success</span>: <span class="text-violet-500">true</span> }
+  <span class="text-violet-400">return</span> { <span class="text-sky-400">success</span>: <span class="text-violet-400">true</span> }
 })</code></pre>
-              </div>
-              <div v-show="activeTab === 'output'" class="log-output">
-                <div class="space-y-1">
-                  <div>
-                    <span class="log-level">[INFO]</span>
-                    <span class="log-method"> POST</span>
-                    <span class="log-path"> /api/checkout</span>
-                    <span class="log-duration"> (234ms)</span>
-                  </div>
-                  <div class="pl-4 text-zinc-500">
-                    <span class="log-key">user</span>: { <span class="log-key">id</span>: <span class="log-number">1</span>, <span class="log-key">plan</span>: <span class="log-string">'pro'</span> }
-                  </div>
-                  <div class="pl-4 text-zinc-500">
-                    <span class="log-key">cart</span>: { <span class="log-key">items</span>: <span class="log-number">3</span>, <span class="log-key">total</span>: <span class="log-number">9999</span> }
-                  </div>
-                  <div class="pl-4 text-zinc-500">
-                    <span class="log-key">status</span>: <span class="log-number">200</span>
-                  </div>
-                </div>
-              </div>
             </div>
           </div>
         </Motion>
 
         <Motion
-          :initial="{ opacity: 0, y: 20 }"
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
           :in-view="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.5, delay: 0.1 }"
+          :transition="{ duration: 0.5, delay: 0.2 }"
           :in-view-options="{ once: true }"
-          class="min-w-0"
         >
-          <div class="overflow-hidden border border-zinc-200 bg-white dark:border-zinc-800 dark:bg-zinc-950">
-            <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
-              <div class="flex">
-                <button
-                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
-                  :class="activeErrorTab === 'code' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
-                  @click="activeErrorTab = 'code'"
-                >
-                  Code
-                </button>
-                <button
-                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
-                  :class="activeErrorTab === 'output' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
-                  @click="activeErrorTab = 'output'"
-                >
-                  Response
-                </button>
+          <div class="h-full overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
+            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div class="flex gap-1.5">
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
               </div>
-              <span class="px-4 text-xs text-muted">Structured Errors</span>
+              <span class="ml-3 font-mono text-xs text-zinc-600">output</span>
+              <span class="ml-auto font-mono text-xs text-emerald-500">INFO</span>
             </div>
+            <div class="p-5 font-mono text-sm leading-relaxed">
+              <div class="mb-3 flex items-baseline gap-3">
+                <span class="text-emerald-500 font-medium">INFO</span>
+                <span class="text-violet-400">POST</span>
+                <span class="text-amber-400">/api/checkout</span>
+                <span class="ml-auto text-zinc-600">(234ms)</span>
+              </div>
+              <div class="space-y-1 pl-4 border-l-2 border-zinc-800">
+                <div>
+                  <span class="text-sky-400">user</span><span class="text-zinc-600">:</span>
+                  <span class="text-zinc-400"> { id: 1842, plan: "pro" }</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">cart</span><span class="text-zinc-600">:</span>
+                  <span class="text-zinc-400"> { items: 3, total: 9999 }</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">status</span><span class="text-zinc-600">:</span>
+                  <span class="text-emerald-400"> 200</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">requestId</span><span class="text-zinc-600">:</span>
+                  <span class="text-zinc-500"> "req_8f2k..."</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-3 border-t border-zinc-800">
+                <p class="text-xs text-zinc-500">
+                  <span class="text-emerald-500">✓</span> One log with full context
+                </p>
+              </div>
+            </div>
+          </div>
+        </Motion>
+      </div>
 
-            <div class="overflow-hidden p-4">
-              <div v-show="activeErrorTab === 'code'" class="overflow-x-auto">
-                <pre class="text-[13px] leading-relaxed"><code class="text-highlighted"><span class="text-violet-500">throw</span> <span class="text-amber-500">createError</span>({
+      <Motion
+        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :in-view="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.5, delay: 0.3 }"
+        :in-view-options="{ once: true }"
+        class="mt-12"
+      >
+        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">Structured Errors</p>
+        <h3 class="editorial-title text-2xl font-bold text-white md:text-3xl max-w-lg mb-6">
+          Errors that explain why<span class="evlog-dot">.</span>
+        </h3>
+      </Motion>
+
+      <div class="grid gap-6 lg:grid-cols-2">
+        <Motion
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+          :in-view="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.5, delay: 0.4 }"
+          :in-view-options="{ once: true }"
+        >
+          <div class="h-full overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
+            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div class="flex gap-1.5">
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
+              </div>
+              <span class="ml-3 font-mono text-xs text-zinc-600">payment.post.ts</span>
+            </div>
+            <div class="p-5 font-mono text-sm leading-relaxed">
+              <pre><code><span class="text-violet-400">throw</span> <span class="text-amber-400">createError</span>({
   <span class="text-sky-400">message</span>: <span class="text-emerald-400">'Payment failed'</span>,
   <span class="text-sky-400">status</span>: <span class="text-pink-400">402</span>,
   <span class="text-sky-400">why</span>: <span class="text-emerald-400">'Card declined by issuer'</span>,
-  <span class="text-sky-400">fix</span>: <span class="text-emerald-400">'Try a different payment method'</span>,
-  <span class="text-sky-400">link</span>: <span class="text-emerald-400">'https://docs.example.com/payments'</span>
+  <span class="text-sky-400">fix</span>: <span class="text-emerald-400">'Try a different card'</span>,
 })</code></pre>
+            </div>
+          </div>
+        </Motion>
+
+        <Motion
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+          :in-view="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.5, delay: 0.5 }"
+          :in-view-options="{ once: true }"
+        >
+          <div class="h-full overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
+            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+              <div class="flex gap-1.5">
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
+                <div class="size-3 rounded-full bg-zinc-700" />
               </div>
-              <div v-show="activeErrorTab === 'output'" class="log-output overflow-x-auto">
-                <pre class="text-[13px] leading-relaxed"><code>{
-  <span class="log-key">"statusCode"</span>: <span class="log-number">402</span>,
-  <span class="log-key">"message"</span>: <span class="log-string">"Payment failed"</span>,
-  <span class="log-key">"data"</span>: {
-    <span class="log-key">"why"</span>: <span class="log-string">"Card declined by issuer"</span>,
-    <span class="log-key">"fix"</span>: <span class="log-string">"Try a different payment method"</span>,
-    <span class="log-key">"link"</span>: <span class="log-string">"https://docs.example.com/payments"</span>
-  }
-}</code></pre>
+              <span class="ml-3 font-mono text-xs text-zinc-600">output</span>
+              <span class="ml-auto font-mono text-xs text-red-500">ERROR</span>
+            </div>
+            <div class="p-5 font-mono text-sm leading-relaxed">
+              <div class="mb-3 flex items-baseline gap-3">
+                <span class="text-red-500 font-medium">ERROR</span>
+                <span class="text-violet-400">POST</span>
+                <span class="text-amber-400">/api/payment</span>
+                <span class="ml-auto text-red-500">402</span>
+              </div>
+              <div class="space-y-1 pl-4 border-l-2 border-red-500/30">
+                <div>
+                  <span class="text-sky-400">message</span><span class="text-zinc-600">:</span>
+                  <span class="text-zinc-400"> "Payment failed"</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">why</span><span class="text-zinc-600">:</span>
+                  <span class="text-zinc-400"> "Card declined by issuer"</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">fix</span><span class="text-zinc-600">:</span>
+                  <span class="text-emerald-400"> "Try a different card"</span>
+                </div>
+              </div>
+              <div class="mt-4 pt-3 border-t border-zinc-800">
+                <p class="text-xs text-zinc-500">
+                  <span class="text-emerald-500">✓</span> Actionable error messages
+                </p>
               </div>
             </div>
           </div>
