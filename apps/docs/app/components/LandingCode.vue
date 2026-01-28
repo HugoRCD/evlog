@@ -35,14 +35,14 @@ const activeErrorTab = ref<'code' | 'output'>('code')
             <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
               <div class="flex">
                 <button
-                  class="px-4 py-2.5 text-sm font-medium transition-colors"
+                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
                   :class="activeTab === 'code' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
                   @click="activeTab = 'code'"
                 >
                   Code
                 </button>
                 <button
-                  class="px-4 py-2.5 text-sm font-medium transition-colors"
+                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
                   :class="activeTab === 'output' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
                   @click="activeTab = 'output'"
                 >
@@ -98,14 +98,14 @@ const activeErrorTab = ref<'code' | 'output'>('code')
             <div class="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800">
               <div class="flex">
                 <button
-                  class="px-4 py-2.5 text-sm font-medium transition-colors"
+                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
                   :class="activeErrorTab === 'code' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
                   @click="activeErrorTab = 'code'"
                 >
                   Code
                 </button>
                 <button
-                  class="px-4 py-2.5 text-sm font-medium transition-colors"
+                  class="px-4 py-2.5 text-sm font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-inset"
                   :class="activeErrorTab === 'output' ? 'bg-zinc-100 text-highlighted dark:bg-zinc-900' : 'text-muted hover:text-highlighted'"
                   @click="activeErrorTab = 'output'"
                 >

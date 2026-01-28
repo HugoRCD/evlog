@@ -1,6 +1,12 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
 
+const prefersReducedMotion = ref(false)
+
+onMounted(() => {
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+})
+
 const features = [
   {
     icon: 'i-lucide-layers',
@@ -13,14 +19,9 @@ const features = [
     description: 'Errors with why, fix, and link fields. Actionable context for debugging and resolution.',
   },
   {
-    icon: 'i-lucide-git-branch',
-    title: 'Request Scoping',
-    description: 'Accumulate context throughout the request lifecycle. Emit once at the end with complete data.',
-  },
-  {
-    icon: 'i-lucide-palette',
-    title: 'Pretty for Dev, JSON for Prod',
-    description: 'Human-readable logs in development, machine-parseable JSON in production.',
+    icon: 'i-lucide-bot',
+    title: 'Agent-Ready Logs',
+    description: 'Structured output that AI agents can parse and understand. Perfect for agentic debugging and automated issue resolution.',
   },
   {
     icon: 'i-lucide-zap',
@@ -28,9 +29,14 @@ const features = [
     description: 'First-class integration with Nuxt and Nitro. Auto-create loggers, auto-emit at request end.',
   },
   {
-    icon: 'i-lucide-bot',
-    title: 'Agent-Ready',
-    description: 'Structured output that AI agents can parse. Perfect for automated debugging in the agentic era.',
+    icon: 'i-lucide-filter',
+    title: 'Smart Sampling',
+    description: 'Head and tail sampling strategies. Keep errors, slow requests, and critical paths while reducing volume.',
+  },
+  {
+    icon: 'i-lucide-palette',
+    title: 'Pretty for Dev, JSON for Prod',
+    description: 'Human-readable logs in development, machine-parseable JSON in production.',
   },
 ]
 </script>
@@ -41,16 +47,16 @@ const features = [
 
     <div class="mx-auto max-w-5xl px-6">
       <Motion
-        :initial="{ opacity: 0, y: 20 }"
+        :initial="prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }"
         :in-view="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.5 }"
+        :transition="{ duration: prefersReducedMotion ? 0 : 0.5 }"
         :in-view-options="{ once: true }"
         class="mb-20 text-center"
       >
-        <h2 class="editorial-title mb-6 text-4xl font-bold text-highlighted md:text-5xl">
+        <h2 class="editorial-title mb-6 text-4xl font-bold text-highlighted md:text-5xl text-balance">
           Why evlog<span class="evlog-dot">.</span>
         </h2>
-        <p class="mx-auto max-w-xl text-lg text-muted">
+        <p class="mx-auto max-w-xl text-lg text-muted text-pretty">
           Traditional logging is broken. Your logs are scattered, each request generates 10+ log lines,
           and when something goes wrong, you're grep-ing through noise hoping to find signal.
         </p>
@@ -60,9 +66,9 @@ const features = [
         <Motion
           v-for="(feature, index) in features"
           :key="feature.title"
-          :initial="{ opacity: 0, y: 16 }"
+          :initial="prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 16 }"
           :in-view="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.4, delay: index * 0.08 }"
+          :transition="{ duration: prefersReducedMotion ? 0 : 0.4, delay: prefersReducedMotion ? 0 : index * 0.08 }"
           :in-view-options="{ once: true }"
           class="group"
         >

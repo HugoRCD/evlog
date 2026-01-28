@@ -2,6 +2,12 @@
 import { ref, onMounted, onUnmounted, nextTick } from 'vue'
 import { Motion } from 'motion-v'
 
+const prefersReducedMotion = ref(false)
+
+onMounted(() => {
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+})
+
 const mode = ref<'chaos' | 'clarity'>('chaos')
 const isPaused = ref(false)
 const chaosScrollRef = ref<HTMLElement | null>(null)
@@ -203,12 +209,12 @@ onUnmounted(() => {
 </script>
 
 <template>
-  <section class="relative py-32">
+  <section id="problem" class="relative py-32">
     <div class="mx-auto max-w-4xl px-6">
       <Motion
-        :initial="{ opacity: 0, y: 20 }"
+        :initial="prefersReducedMotion ? { opacity: 1, y: 0 } : { opacity: 0, y: 20 }"
         :in-view="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.5 }"
+        :transition="{ duration: prefersReducedMotion ? 0 : 0.5 }"
         :in-view-options="{ once: true }"
         class="mb-12 text-center"
       >
@@ -224,7 +230,7 @@ onUnmounted(() => {
       <div class="dark overflow-hidden rounded-lg border border-muted bg-[#09090b]">
         <div class="flex border-b border-muted">
           <button
-            class="flex-1 px-4 py-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-muted"
+            class="flex-1 px-4 py-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
             :class="mode === 'chaos'
               ? 'bg-accented text-highlighted'
               : 'text-muted hover:text-toned'"
@@ -233,7 +239,7 @@ onUnmounted(() => {
             Traditional Logging
           </button>
           <button
-            class="flex-1 border-l border-muted px-4 py-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-1 focus-visible:ring-muted"
+            class="flex-1 border-l border-muted px-4 py-2.5 text-xs font-medium outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
             :class="mode === 'clarity'
               ? 'bg-accented text-highlighted'
               : 'text-muted hover:text-toned'"
@@ -242,13 +248,13 @@ onUnmounted(() => {
             Wide Events
           </button>
           <button
-            class="border-l border-muted px-3 py-2.5 text-xs outline-none transition-colors focus-visible:ring-1 focus-visible:ring-muted"
+            class="border-l border-muted px-3 py-2.5 text-xs outline-none transition-colors focus-visible:ring-2 focus-visible:ring-evlog-blue focus-visible:ring-offset-1 focus-visible:ring-offset-zinc-900"
             :class="isPaused ? 'text-success' : 'text-muted hover:text-toned'"
-            :title="isPaused ? 'Resume' : 'Pause'"
+            :aria-label="isPaused ? 'Resume animation' : 'Pause animation'"
             @click="togglePause"
           >
-            <span v-if="isPaused">▶</span>
-            <span v-else>⏸</span>
+            <span v-if="isPaused" aria-hidden="true">▶</span>
+            <span v-else aria-hidden="true">⏸</span>
           </button>
         </div>
 

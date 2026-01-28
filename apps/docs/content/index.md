@@ -8,10 +8,10 @@ seo:
 ::landing-hero
 ::
 
-::landing-features
+::landing-comparison
 ::
 
-::landing-comparison
+::landing-features
 ::
 
 ::landing-code
