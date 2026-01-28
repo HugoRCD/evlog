@@ -1,2 +1,9 @@
 title: Core Concepts
 icon: i-lucide-book-open
+items:
+  - title: Wide Events
+    path: /core-concepts/wide-events
+  - title: Structured Errors
+    path: /core-concepts/structured-errors
+  - title: Best Practices
+    path: /core-concepts/best-practices

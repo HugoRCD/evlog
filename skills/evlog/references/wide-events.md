@@ -273,6 +273,103 @@ export default defineEventHandler(async (event) => {
 - Forget to call `emit()` (or use the Nuxt module for auto-emit)
 - Include debugging logs inside wide events (remove them)
 
+## Security: Preventing Sensitive Data Leakage
+
+Wide events capture comprehensive context, making it easy to accidentally log sensitive data. Follow these guidelines to prevent data leakage.
+
+### What NOT to Log
+
+| Category | Examples | Risk |
+|----------|----------|------|
+| Credentials | Passwords, API keys, tokens, secrets | Account compromise |
+| Payment data | Full card numbers, CVV, bank accounts | PCI compliance violation |
+| Personal data (PII) | SSN, passport numbers, driver's license | Privacy laws (GDPR, CCPA) |
+| Health data | Medical records, diagnoses | HIPAA violation |
+| Authentication | Session tokens, JWTs, refresh tokens | Session hijacking |
+
+### Safe Logging Pattern
+
+Always explicitly select which fields to log:
+
+```typescript
+// ❌ DANGEROUS - logs everything including password
+const body = await readBody(event)
+log.set({ user: body })
+
+// ✅ SAFE - explicitly select fields
+const body = await readBody(event)
+log.set({
+  user: {
+    id: body.id,
+    email: maskEmail(body.email),
+    // password: body.password ← NEVER include
+  },
+})
+```
+
+### Sanitization Helpers
+
+Create utility functions for common data types:
+
+```typescript
+// server/utils/sanitize.ts
+
+/** Masks email: john.doe@example.com → j***@e***.com */
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split('@')
+  if (!domain) return '***'
+  const [domainName, tld] = domain.split('.')
+  return `${local[0]}***@${domainName[0]}***.${tld}`
+}
+
+/** Masks card number: 4242424242424242 → ****4242 */
+export function maskCard(card: string): string {
+  return `****${card.slice(-4)}`
+}
+
+/** Removes sensitive fields from an object */
+export function sanitize<T extends Record<string, unknown>>(
+  obj: T,
+  sensitiveKeys = ['password', 'token', 'secret', 'apiKey']
+): Partial<T> {
+  const result = { ...obj }
+  for (const key of sensitiveKeys) {
+    if (key in result) delete result[key]
+  }
+  return result
+}
+```
+
+### Drain Hook Safety Net
+
+As a last line of defense, filter before sending to external services:
+
+```typescript
+// server/plugins/evlog-sanitize.ts
+const SENSITIVE_KEYS = ['password', 'token', 'secret', 'apiKey', 'authorization']
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', (ctx) => {
+    for (const key of Object.keys(ctx.event)) {
+      if (SENSITIVE_KEYS.some(k => key.toLowerCase().includes(k))) {
+        ctx.event[key] = '[REDACTED]'
+      }
+    }
+  })
+})
+```
+
+### Production Checklist
+
+Before deploying, verify:
+
+- [ ] No passwords or secrets in logs
+- [ ] No full credit card numbers (only last 4 digits)
+- [ ] No API keys or tokens
+- [ ] PII is masked or omitted (emails, phone numbers)
+- [ ] Session tokens are not logged
+- [ ] Request bodies are selectively logged (not `log.set({ body })`)
+
 ## Field Naming Conventions
 
 Use consistent, descriptive field names:

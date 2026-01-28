@@ -36,6 +36,27 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
 
+## Important: Auto-imports in Nuxt
+
+In Nuxt applications, all evlog functions are **auto-imported** - no import statements needed:
+
+```typescript
+// server/api/checkout.post.ts
+export default defineEventHandler(async (event) => {
+  // useLogger is auto-imported - no import needed!
+  const log = useLogger(event)
+  log.set({ user: { id: 1, plan: 'pro' } })
+  return { success: true }
+})
+```
+
+```vue
+<!-- In Vue components - log is auto-imported -->
+<script setup>
+log.info('checkout', 'User initiated checkout')
+</script>
+```
+
 ## Core Philosophy
 
 ### The Problem with Traditional Logging
@@ -53,11 +74,11 @@ console.log('Payment failed')
 
 ```typescript
 // server/api/checkout.post.ts
-import { useLogger } from 'evlog'
+// No import needed in Nuxt - useLogger is auto-imported!
 
 // ✅ One comprehensive event per request
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event)  // Auto-injected by evlog
+  const log = useLogger(event)
 
   log.set({ user: { id: '123', plan: 'premium' } })
   log.set({ cart: { items: 3, total: 9999 } })
@@ -136,11 +157,11 @@ export default defineEventHandler(async (event) => {
 
 ```typescript
 // server/api/orders.post.ts
-import { useLogger } from 'evlog'
+// useLogger is auto-imported in Nuxt - no import needed!
 
 // ✅ Request-scoped with full context
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event)  // Auto-injected
+  const log = useLogger(event)
 
   const user = await getUser(event)
   log.set({ user: { id: user.id, plan: user.plan } })
@@ -268,6 +289,64 @@ try {
 
 **The difference**: A generic error shows "An error occurred". A structured error shows the message, explains why, suggests a fix, and links to docs.
 
+## Client-Side Logging
+
+The `log` API works on both server and client. In Nuxt, it's auto-imported:
+
+```typescript
+// In Vue components, composables, or client-side code
+log.info('checkout', 'User initiated checkout')
+log.error({ action: 'payment', error: 'validation_failed' })
+log.warn('form', 'Invalid email format')
+log.debug({ component: 'CartDrawer', itemCount: 3 })
+```
+
+Client logs output to the browser console with colored tags in development. Use for debugging - for production analytics, recommend dedicated services.
+
+## Security: Preventing Sensitive Data Leakage
+
+Wide events capture comprehensive context, making it easy to accidentally log sensitive data.
+
+### What NOT to Log
+
+| Category | Examples | Risk |
+|----------|----------|------|
+| Credentials | Passwords, API keys, tokens | Account compromise |
+| Payment data | Full card numbers, CVV | PCI violation |
+| Personal data (PII) | SSN, unmasked emails | GDPR/CCPA violation |
+| Authentication | Session tokens, JWTs | Session hijacking |
+
+### Safe Logging Pattern
+
+```typescript
+// ❌ DANGEROUS - logs everything including password
+const body = await readBody(event)
+log.set({ user: body })
+
+// ✅ SAFE - explicitly select fields
+log.set({
+  user: {
+    id: body.id,
+    plan: body.plan,
+    // password: body.password ← NEVER include
+  },
+})
+```
+
+### Sanitization Helpers
+
+```typescript
+// server/utils/sanitize.ts
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split('@')
+  return `${local[0]}***@${domain}`
+}
+
+export function maskCard(card: string): string {
+  return `****${card.slice(-4)}`
+}
+```
+
 ## Review Checklist
 
 When reviewing code, check for:
@@ -278,6 +357,8 @@ When reviewing code, check for:
 4. **Missing context** → Add user, business, and outcome context with `log.set()`
 5. **No duration tracking** → Let `emit()` handle it automatically
 6. **No frontend error handling** → Catch errors and display toasts with structured data
+7. **Sensitive data in logs** → Check for passwords, tokens, full card numbers, PII
+8. **Client-side logging** → Use `log` API for debugging in Vue components
 
 ## Loading Reference Files
 

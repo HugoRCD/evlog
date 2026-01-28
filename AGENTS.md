@@ -288,6 +288,69 @@ When creating errors with `createError()`:
 - Document public APIs with JSDoc comments
 - **No HTML comments in Vue templates** - Never use `<!-- comment -->` in `<template>` blocks. The code should be self-explanatory.
 
+### Security: Preventing Sensitive Data Leakage
+
+Wide events capture comprehensive context, making it easy to accidentally log sensitive data. **Never log:**
+
+| Category | Examples | Risk |
+|----------|----------|------|
+| Credentials | Passwords, API keys, tokens, secrets | Account compromise |
+| Payment data | Full card numbers, CVV, bank accounts | PCI compliance violation |
+| Personal data (PII) | SSN, passport numbers, emails (unmasked) | Privacy laws (GDPR, CCPA) |
+| Authentication | Session tokens, JWTs, refresh tokens | Session hijacking |
+
+**Safe logging pattern** - explicitly select which fields to log:
+
+```typescript
+// ❌ DANGEROUS - logs everything including password
+const body = await readBody(event)
+log.set({ user: body })
+
+// ✅ SAFE - explicitly select fields
+log.set({
+  user: {
+    id: body.id,
+    plan: body.plan,
+    // password: body.password ← NEVER include
+  },
+})
+```
+
+**Sanitization helpers** - create utilities for masking data:
+
+```typescript
+// server/utils/sanitize.ts
+export function maskEmail(email: string): string {
+  const [local, domain] = email.split('@')
+  if (!domain) return '***'
+  return `${local[0]}***@${domain[0]}***.${domain.split('.')[1]}`
+}
+
+export function maskCard(card: string): string {
+  return `****${card.slice(-4)}`
+}
+```
+
+**Production checklist**:
+
+- [ ] No passwords or secrets in logs
+- [ ] No full credit card numbers (only last 4 digits)
+- [ ] No API keys or tokens
+- [ ] PII is masked or omitted
+- [ ] Request bodies are selectively logged (not `log.set({ body })`)
+
+### Client-Side Logging
+
+The `log` API also works on the client side (auto-imported in Nuxt):
+
+```typescript
+// In a Vue component or composable
+log.info('checkout', 'User initiated checkout')
+log.error({ action: 'payment', error: 'validation_failed' })
+```
+
+Client logs output to the browser console with colored tags in development. Use for debugging and development - for production analytics, use dedicated services.
+
 ## Publishing
 
 ```bash
