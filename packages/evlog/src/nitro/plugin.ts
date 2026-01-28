@@ -1,6 +1,7 @@
+import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, SamplingConfig, ServerEvent, TailSamplingContext } from '../types'
+import type { RequestLogger, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
 
 interface EvlogConfig {
@@ -36,6 +37,17 @@ function getResponseStatus(event: ServerEvent): number {
   }
 
   return 200
+}
+
+function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event: ServerEvent): void {
+  if (emittedEvent) {
+    nitroApp.hooks.callHook('evlog:drain', {
+      event: emittedEvent,
+      request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+    }).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    })
+  }
 }
 
 export default defineNitroPlugin((nitroApp) => {
@@ -98,15 +110,7 @@ export default defineNitroPlugin((nitroApp) => {
       e.context._evlogEmitted = true
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-
-      if (emittedEvent) {
-        nitroApp.hooks.callHook('evlog:drain', {
-          event: emittedEvent,
-          request: { method: e.method, path: e.path, requestId: e.context.requestId as string | undefined },
-        }).catch((err) => {
-          console.error('[evlog] drain failed:', err)
-        })
-      }
+      callDrainHook(nitroApp, emittedEvent, e)
     }
   })
 
@@ -135,15 +139,7 @@ export default defineNitroPlugin((nitroApp) => {
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-
-      if (emittedEvent) {
-        nitroApp.hooks.callHook('evlog:drain', {
-          event: emittedEvent,
-          request: { method: e.method, path: e.path, requestId: e.context.requestId as string | undefined },
-        }).catch((err) => {
-          console.error('[evlog] drain failed:', err)
-        })
-      }
+      callDrainHook(nitroApp, emittedEvent, e)
     }
   })
 })

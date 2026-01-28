@@ -225,6 +225,54 @@ describe('createRequestLogger', () => {
     expect(output).toContain('"original":true')
     expect(output).toContain('"override":true')
   })
+
+  it('returns WideEvent when log is emitted', () => {
+    const logger = createRequestLogger({
+      method: 'GET',
+      path: '/api/test',
+    })
+
+    logger.set({ user: { id: '123' } })
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('timestamp')
+    expect(result).toHaveProperty('level', 'info')
+    expect(result).toHaveProperty('method', 'GET')
+    expect(result).toHaveProperty('path', '/api/test')
+    expect(result).toHaveProperty('user', { id: '123' })
+  })
+
+  it('returns null when log is sampled out', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 0 },
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+  })
+
+  it('returns null when head sampling excludes the log', () => {
+    const randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.9)
+
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 50 },
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+    randomSpy.mockRestore()
+  })
 })
 
 describe('sampling', () => {
