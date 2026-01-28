@@ -97,8 +97,16 @@ export default defineNitroPlugin((nitroApp) => {
 
       e.context._evlogEmitted = true
 
-      // Emit immediately since afterResponse might not run on errors
-      log.emit({ _forceKeep: tailCtx.shouldKeep })
+      const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
+
+      if (emittedEvent) {
+        nitroApp.hooks.callHook('evlog:drain', {
+          event: emittedEvent,
+          request: { method: e.method, path: e.path, requestId: e.context.requestId as string | undefined },
+        }).catch((err) => {
+          console.error('[evlog] drain failed:', err)
+        })
+      }
     }
   })
 
@@ -126,7 +134,16 @@ export default defineNitroPlugin((nitroApp) => {
 
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
-      log.emit({ _forceKeep: tailCtx.shouldKeep })
+      const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
+
+      if (emittedEvent) {
+        nitroApp.hooks.callHook('evlog:drain', {
+          event: emittedEvent,
+          request: { method: e.method, path: e.path, requestId: e.context.requestId as string | undefined },
+        }).catch((err) => {
+          console.error('[evlog] drain failed:', err)
+        })
+      }
     }
   })
 })

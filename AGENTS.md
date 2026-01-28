@@ -205,6 +205,27 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
+#### Log Draining
+
+Use the `evlog:drain` hook to send logs to external services like Axiom, Loki, or custom endpoints.
+
+```typescript
+// server/plugins/evlog-axiom.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await fetch('https://api.axiom.co/v1/datasets/logs/ingest', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${process.env.AXIOM_TOKEN}` },
+      body: JSON.stringify([ctx.event])
+    })
+  })
+})
+```
+
+The `DrainContext` contains:
+- `event`: The complete `WideEvent` with all fields (timestamp, level, service, etc.)
+- `request`: Optional request metadata (`method`, `path`, `requestId`)
+
 **Tip:** Use `$production` to sample only in production:
 
 ```typescript

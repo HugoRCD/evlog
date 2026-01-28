@@ -16,6 +16,24 @@ declare module 'nitropack/types' {
      * ```
      */
     'evlog:emit:keep': (ctx: TailSamplingContext) => void | Promise<void>
+
+    /**
+     * Drain hook - called after emitting a log (fire-and-forget).
+     * Use this to send logs to external services like Axiom, Loki, or custom endpoints.
+     * Errors are logged but never block the request.
+     *
+     * @example
+     * ```ts
+     * nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+     *   await fetch('https://api.axiom.co/v1/datasets/logs/ingest', {
+     *     method: 'POST',
+     *     headers: { Authorization: `Bearer ${process.env.AXIOM_TOKEN}` },
+     *     body: JSON.stringify([ctx.event])
+     *   })
+     * })
+     * ```
+     */
+    'evlog:drain': (ctx: DrainContext) => void | Promise<void>
   }
 }
 
@@ -66,6 +84,21 @@ export interface TailSamplingContext {
    * Multiple hooks can set this - if any sets it to true, the log is kept.
    */
   shouldKeep?: boolean
+}
+
+/**
+ * Context passed to the evlog:drain hook.
+ * Contains the complete wide event and request metadata for external transport.
+ */
+export interface DrainContext {
+  /** The complete wide event to drain */
+  event: WideEvent
+  /** Request metadata (if available) */
+  request?: {
+    method?: string
+    path?: string
+    requestId?: string
+  }
 }
 
 /**
@@ -181,9 +214,10 @@ export interface RequestLogger {
   error: (error: Error | string, context?: Record<string, unknown>) => void
 
   /**
-   * Emit the final wide event with all accumulated context
+   * Emit the final wide event with all accumulated context.
+   * Returns the emitted WideEvent, or null if the log was sampled out.
    */
-  emit: (overrides?: Record<string, unknown>) => void
+  emit: (overrides?: Record<string, unknown>) => WideEvent | null
 
   /**
    * Get the current accumulated context

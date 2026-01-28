@@ -1,4 +1,4 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext } from './types'
+import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 let globalEnv: EnvironmentContext = {
@@ -72,12 +72,12 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): void {
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
   if (!skipSamplingCheck && !shouldSample(level)) {
-    return
+    return null
   }
 
-  const formatted = {
+  const formatted: WideEvent = {
     timestamp: new Date().toISOString(),
     level,
     ...globalEnv,
@@ -89,6 +89,8 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
   } else {
     console[getConsoleMethod(level)](JSON.stringify(formatted))
   }
+
+  return formatted
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
@@ -232,7 +234,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       }
     },
 
-    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): void {
+    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'
@@ -254,14 +256,14 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
 
       // Apply head sampling only if not force-kept
       if (!forceKeep && !shouldSample(level)) {
-        return
+        return null
       }
 
-      emitWideEvent(level, {
+      return emitWideEvent(level, {
         ...context,
         ...restOverrides,
         duration,
-      }, true) // Skip head sampling check (already done above)
+      }, true)
     },
 
     getContext(): Record<string, unknown> {
