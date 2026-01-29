@@ -18,7 +18,9 @@ onMounted(() => {
           :transition="{ duration: 0.5 }"
           :in-view-options="{ once: true }"
         >
-          <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">Get Started</p>
+          <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">
+            Get Started
+          </p>
           <h2 class="editorial-title mb-6 text-3xl font-bold text-white md:text-4xl lg:text-5xl">
             Stop grep-ing through chaos<span class="evlog-dot">.</span>
           </h2>

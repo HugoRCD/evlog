@@ -18,7 +18,9 @@ onMounted(() => {
         :in-view-options="{ once: true }"
         class="mb-12"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">Simple API</p>
+        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">
+          Simple API
+        </p>
         <h2 class="editorial-title text-3xl font-bold text-white md:text-4xl max-w-lg">
           Three lines of code.<br>Full observability<span class="evlog-dot">.</span>
         </h2>
@@ -111,7 +113,9 @@ onMounted(() => {
         :in-view-options="{ once: true }"
         class="mt-12"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">Structured Errors</p>
+        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-zinc-500">
+          Structured Errors
+        </p>
         <h3 class="editorial-title text-2xl font-bold text-white md:text-3xl max-w-lg mb-6">
           Errors that explain why<span class="evlog-dot">.</span>
         </h3>
