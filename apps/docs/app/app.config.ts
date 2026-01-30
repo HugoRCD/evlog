@@ -1,4 +1,7 @@
 export default defineAppConfig({
+  github: {
+    rootDir: 'apps/docs',
+  },
   seo: {
     titleTemplate: '%s - evlog',
     title: 'evlog',
