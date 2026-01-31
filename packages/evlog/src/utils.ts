@@ -15,13 +15,6 @@ export function isClient(): boolean {
   return typeof window !== 'undefined'
 }
 
-export function isDev(): boolean {
-  if (typeof process !== 'undefined' && process.env.NODE_ENV) {
-    return process.env.NODE_ENV !== 'production'
-  }
-  return true
-}
-
 export function detectEnvironment(): Partial<EnvironmentContext> {
   const env = typeof process !== 'undefined' ? process.env : {}
 

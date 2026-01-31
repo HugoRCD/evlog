@@ -1,0 +1,15 @@
+{
+  "private": true,
+  "type": "module",
+  "name": "worker-playground",
+  "scripts": {
+    "dev": "wrangler dev",
+    "gen:types": "wrangler types"
+  },
+  "dependencies": {
+    "evlog": "workspace:*"
+  },
+  "devDependencies": {
+    "wrangler": "^4.61.1"
+  }
+}

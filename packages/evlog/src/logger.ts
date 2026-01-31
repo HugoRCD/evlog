@@ -1,12 +1,13 @@
+import { isDevelopment } from 'std-env'
 import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
-import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
+import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, matchesPattern } from './utils'
 
 let globalEnv: EnvironmentContext = {
   service: 'app',
   environment: 'development',
 }
 
-let globalPretty = isDev()
+let globalPretty = isDevelopment
 let globalSampling: SamplingConfig = {}
 
 /**
@@ -24,7 +25,7 @@ export function initLogger(config: LoggerConfig = {}): void {
     region: config.env?.region ?? detected.region,
   }
 
-  globalPretty = config.pretty ?? isDev()
+  globalPretty = config.pretty ?? isDevelopment
   globalSampling = config.sampling ?? {}
 }
 
