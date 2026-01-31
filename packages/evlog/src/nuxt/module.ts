@@ -79,7 +79,7 @@ export default defineNuxtModule<ModuleOptions>({
   setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
 
-    const transportEnabled = options.transport?.enabled ?? !nuxt.options.dev
+    const transportEnabled = options.transport?.enabled ?? false
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
 
     nuxt.options.runtimeConfig.evlog = options
