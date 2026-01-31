@@ -24,10 +24,6 @@ export class EvlogError extends HTTPError {
   readonly fix?: string
   readonly link?: string
 
-  override get name(): string {
-    return 'EvlogError'
-  }
-
   constructor(options: ErrorOptions | string) {
     const opts = typeof options === 'string' ? { message: options } : options
 
@@ -35,9 +31,11 @@ export class EvlogError extends HTTPError {
       ? { why: opts.why, fix: opts.fix, link: opts.link }
       : undefined
 
-    super(opts.message, { cause: opts.cause, body })
+    const statusCode = opts.status ?? 500
 
-    this.status = opts.status ?? 500
+    super(opts.message, { cause: opts.cause, body, statusCode })
+
+    this.status = statusCode
     this.why = opts.why
     this.fix = opts.fix
     this.link = opts.link

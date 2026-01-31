@@ -104,12 +104,14 @@ export default definePlugin((nitroApp) => {
 
       // Drain hook integration
       if (emittedEvent) {
-        (nitroApp.hooks as any).callHook('evlog:drain', {
-          event: emittedEvent,
-          request: { method: e.req.method, path: pathname, requestId: e.req.context.requestId as string | undefined },
-        }).catch((err: Error) => {
+        try {
+          await nitroApp.hooks.callHook('evlog:drain', {
+            event: emittedEvent,
+            request: { method: e.req.method, path: pathname, requestId: e.req.context.requestId as string | undefined },
+          })
+        } catch (err) {
           console.error('[evlog] drain failed:', err)
-        })
+        }
       }
     }
   })
@@ -147,12 +149,14 @@ export default definePlugin((nitroApp) => {
 
       // Drain hook integration
       if (emittedEvent) {
-        await nitroApp.hooks.callHook('evlog:drain', {
-          event: emittedEvent,
-          request: { method: e.req.method, path: pathname, requestId: e.req.context.requestId as string | undefined },
-        }).catch((err: Error) => {
+        try {
+          await nitroApp.hooks.callHook('evlog:drain', {
+            event: emittedEvent,
+            request: { method: e.req.method, path: pathname, requestId: e.req.context.requestId as string | undefined },
+          })
+        } catch (err) {
           console.error('[evlog] drain failed:', err)
-        })
+        }
       }
     }
   })
