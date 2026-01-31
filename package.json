@@ -12,6 +12,7 @@
   "scripts": {
     "dev": "turbo run dev --filter=evlog-playground",
     "dev:nitro": "turbo run dev --filter=evlog-nitro-playground",
+    "dev:nitro:v3": "turbo run dev --filter=evlog-nitro-v3-playground",
     "dev:prepare": "turbo run dev:prepare",
     "dev:docs": "turbo run dev --filter=evlog-docs",
     "docs": "turbo run dev --filter=evlog-docs",

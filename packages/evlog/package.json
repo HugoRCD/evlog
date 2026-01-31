@@ -34,6 +34,10 @@
     "./nitro": {
       "types": "./dist/nitro/plugin.d.mts",
       "import": "./dist/nitro/plugin.mjs"
+    },
+    "./nitro/v3": {
+      "types": "./dist/nitro/v3/plugin.d.mts",
+      "import": "./dist/nitro/v3/plugin.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -48,6 +52,9 @@
       ],
       "nitro": [
         "./dist/nitro/plugin.d.mts"
+      ],
+      "nitro/v3": [
+        "./dist/nitro/v3/plugin.d.mts"
       ]
     }
   },
@@ -67,7 +74,8 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.3.0"
+    "@nuxt/kit": "^4.3.0",
+    "ufo": "^1.6.3"
   },
   "devDependencies": {
     "@nuxt/devtools": "^3.1.1",
@@ -78,12 +86,14 @@
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.0",
     "typescript": "^5.9.3",
-    "unbuild": "^3.6.1"
+    "unbuild": "^3.6.1",
+    "nitro": "^3.0.1-alpha.2"
   },
   "peerDependencies": {
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
-    "ofetch": "^1.5.1"
+    "ofetch": "^1.5.1",
+    "nitro": "^3.0.1-alpha.2"
   },
   "peerDependenciesMeta": {
     "h3": {
@@ -93,6 +103,9 @@
       "optional": true
     },
     "ofetch": {
+      "optional": true
+    },
+    "nitro": {
       "optional": true
     }
   }
