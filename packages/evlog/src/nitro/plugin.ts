@@ -8,14 +8,23 @@ interface EvlogConfig {
   env?: Record<string, unknown>
   pretty?: boolean
   include?: string[]
+  exclude?: string[]
   sampling?: SamplingConfig
 }
 
-function shouldLog(path: string, include?: string[]): boolean {
-  // If no include patterns, log everything
+function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
+  // Check exclusions first (they take precedence)
+  if (exclude && exclude.length > 0) {
+    if (exclude.some(pattern => matchesPattern(path, pattern))) {
+      return false
+    }
+  }
+
+  // If no include patterns, log everything (that wasn't excluded)
   if (!include || include.length === 0) {
     return true
   }
+
   // Log only if path matches at least one include pattern
   return include.some(pattern => matchesPattern(path, pattern))
 }
@@ -63,8 +72,8 @@ export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('request', (event) => {
     const e = event as ServerEvent
 
-    // Skip logging for routes not matching include patterns
-    if (!shouldLog(e.path, evlogConfig?.include)) {
+    // Skip logging for routes not matching include/exclude patterns
+    if (!shouldLog(e.path, evlogConfig?.include, evlogConfig?.exclude)) {
       return
     }
 
