@@ -29,6 +29,14 @@ export interface ModuleOptions {
   include?: string[]
 
   /**
+   * Route patterns to exclude from logging.
+   * Supports glob patterns like '/api/_nuxt_icon/**'.
+   * Exclusions take precedence over inclusions.
+   * @example ['/api/_nuxt_icon/**', '/health']
+   */
+  exclude?: string[]
+
+  /**
    * Sampling configuration for filtering logs.
    * Allows configuring what percentage of logs to keep per level.
    *
