@@ -165,6 +165,8 @@ export default defineNuxtConfig({
 | `pretty` | `boolean` | `true` in dev | Pretty print logs with tree formatting |
 | `sampling.rates` | `object` | `undefined` | Head sampling rates per log level (0-100%). Error defaults to 100% |
 | `sampling.keep` | `array` | `undefined` | Tail sampling conditions to force-keep logs (see below) |
+| `transport.enabled` | `boolean` | `false` | Enable sending client logs to the server |
+| `transport.endpoint` | `string` | `'/api/_evlog/ingest'` | API endpoint for client log ingestion |
 
 #### Sampling Configuration
 
@@ -349,7 +351,39 @@ log.info('checkout', 'User initiated checkout')
 log.error({ action: 'payment', error: 'validation_failed' })
 ```
 
-Client logs output to the browser console with colored tags in development. Use for debugging and development - for production analytics, use dedicated services.
+Client logs output to the browser console with colored tags in development.
+
+#### Client Transport
+
+To send client logs to your server for centralized logging, enable the transport:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    transport: {
+      enabled: true,  // Send client logs to server
+    },
+  },
+})
+```
+
+When enabled:
+1. Client logs are sent to `/api/_evlog/ingest` via POST
+2. Server enriches with environment context (service, version, etc.)
+3. `evlog:drain` hook is called with `source: 'client'`
+4. External services receive the log
+
+Identify client logs in your drain hook:
+
+```typescript
+nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+  if (ctx.event.source === 'client') {
+    // Handle client logs specifically
+  }
+})
+```
 
 ## Publishing
 

@@ -204,6 +204,10 @@ export default defineNuxtConfig({
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
+    // Optional: send client logs to server (default: false)
+    transport: {
+      enabled: true,
+    },
   },
 })
 ```
@@ -301,7 +305,39 @@ log.warn('form', 'Invalid email format')
 log.debug({ component: 'CartDrawer', itemCount: 3 })
 ```
 
-Client logs output to the browser console with colored tags in development. Use for debugging - for production analytics, recommend dedicated services.
+Client logs output to the browser console with colored tags in development.
+
+### Client Transport
+
+To send client logs to the server for centralized logging, enable the transport:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    transport: {
+      enabled: true,  // Send client logs to server
+    },
+  },
+})
+```
+
+When enabled:
+1. Client logs are sent to `/api/_evlog/ingest` via POST
+2. Server enriches with environment context (service, version, etc.)
+3. `evlog:drain` hook is called with `source: 'client'`
+4. External services receive the log
+
+Identify client logs in your drain hook:
+
+```typescript
+nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+  if (ctx.event.source === 'client') {
+    // Handle client logs specifically
+  }
+})
+```
 
 ## Security: Preventing Sensitive Data Leakage
 
@@ -359,6 +395,7 @@ When reviewing code, check for:
 6. **No frontend error handling** → Catch errors and display toasts with structured data
 7. **Sensitive data in logs** → Check for passwords, tokens, full card numbers, PII
 8. **Client-side logging** → Use `log` API for debugging in Vue components
+9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
 
 ## Loading Reference Files
 

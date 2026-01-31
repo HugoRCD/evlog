@@ -97,6 +97,10 @@ export default defineNuxtConfig({
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
+    // Optional: send client logs to server (default: false)
+    transport: {
+      enabled: true,
+    },
   },
 })
 ```
@@ -517,6 +521,40 @@ Once installed, your AI assistant will:
 Add logging to this endpoint
 Review my logging code
 Help me set up logging for this service
+```
+
+## Client Transport
+
+Send browser logs to your server for centralized logging. When enabled, client-side `log.info()`, `log.error()`, etc. are automatically sent to the server.
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    transport: {
+      enabled: true,  // Enable client log transport
+    },
+  },
+})
+```
+
+**How it works:**
+
+1. Client calls `log.info({ action: 'click', button: 'submit' })`
+2. Log is sent to `/api/_evlog/ingest` via POST
+3. Server enriches with environment context (service, version, etc.)
+4. `evlog:drain` hook is called with `source: 'client'`
+5. External services receive the log
+
+In your drain hook, identify client logs by `source: 'client'`:
+
+```typescript
+nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+  if (ctx.event.source === 'client') {
+    // Handle client logs
+  }
+})
 ```
 
 ## Philosophy
