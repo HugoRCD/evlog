@@ -8,6 +8,7 @@ export default defineBuildConfig({
     { input: 'src/runtime/client/log', name: 'runtime/client/log' },
     { input: 'src/runtime/client/plugin', name: 'runtime/client/plugin' },
     { input: 'src/runtime/server/useLogger', name: 'runtime/server/useLogger' },
+    { input: 'src/runtime/server/routes/_evlog/ingest.post', name: 'runtime/server/routes/_evlog/ingest.post' },
     { input: 'src/runtime/utils/parseError', name: 'runtime/utils/parseError' },
     { input: 'src/error', name: 'error' },
     { input: 'src/logger', name: 'logger' },
@@ -32,5 +33,7 @@ export default defineBuildConfig({
     'nitropack',
     'nitropack/runtime',
     'ofetch',
+    'h3',
+    'zod',
   ],
 })

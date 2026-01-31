@@ -9,6 +9,7 @@ export type {
   EnvironmentContext,
   ErrorOptions,
   H3EventContext,
+  IngestPayload,
   Log,
   LoggerConfig,
   LogLevel,
@@ -20,5 +21,6 @@ export type {
   ServerEvent,
   TailSamplingCondition,
   TailSamplingContext,
+  TransportConfig,
   WideEvent,
 } from './types'

@@ -1,8 +1,10 @@
+import type { TransportConfig } from '../../types'
 import { initLog } from './log'
 import { defineNuxtPlugin, useRuntimeConfig } from '#app'
 
 interface EvlogPublicConfig {
   pretty?: boolean
+  transport?: TransportConfig
 }
 
 export default defineNuxtPlugin(() => {
@@ -12,5 +14,6 @@ export default defineNuxtPlugin(() => {
   initLog({
     pretty: evlogConfig?.pretty ?? import.meta.dev,
     service: 'client',
+    transport: evlogConfig?.transport,
   })
 })

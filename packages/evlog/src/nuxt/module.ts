@@ -1,12 +1,13 @@
 import {
   addImports,
   addPlugin,
+  addServerHandler,
   addServerImports,
   addServerPlugin,
   createResolver,
   defineNuxtModule,
 } from '@nuxt/kit'
-import type { EnvironmentContext, SamplingConfig } from '../types'
+import type { EnvironmentContext, SamplingConfig, TransportConfig } from '../types'
 
 export interface ModuleOptions {
   /**
@@ -53,6 +54,19 @@ export interface ModuleOptions {
    * ```
    */
   sampling?: SamplingConfig
+
+  /**
+   * Transport configuration for sending client logs to the server.
+   *
+   * @example
+   * ```ts
+   * transport: {
+   *   enabled: true,  // Send logs to server API
+   *   endpoint: '/api/_evlog/ingest'  // Custom endpoint
+   * }
+   * ```
+   */
+  transport?: TransportConfig
 }
 
 export default defineNuxtModule<ModuleOptions>({
@@ -65,10 +79,23 @@ export default defineNuxtModule<ModuleOptions>({
   setup(options, nuxt) {
     const resolver = createResolver(import.meta.url)
 
+    const transportEnabled = options.transport?.enabled ?? !nuxt.options.dev
+    const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
+
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
       pretty: options.pretty,
+      transport: {
+        enabled: transportEnabled,
+        endpoint: transportEndpoint,
+      },
     }
+
+    addServerHandler({
+      route: transportEndpoint,
+      method: 'post',
+      handler: resolver.resolve('../runtime/server/routes/_evlog/ingest.post'),
+    })
 
     addServerPlugin(resolver.resolve('../nitro/plugin'))
 
