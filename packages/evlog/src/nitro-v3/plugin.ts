@@ -7,6 +7,8 @@ import { createRequestLogger, initLogger } from '../logger'
 import { shouldLog } from '../nitro'
 import type { RequestLogger } from '../types'
 
+export * from './error'
+
 interface EvlogConfig {
   env?: Record<string, unknown>
   pretty?: boolean
