@@ -43,7 +43,7 @@ declare module 'nitropack/types' {
 export interface TransportConfig {
   /**
    * Enable sending logs to the server API
-   * @default true in production, false in development
+   * @default false
    */
   enabled?: boolean
 
