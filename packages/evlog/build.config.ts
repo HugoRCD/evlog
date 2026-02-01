@@ -34,6 +34,5 @@ export default defineBuildConfig({
     'nitropack/runtime',
     'ofetch',
     'h3',
-    'zod',
   ],
 })
