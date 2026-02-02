@@ -20,7 +20,7 @@
         "@vercel/analytics": "^1.6.1",
         "@vercel/speed-insights": "^1.3.1",
         "better-sqlite3": "^12.6.2",
-        "docus": "https://pkg.pr.new/docus@1241",
+        "docus": "https://pkg.pr.new/docus@1261",
         "motion-v": "latest",
         "nuxt": "^4.3.0",
       },
@@ -49,7 +49,7 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "1.1.0",
+      "version": "1.2.0",
       "dependencies": {
         "@nuxt/kit": "^4.3.0",
         "defu": "^6.1.4",
@@ -1376,7 +1376,7 @@
 
     "diff3": ["diff3@0.0.3", "", {}, "sha512-iSq8ngPOt0K53A6eVr4d5Kn6GNrM2nQZtC740pzIriHtn4pOQ2lyzEXQMBeVcWERN0ye7fhBsk9PbLLQOnUx/g=="],
 
-    "docus": ["docus@https://pkg.pr.new/docus@1241", { "dependencies": { "@ai-sdk/gateway": "^3.0.28", "@ai-sdk/mcp": "^1.0.14", "@ai-sdk/vue": "3.0.61", "@iconify-json/lucide": "^1.2.86", "@iconify-json/simple-icons": "^1.2.67", "@iconify-json/vscode-icons": "^1.2.40", "@nuxt/content": "^3.11.0", "@nuxt/image": "^2.0.0", "@nuxt/kit": "^4.2.2", "@nuxt/ui": "^4.3.0", "@nuxtjs/i18n": "^10.2.1", "@nuxtjs/mcp-toolkit": "^0.6.2", "@nuxtjs/mdc": "^0.20.0", "@nuxtjs/robots": "^5.6.7", "@shikijs/core": "^3.21.0", "@shikijs/engine-javascript": "^3.21.0", "@shikijs/langs": "^3.21.0", "@shikijs/themes": "^3.21.0", "@vueuse/core": "^14.1.0", "ai": "6.0.61", "defu": "^6.1.4", "exsolve": "^1.0.8", "git-url-parse": "^16.1.0", "minimark": "^0.2.0", "motion-v": "^1.9.0", "nuxt-llms": "^0.2.0", "nuxt-og-image": "^5.1.13", "pkg-types": "^2.3.0", "scule": "^1.3.0", "shiki-stream": "^0.1.4", "tailwindcss": "^4.1.18", "ufo": "^1.6.3", "zod": "^4.3.5", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "better-sqlite3": "12.x", "nuxt": "4.x" } }],
+    "docus": ["docus@https://pkg.pr.new/docus@1261", { "dependencies": { "@ai-sdk/gateway": "^3.0.28", "@ai-sdk/mcp": "^1.0.14", "@ai-sdk/vue": "3.0.61", "@iconify-json/lucide": "^1.2.86", "@iconify-json/simple-icons": "^1.2.67", "@iconify-json/vscode-icons": "^1.2.40", "@nuxt/content": "^3.11.0", "@nuxt/image": "^2.0.0", "@nuxt/kit": "^4.2.2", "@nuxt/ui": "^4.3.0", "@nuxtjs/i18n": "^10.2.1", "@nuxtjs/mcp-toolkit": "^0.6.2", "@nuxtjs/mdc": "^0.20.0", "@nuxtjs/robots": "^5.6.7", "@shikijs/core": "^3.21.0", "@shikijs/engine-javascript": "^3.21.0", "@shikijs/langs": "^3.21.0", "@shikijs/themes": "^3.21.0", "@vueuse/core": "^14.1.0", "ai": "6.0.61", "defu": "^6.1.4", "exsolve": "^1.0.8", "git-url-parse": "^16.1.0", "minimark": "^0.2.0", "motion-v": "^1.9.0", "nuxt-llms": "^0.2.0", "nuxt-og-image": "^5.1.13", "pkg-types": "^2.3.0", "scule": "^1.3.0", "shiki-stream": "^0.1.4", "tailwindcss": "^4.1.18", "ufo": "^1.6.3", "zod": "^4.3.5", "zod-to-json-schema": "^3.25.1" }, "peerDependencies": { "better-sqlite3": "12.x", "nuxt": "4.x" } }],
 
     "dom-serializer": ["dom-serializer@2.0.0", "", { "dependencies": { "domelementtype": "^2.3.0", "domhandler": "^5.0.2", "entities": "^4.2.0" } }, "sha512-wIkAryiqt/nV5EQKqQpo3SToSOV9J0DnbJqwK7Wv/Trc92zIAYZ4FlMu+JPFW1DfGFt81ZTCGgDEabffXeLyJg=="],
 
@@ -3051,6 +3051,8 @@
     "globals/type-fest": ["type-fest@0.20.2", "", {}, "sha512-Ne+eE4r0/iWnpAxD852z3A+N0Bt5RN//NjJwRd2VFHEmrywxf5vsZlh4R6lixl6B+wz/8d+maTSAkN1FIkI3LQ=="],
 
     "globby/ignore": ["ignore@7.0.5", "", {}, "sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg=="],
+
+    "h3-next/crossws": ["crossws@0.4.4", "", { "peerDependencies": { "srvx": ">=0.7.1" }, "optionalPeers": ["srvx"] }, "sha512-w6c4OdpRNnudVmcgr7brb/+/HmYjMQvYToO/oTrprTwxRUiom3LYWU1PMWuD006okbUWpII1Ea9/+kwpUfmyRg=="],
 
     "hast-util-raw/parse5": ["parse5@7.3.0", "", { "dependencies": { "entities": "^6.0.0" } }, "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="],
 

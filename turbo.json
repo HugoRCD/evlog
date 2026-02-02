@@ -5,7 +5,8 @@
       "dependsOn": ["^build"],
       "outputs": [".vercel/output/**", "dist/**", ".output/**", ".nuxt/**"],
       "env": [
-        "AI_GATEWAY_API_KEY"
+        "AI_GATEWAY_API_KEY",
+        "NUXT_SITE_URL"
       ]
     },
     "dev": {
