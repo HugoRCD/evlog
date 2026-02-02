@@ -140,7 +140,7 @@ describe('createRequestLogger', () => {
     expect(context.cart).toEqual({ items: 3 })
   })
 
-  it('overwrites existing keys with set()', () => {
+  it('overwrites existing primitive keys with set()', () => {
     const logger = createRequestLogger({})
 
     logger.set({ status: 'pending' })
@@ -148,6 +148,50 @@ describe('createRequestLogger', () => {
 
     const context = logger.getContext()
     expect(context.status).toBe('complete')
+  })
+
+  it('deep merges nested objects with set()', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ user: { name: 'Alice' } })
+    logger.set({ user: { id: '123' } })
+
+    const context = logger.getContext()
+    expect(context.user).toEqual({ name: 'Alice', id: '123' })
+  })
+
+  it('deep merges multiple levels of nesting', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ order: { customer: { name: 'Alice' } } })
+    logger.set({ order: { customer: { email: 'alice@example.com' } } })
+    logger.set({ order: { total: 99.99 } })
+
+    const context = logger.getContext()
+    expect(context.order).toEqual({
+      customer: { name: 'Alice', email: 'alice@example.com' },
+      total: 99.99,
+    })
+  })
+
+  it('new values override existing values in nested objects', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ user: { status: 'pending' } })
+    logger.set({ user: { status: 'active' } })
+
+    const context = logger.getContext()
+    expect(context.user).toEqual({ status: 'active' })
+  })
+
+  it('handles arrays in nested objects', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ cart: { items: ['item1'] } })
+    logger.set({ cart: { total: 50 } })
+
+    const context = logger.getContext()
+    expect(context.cart).toEqual({ items: ['item1'], total: 50 })
   })
 
   it('records error with error()', () => {
