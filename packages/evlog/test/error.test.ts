@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createError, createEvlogError, EvlogError } from '../src/error'
+import { parseError } from '../src/runtime/utils/parseError'
 
 describe('EvlogError', () => {
   it('creates error with message only', () => {
@@ -197,5 +198,119 @@ describe('createEvlogError', () => {
 
     expect(error).toBeInstanceOf(EvlogError)
     expect(error.status).toBe(401)
+  })
+})
+
+describe('parseError', () => {
+  describe('Nitro v3+ / H3 v2+ format', () => {
+    it('parses status and statusText', () => {
+      const fetchError = {
+        data: {
+          status: 422,
+          statusText: 'Validation failed',
+          data: { why: 'Invalid input' },
+        },
+        message: 'Fetch error',
+        statusCode: 500,
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(422)
+      expect(parsed.message).toBe('Validation failed')
+      expect(parsed.why).toBe('Invalid input')
+    })
+
+    it('extracts evlog data (why, fix, link)', () => {
+      const fetchError = {
+        data: {
+          status: 400,
+          statusText: 'Bad request',
+          data: {
+            why: 'Missing required field',
+            fix: 'Add the email field',
+            link: 'https://docs.example.com',
+          },
+        },
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.why).toBe('Missing required field')
+      expect(parsed.fix).toBe('Add the email field')
+      expect(parsed.link).toBe('https://docs.example.com')
+    })
+  })
+
+  describe('Nitro v2 / H3 v1 format', () => {
+    it('parses statusCode and statusMessage', () => {
+      const fetchError = {
+        data: {
+          statusCode: 404,
+          statusMessage: 'Not found',
+          data: { why: 'Resource does not exist' },
+        },
+        message: 'Fetch error',
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(404)
+      expect(parsed.message).toBe('Not found')
+      expect(parsed.why).toBe('Resource does not exist')
+    })
+  })
+
+  describe('fallback behavior', () => {
+    it('falls back to fetchError status when data.status is missing', () => {
+      const fetchError = {
+        data: { message: 'Error' },
+        status: 503,
+        statusCode: 502,
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(503)
+    })
+
+    it('falls back to fetchError message', () => {
+      const fetchError = {
+        data: {},
+        message: 'Network error',
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.message).toBe('Network error')
+    })
+
+    it('defaults to 500 and generic message', () => {
+      const fetchError = { data: {} }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(500)
+      expect(parsed.message).toBe('An error occurred')
+    })
+  })
+
+  describe('non-fetch errors', () => {
+    it('parses standard Error', () => {
+      const error = new Error('Something broke')
+
+      const parsed = parseError(error)
+
+      expect(parsed.message).toBe('Something broke')
+      expect(parsed.status).toBe(500)
+      expect(parsed.raw).toBe(error)
+    })
+
+    it('parses unknown values', () => {
+      const parsed = parseError('string error')
+
+      expect(parsed.message).toBe('string error')
+      expect(parsed.status).toBe(500)
+    })
   })
 })
