@@ -30,13 +30,17 @@ export class EvlogError extends Error {
   readonly fix?: string
   readonly link?: string
   readonly data?: { why?: string, fix?: string, link?: string }
+  /** Marks error as handled (H3 v2+ hides data when unhandled=true) */
+  readonly unhandled = false
 
   constructor(options: ErrorOptions | string) {
     const opts = typeof options === 'string' ? { message: options } : options
 
     super(opts.message, { cause: opts.cause })
 
-    this.name = 'EvlogError'
+    // Use 'HTTPError' to be recognized by H3 v2+ error handling
+    // H3 checks: input instanceof Error && input?.name === "HTTPError"
+    this.name = 'HTTPError'
 
     const statusValue = opts.status ?? 500
     const messageValue = opts.message
@@ -98,12 +102,14 @@ export class EvlogError extends Error {
 
   toJSON(): Record<string, unknown> {
     return {
-      name: this.name,
-      message: this.message,
       status: this.status,
       statusText: this.statusText,
+      // Legacy (Nitro v2 / H3 v1)
       statusCode: this.statusCode,
       statusMessage: this.statusMessage,
+      // H3 v2+ checks this to decide if data should be hidden
+      unhandled: this.unhandled,
+      message: this.message,
       data: this.data,
       cause: this.cause instanceof Error
         ? { name: this.cause.name, message: this.cause.message }
