@@ -33,7 +33,7 @@ function isValidISOTimestamp(value: string): boolean {
 }
 
 function validatePayload(body: unknown): IngestPayload {
-  if (!body || typeof body !== 'object') {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw createError({ statusCode: 400, message: 'Invalid request body' })
   }
 
