@@ -30,6 +30,29 @@ function shouldLog(path: string, include?: string[], exclude?: string[]): boolea
   return include.some(pattern => matchesPattern(path, pattern))
 }
 
+/** Headers that should never be passed to the drain hook for security */
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'x-auth-token',
+  'proxy-authorization',
+]
+
+function getSafeHeaders(event: ServerEvent): Record<string, string> {
+  const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
+  const safeHeaders: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(allHeaders)) {
+    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+      safeHeaders[key] = value
+    }
+  }
+
+  return safeHeaders
+}
+
 function getResponseStatus(event: ServerEvent): number {
   // Node.js style
   if (event.node?.res?.statusCode) {
@@ -54,7 +77,7 @@ function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event
     nitroApp.hooks.callHook('evlog:drain', {
       event: emittedEvent,
       request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
-      headers: getHeaders(event as Parameters<typeof getHeaders>[0]),
+      headers: getSafeHeaders(event),
     }).catch((err) => {
       console.error('[evlog] drain failed:', err)
     })
