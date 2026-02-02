@@ -36,10 +36,18 @@ describe('EvlogError', () => {
   })
 
   describe('HTTP compatibility', () => {
-    it('provides statusCode getter for HTTP errors', () => {
+    it('provides status properties for Nitro v3+ / H3 v2+', () => {
+      const error = new EvlogError({ message: 'Not found', status: 404 })
+
+      expect(error.status).toBe(404)
+      expect(error.statusText).toBe('Not found')
+    })
+
+    it('provides statusCode/statusMessage for Nitro v2 / H3 v1', () => {
       const error = new EvlogError({ message: 'Not found', status: 404 })
 
       expect(error.statusCode).toBe(404)
+      expect(error.statusMessage).toBe('Not found')
       expect(error.statusCode).toBe(error.status)
     })
 
@@ -129,12 +137,19 @@ describe('EvlogError', () => {
 
       expect(json.name).toBe('EvlogError')
       expect(json.message).toBe('Test error')
+      // Nitro v3+ / H3 v2+
       expect(json.status).toBe(400)
-      expect(json.why).toBe('Because')
-      expect(json.fix).toBe('Do this')
-      expect(json.link).toBe('https://example.com')
+      expect(json.statusText).toBe('Test error')
+      // Nitro v2 / H3 v1
+      expect(json.statusCode).toBe(400)
+      expect(json.statusMessage).toBe('Test error')
+      // Structured data
+      expect(json.data).toEqual({
+        why: 'Because',
+        fix: 'Do this',
+        link: 'https://example.com',
+      })
       expect(json.cause).toEqual({ name: 'Error', message: 'Original' })
-      expect(json.stack).toBeDefined()
     })
 
     it('handles missing cause', () => {

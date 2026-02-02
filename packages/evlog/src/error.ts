@@ -18,10 +18,18 @@ import { colors, isServer } from './utils'
  */
 export class EvlogError extends Error {
 
+  /** HTTP status code (Nitro v3+ / H3 v2+) */
   readonly status: number
+  /** HTTP status text (Nitro v3+ / H3 v2+) */
+  readonly statusText: string
+  /** @deprecated Use `status` instead */
+  readonly statusCode: number
+  /** @deprecated Use `statusText` instead */
+  readonly statusMessage: string
   readonly why?: string
   readonly fix?: string
   readonly link?: string
+  readonly data?: { why?: string, fix?: string, link?: string }
 
   constructor(options: ErrorOptions | string) {
     const opts = typeof options === 'string' ? { message: options } : options
@@ -29,25 +37,29 @@ export class EvlogError extends Error {
     super(opts.message, { cause: opts.cause })
 
     this.name = 'EvlogError'
-    this.status = opts.status ?? 500
+
+    const statusValue = opts.status ?? 500
+    const messageValue = opts.message
+
+    // New properties (Nitro v3+ / H3 v2+)
+    this.status = statusValue
+    this.statusText = messageValue
+    // Legacy properties (Nitro v2 / H3 v1)
+    this.statusCode = statusValue
+    this.statusMessage = messageValue
+
     this.why = opts.why
     this.fix = opts.fix
     this.link = opts.link
+
+    if (opts.why || opts.fix || opts.link) {
+      this.data = { why: opts.why, fix: opts.fix, link: opts.link }
+    }
 
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, EvlogError)
     }
-  }
-
-  get statusCode(): number {
-    return this.status
-  }
-
-  get data() {
-    return this.why || this.fix || this.link
-      ? { why: this.why, fix: this.fix, link: this.link }
-      : undefined
   }
 
   override toString(): string {
@@ -89,13 +101,13 @@ export class EvlogError extends Error {
       name: this.name,
       message: this.message,
       status: this.status,
-      why: this.why,
-      fix: this.fix,
-      link: this.link,
+      statusText: this.statusText,
+      statusCode: this.statusCode,
+      statusMessage: this.statusMessage,
+      data: this.data,
       cause: this.cause instanceof Error
         ? { name: this.cause.name, message: this.cause.message }
         : undefined,
-      stack: this.stack,
     }
   }
 
@@ -105,7 +117,7 @@ export class EvlogError extends Error {
  * Create a structured error with context for debugging and user-facing messages.
  *
  * @param options - Error message string or full options object
- * @returns EvlogError instance compatible with Nitro's error handling
+ * @returns EvlogError with statusCode, statusMessage and data properties
  *
  * @example
  * ```ts
@@ -126,4 +138,4 @@ export function createError(options: ErrorOptions | string): EvlogError {
   return new EvlogError(options)
 }
 
-export const createEvlogError = createError
+export { createError as createEvlogError }
