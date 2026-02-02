@@ -8,6 +8,9 @@ export default defineAppConfig({
     description: 'Wide events and structured errors for TypeScript. One log per request, full context, errors that explain why and how to fix.',
   },
   assistant: {
+    icons: {
+      trigger: 'i-custom:ai'
+    },
     faqQuestions: [
       {
         category: 'Getting Started',
