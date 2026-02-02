@@ -82,6 +82,11 @@ export default defineNuxtModule<ModuleOptions>({
     const transportEnabled = options.transport?.enabled ?? false
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
 
+    // Register custom error handler for proper EvlogError serialization
+    const nitroOptions = (nuxt.options as { nitro?: { errorHandler?: string } })
+    nitroOptions.nitro = nitroOptions.nitro || {}
+    nitroOptions.nitro.errorHandler = resolver.resolve('../nitro/errorHandler')
+
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
       pretty: options.pretty,
