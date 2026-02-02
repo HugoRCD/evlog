@@ -125,6 +125,8 @@ export interface DrainContext {
     path?: string
     requestId?: string
   }
+  /** HTTP headers from the original request (useful for correlation with external services) */
+  headers?: Record<string, string>
 }
 
 /**

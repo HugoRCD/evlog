@@ -1,5 +1,6 @@
 import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
+import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger } from '../logger'
 import type { RequestLogger, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
@@ -53,6 +54,7 @@ function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event
     nitroApp.hooks.callHook('evlog:drain', {
       event: emittedEvent,
       request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+      headers: getHeaders(event as Parameters<typeof getHeaders>[0]),
     }).catch((err) => {
       console.error('[evlog] drain failed:', err)
     })
