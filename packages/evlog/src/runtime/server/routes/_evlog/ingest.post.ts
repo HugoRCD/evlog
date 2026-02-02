@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getHeader, getRequestHost, readBody, setResponseStatus } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
-import { getEnvironment, log } from '../../../../logger'
+import { getEnvironment } from '../../../../logger'
 
 const VALID_LEVELS = ['info', 'error', 'warn', 'debug'] as const
 
@@ -46,6 +46,11 @@ function validatePayload(body: unknown): IngestPayload {
   const { timestamp: rawTimestamp } = payload
   let timestamp: string
   if (typeof rawTimestamp === 'number') {
+    const minTimestamp = new Date('2000-01-01').getTime()
+    const maxTimestamp = Date.now() + 24 * 60 * 60 * 1000 // 1 day in the future
+    if (rawTimestamp < minTimestamp || rawTimestamp > maxTimestamp) {
+      throw createError({ statusCode: 400, message: 'Invalid timestamp: value out of reasonable range' })
+    }
     timestamp = new Date(rawTimestamp).toISOString()
   } else if (typeof rawTimestamp === 'string') {
     if (!isValidISOTimestamp(rawTimestamp)) {
@@ -79,8 +84,10 @@ export default defineEventHandler(async (event) => {
   const nitroApp = useNitroApp()
   const env = getEnvironment()
 
+  const { service: _clientService, ...sanitizedPayload } = payload as IngestPayload & { service?: unknown }
+
   const wideEvent: WideEvent = {
-    ...payload,
+    ...sanitizedPayload,
     ...env,
     source: 'client',
   }

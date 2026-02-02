@@ -91,11 +91,13 @@ export default defineNuxtModule<ModuleOptions>({
       },
     }
 
-    addServerHandler({
-      route: transportEndpoint,
-      method: 'post',
-      handler: resolver.resolve('../runtime/server/routes/_evlog/ingest.post'),
-    })
+    if (transportEnabled) {
+      addServerHandler({
+        route: transportEndpoint,
+        method: 'post',
+        handler: resolver.resolve('../runtime/server/routes/_evlog/ingest.post'),
+      })
+    }
 
     addServerPlugin(resolver.resolve('../nitro/plugin'))
 

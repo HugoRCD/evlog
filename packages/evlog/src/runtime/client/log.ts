@@ -30,6 +30,8 @@ async function sendToServer(event: Record<string, unknown>): Promise<void> {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event),
+      keepalive: true,
+      credentials: 'same-origin',
     })
   } catch {
     // Silently fail - don't break the app
