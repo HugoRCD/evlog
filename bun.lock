@@ -52,6 +52,7 @@
       "version": "1.1.0",
       "dependencies": {
         "@nuxt/kit": "^4.3.0",
+        "defu": "^6.1.4",
       },
       "devDependencies": {
         "@nuxt/devtools": "^3.1.1",

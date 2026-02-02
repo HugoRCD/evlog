@@ -1,3 +1,4 @@
+import { defu } from 'defu'
 import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
@@ -216,15 +217,14 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
 
   return {
     set<T extends Record<string, unknown>>(data: T): void {
-      context = { ...context, ...data }
+      context = defu(data, context) as Record<string, unknown>
     },
 
     error(error: Error | string, errorContext?: Record<string, unknown>): void {
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
-      context = {
-        ...context,
+      const errorData = {
         ...errorContext,
         error: {
           name: err.name,
@@ -232,6 +232,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
           stack: err.stack,
         },
       }
+      context = defu(errorData, context) as Record<string, unknown>
     },
 
     emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
