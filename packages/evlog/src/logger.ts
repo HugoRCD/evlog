@@ -224,8 +224,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
-      context = {
-        ...context,
+      const errorData = {
         ...errorContext,
         error: {
           name: err.name,
@@ -233,6 +232,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
           stack: err.stack,
         },
       }
+      context = defu(errorData, context) as Record<string, unknown>
     },
 
     emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {

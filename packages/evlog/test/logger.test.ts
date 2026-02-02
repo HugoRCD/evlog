@@ -221,6 +221,25 @@ describe('createRequestLogger', () => {
     })
   })
 
+  it('deep merges errorContext with nested objects after set()', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ order: { id: '123', status: 'pending' } })
+    logger.error(new Error('Payment failed'), { order: { payment: { method: 'card' } } })
+
+    const context = logger.getContext()
+    expect(context.order).toEqual({
+      id: '123',
+      status: 'pending',
+      payment: { method: 'card' },
+    })
+    expect(context.error).toEqual({
+      name: 'Error',
+      message: 'Payment failed',
+      stack: expect.any(String),
+    })
+  })
+
   it('emits wide event on emit()', () => {
     const logger = createRequestLogger({
       method: 'GET',

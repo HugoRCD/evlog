@@ -204,7 +204,7 @@ export type WideEvent = BaseWideEvent & Record<string, unknown>
  */
 export interface RequestLogger {
   /**
-   * Add context to the wide event (shallow merge)
+   * Add context to the wide event (deep merge via defu)
    */
   set: <T extends Record<string, unknown>>(context: T) => void
 
