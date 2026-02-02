@@ -31,7 +31,7 @@ function getSafeHeaders(allHeaders: Record<string, string>): Record<string, stri
 }
 
 describe('nitro plugin - drain hook headers', () => {
-  it('passes headers to evlog:drain hook', async () => {
+  it('passes headers to evlog:drain hook', () => {
     const mockHeaders = {
       'content-type': 'application/json',
       'x-request-id': 'test-123',
@@ -97,7 +97,7 @@ describe('nitro plugin - drain hook headers', () => {
     })
   })
 
-  it('filters out sensitive headers for security', async () => {
+  it('filters out sensitive headers for security', () => {
     const mockHeaders = {
       'content-type': 'application/json',
       'x-request-id': 'test-123',
@@ -145,7 +145,7 @@ describe('nitro plugin - drain hook headers', () => {
     expect(drainContext!.headers).toHaveProperty('x-request-id', 'test-123')
   })
 
-  it('includes all standard non-sensitive HTTP headers', async () => {
+  it('includes all standard non-sensitive HTTP headers', () => {
     const mockHeaders = {
       'accept': 'application/json',
       'accept-language': 'en-US,en;q=0.9',
@@ -185,7 +185,7 @@ describe('nitro plugin - drain hook headers', () => {
     expect(drainContext!.headers?.['x-forwarded-for']).toBe('192.168.1.1')
   })
 
-  it('handles empty headers', async () => {
+  it('handles empty headers', () => {
     vi.mocked(getHeaders).mockReturnValue({})
 
     let drainContext: DrainContext | null = null
@@ -211,7 +211,7 @@ describe('nitro plugin - drain hook headers', () => {
     expect(drainContext!.headers).toEqual({})
   })
 
-  it('preserves custom correlation headers for external services', async () => {
+  it('preserves custom correlation headers for external services', () => {
     // Test headers commonly used for correlation with external services
     const correlationHeaders = {
       // PostHog
@@ -258,7 +258,7 @@ describe('nitro plugin - drain hook headers', () => {
     expect(drainContext!.headers?.['x-correlation-id']).toBe('corr-789')
   })
 
-  it('filters sensitive headers case-insensitively', async () => {
+  it('filters sensitive headers case-insensitively', () => {
     const mockHeaders = {
       'Authorization': 'Bearer token',
       'COOKIE': 'session=123',
