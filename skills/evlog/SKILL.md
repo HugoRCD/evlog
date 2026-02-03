@@ -1,5 +1,5 @@
 ---
-name: Review logging patterns
+name: review-logging-patterns
 description: Review code for logging patterns and suggest evlog adoption. Detects console.log spam, unstructured errors, and missing context. Guides wide event design, structured error handling, and request-scoped logging.
 license: MIT
 metadata:
