@@ -180,7 +180,6 @@ describe('axiom adapter', () => {
   describe('timeout handling', () => {
     it('uses default timeout of 5000ms', async () => {
       const event = createTestEvent()
-      const controller = new AbortController()
 
       // Mock setTimeout to capture the timeout value
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
