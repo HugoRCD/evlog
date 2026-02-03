@@ -38,6 +38,14 @@
     "./workers": {
       "types": "./dist/workers.d.mts",
       "import": "./dist/workers.mjs"
+    },
+    "./axiom": {
+      "types": "./dist/adapters/axiom.d.mts",
+      "import": "./dist/adapters/axiom.mjs"
+    },
+    "./otlp": {
+      "types": "./dist/adapters/otlp.d.mts",
+      "import": "./dist/adapters/otlp.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -55,6 +63,12 @@
       ],
       "workers": [
         "./dist/workers.d.mts"
+      ],
+      "axiom": [
+        "./dist/adapters/axiom.d.mts"
+      ],
+      "otlp": [
+        "./dist/adapters/otlp.d.mts"
       ]
     }
   },

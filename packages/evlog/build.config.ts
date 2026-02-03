@@ -16,6 +16,8 @@ export default defineBuildConfig({
     { input: 'src/utils', name: 'utils' },
     { input: 'src/types', name: 'types' },
     { input: 'src/workers/index', name: 'workers' },
+    { input: 'src/adapters/axiom', name: 'adapters/axiom' },
+    { input: 'src/adapters/otlp', name: 'adapters/otlp' },
   ],
   declaration: true,
   clean: true,
