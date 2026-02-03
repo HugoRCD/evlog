@@ -1,10 +1,10 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Detects console.log spam, unstructured errors, and missing context. Guides wide event design, structured error handling, and request-scoped logging.
+description: Review code for logging patterns and suggest evlog adoption. Detects console.log spam, unstructured errors, and missing context. Guides wide event design, structured error handling, request-scoped logging, and log draining with adapters (Axiom, OTLP).
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.2"
+  version: "0.3"
 ---
 
 # Review logging patterns
@@ -30,11 +30,12 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 
 ## Quick Reference
 
-| Working on...           | Load file                                                          |
+| Working on...           | Resource                                                           |
 | ----------------------- | ------------------------------------------------------------------ |
 | Wide events patterns    | [references/wide-events.md](references/wide-events.md)             |
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
+| Log draining & adapters | See "Log Draining & Adapters" section below                        |
 
 ## Important: Auto-imports in Nuxt
 
@@ -339,6 +340,76 @@ nitroApp.hooks.hook('evlog:drain', async (ctx) => {
 })
 ```
 
+## Log Draining & Adapters
+
+evlog provides built-in adapters to send logs to external observability platforms.
+
+### Built-in Adapters
+
+| Adapter | Import | Use Case |
+|---------|--------|----------|
+| Axiom | `evlog/axiom` | Axiom datasets for querying and dashboards |
+| OTLP | `evlog/otlp` | OpenTelemetry for Grafana, Datadog, Honeycomb, etc. |
+
+### Quick Setup
+
+**Axiom:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
+})
+```
+
+Set `NUXT_AXIOM_TOKEN` and `NUXT_AXIOM_DATASET` environment variables.
+
+**OTLP:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createOTLPDrain())
+})
+```
+
+Set `NUXT_OTLP_ENDPOINT` environment variable.
+
+### Multiple Destinations
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  const axiom = createAxiomDrain()
+  const otlp = createOTLPDrain()
+
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.allSettled([axiom(ctx), otlp(ctx)])
+  })
+})
+```
+
+### Custom Adapter
+
+```typescript
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    // ctx.event contains the full wide event
+    await fetch('https://your-service.com/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ctx.event),
+    })
+  })
+})
+```
+
 ## Security: Preventing Sensitive Data Leakage
 
 Wide events capture comprehensive context, making it easy to accidentally log sensitive data.
@@ -396,6 +467,7 @@ When reviewing code, check for:
 7. **Sensitive data in logs** → Check for passwords, tokens, full card numbers, PII
 8. **Client-side logging** → Use `log` API for debugging in Vue components
 9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
+10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`) for production log export
 
 ## Loading Reference Files
 

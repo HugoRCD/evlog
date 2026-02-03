@@ -207,18 +207,70 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-#### Log Draining
+#### Log Draining & Adapters
 
-Use the `evlog:drain` hook to send logs to external services like Axiom, Loki, or custom endpoints.
+evlog provides built-in adapters for popular observability platforms. Use the `evlog:drain` hook to send logs to external services.
+
+**Built-in Adapters:**
+
+| Adapter | Import | Description |
+|---------|--------|-------------|
+| Axiom | `evlog/axiom` | Send logs to Axiom for querying and dashboards |
+| OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
+
+**Using Axiom Adapter:**
 
 ```typescript
-// server/plugins/evlog-axiom.ts
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
+})
+```
+
+Set environment variables: `NUXT_AXIOM_TOKEN` and `NUXT_AXIOM_DATASET`.
+
+**Using OTLP Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createOTLPDrain())
+})
+```
+
+Set environment variable: `NUXT_OTLP_ENDPOINT`.
+
+**Multiple Destinations:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  const axiom = createAxiomDrain()
+  const otlp = createOTLPDrain()
+
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.allSettled([axiom(ctx), otlp(ctx)])
+  })
+})
+```
+
+**Custom Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', async (ctx) => {
-    await fetch('https://api.axiom.co/v1/datasets/logs/ingest', {
+    await fetch('https://your-service.com/logs', {
       method: 'POST',
-      headers: { Authorization: `Bearer ${process.env.AXIOM_TOKEN}` },
-      body: JSON.stringify([ctx.event])
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ctx.event),
     })
   })
 })
@@ -227,6 +279,7 @@ export default defineNitroPlugin((nitroApp) => {
 The `DrainContext` contains:
 - `event`: The complete `WideEvent` with all fields (timestamp, level, service, etc.)
 - `request`: Optional request metadata (`method`, `path`, `requestId`)
+- `headers`: Safe HTTP headers (sensitive headers are filtered)
 
 **Tip:** Use `$production` to sample only in production:
 

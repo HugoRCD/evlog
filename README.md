@@ -3,8 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/evlog?color=black)](https://npmjs.com/package/evlog)
 [![npm downloads](https://img.shields.io/npm/dm/evlog?color=black)](https://npm.chart.dev/evlog)
 [![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/evlog?color=black&label=size)](https://bundlephobia.com/package/evlog)
+[![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Nuxt](https://img.shields.io/badge/Nuxt-black?logo=nuxt&logoColor=white)](https://nuxt.com/)
+[![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.hrcd.fr)
 [![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
 **Your logs are lying to you.**
@@ -97,10 +98,6 @@ export default defineNuxtConfig({
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
-    // Optional: send client logs to server (default: false)
-    transport: {
-      enabled: true,
-    },
   },
 })
 ```
@@ -393,6 +390,85 @@ Notes:
 - `request.cf` is included (colo, country, asn) unless disabled
 - Use `headerAllowlist` to avoid logging sensitive headers
 
+## Adapters
+
+Send your logs to external observability platforms with built-in adapters.
+
+### Axiom
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_AXIOM_TOKEN=xaat-your-token
+NUXT_AXIOM_DATASET=your-dataset
+```
+
+### OTLP (OpenTelemetry)
+
+Works with Grafana, Datadog, Honeycomb, and any OTLP-compatible backend.
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createOTLPDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_OTLP_ENDPOINT=http://localhost:4318
+```
+
+### Multiple Destinations
+
+Send logs to multiple services:
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  const axiom = createAxiomDrain()
+  const otlp = createOTLPDrain()
+
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.allSettled([axiom(ctx), otlp(ctx)])
+  })
+})
+```
+
+### Custom Adapters
+
+Build your own adapter for any destination:
+
+```typescript
+// server/plugins/evlog-drain.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await fetch('https://your-service.com/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ctx.event),
+    })
+  })
+})
+```
+
+> See the [full documentation](https://evlog.hrcd.fr/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
+
 ## API Reference
 
 ### `initLogger(config)`
@@ -412,19 +488,28 @@ initLogger({
   stringify?: boolean    // JSON.stringify output (default: true, false for Workers)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
   sampling?: {
-    rates?: {
+    rates?: {            // Head sampling (random per level)
       info?: number      // 0-100, default 100
       warn?: number      // 0-100, default 100
       debug?: number     // 0-100, default 100
       error?: number     // 0-100, default 100 (always logged unless set to 0)
     }
+    keep?: Array<{       // Tail sampling (force keep based on outcome)
+      status?: number    // Keep if status >= value
+      duration?: number  // Keep if duration >= value (ms)
+      path?: string      // Keep if path matches glob pattern
+    }>
   }
 })
 ```
 
 ### Sampling
 
-At scale, logging everything can become expensive. Use sampling to keep only a percentage of logs per level:
+At scale, logging everything can become expensive. evlog supports two sampling strategies:
+
+#### Head Sampling (rates)
+
+Random sampling based on log level, decided before the request completes:
 
 ```typescript
 initLogger({
@@ -436,6 +521,43 @@ initLogger({
       // error defaults to 100% (always logged)
     },
   },
+})
+```
+
+#### Tail Sampling (keep)
+
+Force-keep logs based on request outcome, evaluated after the request completes. Useful to always capture slow requests or critical paths:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    sampling: {
+      rates: { info: 10 },  // Only 10% of info logs
+      keep: [
+        { duration: 1000 },           // Always keep if duration >= 1000ms
+        { status: 400 },              // Always keep if status >= 400
+        { path: '/api/critical/**' }, // Always keep critical paths
+      ],
+    },
+  },
+})
+```
+
+#### Custom Tail Sampling Hook
+
+For business-specific conditions (premium users, feature flags), use the `evlog:emit:keep` Nitro hook:
+
+```typescript
+// server/plugins/evlog-custom.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+    // Always keep logs for premium users
+    if (ctx.context.user?.premium) {
+      ctx.shouldKeep = true
+    }
+  })
 })
 ```
 
@@ -593,40 +715,6 @@ Once installed, your AI assistant will:
 Add logging to this endpoint
 Review my logging code
 Help me set up logging for this service
-```
-
-## Client Transport
-
-Send browser logs to your server for centralized logging. When enabled, client-side `log.info()`, `log.error()`, etc. are automatically sent to the server.
-
-```typescript
-// nuxt.config.ts
-export default defineNuxtConfig({
-  modules: ['evlog/nuxt'],
-  evlog: {
-    transport: {
-      enabled: true,  // Enable client log transport
-    },
-  },
-})
-```
-
-**How it works:**
-
-1. Client calls `log.info({ action: 'click', button: 'submit' })`
-2. Log is sent to `/api/_evlog/ingest` via POST
-3. Server enriches with environment context (service, version, etc.)
-4. `evlog:drain` hook is called with `source: 'client'`
-5. External services receive the log
-
-In your drain hook, identify client logs by `source: 'client'`:
-
-```typescript
-nitroApp.hooks.hook('evlog:drain', async (ctx) => {
-  if (ctx.event.source === 'client') {
-    // Handle client logs
-  }
-})
 ```
 
 ## Philosophy
