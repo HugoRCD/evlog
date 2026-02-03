@@ -15,6 +15,7 @@ export default defineBuildConfig({
     { input: 'src/logger', name: 'logger' },
     { input: 'src/utils', name: 'utils' },
     { input: 'src/types', name: 'types' },
+    { input: 'src/workers/index', name: 'workers' },
   ],
   declaration: true,
   clean: true,

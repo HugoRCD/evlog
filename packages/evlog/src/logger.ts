@@ -9,6 +9,7 @@ let globalEnv: EnvironmentContext = {
 
 let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
+let globalStringify = true
 
 /**
  * Initialize the logger with configuration.
@@ -27,6 +28,7 @@ export function initLogger(config: LoggerConfig = {}): void {
 
   globalPretty = config.pretty ?? isDev()
   globalSampling = config.sampling ?? {}
+  globalStringify = config.stringify ?? true
 }
 
 /**
@@ -87,8 +89,10 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
 
   if (globalPretty) {
     prettyPrintWideEvent(formatted)
-  } else {
+  } else if (globalStringify) {
     console[getConsoleMethod(level)](JSON.stringify(formatted))
+  } else {
+    console[getConsoleMethod(level)](formatted)
   }
 
   return formatted
@@ -102,9 +106,9 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
     const color = getLevelColor(level)
     const timestamp = new Date().toISOString().slice(11, 23)
     console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
-  } else {
-    emitWideEvent(level, { tag, message })
+    return
   }
+  emitWideEvent(level, { tag, message })
 }
 
 function formatValue(value: unknown): string {

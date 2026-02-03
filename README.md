@@ -350,6 +350,49 @@ async function processSyncJob(job: Job) {
 }
 ```
 
+## Cloudflare Workers
+
+Use the Workers adapter for structured logs and correct platform severity.
+
+```typescript
+// src/index.ts
+import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'
+
+initWorkersLogger({
+  env: { service: 'edge-api' },
+})
+
+export default {
+  async fetch(request: Request) {
+    const log = createWorkersLogger(request)
+
+    try {
+      log.set({ route: 'health' })
+      const response = new Response('ok', { status: 200 })
+      log.emit({ status: response.status })
+      return response
+    } catch (error) {
+      log.error(error as Error)
+      log.emit({ status: 500 })
+      throw error
+    }
+  },
+}
+```
+
+Disable invocation logs to avoid duplicate request logs:
+
+```toml
+# wrangler.toml
+[observability.logs]
+invocation_logs = false
+```
+
+Notes:
+- `requestId` defaults to `cf-ray` when available
+- `request.cf` is included (colo, country, asn) unless disabled
+- Use `headerAllowlist` to avoid logging sensitive headers
+
 ## API Reference
 
 ### `initLogger(config)`
@@ -366,6 +409,7 @@ initLogger({
     region?: string      // Deployment region
   },
   pretty?: boolean       // Pretty print (default: true in dev)
+  stringify?: boolean    // JSON.stringify output (default: true, false for Workers)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
   sampling?: {
     rates?: {
@@ -435,6 +479,34 @@ log.set({ user: { id: '123' } })  // Add context
 log.error(error, { step: 'x' })   // Log error with context
 log.emit()                         // Emit final event
 log.getContext()                   // Get current context
+```
+
+### `initWorkersLogger(options?)`
+
+Initialize evlog for Cloudflare Workers (object logs + correct severity).
+
+```typescript
+import { initWorkersLogger } from 'evlog/workers'
+
+initWorkersLogger({
+  env: { service: 'edge-api' },
+})
+```
+
+### `createWorkersLogger(request, options?)`
+
+Create a request-scoped logger for Workers. Auto-extracts `cf-ray`, `request.cf`, method, and path.
+
+```typescript
+import { createWorkersLogger } from 'evlog/workers'
+
+const log = createWorkersLogger(request, {
+  requestId: 'custom-id',      // Override cf-ray (default: cf-ray header)
+  headers: ['x-request-id'],   // Headers to include (default: none)
+})
+
+log.set({ user: { id: '123' } })
+log.emit({ status: 200 })
 ```
 
 ### `createError(options)`
