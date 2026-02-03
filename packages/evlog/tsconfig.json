@@ -16,7 +16,8 @@
     "paths": {
       "evlog": ["./src/index.ts"],
       "evlog/nuxt": ["./src/nuxt/module.ts"],
-      "evlog/nitro": ["./src/nitro/plugin.ts"]
+      "evlog/nitro": ["./src/nitro/plugin.ts"],
+      "evlog/workers": ["./src/workers/index.ts"]
     }
   },
   "include": ["src/**/*", "test/**/*"],

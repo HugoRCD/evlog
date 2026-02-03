@@ -34,6 +34,10 @@
     "./nitro": {
       "types": "./dist/nitro/plugin.d.mts",
       "import": "./dist/nitro/plugin.mjs"
+    },
+    "./workers": {
+      "types": "./dist/workers.d.mts",
+      "import": "./dist/workers.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -48,6 +52,9 @@
       ],
       "nitro": [
         "./dist/nitro/plugin.d.mts"
+      ],
+      "workers": [
+        "./dist/workers.d.mts"
       ]
     }
   },

@@ -197,6 +197,12 @@ export interface LoggerConfig {
   pretty?: boolean
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
+  /**
+   * When pretty is disabled, emit JSON strings (default) or raw objects.
+   * Set to false for environments like Cloudflare Workers that expect objects.
+   * @default true
+   */
+  stringify?: boolean
 }
 
 /**
