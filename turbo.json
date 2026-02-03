@@ -6,7 +6,8 @@
       "outputs": [".vercel/output/**", "dist/**", ".output/**", ".nuxt/**"],
       "env": [
         "AI_GATEWAY_API_KEY",
-        "NUXT_SITE_URL"
+        "NUXT_SITE_URL",
+        "AXIOM_TOKEN"
       ]
     },
     "dev": {

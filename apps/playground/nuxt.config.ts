@@ -15,7 +15,6 @@ export default defineNuxtConfig({
       enabled: true,
     },
     sampling: {
-      // Head sampling: only 10% of info logs
       rates: {
         info: 10,
       },

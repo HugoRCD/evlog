@@ -68,6 +68,58 @@ export interface ModuleOptions {
    * ```
    */
   transport?: TransportConfig
+
+  /**
+   * Axiom adapter configuration.
+   * When configured, use `createAxiomDrain()` from `evlog/axiom` to send logs.
+   *
+   * @example
+   * ```ts
+   * axiom: {
+   *   dataset: 'my-app-logs',
+   *   token: process.env.AXIOM_TOKEN,
+   * }
+   * ```
+   */
+  axiom?: {
+    /** Axiom dataset name */
+    dataset: string
+    /** Axiom API token */
+    token: string
+    /** Organization ID (required for Personal Access Tokens) */
+    orgId?: string
+    /** Base URL for Axiom API. Default: https://api.axiom.co */
+    baseUrl?: string
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
+
+  /**
+   * OTLP adapter configuration.
+   * When configured, use `createOTLPDrain()` from `evlog/otlp` to send logs.
+   *
+   * @example
+   * ```ts
+   * otlp: {
+   *   endpoint: 'http://localhost:4318',
+   *   headers: {
+   *     'Authorization': `Basic ${process.env.GRAFANA_TOKEN}`,
+   *   },
+   * }
+   * ```
+   */
+  otlp?: {
+    /** OTLP HTTP endpoint (e.g., http://localhost:4318) */
+    endpoint: string
+    /** Override service name (defaults to event.service) */
+    serviceName?: string
+    /** Additional resource attributes */
+    resourceAttributes?: Record<string, string | number | boolean>
+    /** Custom headers (e.g., for authentication) */
+    headers?: Record<string, string>
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({
