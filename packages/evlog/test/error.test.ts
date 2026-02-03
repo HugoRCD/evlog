@@ -123,7 +123,7 @@ describe('EvlogError', () => {
   })
 
   describe('toJSON()', () => {
-    it('serializes error to plain object', () => {
+    it('serializes error to plain object without duplication', () => {
       const cause = new Error('Original')
       const error = new EvlogError({
         message: 'Test error',
@@ -138,22 +138,26 @@ describe('EvlogError', () => {
 
       expect(json.name).toBe('EvlogError')
       expect(json.message).toBe('Test error')
-      // Primary properties
       expect(json.status).toBe(400)
-      expect(json.statusText).toBe('Test error')
-      // Alias properties
-      expect(json.statusCode).toBe(400)
-      expect(json.statusMessage).toBe('Test error')
-      // Structured data
       expect(json.data).toEqual({
         why: 'Because',
         fix: 'Do this',
         link: 'https://example.com',
       })
       expect(json.cause).toEqual({ name: 'Error', message: 'Original' })
+      // Should NOT include duplicate fields
+      expect(json.statusCode).toBeUndefined()
+      expect(json.statusMessage).toBeUndefined()
+      expect(json.statusText).toBeUndefined()
     })
 
-    it('handles missing cause', () => {
+    it('omits data when no extra fields', () => {
+      const error = new EvlogError('Simple error')
+      const json = error.toJSON()
+      expect(json.data).toBeUndefined()
+    })
+
+    it('omits cause when not present', () => {
       const error = new EvlogError('No cause')
       const json = error.toJSON()
       expect(json.cause).toBeUndefined()

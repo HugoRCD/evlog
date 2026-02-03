@@ -40,6 +40,7 @@ export default defineNitroErrorHandler((error, event) => {
       statusCode: status,
       statusMessage: message,
       message,
+      error: true,
     }))
   }
 
@@ -53,11 +54,13 @@ export default defineNitroErrorHandler((error, event) => {
   setResponseHeader(event, 'Content-Type', 'application/json')
 
   // Serialize EvlogError with all its data, preserving Nitro's response shape
+  const { data } = evlogError as { data?: unknown }
   return send(event, JSON.stringify({
     url,
     statusCode: status,
     statusMessage: (evlogError as { statusMessage?: string }).statusMessage || evlogError.message,
     message: evlogError.message,
-    data: (evlogError as { data?: unknown }).data,
+    error: true,
+    ...(data !== undefined && { data }),
   }))
 })

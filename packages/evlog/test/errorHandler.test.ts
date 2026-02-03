@@ -54,6 +54,7 @@ describe('errorHandler', () => {
       expect(sentBody.statusCode).toBe(402)
       expect(sentBody.message).toBe('Payment failed')
       expect(sentBody.url).toBe('/api/test')
+      expect(sentBody.error).toBe(true)
       expect(sentBody.data).toEqual({
         why: 'Card declined',
         fix: 'Try another card',
@@ -117,6 +118,7 @@ describe('errorHandler', () => {
       expect(sentBody.statusMessage).toBe('Something went wrong')
       expect(sentBody.message).toBe('Something went wrong')
       expect(sentBody.url).toBe('/api/test')
+      expect(sentBody.error).toBe(true)
       // Should NOT include extended fields
       expect(sentBody.data).toBeUndefined()
     })

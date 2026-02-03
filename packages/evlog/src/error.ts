@@ -20,16 +20,9 @@ export class EvlogError extends Error {
 
   /** HTTP status code */
   readonly status: number
-  /** HTTP status text */
-  readonly statusText: string
-  /** HTTP status code (alias for compatibility) */
-  readonly statusCode: number
-  /** HTTP status message (alias for compatibility) */
-  readonly statusMessage: string
   readonly why?: string
   readonly fix?: string
   readonly link?: string
-  readonly data?: { why?: string, fix?: string, link?: string }
 
   constructor(options: ErrorOptions | string) {
     const opts = typeof options === 'string' ? { message: options } : options
@@ -37,29 +30,38 @@ export class EvlogError extends Error {
     super(opts.message, { cause: opts.cause })
 
     this.name = 'EvlogError'
-
-    const statusValue = opts.status ?? 500
-    const messageValue = opts.message
-
-    // Primary properties
-    this.status = statusValue
-    this.statusText = messageValue
-    // Alias properties for compatibility
-    this.statusCode = statusValue
-    this.statusMessage = messageValue
-
+    this.status = opts.status ?? 500
     this.why = opts.why
     this.fix = opts.fix
     this.link = opts.link
-
-    if (opts.why || opts.fix || opts.link) {
-      this.data = { why: opts.why, fix: opts.fix, link: opts.link }
-    }
 
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, EvlogError)
     }
+  }
+
+  /** HTTP status text (alias for message) */
+  get statusText(): string {
+    return this.message
+  }
+
+  /** HTTP status code (alias for compatibility) */
+  get statusCode(): number {
+    return this.status
+  }
+
+  /** HTTP status message (alias for compatibility) */
+  get statusMessage(): string {
+    return this.message
+  }
+
+  /** Structured data for serialization */
+  get data(): { why?: string, fix?: string, link?: string } | undefined {
+    if (this.why || this.fix || this.link) {
+      return { why: this.why, fix: this.fix, link: this.link }
+    }
+    return undefined
   }
 
   override toString(): string {
@@ -101,14 +103,10 @@ export class EvlogError extends Error {
       name: this.name,
       message: this.message,
       status: this.status,
-      statusText: this.statusText,
-      // Alias properties for compatibility
-      statusCode: this.statusCode,
-      statusMessage: this.statusMessage,
-      data: this.data,
-      cause: this.cause instanceof Error
-        ? { name: this.cause.name, message: this.cause.message }
-        : undefined,
+      ...(this.data && { data: this.data }),
+      ...(this.cause instanceof Error && {
+        cause: { name: this.cause.name, message: this.cause.message },
+      }),
     }
   }
 
