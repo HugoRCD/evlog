@@ -99,11 +99,12 @@ export class EvlogError extends Error {
   }
 
   toJSON(): Record<string, unknown> {
+    const { data } = this
     return {
       name: this.name,
       message: this.message,
       status: this.status,
-      ...(this.data && { data: this.data }),
+      ...(data && { data }),
       ...(this.cause instanceof Error && {
         cause: { name: this.cause.name, message: this.cause.message },
       }),

@@ -26,18 +26,25 @@ export default defineNitroErrorHandler((error, event) => {
       ?? (error as { status?: number }).status
       ?? 500
 
+    // Derive message from statusText/statusMessage/message for cross-version compatibility
+    const rawMessage = ((error as { statusText?: string }).statusText
+      ?? (error as { statusMessage?: string }).statusMessage
+      ?? error.message) || 'Internal Server Error'
+
     // Sanitize internal error details in production for 5xx errors
     const message = isDev
-      ? (error.message || 'Internal Server Error')
-      : (status >= 500 ? 'Internal Server Error' : (error.message || 'Internal Server Error'))
+      ? rawMessage
+      : (status >= 500 ? 'Internal Server Error' : rawMessage)
 
     setResponseStatus(event, status)
     setResponseHeader(event, 'Content-Type', 'application/json')
 
-    // Preserve Nitro's default response shape
+    // Preserve Nitro's default response shape with both legacy and modern fields
     return send(event, JSON.stringify({
       url,
+      status,
       statusCode: status,
+      statusText: message,
       statusMessage: message,
       message,
       error: true,
@@ -55,10 +62,13 @@ export default defineNitroErrorHandler((error, event) => {
 
   // Serialize EvlogError with all its data, preserving Nitro's response shape
   const { data } = evlogError as { data?: unknown }
+  const statusMessage = (evlogError as { statusMessage?: string }).statusMessage || evlogError.message
   return send(event, JSON.stringify({
     url,
+    status,
     statusCode: status,
-    statusMessage: (evlogError as { statusMessage?: string }).statusMessage || evlogError.message,
+    statusText: statusMessage,
+    statusMessage,
     message: evlogError.message,
     error: true,
     ...(data !== undefined && { data }),
