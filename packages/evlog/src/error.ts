@@ -18,13 +18,13 @@ import { colors, isServer } from './utils'
  */
 export class EvlogError extends Error {
 
-  /** HTTP status code (Nitro v3+ / H3 v2+) */
+  /** HTTP status code */
   readonly status: number
-  /** HTTP status text (Nitro v3+ / H3 v2+) */
+  /** HTTP status text */
   readonly statusText: string
-  /** @deprecated Use `status` instead */
+  /** HTTP status code (alias for compatibility) */
   readonly statusCode: number
-  /** @deprecated Use `statusText` instead */
+  /** HTTP status message (alias for compatibility) */
   readonly statusMessage: string
   readonly why?: string
   readonly fix?: string
@@ -41,10 +41,10 @@ export class EvlogError extends Error {
     const statusValue = opts.status ?? 500
     const messageValue = opts.message
 
-    // New properties (Nitro v3+ / H3 v2+)
+    // Primary properties
     this.status = statusValue
     this.statusText = messageValue
-    // Legacy properties (Nitro v2 / H3 v1)
+    // Alias properties for compatibility
     this.statusCode = statusValue
     this.statusMessage = messageValue
 
@@ -102,7 +102,7 @@ export class EvlogError extends Error {
       message: this.message,
       status: this.status,
       statusText: this.statusText,
-      // Legacy (Nitro v2 / H3 v1)
+      // Alias properties for compatibility
       statusCode: this.statusCode,
       statusMessage: this.statusMessage,
       data: this.data,

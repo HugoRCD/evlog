@@ -4,11 +4,13 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 const mockSetResponseStatus = vi.fn()
 const mockSetResponseHeader = vi.fn()
 const mockSend = vi.fn()
+const mockGetRequestURL = vi.fn(() => ({ pathname: '/api/test' }))
 
 vi.mock('h3', () => ({
   setResponseStatus: (...args: unknown[]) => mockSetResponseStatus(...args),
   setResponseHeader: (...args: unknown[]) => mockSetResponseHeader(...args),
   send: (...args: unknown[]) => mockSend(...args),
+  getRequestURL: (...args: unknown[]) => mockGetRequestURL(...args),
 }))
 
 // Mock nitropack/runtime
@@ -24,6 +26,7 @@ describe('errorHandler', () => {
 
   beforeEach(() => {
     vi.clearAllMocks()
+    vi.stubEnv('NODE_ENV', 'development')
   })
 
   describe('EvlogError handling', () => {
@@ -40,7 +43,6 @@ describe('errorHandler', () => {
           fix: 'Try another card',
           link: 'https://docs.example.com',
         },
-        cause: undefined,
       }
 
       errorHandler(evlogError as Error, mockEvent)
@@ -49,9 +51,9 @@ describe('errorHandler', () => {
       expect(mockSetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'application/json')
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
-      expect(sentBody.status).toBe(402)
       expect(sentBody.statusCode).toBe(402)
       expect(sentBody.message).toBe('Payment failed')
+      expect(sentBody.url).toBe('/api/test')
       expect(sentBody.data).toEqual({
         why: 'Card declined',
         fix: 'Try another card',
@@ -68,7 +70,6 @@ describe('errorHandler', () => {
         statusCode: 404,
         statusMessage: 'Not found',
         data: { why: 'Resource does not exist' },
-        cause: undefined,
       }
 
       const wrapperError = {
@@ -83,28 +84,8 @@ describe('errorHandler', () => {
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 404)
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
-      expect(sentBody.status).toBe(404)
       expect(sentBody.statusCode).toBe(404)
       expect(sentBody.data).toEqual({ why: 'Resource does not exist' })
-    })
-
-    it('serializes cause when present', () => {
-      const cause = new Error('Connection refused')
-      cause.name = 'NetworkError'
-      const evlogError = {
-        name: 'EvlogError',
-        message: 'API unavailable',
-        status: 503,
-        statusText: 'API unavailable',
-        statusCode: 503,
-        statusMessage: 'API unavailable',
-        cause,
-      }
-
-      errorHandler(evlogError as unknown as Error, mockEvent)
-
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
-      expect(sentBody.cause).toEqual({ name: 'NetworkError', message: 'Connection refused' })
     })
 
     it('defaults to 500 when no status on evlogError', () => {
@@ -135,9 +116,9 @@ describe('errorHandler', () => {
       expect(sentBody.statusCode).toBe(400)
       expect(sentBody.statusMessage).toBe('Something went wrong')
       expect(sentBody.message).toBe('Something went wrong')
+      expect(sentBody.url).toBe('/api/test')
       // Should NOT include extended fields
       expect(sentBody.data).toBeUndefined()
-      expect(sentBody.status).toBeUndefined()
     })
 
     it('defaults to 500 for errors without status', () => {
@@ -162,6 +143,38 @@ describe('errorHandler', () => {
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
+    })
+
+    it('sanitizes 5xx error messages in production', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      const error = {
+        name: 'Error',
+        message: 'Database connection failed: password invalid',
+        statusCode: 500,
+      }
+
+      errorHandler(error as Error, mockEvent)
+
+      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      expect(sentBody.message).toBe('Internal Server Error')
+      expect(sentBody.statusMessage).toBe('Internal Server Error')
+    })
+
+    it('preserves 4xx error messages in production', () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      const error = {
+        name: 'Error',
+        message: 'Invalid email format',
+        statusCode: 400,
+      }
+
+      errorHandler(error as Error, mockEvent)
+
+      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      expect(sentBody.message).toBe('Invalid email format')
+      expect(sentBody.statusMessage).toBe('Invalid email format')
     })
   })
 })

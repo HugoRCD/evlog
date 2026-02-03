@@ -37,14 +37,14 @@ describe('EvlogError', () => {
   })
 
   describe('HTTP compatibility', () => {
-    it('provides status properties for Nitro v3+ / H3 v2+', () => {
+    it('provides status/statusText properties', () => {
       const error = new EvlogError({ message: 'Not found', status: 404 })
 
       expect(error.status).toBe(404)
       expect(error.statusText).toBe('Not found')
     })
 
-    it('provides statusCode/statusMessage for Nitro v2 / H3 v1', () => {
+    it('provides statusCode/statusMessage aliases', () => {
       const error = new EvlogError({ message: 'Not found', status: 404 })
 
       expect(error.statusCode).toBe(404)
@@ -138,10 +138,10 @@ describe('EvlogError', () => {
 
       expect(json.name).toBe('EvlogError')
       expect(json.message).toBe('Test error')
-      // Nitro v3+ / H3 v2+
+      // Primary properties
       expect(json.status).toBe(400)
       expect(json.statusText).toBe('Test error')
-      // Nitro v2 / H3 v1
+      // Alias properties
       expect(json.statusCode).toBe(400)
       expect(json.statusMessage).toBe('Test error')
       // Structured data
@@ -202,7 +202,7 @@ describe('createEvlogError', () => {
 })
 
 describe('parseError', () => {
-  describe('Nitro v3+ / H3 v2+ format', () => {
+  describe('status/statusText format', () => {
     it('parses status and statusText', () => {
       const fetchError = {
         data: {
@@ -242,7 +242,7 @@ describe('parseError', () => {
     })
   })
 
-  describe('Nitro v2 / H3 v1 format', () => {
+  describe('statusCode/statusMessage format', () => {
     it('parses statusCode and statusMessage', () => {
       const fetchError = {
         data: {
