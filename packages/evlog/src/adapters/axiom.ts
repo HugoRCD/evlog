@@ -130,7 +130,8 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
 
     if (!response.ok) {
       const text = await response.text().catch(() => 'Unknown error')
-      throw new Error(`Axiom API error: ${response.status} ${response.statusText} - ${text}`)
+      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
+      throw new Error(`Axiom API error: ${response.status} ${response.statusText} - ${safeText}`)
     }
   } finally {
     clearTimeout(timeoutId)

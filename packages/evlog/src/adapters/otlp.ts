@@ -359,7 +359,8 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
 
     if (!response.ok) {
       const text = await response.text().catch(() => 'Unknown error')
-      throw new Error(`OTLP API error: ${response.status} ${response.statusText} - ${text}`)
+      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
+      throw new Error(`OTLP API error: ${response.status} ${response.statusText} - ${safeText}`)
     }
   } finally {
     clearTimeout(timeoutId)
