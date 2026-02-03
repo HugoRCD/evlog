@@ -25,20 +25,20 @@ log.set({ cart: { items, total } })
 })`,
   },
   {
-    title: 'Agent-Ready',
-    description: 'Structured JSON output that AI agents can parse and understand.',
-    code: `{
-  "level": "error",
-  "why": "Card declined",
-  "fix": "Try another card"
-}`,
+    title: 'Log Draining',
+    description: 'Send logs to external services in fire-and-forget mode. Never blocks your response.',
+    code: `nitroApp.hooks.hook('evlog:drain',
+  async (ctx) => {
+    await sendToAxiom(ctx.event)
+  }
+)`,
   },
   {
-    title: 'Nuxt & Nitro',
-    description: 'First-class integration. Auto-create loggers, auto-emit at request end.',
-    code: `export default defineNuxtConfig({
-  modules: ['evlog/nuxt'],
-})`,
+    title: 'Built-in Adapters',
+    description: 'Zero-config adapters for Axiom, OTLP (Grafana, Datadog, Honeycomb), or build your own.',
+    code: `import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+// Reads config from env vars`,
   },
   {
     title: 'Smart Sampling',
@@ -49,11 +49,35 @@ log.set({ cart: { items, total } })
 }`,
   },
   {
+    title: 'Nuxt & Nitro',
+    description: 'First-class integration. Auto-create loggers, auto-emit at request end.',
+    code: `export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+})`,
+  },
+  {
+    title: 'Client Transport',
+    description: 'Send browser logs to your server. Automatic enrichment with server context.',
+    code: `// Browser
+log.info({ action: 'click' })
+// → Sent to /api/_evlog/ingest
+// → Enriched & drained server-side`,
+  },
+  {
     title: 'Pretty & JSON',
     description: 'Human-readable in dev, machine-parseable JSON in production.',
     code: `[INFO] POST /api/checkout (234ms)
   user: { id: 1, plan: "pro" }
   cart: { items: 3 }`,
+  },
+  {
+    title: 'Agent-Ready',
+    description: 'Structured JSON output that AI agents can parse and understand.',
+    code: `{
+  "level": "error",
+  "why": "Card declined",
+  "fix": "Try another card"
+}`,
   },
 ]
 </script>
