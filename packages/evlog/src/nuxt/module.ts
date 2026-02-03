@@ -7,6 +7,7 @@ import {
   createResolver,
   defineNuxtModule,
 } from '@nuxt/kit'
+import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, SamplingConfig, TransportConfig } from '../types'
 
 export interface ModuleOptions {
@@ -81,6 +82,13 @@ export default defineNuxtModule<ModuleOptions>({
 
     const transportEnabled = options.transport?.enabled ?? false
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
+
+    // Register custom error handler for proper EvlogError serialization
+    // Only set if not already configured to avoid overwriting user's custom handler
+    // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
+    nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
+      nitroConfig.errorHandler = nitroConfig.errorHandler || resolver.resolve('../nitro/errorHandler')
+    })
 
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {

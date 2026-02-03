@@ -5,13 +5,16 @@ export type { ParsedError }
 
 export function parseError(error: unknown): ParsedError {
   if (error && typeof error === 'object' && 'data' in error) {
-    const { data, message: fetchMessage, statusCode: fetchStatusCode } = error as FetchError
+    const { data, message: fetchMessage, statusCode: fetchStatusCode, status: fetchStatus } = error as FetchError & { status?: number }
 
-    const evlogData = data?.data as { why?: string, fix?: string, link?: string } | undefined
+    // Support both nested data.data (fetch response) and direct data (EvlogError)
+    const evlogData = (data?.data ?? data) as { why?: string, fix?: string, link?: string } | undefined
 
     return {
-      message: data?.message || fetchMessage || 'An error occurred',
-      status: data?.statusCode || fetchStatusCode || 500,
+      // Prefer statusText, then statusMessage (or message) for the error message
+      message: data?.statusText || data?.statusMessage || data?.message || fetchMessage || 'An error occurred',
+      // Prefer status, then statusCode for the status value
+      status: data?.status || data?.statusCode || fetchStatus || fetchStatusCode || 500,
       why: evlogData?.why,
       fix: evlogData?.fix,
       link: evlogData?.link,

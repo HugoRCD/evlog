@@ -18,6 +18,7 @@ import { colors, isServer } from './utils'
  */
 export class EvlogError extends Error {
 
+  /** HTTP status code */
   readonly status: number
   readonly why?: string
   readonly fix?: string
@@ -40,14 +41,27 @@ export class EvlogError extends Error {
     }
   }
 
+  /** HTTP status text (alias for message) */
+  get statusText(): string {
+    return this.message
+  }
+
+  /** HTTP status code (alias for compatibility) */
   get statusCode(): number {
     return this.status
   }
 
-  get data() {
-    return this.why || this.fix || this.link
-      ? { why: this.why, fix: this.fix, link: this.link }
-      : undefined
+  /** HTTP status message (alias for compatibility) */
+  get statusMessage(): string {
+    return this.message
+  }
+
+  /** Structured data for serialization */
+  get data(): { why?: string, fix?: string, link?: string } | undefined {
+    if (this.why || this.fix || this.link) {
+      return { why: this.why, fix: this.fix, link: this.link }
+    }
+    return undefined
   }
 
   override toString(): string {
@@ -85,17 +99,15 @@ export class EvlogError extends Error {
   }
 
   toJSON(): Record<string, unknown> {
+    const { data } = this
     return {
       name: this.name,
       message: this.message,
       status: this.status,
-      why: this.why,
-      fix: this.fix,
-      link: this.link,
-      cause: this.cause instanceof Error
-        ? { name: this.cause.name, message: this.cause.message }
-        : undefined,
-      stack: this.stack,
+      ...(data && { data }),
+      ...(this.cause instanceof Error && {
+        cause: { name: this.cause.name, message: this.cause.message },
+      }),
     }
   }
 
@@ -105,7 +117,7 @@ export class EvlogError extends Error {
  * Create a structured error with context for debugging and user-facing messages.
  *
  * @param options - Error message string or full options object
- * @returns EvlogError instance compatible with Nitro's error handling
+ * @returns EvlogError with HTTP metadata (`status`, `statusText`) and `data`; also includes `statusCode` and `statusMessage` for legacy compatibility
  *
  * @example
  * ```ts
@@ -126,4 +138,4 @@ export function createError(options: ErrorOptions | string): EvlogError {
   return new EvlogError(options)
 }
 
-export const createEvlogError = createError
+export { createError as createEvlogError }
