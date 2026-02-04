@@ -16,7 +16,7 @@ export default defineNuxtConfig({
 
   vite: {
     server: {
-      allowedHosts: ["sb-6uos9skfpabx.vercel.run"]
+      allowedHosts: ["sb-3hmr2jru0rrj.vercel.run"]
     }
   },
 
