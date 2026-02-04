@@ -28,9 +28,8 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
         response = await $fetch(options.endpoint, {
           method: options.method || 'GET',
         })
-      }
-      // Otherwise execute the provided function
-      else if (fn) {
+      } else if (fn) {
+        // Otherwise execute the provided function
         response = await fn()
       }
 
