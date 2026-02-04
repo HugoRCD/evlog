@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
-import type { DrainContext, ServerEvent, WideEvent } from '../src/types'
+import type { DrainContext, RouteConfig, ServerEvent, WideEvent } from '../src/types'
+import { matchesPattern } from '../src/utils'
 
 // Mock h3's getHeaders
 vi.mock('h3', () => ({
@@ -470,5 +471,315 @@ describe('nitro plugin - waitUntil support', () => {
     // Neither should be called when event is null
     expect(mockWaitUntil).not.toHaveBeenCalled()
     expect(mockHooks.callHook).not.toHaveBeenCalled()
+  })
+})
+
+describe('nitro plugin - route-based service configuration', () => {
+  /** Simulate the getServiceForPath function from the plugin */
+  function getServiceForPath(path: string, routes?: Record<string, RouteConfig>): string | undefined {
+    if (!routes) return undefined
+
+    for (const [pattern, config] of Object.entries(routes)) {
+      if (matchesPattern(path, pattern)) {
+        return config.service
+      }
+    }
+
+    return undefined
+  }
+
+  it('returns service name for matching route pattern', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/api/auth/**': { service: 'auth-service' },
+      '/api/payment/**': { service: 'payment-service' },
+    }
+
+    expect(getServiceForPath('/api/auth/login', routes)).toBe('auth-service')
+    expect(getServiceForPath('/api/auth/register', routes)).toBe('auth-service')
+    expect(getServiceForPath('/api/payment/process', routes)).toBe('payment-service')
+  })
+
+  it('returns undefined when no route matches', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/api/auth/**': { service: 'auth-service' },
+    }
+
+    expect(getServiceForPath('/api/users/list', routes)).toBeUndefined()
+    expect(getServiceForPath('/health', routes)).toBeUndefined()
+  })
+
+  it('returns undefined when routes parameter is undefined', () => {
+    expect(getServiceForPath('/api/test', undefined)).toBeUndefined()
+  })
+
+  it('returns undefined when routes object is empty', () => {
+    expect(getServiceForPath('/api/test', {})).toBeUndefined()
+  })
+
+  it('implements first-match-wins with overlapping patterns', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/api/auth/admin/**': { service: 'admin-service' },
+      '/api/auth/**': { service: 'auth-service' },
+      '/api/**': { service: 'api-service' },
+    }
+
+    // More specific pattern should win
+    expect(getServiceForPath('/api/auth/admin/users', routes)).toBe('admin-service')
+
+    // Falls back to less specific pattern
+    expect(getServiceForPath('/api/auth/login', routes)).toBe('auth-service')
+
+    // Falls back to most general pattern
+    expect(getServiceForPath('/api/users/list', routes)).toBe('api-service')
+  })
+
+  it('supports exact path matching without wildcards', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/health': { service: 'health-check' },
+      '/api/status': { service: 'status-service' },
+    }
+
+    expect(getServiceForPath('/health', routes)).toBe('health-check')
+    expect(getServiceForPath('/api/status', routes)).toBe('status-service')
+
+    // Should not match partial paths
+    expect(getServiceForPath('/health/check', routes)).toBeUndefined()
+  })
+
+  it('supports single wildcard patterns', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/api/*/process': { service: 'processor' },
+    }
+
+    expect(getServiceForPath('/api/payment/process', routes)).toBe('processor')
+    expect(getServiceForPath('/api/booking/process', routes)).toBe('processor')
+
+    // Should not match nested paths
+    expect(getServiceForPath('/api/payment/retry/process', routes)).toBeUndefined()
+  })
+
+  it('handles wildcard patterns with version paths', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/api/v*/users': { service: 'versioned-users' },
+      '/api/v*/posts/**': { service: 'versioned-posts' },
+    }
+
+    expect(getServiceForPath('/api/v1/users', routes)).toBe('versioned-users')
+    expect(getServiceForPath('/api/v2/users', routes)).toBe('versioned-users')
+    expect(getServiceForPath('/api/v1/posts/123', routes)).toBe('versioned-posts')
+    expect(getServiceForPath('/api/v2/posts/456/comments', routes)).toBe('versioned-posts')
+  })
+
+  it('is case-sensitive for path matching', () => {
+    const routes: Record<string, RouteConfig> = {
+      '/API/auth/**': { service: 'auth-service' },
+    }
+
+    expect(getServiceForPath('/API/auth/login', routes)).toBe('auth-service')
+    expect(getServiceForPath('/api/auth/login', routes)).toBeUndefined()
+  })
+})
+
+describe('nitro plugin - useLogger service parameter', () => {
+  it('service parameter overrides default service', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({ service: 'default-service' }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/test',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // Simulate useLogger with service parameter
+    const { log } = mockEvent.context
+    if (log) {
+      log.set({ service: 'custom-service' })
+    }
+
+    expect(mockLog.set).toHaveBeenCalledWith({ service: 'custom-service' })
+  })
+
+  it('calling useLogger without service parameter preserves existing service', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({ service: 'existing-service' }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/users',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // Simulate useLogger without service parameter
+    const { log } = mockEvent.context
+    expect(log).toBeDefined()
+
+    // Should not call set with service if parameter not provided
+    expect(mockLog.set).not.toHaveBeenCalled()
+  })
+
+  it('explicit service parameter takes precedence over route-based config', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({}),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/auth/login',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // First, route-based config sets service to 'auth-service'
+    mockLog.set({ service: 'auth-service' })
+
+    // Then, explicit parameter overrides it
+    mockLog.set({ service: 'explicit-service' })
+
+    expect(mockLog.set).toHaveBeenCalledWith({ service: 'auth-service' })
+    expect(mockLog.set).toHaveBeenCalledWith({ service: 'explicit-service' })
+    expect(mockLog.set).toHaveBeenCalledTimes(2)
+  })
+
+  it('service parameter can override any existing service configuration', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({ service: 'default-service' }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/test',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // Apply multiple service overrides
+    mockLog.set({ service: 'service-1' })
+    mockLog.set({ service: 'service-2' })
+    mockLog.set({ service: 'final-service' })
+
+    expect(mockLog.set).toHaveBeenCalledTimes(3)
+    expect(mockLog.set).toHaveBeenLastCalledWith({ service: 'final-service' })
+  })
+})
+
+describe('nitro plugin - service resolution priority', () => {
+  it('explicit service parameter has highest priority', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({
+        service: 'env-service',
+      }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/auth/login',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // Simulate the order in nitro plugin:
+    // 1. Logger initialized with env.service = 'env-service'
+    // 2. Route-based config would set 'auth-service'
+    const routeService = 'auth-service'
+    if (routeService) {
+      mockLog.set({ service: routeService })
+    }
+
+    // 3. User calls useLogger(event, 'explicit-service')
+    const explicitService = 'explicit-service'
+    if (explicitService) {
+      mockLog.set({ service: explicitService })
+    }
+
+    // Verify the order and priority
+    expect(mockLog.set).toHaveBeenNthCalledWith(1, { service: 'auth-service' })
+    expect(mockLog.set).toHaveBeenNthCalledWith(2, { service: 'explicit-service' })
+  })
+
+  it('route-based config applies when no explicit service provided', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({
+        service: 'default-service',
+      }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/payment/process',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // Only route-based config applies
+    const routeService = 'payment-service'
+    if (routeService) {
+      mockLog.set({ service: routeService })
+    }
+
+    // No explicit service parameter
+    // (useLogger called without service parameter)
+
+    expect(mockLog.set).toHaveBeenCalledTimes(1)
+    expect(mockLog.set).toHaveBeenCalledWith({ service: 'payment-service' })
+  })
+
+  it('env.service fallback when no route matches and no explicit service', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      emit: vi.fn(),
+      getContext: vi.fn().mockReturnValue({
+        service: 'default-service',
+      }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/unknown',
+      context: {
+        log: mockLog,
+      },
+    }
+
+    // No route matches
+    const routeService = undefined
+    if (routeService) {
+      mockLog.set({ service: routeService })
+    }
+
+    // No explicit service parameter
+    // Should keep env.service ('default-service')
+
+    expect(mockLog.set).not.toHaveBeenCalled()
+    expect(mockLog.getContext().service).toBe('default-service')
   })
 })

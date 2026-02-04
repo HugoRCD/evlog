@@ -8,7 +8,7 @@ import {
   defineNuxtModule,
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
-import type { EnvironmentContext, SamplingConfig, TransportConfig } from '../types'
+import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig } from '../types'
 
 export interface ModuleOptions {
   /**
@@ -37,6 +37,21 @@ export interface ModuleOptions {
    * @example ['/api/_nuxt_icon/**', '/health']
    */
   exclude?: string[]
+
+  /**
+   * Route-specific service configuration.
+   * Allows setting different service names for different routes.
+   * Patterns are matched using glob syntax.
+   *
+   * @example
+   * ```ts
+   * routes: {
+   *   '/api/foo/**': { service: 'service1' },
+   *   '/api/bar/**': { service: 'service2' }
+   * }
+   * ```
+   */
+  routes?: Record<string, RouteConfig>
 
   /**
    * Sampling configuration for filtering logs.

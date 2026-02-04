@@ -14,6 +14,11 @@ export default defineNuxtConfig({
     transport: {
       enabled: true,
     },
+    routes: {
+      '/api/auth/**': { service: 'auth-service' },
+      '/api/payment/**': { service: 'payment-service' },
+      '/api/booking/**': { service: 'booking-service' },
+    },
     sampling: {
       rates: {
         info: 10,
