@@ -354,7 +354,16 @@ export interface H3EventContext {
 export interface ServerEvent {
   method: string
   path: string
-  context: H3EventContext
+  context: H3EventContext & {
+    /** Cloudflare Workers context (available when deployed to CF Workers) */
+    cloudflare?: {
+      context: {
+        waitUntil: (promise: Promise<unknown>) => void
+      }
+    }
+    /** Vercel Edge context (available when deployed to Vercel Edge) */
+    waitUntil?: (promise: Promise<unknown>) => void
+  }
   node?: { res?: { statusCode?: number } }
   response?: Response
 }

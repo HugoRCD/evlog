@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
-import type { DrainContext } from '../src/types'
+import type { DrainContext, ServerEvent, WideEvent } from '../src/types'
 
 // Mock h3's getHeaders
 vi.mock('h3', () => ({
@@ -295,5 +295,180 @@ describe('nitro plugin - drain hook headers', () => {
 
     // Verify safe headers are kept
     expect(drainContext!.headers).toHaveProperty('content-type', 'application/json')
+  })
+})
+
+describe('nitro plugin - waitUntil support', () => {
+  /** Simulate the callDrainHook function from the plugin */
+  function callDrainHook(
+    nitroApp: { hooks: { callHook: (name: string, ctx: DrainContext) => Promise<void> } },
+    emittedEvent: WideEvent | null,
+    event: ServerEvent,
+  ): void {
+    if (!emittedEvent) return
+
+    const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+      event: emittedEvent,
+      request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+      headers: {},
+    }).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    })
+
+    // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+    const waitUntil = event.context.cloudflare?.context?.waitUntil
+      ?? event.context.waitUntil
+
+    if (typeof waitUntil === 'function') {
+      waitUntil(drainPromise)
+    }
+  }
+
+  it('calls waitUntil with Cloudflare Workers context', () => {
+    const mockWaitUntil = vi.fn()
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/test',
+      context: {
+        cloudflare: {
+          context: {
+            waitUntil: mockWaitUntil,
+          },
+        },
+      },
+    }
+
+    const mockEmittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      service: 'test',
+      environment: 'production',
+    }
+
+    callDrainHook({ hooks: mockHooks }, mockEmittedEvent, mockEvent)
+
+    // Verify waitUntil was called with a promise
+    expect(mockWaitUntil).toHaveBeenCalledTimes(1)
+    expect(mockWaitUntil).toHaveBeenCalledWith(expect.any(Promise))
+  })
+
+  it('calls waitUntil with Vercel Edge context', () => {
+    const mockWaitUntil = vi.fn()
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/users',
+      context: {
+        waitUntil: mockWaitUntil,
+      },
+    }
+
+    const mockEmittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      service: 'test',
+      environment: 'production',
+    }
+
+    callDrainHook({ hooks: mockHooks }, mockEmittedEvent, mockEvent)
+
+    // Verify waitUntil was called with a promise
+    expect(mockWaitUntil).toHaveBeenCalledTimes(1)
+    expect(mockWaitUntil).toHaveBeenCalledWith(expect.any(Promise))
+  })
+
+  it('prefers Cloudflare waitUntil over Vercel when both are present', () => {
+    const mockCfWaitUntil = vi.fn()
+    const mockVercelWaitUntil = vi.fn()
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/checkout',
+      context: {
+        cloudflare: {
+          context: {
+            waitUntil: mockCfWaitUntil,
+          },
+        },
+        waitUntil: mockVercelWaitUntil,
+      },
+    }
+
+    const mockEmittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      service: 'test',
+      environment: 'production',
+    }
+
+    callDrainHook({ hooks: mockHooks }, mockEmittedEvent, mockEvent)
+
+    // Cloudflare should be preferred
+    expect(mockCfWaitUntil).toHaveBeenCalledTimes(1)
+    expect(mockVercelWaitUntil).not.toHaveBeenCalled()
+  })
+
+  it('works without waitUntil (traditional Node.js server)', () => {
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/health',
+      context: {
+        // No cloudflare or waitUntil context
+      },
+    }
+
+    const mockEmittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      service: 'test',
+      environment: 'development',
+    }
+
+    // Should not throw
+    expect(() => {
+      callDrainHook({ hooks: mockHooks }, mockEmittedEvent, mockEvent)
+    }).not.toThrow()
+
+    // Drain hook should still be called
+    expect(mockHooks.callHook).toHaveBeenCalledWith('evlog:drain', expect.any(Object))
+  })
+
+  it('does not call waitUntil when emittedEvent is null', () => {
+    const mockWaitUntil = vi.fn()
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/test',
+      context: {
+        cloudflare: {
+          context: {
+            waitUntil: mockWaitUntil,
+          },
+        },
+      },
+    }
+
+    callDrainHook({ hooks: mockHooks }, null, mockEvent)
+
+    // Neither should be called when event is null
+    expect(mockWaitUntil).not.toHaveBeenCalled()
+    expect(mockHooks.callHook).not.toHaveBeenCalled()
   })
 })

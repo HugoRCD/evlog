@@ -73,14 +73,23 @@ function getResponseStatus(event: ServerEvent): number {
 }
 
 function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event: ServerEvent): void {
-  if (emittedEvent) {
-    nitroApp.hooks.callHook('evlog:drain', {
-      event: emittedEvent,
-      request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
-      headers: getSafeHeaders(event),
-    }).catch((err) => {
-      console.error('[evlog] drain failed:', err)
-    })
+  if (!emittedEvent) return
+
+  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+    event: emittedEvent,
+    request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+    headers: getSafeHeaders(event),
+  }).catch((err) => {
+    console.error('[evlog] drain failed:', err)
+  })
+
+  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+  // This ensures drains complete before the runtime terminates
+  const waitUntil = event.context.cloudflare?.context?.waitUntil
+    ?? event.context.waitUntil
+
+  if (typeof waitUntil === 'function') {
+    waitUntil(drainPromise)
   }
 }
 
