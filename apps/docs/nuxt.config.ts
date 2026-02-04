@@ -14,6 +14,12 @@ export default defineNuxtConfig({
     name: 'evlog MCP',
   },
 
+  vite: {
+    server: {
+      allowedHosts: ["sb-6uos9skfpabx.vercel.run"]
+    }
+  },
+
   mdc: {
     highlight: {
       noApiRoute: false,
