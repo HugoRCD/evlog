@@ -13,7 +13,7 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
     "better-sqlite3": "^12.6.2",
-    "docus": "latest",
+    "docus": "^5.5.0",
     "motion-v": "latest",
     "nuxt": "^4.3.0"
   },

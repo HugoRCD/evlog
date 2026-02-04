@@ -22,6 +22,8 @@ Here are the available types and scopes:
 - docs (the documentation)
 - playground (the playground)
 - module (the module)
+- deps (the dependencies)
+- repo (the repository)
 -->
 
 ### 🔗 Linked issue

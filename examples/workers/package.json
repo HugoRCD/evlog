@@ -1,0 +1,15 @@
+{
+  "name": "evlog-workers-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "wrangler deploy"
+  },
+  "dependencies": {
+    "evlog": "file:../../packages/evlog"
+  },
+  "devDependencies": {
+    "wrangler": "^3.101.0"
+  }
+}

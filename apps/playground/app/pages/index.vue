@@ -8,6 +8,14 @@ const loadingError = ref(false)
 const loadingWideEvent = ref(false)
 const loadingStructuredError = ref(false)
 
+// Tail sampling tests
+const loadingFastSingle = ref(false)
+const loadingFastBatch = ref(false)
+const loadingSlow = ref(false)
+const loadingTailError = ref(false)
+const loadingCritical = ref(false)
+const loadingPremium = ref(false)
+
 function testClientLog() {
   log.info({ action: 'test_client', timestamp: Date.now() })
 }
@@ -90,6 +98,90 @@ async function testStructuredApiError() {
     }
   } finally {
     loadingStructuredError.value = false
+  }
+}
+
+// Tail sampling test functions
+async function testFastRequest() {
+  loadingFastSingle.value = true
+  try {
+    await $fetch('/api/test/tail-sampling/fast')
+  } finally {
+    loadingFastSingle.value = false
+  }
+}
+
+async function testFastRequestBatch() {
+  loadingFastBatch.value = true
+  try {
+    // Make 20 requests in parallel
+    await Promise.all(
+      Array.from({ length: 20 }, () => $fetch('/api/test/tail-sampling/fast')),
+    )
+    toast.add({
+      title: '20 fast requests sent',
+      description: 'Check terminal - only ~10% should be logged (head sampling)',
+      color: 'info',
+    })
+  } finally {
+    loadingFastBatch.value = false
+  }
+}
+
+async function testSlowRequest() {
+  loadingSlow.value = true
+  try {
+    await $fetch('/api/test/tail-sampling/slow')
+    toast.add({
+      title: 'Slow request completed',
+      description: 'This should always be logged (duration >= 500ms)',
+      color: 'success',
+    })
+  } finally {
+    loadingSlow.value = false
+  }
+}
+
+async function testTailError() {
+  loadingTailError.value = true
+  try {
+    await $fetch('/api/test/tail-sampling/error')
+  } catch {
+    toast.add({
+      title: 'Error request triggered',
+      description: 'This should always be logged (status >= 400)',
+      color: 'error',
+    })
+  } finally {
+    loadingTailError.value = false
+  }
+}
+
+async function testCriticalPath() {
+  loadingCritical.value = true
+  try {
+    await $fetch('/api/test/critical/important')
+    toast.add({
+      title: 'Critical path request',
+      description: 'This should always be logged (path matches /api/test/critical/**)',
+      color: 'warning',
+    })
+  } finally {
+    loadingCritical.value = false
+  }
+}
+
+async function testPremiumUser() {
+  loadingPremium.value = true
+  try {
+    await $fetch('/api/test/tail-sampling/premium')
+    toast.add({
+      title: 'Premium user request',
+      description: 'This should always be logged (evlog:emit:keep hook)',
+      color: 'success',
+    })
+  } finally {
+    loadingPremium.value = false
   }
 }
 </script>
@@ -184,6 +276,102 @@ async function testStructuredApiError() {
             color="error"
             @click="testStructuredApiError"
           />
+        </div>
+      </section>
+
+      <USeparator />
+
+      <section class="space-y-4">
+        <h2 class="text-xl font-semibold text-highlighted">
+          Tail Sampling
+        </h2>
+        <p class="text-muted text-sm">
+          Test how tail sampling rescues logs that would be dropped by head sampling.
+          Config: <code class="text-highlighted">rates: { info: 10 }</code> (only 10% logged by default).
+        </p>
+
+        <div class="grid gap-4 md:grid-cols-2">
+          <div class="p-4 rounded-lg bg-elevated space-y-3">
+            <h3 class="font-medium text-highlighted">
+              Head Sampling Only (10%)
+            </h3>
+            <p class="text-sm text-muted">
+              Fast requests - only ~10% will appear in logs.
+            </p>
+            <div class="flex gap-2">
+              <UButton
+                label="1 Request"
+                :loading="loadingFastSingle"
+                variant="outline"
+                @click="testFastRequest"
+              />
+              <UButton
+                label="20 Requests"
+                :loading="loadingFastBatch"
+                @click="testFastRequestBatch"
+              />
+            </div>
+          </div>
+
+          <div class="p-4 rounded-lg bg-elevated space-y-3">
+            <h3 class="font-medium text-highlighted">
+              Tail: Duration >= 500ms
+            </h3>
+            <p class="text-sm text-muted">
+              Slow requests (600ms) - always logged.
+            </p>
+            <UButton
+              label="Slow Request"
+              :loading="loadingSlow"
+              color="warning"
+              @click="testSlowRequest"
+            />
+          </div>
+
+          <div class="p-4 rounded-lg bg-elevated space-y-3">
+            <h3 class="font-medium text-highlighted">
+              Tail: Status >= 400
+            </h3>
+            <p class="text-sm text-muted">
+              Error responses - always logged.
+            </p>
+            <UButton
+              label="Error Request"
+              :loading="loadingTailError"
+              color="error"
+              @click="testTailError"
+            />
+          </div>
+
+          <div class="p-4 rounded-lg bg-elevated space-y-3">
+            <h3 class="font-medium text-highlighted">
+              Tail: Path Pattern
+            </h3>
+            <p class="text-sm text-muted">
+              Critical paths (<code class="text-xs">/api/test/critical/**</code>) - always logged.
+            </p>
+            <UButton
+              label="Critical Path"
+              :loading="loadingCritical"
+              color="warning"
+              @click="testCriticalPath"
+            />
+          </div>
+
+          <div class="p-4 rounded-lg bg-elevated space-y-3 md:col-span-2">
+            <h3 class="font-medium text-highlighted">
+              Tail: Custom Hook (evlog:emit:keep)
+            </h3>
+            <p class="text-sm text-muted">
+              Premium users - always logged via custom Nitro hook.
+            </p>
+            <UButton
+              label="Premium User Request"
+              :loading="loadingPremium"
+              color="success"
+              @click="testPremiumUser"
+            />
+          </div>
         </div>
       </section>
     </div>

@@ -31,3 +31,4 @@ logs
 .workflow-data*
 apps/web/.data
 apps/chat/.data
+.codex/environments/

@@ -3,8 +3,9 @@
 [![npm version](https://img.shields.io/npm/v/evlog?color=black)](https://npmjs.com/package/evlog)
 [![npm downloads](https://img.shields.io/npm/dm/evlog?color=black)](https://npm.chart.dev/evlog)
 [![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
-[![bundle size](https://img.shields.io/bundlephobia/minzip/evlog?color=black&label=size)](https://bundlephobia.com/package/evlog)
+[![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Nuxt](https://img.shields.io/badge/Nuxt-black?logo=nuxt&logoColor=white)](https://nuxt.com/)
+[![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev)
 [![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
 **Your logs are lying to you.**
@@ -94,11 +95,23 @@ export default defineNuxtConfig({
   evlog: {
     env: {
       service: 'my-app',
-      environment: process.env.NODE_ENV,
     },
+    // Optional: only log specific routes (supports glob patterns)
+    include: ['/api/**'],
   },
 })
 ```
+
+> **Tip:** Use `$production` to enable [sampling](#sampling) only in production:
+> ```typescript
+> export default defineNuxtConfig({
+>   modules: ['evlog/nuxt'],
+>   evlog: { env: { service: 'my-app' } },
+>   $production: {
+>     evlog: { sampling: { rates: { info: 10, warn: 50, debug: 0 } } },
+>   },
+> })
+> ```
 
 That's it. Now use `useLogger(event)` in any API route:
 
@@ -334,6 +347,128 @@ async function processSyncJob(job: Job) {
 }
 ```
 
+## Cloudflare Workers
+
+Use the Workers adapter for structured logs and correct platform severity.
+
+```typescript
+// src/index.ts
+import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'
+
+initWorkersLogger({
+  env: { service: 'edge-api' },
+})
+
+export default {
+  async fetch(request: Request) {
+    const log = createWorkersLogger(request)
+
+    try {
+      log.set({ route: 'health' })
+      const response = new Response('ok', { status: 200 })
+      log.emit({ status: response.status })
+      return response
+    } catch (error) {
+      log.error(error as Error)
+      log.emit({ status: 500 })
+      throw error
+    }
+  },
+}
+```
+
+Disable invocation logs to avoid duplicate request logs:
+
+```toml
+# wrangler.toml
+[observability.logs]
+invocation_logs = false
+```
+
+Notes:
+- `requestId` defaults to `cf-ray` when available
+- `request.cf` is included (colo, country, asn) unless disabled
+- Use `headerAllowlist` to avoid logging sensitive headers
+
+## Adapters
+
+Send your logs to external observability platforms with built-in adapters.
+
+### Axiom
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_AXIOM_TOKEN=xaat-your-token
+NUXT_AXIOM_DATASET=your-dataset
+```
+
+### OTLP (OpenTelemetry)
+
+Works with Grafana, Datadog, Honeycomb, and any OTLP-compatible backend.
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createOTLPDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_OTLP_ENDPOINT=http://localhost:4318
+```
+
+### Multiple Destinations
+
+Send logs to multiple services:
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+
+export default defineNitroPlugin((nitroApp) => {
+  const axiom = createAxiomDrain()
+  const otlp = createOTLPDrain()
+
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.allSettled([axiom(ctx), otlp(ctx)])
+  })
+})
+```
+
+### Custom Adapters
+
+Build your own adapter for any destination:
+
+```typescript
+// server/plugins/evlog-drain.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await fetch('https://your-service.com/logs', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(ctx.event),
+    })
+  })
+})
+```
+
+> See the [full documentation](https://evlog.hrcd.fr/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
+
 ## API Reference
 
 ### `initLogger(config)`
@@ -350,8 +485,94 @@ initLogger({
     region?: string      // Deployment region
   },
   pretty?: boolean       // Pretty print (default: true in dev)
+  stringify?: boolean    // JSON.stringify output (default: true, false for Workers)
+  include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
+  sampling?: {
+    rates?: {            // Head sampling (random per level)
+      info?: number      // 0-100, default 100
+      warn?: number      // 0-100, default 100
+      debug?: number     // 0-100, default 100
+      error?: number     // 0-100, default 100 (always logged unless set to 0)
+    }
+    keep?: Array<{       // Tail sampling (force keep based on outcome)
+      status?: number    // Keep if status >= value
+      duration?: number  // Keep if duration >= value (ms)
+      path?: string      // Keep if path matches glob pattern
+    }>
+  }
 })
 ```
+
+### Sampling
+
+At scale, logging everything can become expensive. evlog supports two sampling strategies:
+
+#### Head Sampling (rates)
+
+Random sampling based on log level, decided before the request completes:
+
+```typescript
+initLogger({
+  sampling: {
+    rates: {
+      info: 10,   // Keep 10% of info logs
+      warn: 50,   // Keep 50% of warning logs
+      debug: 0,   // Disable debug logs
+      // error defaults to 100% (always logged)
+    },
+  },
+})
+```
+
+#### Tail Sampling (keep)
+
+Force-keep logs based on request outcome, evaluated after the request completes. Useful to always capture slow requests or critical paths:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    sampling: {
+      rates: { info: 10 },  // Only 10% of info logs
+      keep: [
+        { duration: 1000 },           // Always keep if duration >= 1000ms
+        { status: 400 },              // Always keep if status >= 400
+        { path: '/api/critical/**' }, // Always keep critical paths
+      ],
+    },
+  },
+})
+```
+
+#### Custom Tail Sampling Hook
+
+For business-specific conditions (premium users, feature flags), use the `evlog:emit:keep` Nitro hook:
+
+```typescript
+// server/plugins/evlog-custom.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+    // Always keep logs for premium users
+    if (ctx.context.user?.premium) {
+      ctx.shouldKeep = true
+    }
+  })
+})
+```
+
+### Pretty Output Format
+
+In development, evlog uses a compact tree format:
+
+```
+16:45:31.060 INFO [my-app] GET /api/checkout 200 in 234ms
+  ├─ user: id=123 plan=premium
+  ├─ cart: items=3 total=9999
+  └─ payment: id=pay_xyz method=card
+```
+
+In production (`pretty: false`), logs are emitted as JSON for machine parsing.
 
 ### `log`
 
@@ -380,6 +601,34 @@ log.set({ user: { id: '123' } })  // Add context
 log.error(error, { step: 'x' })   // Log error with context
 log.emit()                         // Emit final event
 log.getContext()                   // Get current context
+```
+
+### `initWorkersLogger(options?)`
+
+Initialize evlog for Cloudflare Workers (object logs + correct severity).
+
+```typescript
+import { initWorkersLogger } from 'evlog/workers'
+
+initWorkersLogger({
+  env: { service: 'edge-api' },
+})
+```
+
+### `createWorkersLogger(request, options?)`
+
+Create a request-scoped logger for Workers. Auto-extracts `cf-ray`, `request.cf`, method, and path.
+
+```typescript
+import { createWorkersLogger } from 'evlog/workers'
+
+const log = createWorkersLogger(request, {
+  requestId: 'custom-id',      // Override cf-ray (default: cf-ray header)
+  headers: ['x-request-id'],   // Headers to include (default: none)
+})
+
+log.set({ user: { id: '123' } })
+log.emit({ status: 200 })
 ```
 
 ### `createError(options)`

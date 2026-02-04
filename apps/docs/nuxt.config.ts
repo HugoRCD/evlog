@@ -15,8 +15,14 @@ export default defineNuxtConfig({
   },
 
   vite: {
-    server: {
-      allowedHosts: ["sb-3hmr2jru0rrj.vercel.run"]
+    optimizeDeps: {
+      include: ['@vercel/oidc'],
+    },
+  },
+
+  content: {
+    experimental: {
+      sqliteConnector: 'native'
     }
   },
 

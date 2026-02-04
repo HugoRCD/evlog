@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createError, createEvlogError, EvlogError } from '../src/error'
+import { parseError } from '../src/runtime/utils/parseError'
 
 describe('EvlogError', () => {
   it('creates error with message only', () => {
@@ -36,10 +37,18 @@ describe('EvlogError', () => {
   })
 
   describe('HTTP compatibility', () => {
-    it('provides statusCode getter for HTTP errors', () => {
+    it('provides status/statusText properties', () => {
+      const error = new EvlogError({ message: 'Not found', status: 404 })
+
+      expect(error.status).toBe(404)
+      expect(error.statusText).toBe('Not found')
+    })
+
+    it('provides statusCode/statusMessage aliases', () => {
       const error = new EvlogError({ message: 'Not found', status: 404 })
 
       expect(error.statusCode).toBe(404)
+      expect(error.statusMessage).toBe('Not found')
       expect(error.statusCode).toBe(error.status)
     })
 
@@ -114,7 +123,7 @@ describe('EvlogError', () => {
   })
 
   describe('toJSON()', () => {
-    it('serializes error to plain object', () => {
+    it('serializes error to plain object without duplication', () => {
       const cause = new Error('Original')
       const error = new EvlogError({
         message: 'Test error',
@@ -130,14 +139,25 @@ describe('EvlogError', () => {
       expect(json.name).toBe('EvlogError')
       expect(json.message).toBe('Test error')
       expect(json.status).toBe(400)
-      expect(json.why).toBe('Because')
-      expect(json.fix).toBe('Do this')
-      expect(json.link).toBe('https://example.com')
+      expect(json.data).toEqual({
+        why: 'Because',
+        fix: 'Do this',
+        link: 'https://example.com',
+      })
       expect(json.cause).toEqual({ name: 'Error', message: 'Original' })
-      expect(json.stack).toBeDefined()
+      // Should NOT include duplicate fields
+      expect(json.statusCode).toBeUndefined()
+      expect(json.statusMessage).toBeUndefined()
+      expect(json.statusText).toBeUndefined()
     })
 
-    it('handles missing cause', () => {
+    it('omits data when no extra fields', () => {
+      const error = new EvlogError('Simple error')
+      const json = error.toJSON()
+      expect(json.data).toBeUndefined()
+    })
+
+    it('omits cause when not present', () => {
       const error = new EvlogError('No cause')
       const json = error.toJSON()
       expect(json.cause).toBeUndefined()
@@ -182,5 +202,119 @@ describe('createEvlogError', () => {
 
     expect(error).toBeInstanceOf(EvlogError)
     expect(error.status).toBe(401)
+  })
+})
+
+describe('parseError', () => {
+  describe('status/statusText format', () => {
+    it('parses status and statusText', () => {
+      const fetchError = {
+        data: {
+          status: 422,
+          statusText: 'Validation failed',
+          data: { why: 'Invalid input' },
+        },
+        message: 'Fetch error',
+        statusCode: 500,
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(422)
+      expect(parsed.message).toBe('Validation failed')
+      expect(parsed.why).toBe('Invalid input')
+    })
+
+    it('extracts evlog data (why, fix, link)', () => {
+      const fetchError = {
+        data: {
+          status: 400,
+          statusText: 'Bad request',
+          data: {
+            why: 'Missing required field',
+            fix: 'Add the email field',
+            link: 'https://docs.example.com',
+          },
+        },
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.why).toBe('Missing required field')
+      expect(parsed.fix).toBe('Add the email field')
+      expect(parsed.link).toBe('https://docs.example.com')
+    })
+  })
+
+  describe('statusCode/statusMessage format', () => {
+    it('parses statusCode and statusMessage', () => {
+      const fetchError = {
+        data: {
+          statusCode: 404,
+          statusMessage: 'Not found',
+          data: { why: 'Resource does not exist' },
+        },
+        message: 'Fetch error',
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(404)
+      expect(parsed.message).toBe('Not found')
+      expect(parsed.why).toBe('Resource does not exist')
+    })
+  })
+
+  describe('fallback behavior', () => {
+    it('falls back to fetchError status when data.status is missing', () => {
+      const fetchError = {
+        data: { message: 'Error' },
+        status: 503,
+        statusCode: 502,
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(503)
+    })
+
+    it('falls back to fetchError message', () => {
+      const fetchError = {
+        data: {},
+        message: 'Network error',
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.message).toBe('Network error')
+    })
+
+    it('defaults to 500 and generic message', () => {
+      const fetchError = { data: {} }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.status).toBe(500)
+      expect(parsed.message).toBe('An error occurred')
+    })
+  })
+
+  describe('non-fetch errors', () => {
+    it('parses standard Error', () => {
+      const error = new Error('Something broke')
+
+      const parsed = parseError(error)
+
+      expect(parsed.message).toBe('Something broke')
+      expect(parsed.status).toBe(500)
+      expect(parsed.raw).toBe(error)
+    })
+
+    it('parses unknown values', () => {
+      const parsed = parseError('string error')
+
+      expect(parsed.message).toBe('string error')
+      expect(parsed.status).toBe(500)
+    })
   })
 })

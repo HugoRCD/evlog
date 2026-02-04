@@ -1,89 +1,124 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
 
+const prefersReducedMotion = ref(false)
+
+onMounted(() => {
+  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
+})
+
 const features = [
   {
-    icon: 'i-lucide-layers',
     title: 'Wide Events',
-    description: 'One comprehensive log per request containing all context. No more scattered logs—just signal, no noise.',
+    description: 'Accumulate context throughout your request. Emit once at the end with everything you need.',
+    code: `log.set({ user: { id, plan } })
+log.set({ cart: { items, total } })
+// → One event with all context`,
   },
   {
-    icon: 'i-lucide-shield-alert',
     title: 'Structured Errors',
-    description: 'Errors with why, fix, and link fields. Actionable context for debugging and resolution.',
+    description: 'Errors that explain why they happened and how to fix them.',
+    code: `throw createError({
+  message: 'Payment failed',
+  why: 'Card declined',
+  fix: 'Try another card',
+})`,
   },
   {
-    icon: 'i-lucide-git-branch',
-    title: 'Request Scoping',
-    description: 'Accumulate context throughout the request lifecycle. Emit once at the end with complete data.',
+    title: 'Log Draining',
+    description: 'Send logs to external services in fire-and-forget mode. Never blocks your response.',
+    code: `nitroApp.hooks.hook('evlog:drain',
+  async (ctx) => {
+    await sendToAxiom(ctx.event)
+  }
+)`,
   },
   {
-    icon: 'i-lucide-palette',
-    title: 'Pretty for Dev, JSON for Prod',
-    description: 'Human-readable logs in development, machine-parseable JSON in production.',
+    title: 'Built-in Adapters',
+    description: 'Zero-config adapters for Axiom, OTLP (Grafana, Datadog, Honeycomb), or build your own.',
+    code: `import { createAxiomDrain } from 'evlog/axiom'
+import { createOTLPDrain } from 'evlog/otlp'
+// Reads config from env vars`,
   },
   {
-    icon: 'i-lucide-zap',
-    title: 'Nuxt & Nitro Ready',
-    description: 'First-class integration with Nuxt and Nitro. Auto-create loggers, auto-emit at request end.',
+    title: 'Smart Sampling',
+    description: 'Head and tail sampling. Keep errors and slow requests, reduce noise.',
+    code: `sampling: {
+  rates: { info: 10, warn: 50 },
+  keep: [{ status: 400 }]
+}`,
   },
   {
-    icon: 'i-lucide-bot',
+    title: 'Nuxt & Nitro',
+    description: 'First-class integration. Auto-create loggers, auto-emit at request end.',
+    code: `export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+})`,
+  },
+  {
+    title: 'Client Transport',
+    description: 'Send browser logs to your server. Automatic enrichment with server context.',
+    code: `// Browser
+log.info({ action: 'click' })
+// → Sent to /api/_evlog/ingest
+// → Enriched & drained server-side`,
+  },
+  {
+    title: 'Pretty & JSON',
+    description: 'Human-readable in dev, machine-parseable JSON in production.',
+    code: `[INFO] POST /api/checkout (234ms)
+  user: { id: 1, plan: "pro" }
+  cart: { items: 3 }`,
+  },
+  {
     title: 'Agent-Ready',
-    description: 'Structured output that AI agents can parse. Perfect for automated debugging in the agentic era.',
+    description: 'Structured JSON output that AI agents can parse and understand.',
+    code: `{
+  "level": "error",
+  "why": "Card declined",
+  "fix": "Try another card"
+}`,
   },
 ]
 </script>
 
 <template>
-  <section id="features" class="relative py-32">
-    <div class="editorial-separator mx-auto mb-24 max-w-md" />
-
-    <div class="mx-auto max-w-5xl px-6">
+  <section class="bg-default py-24 lg:py-32">
+    <div class="mx-auto w-full max-w-6xl px-6">
       <Motion
-        :initial="{ opacity: 0, y: 20 }"
+        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
         :in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5 }"
         :in-view-options="{ once: true }"
-        class="mb-20 text-center"
+        class="mb-12"
       >
-        <h2 class="editorial-title mb-6 text-4xl font-bold text-highlighted md:text-5xl">
-          Why evlog<span class="evlog-dot">.</span>
-        </h2>
-        <p class="mx-auto max-w-xl text-lg text-muted">
-          Traditional logging is broken. Your logs are scattered, each request generates 10+ log lines,
-          and when something goes wrong, you're grep-ing through noise hoping to find signal.
+        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+          Features
         </p>
+        <h2 class="editorial-title text-3xl font-bold text-highlighted md:text-4xl">
+          Everything you need<span class="evlog-dot">.</span>
+        </h2>
       </Motion>
 
-      <div class="grid gap-x-16 gap-y-14 md:grid-cols-2 lg:grid-cols-3">
+      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
         <Motion
           v-for="(feature, index) in features"
           :key="feature.title"
-          :initial="{ opacity: 0, y: 16 }"
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
           :in-view="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.4, delay: index * 0.08 }"
+          :transition="{ duration: 0.4, delay: index * 0.05 }"
           :in-view-options="{ once: true }"
-          class="group"
         >
-          <div class="relative">
-            <div class="mb-6 flex items-center gap-4">
-              <div class="flex size-11 items-center justify-center rounded-full border border-zinc-200 bg-zinc-50 transition-all duration-300 group-hover:border-evlog-blue/40 group-hover:bg-evlog-blue/5 dark:border-zinc-800 dark:bg-zinc-900">
-                <UIcon
-                  :name="feature.icon"
-                  class="size-5 text-zinc-500 transition-colors duration-300 group-hover:text-evlog-blue dark:text-zinc-500"
-                />
-              </div>
-              <div class="h-px flex-1 bg-zinc-200 transition-colors duration-300 group-hover:bg-evlog-blue/30 dark:bg-zinc-800" />
-            </div>
-
-            <h3 class="mb-3 font-serif text-xl font-bold tracking-tight text-highlighted">
+          <div class="group h-full border border-muted/50 bg-muted/30 p-5 transition-colors duration-300 hover:border-muted">
+            <h3 class="mb-2 font-mono font-semibold text-evlog-blue">
               {{ feature.title }}
             </h3>
-
-            <p class="text-sm leading-relaxed text-muted">
+            <p class="mb-4 text-sm leading-relaxed text-toned">
               {{ feature.description }}
             </p>
+            <div class="dark overflow-hidden border border-zinc-800 bg-zinc-950 p-3 transition-colors duration-300 group-hover:border-zinc-700">
+              <pre class="font-mono text-[11px] leading-relaxed text-zinc-500 transition-colors duration-300 group-hover:text-zinc-400">{{ feature.code }}</pre>
+            </div>
           </div>
         </Motion>
       </div>

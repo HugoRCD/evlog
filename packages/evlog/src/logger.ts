@@ -1,5 +1,6 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions } from './types'
-import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev } from './utils'
+import { defu } from 'defu'
+import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 let globalEnv: EnvironmentContext = {
   service: 'app',
@@ -7,6 +8,8 @@ let globalEnv: EnvironmentContext = {
 }
 
 let globalPretty = isDev()
+let globalSampling: SamplingConfig = {}
+let globalStringify = true
 
 /**
  * Initialize the logger with configuration.
@@ -24,10 +27,60 @@ export function initLogger(config: LoggerConfig = {}): void {
   }
 
   globalPretty = config.pretty ?? isDev()
+  globalSampling = config.sampling ?? {}
+  globalStringify = config.stringify ?? true
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>): void {
-  const formatted = {
+/**
+ * Determine if a log at the given level should be emitted based on sampling config.
+ * Error level defaults to 100% (always logged) unless explicitly configured otherwise.
+ */
+function shouldSample(level: LogLevel): boolean {
+  const { rates } = globalSampling
+  if (!rates) {
+    return true // No sampling configured, log everything
+  }
+
+  // Error defaults to 100% unless explicitly set
+  const percentage = level === 'error' && rates.error === undefined
+    ? 100
+    : rates[level] ?? 100
+
+  // 0% = never log, 100% = always log
+  if (percentage <= 0) return false
+  if (percentage >= 100) return true
+
+  return Math.random() * 100 < percentage
+}
+
+/**
+ * Evaluate tail sampling conditions to determine if a log should be force-kept.
+ * Returns true if ANY condition matches (OR logic).
+ */
+export function shouldKeep(ctx: TailSamplingContext): boolean {
+  const { keep } = globalSampling
+  if (!keep?.length) return false
+
+  return keep.some((condition) => {
+    if (condition.status !== undefined && ctx.status !== undefined && ctx.status >= condition.status) {
+      return true
+    }
+    if (condition.duration !== undefined && ctx.duration !== undefined && ctx.duration >= condition.duration) {
+      return true
+    }
+    if (condition.path && ctx.path && matchesPattern(ctx.path, condition.path)) {
+      return true
+    }
+    return false
+  })
+}
+
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+  if (!skipSamplingCheck && !shouldSample(level)) {
+    return null
+  }
+
+  const formatted: WideEvent = {
     timestamp: new Date().toISOString(),
     level,
     ...globalEnv,
@@ -36,19 +89,48 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>): void {
 
   if (globalPretty) {
     prettyPrintWideEvent(formatted)
-  } else {
+  } else if (globalStringify) {
     console[getConsoleMethod(level)](JSON.stringify(formatted))
+  } else {
+    console[getConsoleMethod(level)](formatted)
   }
+
+  return formatted
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (globalPretty) {
+    if (!shouldSample(level)) {
+      return
+    }
     const color = getLevelColor(level)
     const timestamp = new Date().toISOString().slice(11, 23)
     console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
-  } else {
-    emitWideEvent(level, { tag, message })
+    return
   }
+  emitWideEvent(level, { tag, message })
+}
+
+function formatValue(value: unknown): string {
+  if (value === null || value === undefined) {
+    return String(value)
+  }
+  if (typeof value === 'object') {
+    // Flatten object to key=value pairs
+    const pairs: string[] = []
+    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+      if (v !== undefined && v !== null) {
+        if (typeof v === 'object') {
+          // For nested objects, show as JSON
+          pairs.push(`${k}=${JSON.stringify(v)}`)
+        } else {
+          pairs.push(`${k}=${v}`)
+        }
+      }
+    }
+    return pairs.join(' ')
+  }
+  return String(value)
 }
 
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
@@ -65,27 +147,28 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     delete rest.path
   }
 
-  if (rest.duration) {
-    header += ` ${colors.dim}${rest.duration}${colors.reset}`
-    delete rest.duration
-  }
-
   if (rest.status) {
     const statusColor = (rest.status as number) >= 400 ? colors.red : colors.green
     header += ` ${statusColor}${rest.status}${colors.reset}`
     delete rest.status
   }
 
+  if (rest.duration) {
+    header += ` ${colors.dim}in ${rest.duration}${colors.reset}`
+    delete rest.duration
+  }
+
   console.log(header)
 
-  if (Object.keys(rest).length > 0) {
-    for (const [key, value] of Object.entries(rest)) {
-      if (value !== undefined) {
-        const formatted = typeof value === 'object' ? JSON.stringify(value) : value
-        console.log(`  ${colors.dim}${key}:${colors.reset} ${formatted}`)
-      }
-    }
-  }
+  const entries = Object.entries(rest).filter(([_, v]) => v !== undefined)
+  const lastIndex = entries.length - 1
+
+  entries.forEach(([key, value], index) => {
+    const isLast = index === lastIndex
+    const prefix = isLast ? '└─' : '├─'
+    const formatted = formatValue(value)
+    console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${key}:${colors.reset} ${formatted}`)
+  })
 }
 
 function createLogMethod(level: LogLevel) {
@@ -138,15 +221,14 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
 
   return {
     set<T extends Record<string, unknown>>(data: T): void {
-      context = { ...context, ...data }
+      context = defu(data, context) as Record<string, unknown>
     },
 
     error(error: Error | string, errorContext?: Record<string, unknown>): void {
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
-      context = {
-        ...context,
+      const errorData = {
         ...errorContext,
         error: {
           name: err.name,
@@ -154,17 +236,39 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
           stack: err.stack,
         },
       }
+      context = defu(errorData, context) as Record<string, unknown>
     },
 
-    emit(overrides?: Record<string, unknown>): void {
-      const duration = formatDuration(Date.now() - startTime)
+    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
+      const durationMs = Date.now() - startTime
+      const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'
 
-      emitWideEvent(level, {
+      // Extract _forceKeep from overrides (set by evlog:emit:keep hook)
+      const { _forceKeep, ...restOverrides } = overrides ?? {}
+
+      // Build tail sampling context
+      const tailCtx: TailSamplingContext = {
+        status: (context.status ?? restOverrides.status) as number | undefined,
+        duration: durationMs,
+        path: context.path as string | undefined,
+        method: context.method as string | undefined,
+        context: { ...context, ...restOverrides },
+      }
+
+      // Tail sampling: force keep if hook or built-in conditions match
+      const forceKeep = _forceKeep || shouldKeep(tailCtx)
+
+      // Apply head sampling only if not force-kept
+      if (!forceKeep && !shouldSample(level)) {
+        return null
+      }
+
+      return emitWideEvent(level, {
         ...context,
-        ...overrides,
+        ...restOverrides,
         duration,
-      })
+      }, true)
     },
 
     getContext(): Record<string, unknown> {

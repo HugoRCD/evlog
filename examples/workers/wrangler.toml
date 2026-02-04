@@ -1,0 +1,7 @@
+name = "evlog-workers-example"
+main = "src/index.ts"
+compatibility_date = "2026-02-03"
+
+[observability.logs]
+enabled = true
+invocation_logs = false

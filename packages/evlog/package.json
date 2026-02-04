@@ -1,6 +1,6 @@
 {
   "name": "evlog",
-  "version": "1.0.0",
+  "version": "1.3.0",
   "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -34,6 +34,18 @@
     "./nitro": {
       "types": "./dist/nitro/plugin.d.mts",
       "import": "./dist/nitro/plugin.mjs"
+    },
+    "./workers": {
+      "types": "./dist/workers.d.mts",
+      "import": "./dist/workers.mjs"
+    },
+    "./axiom": {
+      "types": "./dist/adapters/axiom.d.mts",
+      "import": "./dist/adapters/axiom.mjs"
+    },
+    "./otlp": {
+      "types": "./dist/adapters/otlp.d.mts",
+      "import": "./dist/adapters/otlp.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -48,6 +60,15 @@
       ],
       "nitro": [
         "./dist/nitro/plugin.d.mts"
+      ],
+      "workers": [
+        "./dist/workers.d.mts"
+      ],
+      "axiom": [
+        "./dist/adapters/axiom.d.mts"
+      ],
+      "otlp": [
+        "./dist/adapters/otlp.d.mts"
       ]
     }
   },
@@ -57,7 +78,7 @@
   ],
   "scripts": {
     "build": "unbuild",
-    "dev:prepare": "unbuild --stub",
+    "dev:prepare": "unbuild",
     "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -67,7 +88,8 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.3.0"
+    "@nuxt/kit": "^4.3.0",
+    "defu": "^6.1.4"
   },
   "devDependencies": {
     "@nuxt/devtools": "^3.1.1",

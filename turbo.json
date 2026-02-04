@@ -3,12 +3,20 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": [".vercel/output/**", "dist/**", ".output/**", ".nuxt/**"]
+      "outputs": [".vercel/output/**", "dist/**", ".output/**", ".nuxt/**"],
+      "env": [
+        "AI_GATEWAY_API_KEY",
+        "NUXT_SITE_URL",
+        "AXIOM_TOKEN"
+      ]
     },
     "dev": {
       "dependsOn": ["dev:prepare"],
       "cache": false,
-      "persistent": true
+      "persistent": true,
+      "env": [
+        "AI_GATEWAY_API_KEY"
+      ]
     },
     "dev:prepare": {
       "dependsOn": ["^dev:prepare"],

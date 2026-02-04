@@ -1,3 +1,178 @@
+import type { NitroRuntimeHooks } from 'nitropack/types'
+
+declare module 'nitropack/types' {
+  interface NitroRuntimeHooks {
+    /**
+     * Tail sampling hook - called before emitting a log.
+     * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
+     *
+     * @example
+     * ```ts
+     * nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+     *   if (ctx.context.user?.premium) {
+     *     ctx.shouldKeep = true
+     *   }
+     * })
+     * ```
+     */
+    'evlog:emit:keep': (ctx: TailSamplingContext) => void | Promise<void>
+
+    /**
+     * Drain hook - called after emitting a log (fire-and-forget).
+     * Use this to send logs to external services like Axiom, Loki, or custom endpoints.
+     * Errors are logged but never block the request.
+     *
+     * @example
+     * ```ts
+     * nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+     *   await fetch('https://api.axiom.co/v1/datasets/logs/ingest', {
+     *     method: 'POST',
+     *     headers: { Authorization: `Bearer ${process.env.AXIOM_TOKEN}` },
+     *     body: JSON.stringify([ctx.event])
+     *   })
+     * })
+     * ```
+     */
+    'evlog:drain': (ctx: DrainContext) => void | Promise<void>
+  }
+}
+
+/**
+ * Transport configuration for sending client logs to the server
+ */
+export interface TransportConfig {
+  /**
+   * Enable sending logs to the server API
+   * @default false
+   */
+  enabled?: boolean
+
+  /**
+   * API endpoint for log ingestion
+   * @default '/api/_evlog/ingest'
+   */
+  endpoint?: string
+}
+
+/**
+ * Payload sent from client to server for log ingestion
+ */
+export interface IngestPayload {
+  timestamp: string
+  level: 'info' | 'error' | 'warn' | 'debug'
+  [key: string]: unknown
+}
+
+/**
+ * Sampling rates per log level (0-100 percentage)
+ */
+export interface SamplingRates {
+  /** Percentage of info logs to keep (0-100). Default: 100 */
+  info?: number
+  /** Percentage of warn logs to keep (0-100). Default: 100 */
+  warn?: number
+  /** Percentage of debug logs to keep (0-100). Default: 100 */
+  debug?: number
+  /** Percentage of error logs to keep (0-100). Default: 100 */
+  error?: number
+}
+
+/**
+ * Tail sampling condition for forcing log retention based on request outcome.
+ * All conditions use >= comparison (e.g., status: 400 means status >= 400).
+ */
+export interface TailSamplingCondition {
+  /** Keep if HTTP status >= this value (e.g., 400 for all errors) */
+  status?: number
+  /** Keep if request duration >= this value in milliseconds */
+  duration?: number
+  /** Keep if path matches this glob pattern (e.g., '/api/critical/**') */
+  path?: string
+}
+
+/**
+ * Context passed to tail sampling evaluation and hooks.
+ * Contains request outcome information for sampling decisions.
+ */
+export interface TailSamplingContext {
+  /** HTTP response status code */
+  status?: number
+  /** Request duration in milliseconds (raw number) */
+  duration?: number
+  /** Request path */
+  path?: string
+  /** HTTP method */
+  method?: string
+  /** Full accumulated context from the request logger */
+  context: Record<string, unknown>
+  /**
+   * Set to true in evlog:emit:keep hook to force keep this log.
+   * Multiple hooks can set this - if any sets it to true, the log is kept.
+   */
+  shouldKeep?: boolean
+}
+
+/**
+ * Context passed to the evlog:drain hook.
+ * Contains the complete wide event and request metadata for external transport.
+ */
+export interface DrainContext {
+  /** The complete wide event to drain */
+  event: WideEvent
+  /** Request metadata (if available) */
+  request?: {
+    method?: string
+    path?: string
+    requestId?: string
+  }
+  /** HTTP headers from the original request (useful for correlation with external services) */
+  headers?: Record<string, string>
+}
+
+/**
+ * Sampling configuration for filtering logs
+ */
+export interface SamplingConfig {
+  /**
+   * Sampling rates per log level (head sampling).
+   * Values are percentages from 0 to 100.
+   * Default: 100 for all levels (log everything).
+   * Error defaults to 100 even if not specified.
+   *
+   * @example
+   * ```ts
+   * sampling: {
+   *   rates: {
+   *     info: 10,    // Keep 10% of info logs
+   *     warn: 50,    // Keep 50% of warning logs
+   *     debug: 5,    // Keep 5% of debug logs
+   *     error: 100,  // Always keep errors (default)
+   *   }
+   * }
+   * ```
+   */
+  rates?: SamplingRates
+
+  /**
+   * Tail sampling conditions for forcing log retention (OR logic).
+   * If ANY condition matches, the log is kept regardless of head sampling.
+   * Use the `evlog:emit:keep` Nitro hook for custom conditions.
+   *
+   * @example
+   * ```ts
+   * sampling: {
+   *   rates: { info: 10 },  // Head sampling: keep 10% of info logs
+   *   keep: [
+   *     { status: 400 },     // Always keep if status >= 400
+   *     { duration: 1000 },  // Always keep if duration >= 1000ms
+   *     { path: '/api/critical/**' },  // Always keep critical paths
+   *   ]
+   * }
+   * ```
+   */
+  keep?: TailSamplingCondition[]
+}
+
 /**
  * Environment context automatically included in every log event
  */
@@ -22,6 +197,14 @@ export interface LoggerConfig {
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
+  /** Sampling configuration for filtering logs */
+  sampling?: SamplingConfig
+  /**
+   * When pretty is disabled, emit JSON strings (default) or raw objects.
+   * Set to false for environments like Cloudflare Workers that expect objects.
+   * @default true
+   */
+  stringify?: boolean
 }
 
 /**
@@ -55,7 +238,7 @@ export type WideEvent = BaseWideEvent & Record<string, unknown>
  */
 export interface RequestLogger {
   /**
-   * Add context to the wide event (shallow merge)
+   * Add context to the wide event (deep merge via defu)
    */
   set: <T extends Record<string, unknown>>(context: T) => void
 
@@ -65,9 +248,10 @@ export interface RequestLogger {
   error: (error: Error | string, context?: Record<string, unknown>) => void
 
   /**
-   * Emit the final wide event with all accumulated context
+   * Emit the final wide event with all accumulated context.
+   * Returns the emitted WideEvent, or null if the log was sampled out.
    */
-  emit: (overrides?: Record<string, unknown>) => void
+  emit: (overrides?: Record<string, unknown>) => WideEvent | null
 
   /**
    * Get the current accumulated context
@@ -157,6 +341,10 @@ export interface H3EventContext {
   log?: RequestLogger
   requestId?: string
   status?: number
+  /** Internal: start time for duration calculation in tail sampling */
+  _evlogStartTime?: number
+  /** Internal: flag to prevent double emission on errors */
+  _evlogEmitted?: boolean
   [key: string]: unknown
 }
 

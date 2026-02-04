@@ -27,9 +27,9 @@
   "devDependencies": {
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
-    "automd": "^0.4.2",
+    "automd": "^0.4.3",
     "eslint": "^9.39.2",
-    "turbo": "^2.7.6",
+    "turbo": "^2.8.1",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "vue-tsc": "^3.2.4"

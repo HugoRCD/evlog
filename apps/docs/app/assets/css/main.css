@@ -4,36 +4,18 @@
 @theme {
   --font-serif: "Redaction", serif;
   --font-sans: "Geist", sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
   --font-redaction: "Redaction", serif;
   --color-evlog-blue: #2853FF;
 }
 
 :root {
   --ui-radius: 0;
-  --ui-bg: #fafafa;
   --ui-primary: #2853FF;
-  --color-primary-50: #eef2ff;
-  --color-primary-100: #e0e7ff;
-  --color-primary-200: #c7d2fe;
-  --color-primary-300: #a5b4fc;
-  --color-primary-400: #818cf8;
-  --color-primary-500: #2853FF;
-  --color-primary-600: #2347db;
-  --color-primary-700: #1e3bb7;
-  --color-primary-800: #192f93;
-  --color-primary-900: #142370;
-  --color-primary-950: #0c1747;
 }
 
 .dark {
-  --ui-bg: #020202;
-  --ui-primary: #2853FF;
-}
-
-/* evlog blue dot accent */
-.evlog-dot {
-  color: var(--color-evlog-blue);
-  font-weight: 700;
+  --ui-bg: #09090b;
 }
 
 @layer base {
@@ -42,107 +24,60 @@
   }
 }
 
-/* Hero grid background pattern */
-.hero-grid {
-  background-image:
-    radial-gradient(circle, #e4e4e7 1px, transparent 1px);
-  background-size: 40px 40px;
-}
-
-.dark .hero-grid {
-  background-image:
-    radial-gradient(circle, #18181b 1px, transparent 1px);
-}
-
-/* Corner bracket decorations */
-.corner-bracket {
-  position: absolute;
-  width: 32px;
-  height: 32px;
-  border-color: #d4d4d8;
-}
-
-.dark .corner-bracket {
-  border-color: #3f3f46;
-}
-
-.corner-bracket-tl {
-  top: 24px;
-  left: 24px;
-  border-left-width: 1px;
-  border-top-width: 1px;
-}
-
-.corner-bracket-tr {
-  top: 24px;
-  right: 24px;
-  border-right-width: 1px;
-  border-top-width: 1px;
-}
-
-.corner-bracket-bl {
-  bottom: 24px;
-  left: 24px;
-  border-left-width: 1px;
-  border-bottom-width: 1px;
-}
-
-.corner-bracket-br {
-  bottom: 24px;
-  right: 24px;
-  border-right-width: 1px;
-  border-bottom-width: 1px;
-}
-
-/* Editorial typography */
+/* Editorial title - Redaction font */
 .editorial-title {
   font-family: var(--font-redaction);
   letter-spacing: -0.02em;
   line-height: 1.1;
 }
 
-/* Subtle separator line */
-.editorial-separator {
+/* Blue dot accent */
+.evlog-dot {
+  color: var(--color-evlog-blue);
+}
+
+/* Section label with dot */
+.section-label::before {
+  content: '';
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background-color: var(--color-evlog-blue);
+  margin-right: 0.5rem;
+}
+
+/* Subtle dot grid for hero */
+.dot-grid {
+  background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+.dark .dot-grid {
+  background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+}
+
+/* Fade mask for scroll areas */
+.fade-bottom {
+  mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+/* Animated underline for links */
+.animated-underline {
+  position: relative;
+}
+
+.animated-underline::after {
+  content: '';
+  position: absolute;
+  bottom: -2px;
+  left: 0;
+  width: 0;
   height: 1px;
-  background: linear-gradient(to right, transparent, #e4e4e7, transparent);
+  background-color: var(--color-evlog-blue);
+  transition: width 0.3s ease;
 }
 
-.dark .editorial-separator {
-  background: linear-gradient(to right, transparent, #27272a, transparent);
-}
-
-/* Log output styling */
-.log-output {
-  font-family: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  font-size: 0.8125rem;
-  line-height: 1.6;
-}
-
-.log-output .log-level {
-  color: #22c55e;
-  font-weight: 600;
-}
-
-.log-output .log-method {
-  color: #a78bfa;
-}
-
-.log-output .log-path {
-  color: #fbbf24;
-}
-
-.log-output .log-duration {
-  color: #6b7280;
-}
-
-.log-output .log-key {
-  color: #60a5fa;
-}
-
-.log-output .log-string {
-  color: #34d399;
-}
-
-.log-output .log-number {
-  color: #f472b6;
+.animated-underline:hover::after {
+  width: 100%;
 }

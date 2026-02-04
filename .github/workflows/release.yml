@@ -28,6 +28,9 @@ jobs:
         with:
           bun-version: latest
 
+      - name: Use latest npm
+        run: npm install -g npm@latest
+
       - name: Install dependencies
         run: bun install
 
@@ -40,3 +43,5 @@ jobs:
       - name: Publish to npm
         working-directory: packages/evlog
         run: npm publish --access public
+        env:
+          NPM_CONFIG_PROVENANCE: true
