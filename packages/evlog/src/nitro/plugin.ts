@@ -2,12 +2,8 @@ import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
+import type { RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
-
-interface RouteConfig {
-  service: string
-}
 
 interface EvlogConfig {
   env?: Record<string, unknown>
@@ -37,7 +33,24 @@ function shouldLog(path: string, include?: string[], exclude?: string[]): boolea
 
 /**
  * Find the service name for a given path based on route patterns.
- * Returns undefined if no matching route is found.
+ *
+ * When multiple patterns match the same path, the first matching pattern wins
+ * based on object iteration order. To ensure predictable behavior, order your
+ * route patterns from most specific to most general.
+ *
+ * @param path - The request path to match
+ * @param routes - Route configuration mapping patterns to service names
+ * @returns The service name for the matching route, or undefined if no match
+ *
+ * @example
+ * ```ts
+ * // Good: specific patterns first, general patterns last
+ * routes: {
+ *   '/api/auth/admin/**': { service: 'admin-service' },
+ *   '/api/auth/**': { service: 'auth-service' },
+ *   '/api/**': { service: 'api-service' },
+ * }
+ * ```
  */
 function getServiceForPath(path: string, routes?: Record<string, RouteConfig>): string | undefined {
   if (!routes) return undefined

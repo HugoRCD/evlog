@@ -174,6 +174,14 @@ export interface SamplingConfig {
 }
 
 /**
+ * Route-based service configuration
+ */
+export interface RouteConfig {
+  /** Service name to use for routes matching this pattern */
+  service: string
+}
+
+/**
  * Environment context automatically included in every log event
  */
 export interface EnvironmentContext {

@@ -8,14 +8,7 @@ import {
   defineNuxtModule,
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
-import type { EnvironmentContext, SamplingConfig, TransportConfig } from '../types'
-
-export interface RouteConfig {
-  /**
-   * Service name for this route
-   */
-  service: string
-}
+import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig } from '../types'
 
 export interface ModuleOptions {
   /**
