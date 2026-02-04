@@ -598,7 +598,7 @@ describe('nitro plugin - useLogger service parameter', () => {
     }
 
     // Simulate useLogger with service parameter
-    const log = mockEvent.context.log
+    const { log } = mockEvent.context
     if (log) {
       log.set({ service: 'custom-service' })
     }
@@ -623,7 +623,7 @@ describe('nitro plugin - useLogger service parameter', () => {
     }
 
     // Simulate useLogger without service parameter
-    const log = mockEvent.context.log
+    const { log } = mockEvent.context
     expect(log).toBeDefined()
 
     // Should not call set with service if parameter not provided
