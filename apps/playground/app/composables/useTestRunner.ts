@@ -39,8 +39,7 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
       options?.onSuccess?.(response)
 
       return response
-    }
-    catch (err: any) {
+    } catch (err: any) {
       state.setStatus(testId, 'error')
       state.setError(testId, err)
       options?.onError?.(err)

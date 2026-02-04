@@ -26,8 +26,7 @@ async function copyToClipboard() {
       setTimeout(() => {
         copied.value = false
       }, 2000)
-    }
-    catch (err) {
+    } catch (err) {
       console.error('Failed to copy:', err)
     }
   }

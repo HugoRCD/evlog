@@ -30,12 +30,10 @@ async function handleClick() {
   try {
     if (props.onClick) {
       await execute(props.onClick)
-    }
-    else {
+    } else {
       await execute()
     }
-  }
-  catch {
+  } catch {
     // Error already handled by useTestRunner
   }
 }
@@ -44,18 +42,18 @@ async function handleClick() {
 <template>
   <div>
     <UButton
-      :label="label"
+      :label
       :loading="isLoading"
-      :color="color"
-      :variant="variant"
+      :color
+      :variant
       @click="handleClick"
     />
 
     <PlaygroundTestResult
       v-if="showResult"
-      :status="status"
+      :status
       :response="result"
-      :error="error"
+      :error
     />
   </div>
 </template>

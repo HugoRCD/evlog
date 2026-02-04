@@ -30,8 +30,7 @@ export function useTestState() {
     setStatus: (id: string, status: TestState['status']) => {
       if (!state.value[id]) {
         state.value[id] = { status, timestamp: Date.now() }
-      }
-      else {
+      } else {
         state.value[id].status = status
         state.value[id].timestamp = Date.now()
       }
@@ -43,8 +42,7 @@ export function useTestState() {
     setResult: (id: string, result: any) => {
       if (!state.value[id]) {
         state.value[id] = { status: 'success', result, timestamp: Date.now() }
-      }
-      else {
+      } else {
         state.value[id].result = result
       }
     },
@@ -55,8 +53,7 @@ export function useTestState() {
     setError: (id: string, error: any) => {
       if (!state.value[id]) {
         state.value[id] = { status: 'error', error, timestamp: Date.now() }
-      }
-      else {
+      } else {
         state.value[id].error = error
       }
     },
