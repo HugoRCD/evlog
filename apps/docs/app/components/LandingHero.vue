@@ -32,8 +32,7 @@ import { Motion } from 'motion-v'
         :transition="{ duration: 0.8, delay: 0.1 }"
       >
         <h1 class="editorial-title mb-10 text-6xl font-bold text-zinc-900 dark:text-white md:text-8xl">
-          Logging that<br>
-          makes sense<span class="text-evlog-blue">.</span>
+          Hello from v0<span class="text-evlog-blue">.</span>
         </h1>
       </Motion>
 
