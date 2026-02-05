@@ -1,6 +1,7 @@
 import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
+import { runtime } from 'std-env'
 import { createRequestLogger, initLogger } from '../logger'
 import type { RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
@@ -147,11 +148,18 @@ export default defineNitroPlugin((nitroApp) => {
 
     // Store start time for duration calculation in tail sampling
     e.context._evlogStartTime = Date.now()
+    
+    let requestIdOverride: string | undefined = undefined
+    // Are we in a cloudflare environment? Use cf-ray for requestId
+    if (runtime === 'workerd') {
+      const cfRay = getSafeHeaders(event)?.['cf-ray']
+      if (cfRay) requestIdOverride = cfRay
+    }
 
     const log = createRequestLogger({
       method: e.method,
       path: e.path,
-      requestId: e.context.requestId || crypto.randomUUID(),
+      requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
     })
 
     // Apply route-based service configuration if a matching route is found
