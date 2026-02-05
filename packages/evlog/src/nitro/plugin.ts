@@ -119,12 +119,9 @@ function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
   // This ensures drains complete before the runtime terminates
-  const cfContext = event.context.cloudflare?.context
-
-  if (cfContext && typeof cfContext.waitUntil === 'function') {
-    cfContext.waitUntil(drainPromise)
-  } else if (event.context.waitUntil && typeof event.context.waitUntil === 'function') {
-    event.context.waitUntil(drainPromise)
+  const waitUntilCtx = event.context.cloudflare?.context ?? event.context
+  if (typeof waitUntilCtx?.waitUntil === 'function') {
+    waitUntilCtx.waitUntil(drainPromise)
   }
 }
 
