@@ -12,6 +12,7 @@ interface EvlogConfig {
   exclude?: string[]
   routes?: Record<string, RouteConfig>
   sampling?: SamplingConfig
+  inset?: string
 }
 
 function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
@@ -119,11 +120,12 @@ function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
   // This ensures drains complete before the runtime terminates
-  const waitUntil = event.context.cloudflare?.context?.waitUntil
-    ?? event.context.waitUntil
+  const cfContext = event.context.cloudflare?.context
 
-  if (typeof waitUntil === 'function') {
-    waitUntil(drainPromise)
+  if (cfContext && typeof cfContext.waitUntil === 'function') {
+    cfContext.waitUntil(drainPromise)
+  } else if (event.context.waitUntil && typeof event.context.waitUntil === 'function') {
+    event.context.waitUntil(drainPromise)
   }
 }
 
@@ -135,6 +137,7 @@ export default defineNitroPlugin((nitroApp) => {
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
     sampling: evlogConfig?.sampling,
+    inset: evlogConfig?.inset,
   })
 
   nitroApp.hooks.hook('request', (event) => {

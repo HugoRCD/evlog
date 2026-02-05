@@ -213,6 +213,8 @@ export interface LoggerConfig {
    * @default true
    */
   stringify?: boolean
+  /** Nested property name for wide events */
+  inset?: string;
 }
 
 /**
@@ -226,6 +228,13 @@ export interface BaseWideEvent {
   version?: string
   commitHash?: string
   region?: string
+}
+
+/** 
+ * Wide event inside a nested propery from global config: inset
+ */
+export type InsetWideEvent = {
+   [key: string]: BaseWideEvent & Record<string, unknown>
 }
 
 /**
