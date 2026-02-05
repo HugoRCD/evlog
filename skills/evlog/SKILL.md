@@ -205,6 +205,8 @@ export default defineNuxtConfig({
     },
     // Optional: only log specific routes (supports glob patterns)
     include: ['/api/**'],
+    // Optional: nest log data under a property (e.g., for Cloudflare Observability)
+    inset: 'evlog',
     // Optional: send client logs to server (default: false)
     transport: {
       enabled: true,
@@ -340,6 +342,29 @@ nitroApp.hooks.hook('evlog:drain', async (ctx) => {
 })
 ```
 
+## Inset (Nested Log Data)
+
+`inset` nests the wide event inside a `$`-prefixed property. Only applies when `pretty: false` (production JSON).
+
+- Use when the platform injects root-level metadata (e.g., Cloudflare Observability adds `$metadata`, `$workers`)
+- Do NOT use with Axiom, Datadog, Grafana — they expect flat root-level JSON
+
+```typescript
+// inset: 'evlog' → wraps under $evlog
+{ "$evlog": { "level": "info", "service": "api", "user": { "id": "123" }, ... } }
+
+// Without inset (default) → flat root
+{ "level": "info", "service": "api", "user": { "id": "123" }, ... }
+```
+
+```typescript
+// ❌ Don't use with flat-log consumers
+evlog: { inset: 'data' }  // Axiom/Datadog expect root-level fields
+
+// ✅ Use when platform adds root-level metadata
+evlog: { inset: 'evlog' }  // Cloudflare Observability
+```
+
 ## Log Draining & Adapters
 
 evlog provides built-in adapters to send logs to external observability platforms.
@@ -468,6 +493,7 @@ When reviewing code, check for:
 8. **Client-side logging** → Use `log` API for debugging in Vue components
 9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
 10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`) for production log export
+11. **Inset misconfiguration** → Only enable `inset` when the platform adds root-level metadata (e.g., Cloudflare Observability). Do not use with systems expecting flat root-level JSON (Axiom, Datadog, Grafana).
 
 ## Loading Reference Files
 
