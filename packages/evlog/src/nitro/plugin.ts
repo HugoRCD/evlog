@@ -1,7 +1,6 @@
 import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
-import { runtime } from 'std-env'
 import { createRequestLogger, initLogger } from '../logger'
 import type { RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
@@ -151,7 +150,7 @@ export default defineNitroPlugin((nitroApp) => {
     
     let requestIdOverride: string | undefined = undefined
     // Are we in a cloudflare environment? Use cf-ray for requestId
-    if (runtime === 'workerd') {
+    if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
       const cfRay = getSafeHeaders(event)?.['cf-ray']
       if (cfRay) requestIdOverride = cfRay
     }
