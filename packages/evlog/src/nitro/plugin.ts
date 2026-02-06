@@ -149,7 +149,6 @@ export default defineNitroPlugin((nitroApp) => {
     e.context._evlogStartTime = Date.now()
     
     let requestIdOverride: string | undefined = undefined
-    // Are we in a cloudflare environment? Use cf-ray for requestId
     if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
       const cfRay = getSafeHeaders(event)?.['cf-ray']
       if (cfRay) requestIdOverride = cfRay
