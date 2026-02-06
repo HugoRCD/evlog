@@ -564,7 +564,7 @@ export default defineNitroPlugin((nitroApp) => {
 
 ### Inset - Nesting Logs
 
-By default, ```pretty``` is disabled, soevlog will log the object at root level when logging in production; however, for services like Cloudflare Observability, you may wish to nest the data inside an arbitrary property name. This can help organize your data and make it easier to query and analyze.
+By default, `pretty` is disabled, so evlog will log the object at root level when logging in production; however, for services like Cloudflare Observability, you may wish to nest the data inside an arbitrary property name. This can help organize your data and make it easier to query and analyze.
 
 > **Note**: Nesting can have adverse effects if your logging system expects root-level json data, such as requestIds, or tracing ids.
 
