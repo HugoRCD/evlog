@@ -35,10 +35,10 @@ log.set({ cart: { items, total } })
   },
   {
     title: 'Built-in Adapters',
-    description: 'Zero-config adapters for Axiom, OTLP (Grafana, Datadog, Honeycomb), or build your own.',
+    description: 'Zero-config adapters for Axiom, Posthog, OTLP (Grafana, Datadog, Honeycomb), or build your own.',
     code: `import { createAxiomDrain } from 'evlog/axiom'
 import { createOTLPDrain } from 'evlog/otlp'
-// Reads config from env vars`,
+import { createPostHogDrain } from 'evlog/posthog'`,
   },
   {
     title: 'Smart Sampling',
