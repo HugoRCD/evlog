@@ -1,5 +1,4 @@
 export default defineEventHandler((event) => {
-  // Test explicit service override via useLogger second parameter
   const log = useLogger(event, 'custom-service')
 
   log.set({

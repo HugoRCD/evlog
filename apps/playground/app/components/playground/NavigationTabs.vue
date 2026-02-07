@@ -28,7 +28,7 @@ function selectSection(sectionId: string) {
       ]"
       @click="selectSection(section.id)"
     >
-      <UIcon v-if="section.icon" :name="section.icon" class="w-4 h-4" />
+      <UIcon v-if="section.icon" :name="section.icon" class="size-4" />
       {{ section.label }}
     </button>
   </div>

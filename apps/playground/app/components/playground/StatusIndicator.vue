@@ -34,6 +34,6 @@ const config = computed(() => {
   <UIcon
     :name="config.icon"
     :class="[config.color, config.animate]"
-    class="w-4 h-4"
+    class="size-4"
   />
 </template>

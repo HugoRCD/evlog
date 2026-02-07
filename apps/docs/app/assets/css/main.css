@@ -3,7 +3,7 @@
 
 @theme {
   --font-sans: "Geist", sans-serif;
-  --font-mono: "Geist Pixel Square", monospace;
+  --font-mono: "Geist Pixel Line", monospace;
 }
 
 :root {
