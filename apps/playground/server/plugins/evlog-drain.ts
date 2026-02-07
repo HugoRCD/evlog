@@ -1,4 +1,5 @@
-import { createAxiomDrain } from 'evlog/axiom'
+// import { createAxiomDrain } from 'evlog/axiom'
+// import { createPostHogDrain } from 'evlog/posthog'
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', (ctx) => {
@@ -13,5 +14,9 @@ export default defineNitroPlugin((nitroApp) => {
     // })
 
     // axiomDrain(ctx)
+
+    // const posthogDrain = createPostHogDrain()
+
+    // posthogDrain(ctx)
   })
 })

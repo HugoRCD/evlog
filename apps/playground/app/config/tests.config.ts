@@ -266,6 +266,29 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'drains',
+      label: 'Drains',
+      icon: 'i-lucide-database',
+      title: 'Log Drains',
+      description: 'Test the drain adapters (Axiom, OTLP, PostHog). Events flow through the evlog:drain hook in server/plugins/evlog-drain.ts. Uncomment an adapter there to test it live.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'drain-test',
+          label: 'Emit Drain Event',
+          description: 'Triggers a wide event that flows through the evlog:drain hook. Check terminal output and any configured adapters.',
+          endpoint: '/api/test/drain',
+          method: 'GET',
+          color: 'primary',
+          showResult: true,
+          badge: {
+            label: 'evlog:drain',
+            color: 'blue',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'services',
       label: 'Services',
       icon: 'i-lucide-network',

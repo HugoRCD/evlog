@@ -46,6 +46,10 @@
     "./otlp": {
       "types": "./dist/adapters/otlp.d.mts",
       "import": "./dist/adapters/otlp.mjs"
+    },
+    "./posthog": {
+      "types": "./dist/adapters/posthog.d.mts",
+      "import": "./dist/adapters/posthog.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -69,6 +73,9 @@
       ],
       "otlp": [
         "./dist/adapters/otlp.d.mts"
+      ],
+      "posthog": [
+        "./dist/adapters/posthog.d.mts"
       ]
     }
   },
