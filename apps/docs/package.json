@@ -15,7 +15,7 @@
     "better-sqlite3": "^12.6.2",
     "docus": "^5.5.0",
     "motion-v": "latest",
-    "nuxt": "^4.3.0"
+    "nuxt": "^4.3.1"
   },
   "devDependencies": {
     "eslint": "^9.39.2"
