@@ -135,6 +135,37 @@ export interface ModuleOptions {
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
   }
+
+  /**
+   * Sentry adapter configuration.
+   * When configured, use `createSentryDrain()` from `evlog/sentry` to send logs.
+   *
+   * @example
+   * ```ts
+   * sentry: {
+   *   dsn: process.env.SENTRY_DSN,
+   *   environment: 'production',
+   * }
+   * ```
+   */
+  sentry?: {
+    /** Sentry DSN */
+    dsn: string
+    /** Environment override (defaults to event.environment) */
+    environment?: string
+    /** Release version override (defaults to event.version) */
+    release?: string
+    /** Server name override */
+    serverName?: string
+    /** Logger name override. Default: evlog */
+    logger?: string
+    /** Message override (defaults to event.message/action/path) */
+    message?: string
+    /** Additional tags to attach */
+    tags?: Record<string, string>
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({

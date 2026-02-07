@@ -431,6 +431,23 @@ Set environment variables:
 NUXT_OTLP_ENDPOINT=http://localhost:4318
 ```
 
+### Sentry
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createSentryDrain } from 'evlog/sentry'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createSentryDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_SENTRY_DSN=https://public@o0.ingest.sentry.io/123
+```
+
 ### Multiple Destinations
 
 Send logs to multiple services:

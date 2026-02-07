@@ -19,6 +19,7 @@ export default defineBuildConfig({
     { input: 'src/adapters/axiom', name: 'adapters/axiom' },
     { input: 'src/adapters/otlp', name: 'adapters/otlp' },
     { input: 'src/adapters/posthog', name: 'adapters/posthog' },
+    { input: 'src/adapters/sentry', name: 'adapters/sentry' },
   ],
   declaration: true,
   clean: true,

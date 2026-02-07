@@ -50,6 +50,10 @@
     "./posthog": {
       "types": "./dist/adapters/posthog.d.mts",
       "import": "./dist/adapters/posthog.mjs"
+    },
+    "./sentry": {
+      "types": "./dist/adapters/sentry.d.mts",
+      "import": "./dist/adapters/sentry.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -76,6 +80,9 @@
       ],
       "posthog": [
         "./dist/adapters/posthog.d.mts"
+      ],
+      "sentry": [
+        "./dist/adapters/sentry.d.mts"
       ]
     }
   },
