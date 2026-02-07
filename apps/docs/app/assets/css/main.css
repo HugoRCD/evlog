@@ -3,7 +3,8 @@
 
 @theme {
   --font-sans: "Geist", sans-serif;
-  --font-mono: "Geist Pixel Line", monospace;
+  --font-mono: "Geist Mono", monospace;
+  --font-pixel: "Geist Pixel Line", monospace;
 }
 
 :root {
@@ -32,7 +33,7 @@
 }
 
 .section-title {
-  @apply font-mono text-3xl md:text-4xl lg:text-5xl;
+  @apply font-pixel text-3xl md:text-4xl lg:text-5xl;
 }
 
 /* Subtle dot grid for hero */

@@ -18,7 +18,7 @@ onMounted(() => {
         :in-view-options="{ once: true }"
         class="mb-12"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
           Simple API
         </p>
         <h2 class="section-title max-w-lg">
@@ -113,7 +113,7 @@ onMounted(() => {
         :in-view-options="{ once: true }"
         class="mt-24"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
           Structured Errors
         </p>
         <h3 class="section-title max-w-lg mb-6">

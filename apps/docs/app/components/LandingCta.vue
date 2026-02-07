@@ -18,7 +18,7 @@ onMounted(() => {
           :transition="{ duration: 0.5 }"
           :in-view-options="{ once: true }"
         >
-          <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+          <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
             Get Started
           </p>
           <h2 class="mb-6 section-title">

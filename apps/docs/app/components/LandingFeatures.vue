@@ -92,7 +92,7 @@ log.info({ action: 'click' })
         :in-view-options="{ once: true }"
         class="mb-12"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
           Features
         </p>
         <h2 class="section-title">
@@ -110,7 +110,7 @@ log.info({ action: 'click' })
           :in-view-options="{ once: true }"
         >
           <div class="group h-full border border-muted/50 bg-muted/30 p-5 transition-colors duration-300 hover:border-muted">
-            <h3 class="mb-2 font-mono font-semibold text-primary">
+            <h3 class="mb-2 font-pixel font-semibold text-primary">
               {{ feature.title }}
             </h3>
             <p class="mb-4 text-sm leading-relaxed text-toned">

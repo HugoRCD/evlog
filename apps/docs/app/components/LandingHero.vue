@@ -162,7 +162,7 @@ function getLevelColor(level: string) {
           :transition="{ duration: 0.5 }"
         >
           <button
-            class="group mb-4 flex items-center gap-2 font-mono text-sm transition-colors cursor-copy"
+            class="group mb-2 flex items-center gap-2 font-pixel text-sm transition-colors cursor-copy"
             :class="copied ? 'text-emerald-500' : 'text-muted hover:text-highlighted'"
             @click="copyCommand"
           >
@@ -170,7 +170,7 @@ function getLevelColor(level: string) {
             <span v-else>$ npx skills add hugorcd/evlog</span>
           </button>
 
-          <h1 class="font-mono mb-6 text-5xl sm:text-6xl lg:text-7xl">
+          <h1 class="font-pixel mb-6 text-5xl sm:text-6xl lg:text-7xl">
             Logging that<br>makes sense<span class="text-primary">.</span>
           </h1>
 

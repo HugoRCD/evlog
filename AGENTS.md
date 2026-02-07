@@ -211,6 +211,8 @@ export default defineNitroPlugin((nitroApp) => {
 
 evlog provides built-in adapters for popular observability platforms. Use the `evlog:drain` hook to send logs to external services.
 
+> **Creating a new adapter?** Follow the skill at `.agents/skills/create-adapter/SKILL.md`. It covers all touchpoints: source code, build config, package exports, tests, and all documentation updates.
+
 **Built-in Adapters:**
 
 | Adapter | Import | Description |
