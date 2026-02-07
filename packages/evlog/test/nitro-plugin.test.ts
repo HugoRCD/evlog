@@ -317,11 +317,10 @@ describe('nitro plugin - waitUntil support', () => {
     })
 
     // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
-    const waitUntil = event.context.cloudflare?.context?.waitUntil
-      ?? event.context.waitUntil
-
-    if (typeof waitUntil === 'function') {
-      waitUntil(drainPromise)
+    // Call as a method on the context object to preserve `this` binding
+    const waitUntilCtx = event.context.cloudflare?.context ?? event.context
+    if (typeof waitUntilCtx?.waitUntil === 'function') {
+      waitUntilCtx.waitUntil(drainPromise)
     }
   }
 
@@ -446,6 +445,49 @@ describe('nitro plugin - waitUntil support', () => {
 
     // Drain hook should still be called
     expect(mockHooks.callHook).toHaveBeenCalledWith('evlog:drain', expect.any(Object))
+  })
+
+  it('preserves this binding when calling waitUntil (prevents Illegal invocation)', () => {
+    // Simulate a real waitUntil that requires correct `this` binding,
+    // like Cloudflare's ExecutionContext which throws "Illegal invocation"
+    // when `waitUntil` is called without proper `this` context
+    const executionContext = {
+      _promises: [] as Promise<unknown>[],
+      waitUntil(promise: Promise<unknown>) {
+        if (this !== executionContext) {
+          throw new TypeError('Illegal invocation')
+        }
+        this._promises.push(promise)
+      },
+    }
+
+    const mockHooks = {
+      callHook: vi.fn().mockResolvedValue(undefined),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/api/test',
+      context: {
+        cloudflare: {
+          context: executionContext,
+        },
+      },
+    }
+
+    const mockEmittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'info',
+      service: 'test',
+      environment: 'production',
+    }
+
+    // Should NOT throw "Illegal invocation" because waitUntil is called as a method
+    expect(() => {
+      callDrainHook({ hooks: mockHooks }, mockEmittedEvent, mockEvent)
+    }).not.toThrow()
+
+    expect(executionContext._promises).toHaveLength(1)
   })
 
   it('does not call waitUntil when emittedEvent is null', () => {
