@@ -1,5 +1,5 @@
 import { defu } from 'defu'
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { EnvironmentContext, InsetWideEvent, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 let globalEnv: EnvironmentContext = {
@@ -10,6 +10,7 @@ let globalEnv: EnvironmentContext = {
 let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
+let globalInset: string | undefined = undefined
 
 /**
  * Initialize the logger with configuration.
@@ -29,6 +30,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalPretty = config.pretty ?? isDev()
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
+  globalInset = config.inset ?? undefined
 }
 
 /**
@@ -75,12 +77,19 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | InsetWideEvent | null {
   if (!skipSamplingCheck && !shouldSample(level)) {
     return null
   }
 
-  const formatted: WideEvent = {
+  const formatted: InsetWideEvent | WideEvent = !globalPretty && globalInset && globalInset !== undefined ? {
+    [`$${globalInset}`]: {
+      timestamp: new Date().toISOString(),
+      level,
+      ...globalEnv,
+      ...event,
+    }
+  } : {
     timestamp: new Date().toISOString(),
     level,
     ...globalEnv,

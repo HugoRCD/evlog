@@ -23,4 +23,5 @@ export type {
   TailSamplingContext,
   TransportConfig,
   WideEvent,
+  InsetWideEvent
 } from './types'

@@ -12,6 +12,7 @@ interface EvlogConfig {
   exclude?: string[]
   routes?: Record<string, RouteConfig>
   sampling?: SamplingConfig
+  inset?: string
 }
 
 function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
@@ -133,6 +134,7 @@ export default defineNitroPlugin((nitroApp) => {
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
     sampling: evlogConfig?.sampling,
+    inset: evlogConfig?.inset,
   })
 
   nitroApp.hooks.hook('request', (event) => {
