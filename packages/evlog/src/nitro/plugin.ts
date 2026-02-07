@@ -145,11 +145,17 @@ export default defineNitroPlugin((nitroApp) => {
 
     // Store start time for duration calculation in tail sampling
     e.context._evlogStartTime = Date.now()
+    
+    let requestIdOverride: string | undefined = undefined
+    if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
+      const cfRay = getSafeHeaders(event)?.['cf-ray']
+      if (cfRay) requestIdOverride = cfRay
+    }
 
     const log = createRequestLogger({
       method: e.method,
       path: e.path,
-      requestId: e.context.requestId || crypto.randomUUID(),
+      requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
     })
 
     // Apply route-based service configuration if a matching route is found

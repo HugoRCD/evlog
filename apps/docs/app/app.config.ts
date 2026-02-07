@@ -33,6 +33,7 @@ export default defineAppConfig({
         items: [
           'How do I configure sampling?',
           'How do I send logs to Axiom?',
+          'How do I send logs to PostHog?',
         ],
       },
     ],
