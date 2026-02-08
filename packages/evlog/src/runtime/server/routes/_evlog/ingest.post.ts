@@ -1,7 +1,8 @@
-import { createError, defineEventHandler, getHeader, getRequestHost, readBody, setResponseStatus } from 'h3'
+import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost, readBody, setResponseStatus } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
 import { getEnvironment } from '../../../../logger'
+import { filterSafeHeaders } from '../../../../utils'
 
 const VALID_LEVELS = ['info', 'error', 'warn', 'debug'] as const
 
@@ -76,6 +77,11 @@ function validatePayload(body: unknown): IngestPayload {
   }
 }
 
+function getSafeHeaders(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): Record<string, string> {
+  const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
+  return filterSafeHeaders(allHeaders)
+}
+
 export default defineEventHandler(async (event) => {
   validateOrigin(event)
 
@@ -92,13 +98,36 @@ export default defineEventHandler(async (event) => {
     source: 'client',
   }
 
+  const headers = getSafeHeaders(event)
+  const request = { method: 'POST' as const, path: event.path }
+
   try {
-    await nitroApp.hooks.callHook('evlog:drain', {
+    await nitroApp.hooks.callHook('evlog:enrich', {
       event: wideEvent,
-      request: { method: 'POST', path: event.path },
+      request,
+      headers,
+      response: { status: 204 },
     })
-  } catch {
-    // Silently fail - don't break the client
+  } catch (err) {
+    console.error('[evlog] enrich failed:', err)
+  }
+
+  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+    event: wideEvent,
+    request,
+    headers,
+  }).catch((err) => {
+    console.error('[evlog] drain failed:', err)
+  })
+
+  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+  // Otherwise, await the drain to prevent lost logs in serverless environments
+  const waitUntilCtx = (event as unknown as { context: Record<string, unknown> }).context
+  const cfCtx = (waitUntilCtx as { cloudflare?: { context?: { waitUntil?: (p: Promise<unknown>) => void } } }).cloudflare?.context ?? waitUntilCtx
+  if (typeof (cfCtx as { waitUntil?: unknown }).waitUntil === 'function') {
+    (cfCtx as { waitUntil: (p: Promise<unknown>) => void }).waitUntil(drainPromise)
+  } else {
+    await drainPromise
   }
 
   setResponseStatus(event, 204)

@@ -20,6 +20,7 @@ export default defineBuildConfig({
     { input: 'src/adapters/otlp', name: 'adapters/otlp' },
     { input: 'src/adapters/posthog', name: 'adapters/posthog' },
     { input: 'src/adapters/sentry', name: 'adapters/sentry' },
+    { input: 'src/enrichers/index', name: 'enrichers' },
   ],
   declaration: true,
   clean: true,
