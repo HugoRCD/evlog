@@ -219,7 +219,7 @@ describe('sentry adapter', () => {
       const itemPayload = JSON.parse(lines[2])
       expect(itemPayload.items).toHaveLength(1)
 
-      const log = itemPayload.items[0]
+      const [log] = itemPayload.items
       expect(log.level).toBe('error')
       expect(log.severity_number).toBe(17)
       expect(log.body).toBe('boom')
