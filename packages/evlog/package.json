@@ -101,9 +101,6 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "echo 'Typecheck handled by build'"
   },
-  "dependencies": {
-    "defu": "^6.1.4"
-  },
   "devDependencies": {
     "@nuxt/devtools": "^3.1.1",
     "@nuxt/schema": "^4.3.1",

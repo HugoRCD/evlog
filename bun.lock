@@ -50,9 +50,6 @@
     "packages/evlog": {
       "name": "evlog",
       "version": "1.6.0",
-      "dependencies": {
-        "defu": "^6.1.4",
-      },
       "devDependencies": {
         "@nuxt/devtools": "^3.1.1",
         "@nuxt/schema": "^4.3.1",

@@ -1,4 +1,5 @@
 import type { DrainContext, LogLevel, WideEvent } from '../types'
+import { getRuntimeConfig } from './_utils'
 
 export interface SentryConfig {
   /** Sentry DSN */
@@ -43,21 +44,6 @@ const SEVERITY_MAP: Record<LogLevel, number> = {
   info: 9,
   warn: 13,
   error: 17,
-}
-
-/**
- * Try to get runtime config from Nitro/Nuxt environment.
- * Returns undefined if not in a Nitro context.
- */
-function getRuntimeConfig(): { evlog?: { sentry?: Partial<SentryConfig> }, sentry?: Partial<SentryConfig> } | undefined {
-  try {
-    // Dynamic import to avoid bundling issues when not in Nitro
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
-    return useRuntimeConfig()
-  } catch {
-    return undefined
-  }
 }
 
 function parseSentryDsn(dsn: string): SentryDsnParts {

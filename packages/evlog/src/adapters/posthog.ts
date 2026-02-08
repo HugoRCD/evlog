@@ -1,4 +1,5 @@
 import type { DrainContext, WideEvent } from '../types'
+import { getRuntimeConfig } from './_utils'
 
 export interface PostHogConfig {
   /** PostHog project API key */
@@ -19,21 +20,6 @@ export interface PostHogEvent {
   distinct_id: string
   timestamp: string
   properties: Record<string, unknown>
-}
-
-/**
- * Try to get runtime config from Nitro/Nuxt environment.
- * Returns undefined if not in a Nitro context.
- */
-function getRuntimeConfig(): { evlog?: { posthog?: Partial<PostHogConfig> }, posthog?: Partial<PostHogConfig> } | undefined {
-  try {
-    // Dynamic import to avoid bundling issues when not in Nitro
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
-    return useRuntimeConfig()
-  } catch {
-    return undefined
-  }
 }
 
 /**
