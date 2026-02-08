@@ -214,8 +214,11 @@ function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
  * }))
  * ```
  */
-export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: DrainContext) => Promise<void> {
-  return async (ctx: DrainContext) => {
+export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+  return async (ctx: DrainContext | DrainContext[]) => {
+    const contexts = Array.isArray(ctx) ? ctx : [ctx]
+    if (contexts.length === 0) return
+
     const runtimeConfig = getRuntimeConfig()
     const evlogSentry = runtimeConfig?.evlog?.sentry
     const rootSentry = runtimeConfig?.sentry
@@ -233,11 +236,7 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: Drai
       return
     }
 
-    try {
-      await sendToSentry(ctx.event, config as SentryConfig)
-    } catch (error) {
-      console.error('[evlog/sentry] Failed to send log:', error)
-    }
+    await sendBatchToSentry(contexts.map(c => c.event), config as SentryConfig)
   }
 }
 

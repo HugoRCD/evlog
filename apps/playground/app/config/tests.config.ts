@@ -266,6 +266,44 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'pipeline',
+      label: 'Pipeline',
+      icon: 'i-lucide-layers',
+      title: 'Drain Pipeline (Batching + Retry)',
+      description: 'Events are buffered and sent in batches (size: 5, interval: 2s). Watch the terminal for "[evlog/pipeline] Flushing batch of N events" messages.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'pipeline-single',
+          label: '1 Request',
+          description: 'Single event - buffered until batch size (5) or interval (2s) is reached',
+          endpoint: '/api/test/success',
+          method: 'GET',
+          badge: {
+            label: 'Buffered',
+            color: 'blue',
+          },
+          toastOnSuccess: {
+            title: 'Event buffered',
+            description: 'Check terminal - will flush after 2s or when 5 events accumulate',
+          },
+        },
+        {
+          id: 'pipeline-batch',
+          label: 'Fire 10 Requests',
+          description: 'Fires 10 requests in parallel - should produce 2 batches of 5 events',
+          badge: {
+            label: '2 batches',
+            color: 'green',
+          },
+          toastOnSuccess: {
+            title: '10 requests sent',
+            description: 'Check terminal - should see 2 batches of 5 events',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'drains',
       label: 'Drains',
       icon: 'i-lucide-database',
