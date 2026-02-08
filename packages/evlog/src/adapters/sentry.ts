@@ -31,6 +31,7 @@ export interface SentryLog {
 
 interface SentryDsnParts {
   publicKey: string
+  secretKey?: string
   projectId: string
   origin: string
   basePath: string
@@ -66,6 +67,8 @@ function parseSentryDsn(dsn: string): SentryDsnParts {
     throw new Error('Invalid Sentry DSN: missing public key')
   }
 
+  const secretKey = url.password || undefined
+
   const pathParts = url.pathname.split('/').filter(Boolean)
   const projectId = pathParts.pop()
   if (!projectId) {
@@ -76,6 +79,7 @@ function parseSentryDsn(dsn: string): SentryDsnParts {
 
   return {
     publicKey,
+    secretKey,
     projectId,
     origin: `${url.protocol}//${url.host}`,
     basePath,
@@ -83,9 +87,12 @@ function parseSentryDsn(dsn: string): SentryDsnParts {
 }
 
 function getSentryEnvelopeUrl(dsn: string): { url: string, authHeader: string } {
-  const { publicKey, projectId, origin, basePath } = parseSentryDsn(dsn)
+  const { publicKey, secretKey, projectId, origin, basePath } = parseSentryDsn(dsn)
   const url = `${origin}${basePath}/api/${projectId}/envelope/`
-  const authHeader = `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=evlog`
+  let authHeader = `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=evlog`
+  if (secretKey) {
+    authHeader += `, sentry_secret=${secretKey}`
+  }
   return { url, authHeader }
 }
 
@@ -106,6 +113,9 @@ function getFirstStringValue(event: WideEvent, keys: string[]): string | undefin
 }
 
 function toAttributeValue(value: unknown): SentryAttributeValue | undefined {
+  if (value === null || value === undefined) {
+    return undefined
+  }
   if (typeof value === 'string') {
     return { value, type: 'string' }
   }
@@ -117,9 +127,6 @@ function toAttributeValue(value: unknown): SentryAttributeValue | undefined {
       return { value, type: 'integer' }
     }
     return { value, type: 'double' }
-  }
-  if (value === null || value === undefined) {
-    return undefined
   }
   return { value: JSON.stringify(value), type: 'string' }
 }

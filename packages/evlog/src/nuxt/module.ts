@@ -136,6 +136,17 @@ export interface ModuleOptions {
     timeout?: number
   }
 
+  /**
+   * PostHog adapter configuration.
+   * When configured, use `createPostHogDrain()` from `evlog/posthog` to send logs.
+   *
+   * @example
+   * ```ts
+   * posthog: {
+   *   apiKey: process.env.POSTHOG_API_KEY,
+   * }
+   * ```
+   */
   posthog?: {
     /** PostHog project API key */
     apiKey: string
@@ -149,6 +160,17 @@ export interface ModuleOptions {
     timeout?: number
   }
 
+  /**
+   * Sentry adapter configuration.
+   * When configured, use `createSentryDrain()` from `evlog/sentry` to send logs.
+   *
+   * @example
+   * ```ts
+   * sentry: {
+   *   dsn: process.env.SENTRY_DSN,
+   * }
+   * ```
+   */
   sentry?: {
     /** Sentry DSN */
     dsn: string
