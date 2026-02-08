@@ -34,8 +34,11 @@ export interface AxiomConfig {
  * }))
  * ```
  */
-export function createAxiomDrain(overrides?: Partial<AxiomConfig>): (ctx: DrainContext) => Promise<void> {
-  return async (ctx: DrainContext) => {
+export function createAxiomDrain(overrides?: Partial<AxiomConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+  return async (ctx: DrainContext | DrainContext[]) => {
+    const contexts = Array.isArray(ctx) ? ctx : [ctx]
+    if (contexts.length === 0) return
+
     const runtimeConfig = getRuntimeConfig()
     // Support both runtimeConfig.evlog.axiom and runtimeConfig.axiom
     const evlogAxiom = runtimeConfig?.evlog?.axiom
@@ -55,11 +58,7 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>): (ctx: DrainC
       return
     }
 
-    try {
-      await sendToAxiom(ctx.event, config as AxiomConfig)
-    } catch (error) {
-      console.error('[evlog/axiom] Failed to send event:', error)
-    }
+    await sendBatchToAxiom(contexts.map(c => c.event), config as AxiomConfig)
   }
 }
 

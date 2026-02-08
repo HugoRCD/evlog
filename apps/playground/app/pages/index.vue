@@ -39,6 +39,12 @@ async function handleBatchRequest() {
   )
 }
 
+async function handlePipelineBatch() {
+  await Promise.all(
+    Array.from({ length: 10 }, () => $fetch('/api/test/success')),
+  )
+}
+
 // Get custom onClick for specific tests
 function getOnClick(testId: string) {
   if (testId === 'structured-error-toast') {
@@ -46,6 +52,9 @@ function getOnClick(testId: string) {
   }
   if (testId === 'tail-fast-batch') {
     return handleBatchRequest
+  }
+  if (testId === 'pipeline-batch') {
+    return handlePipelineBatch
   }
   return undefined
 }
