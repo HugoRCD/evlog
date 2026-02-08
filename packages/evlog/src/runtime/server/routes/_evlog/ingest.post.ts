@@ -1,4 +1,4 @@
-import { createError, defineEventHandler, getHeader, getRequestHost, readBody, setResponseStatus } from 'h3'
+import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost, readBody, setResponseStatus } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
 import { getEnvironment } from '../../../../logger'
@@ -76,6 +76,28 @@ function validatePayload(body: unknown): IngestPayload {
   }
 }
 
+const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'x-auth-token',
+  'proxy-authorization',
+]
+
+function getSafeHeaders(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): Record<string, string> {
+  const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
+  const safeHeaders: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(allHeaders)) {
+    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+      safeHeaders[key] = value
+    }
+  }
+
+  return safeHeaders
+}
+
 export default defineEventHandler(async (event) => {
   validateOrigin(event)
 
@@ -93,6 +115,13 @@ export default defineEventHandler(async (event) => {
   }
 
   try {
+    await nitroApp.hooks.callHook('evlog:enrich', {
+      event: wideEvent,
+      request: { method: 'POST', path: event.path },
+      headers: getSafeHeaders(event),
+      response: { status: 204 },
+    })
+
     await nitroApp.hooks.callHook('evlog:drain', {
       event: wideEvent,
       request: { method: 'POST', path: event.path },

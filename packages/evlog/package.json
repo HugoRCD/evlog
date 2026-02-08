@@ -54,6 +54,10 @@
     "./sentry": {
       "types": "./dist/adapters/sentry.d.mts",
       "import": "./dist/adapters/sentry.mjs"
+    },
+    "./enrichers": {
+      "types": "./dist/enrichers.d.mts",
+      "import": "./dist/enrichers.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -83,6 +87,9 @@
       ],
       "sentry": [
         "./dist/adapters/sentry.d.mts"
+      ],
+      "enrichers": [
+        "./dist/enrichers.d.mts"
       ]
     }
   },

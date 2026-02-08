@@ -2,7 +2,7 @@ import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
+import type { EnrichContext, RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { matchesPattern } from '../utils'
 
 interface EvlogConfig {
@@ -74,17 +74,42 @@ const SENSITIVE_HEADERS = [
   'proxy-authorization',
 ]
 
-function getSafeHeaders(event: ServerEvent): Record<string, string> {
-  const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
+function filterSafeHeaders(headers: Record<string, string>): Record<string, string> {
   const safeHeaders: Record<string, string> = {}
 
-  for (const [key, value] of Object.entries(allHeaders)) {
+  for (const [key, value] of Object.entries(headers)) {
     if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
       safeHeaders[key] = value
     }
   }
 
   return safeHeaders
+}
+
+function getSafeHeaders(event: ServerEvent): Record<string, string> {
+  const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
+  return filterSafeHeaders(allHeaders)
+}
+
+function getSafeResponseHeaders(event: ServerEvent): Record<string, string> | undefined {
+  const headers: Record<string, string> = {}
+  const nodeRes = event.node?.res as { getHeaders?: () => Record<string, unknown> } | undefined
+
+  if (nodeRes?.getHeaders) {
+    for (const [key, value] of Object.entries(nodeRes.getHeaders())) {
+      if (value === undefined) continue
+      headers[key] = Array.isArray(value) ? value.join(', ') : String(value)
+    }
+  }
+
+  if (event.response?.headers) {
+    event.response.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+  }
+
+  if (Object.keys(headers).length === 0) return undefined
+  return filterSafeHeaders(headers)
 }
 
 function getResponseStatus(event: ServerEvent): number {
@@ -106,13 +131,31 @@ function getResponseStatus(event: ServerEvent): number {
   return 200
 }
 
-function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event: ServerEvent): void {
+function buildHookContext(event: ServerEvent): Omit<EnrichContext, 'event'> {
+  const responseHeaders = getSafeResponseHeaders(event)
+  return {
+    request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+    headers: getSafeHeaders(event),
+    response: {
+      status: getResponseStatus(event),
+      headers: responseHeaders,
+    },
+  }
+}
+
+function callDrainHook(
+  nitroApp: NitroApp,
+  emittedEvent: WideEvent | null,
+  event: ServerEvent,
+  request: EnrichContext['request'],
+  headers: EnrichContext['headers'],
+): void {
   if (!emittedEvent) return
 
   const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
     event: emittedEvent,
-    request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
-    headers: getSafeHeaders(event),
+    request,
+    headers,
   }).catch((err) => {
     console.error('[evlog] drain failed:', err)
   })
@@ -123,6 +166,24 @@ function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event
   if (typeof waitUntilCtx?.waitUntil === 'function') {
     waitUntilCtx.waitUntil(drainPromise)
   }
+}
+
+async function callEnrichAndDrain(
+  nitroApp: NitroApp,
+  emittedEvent: WideEvent | null,
+  event: ServerEvent,
+): Promise<void> {
+  if (!emittedEvent) return
+
+  const hookContext = buildHookContext(event)
+
+  try {
+    await nitroApp.hooks.callHook('evlog:enrich', { event: emittedEvent, ...hookContext })
+  } catch (err) {
+    console.error('[evlog] enrich failed:', err)
+  }
+
+  callDrainHook(nitroApp, emittedEvent, event, hookContext.request, hookContext.headers)
 }
 
 export default defineNitroPlugin((nitroApp) => {
@@ -198,7 +259,7 @@ export default defineNitroPlugin((nitroApp) => {
       e.context._evlogEmitted = true
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-      callDrainHook(nitroApp, emittedEvent, e)
+      await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })
 
@@ -227,7 +288,7 @@ export default defineNitroPlugin((nitroApp) => {
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-      callDrainHook(nitroApp, emittedEvent, e)
+      await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })
 })
