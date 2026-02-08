@@ -1,6 +1,6 @@
 {
   "name": "evlog",
-  "version": "1.5.0",
+  "version": "1.6.0",
   "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -102,7 +102,6 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
-    "@nuxt/kit": "^4.3.1",
     "defu": "^6.1.4"
   },
   "devDependencies": {
@@ -117,11 +116,15 @@
     "unbuild": "^3.6.1"
   },
   "peerDependencies": {
+    "@nuxt/kit": "^4.3.1",
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1"
   },
   "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    },
     "h3": {
       "optional": true
     },
