@@ -6,6 +6,7 @@ Replace `{Name}`, `{name}`, and `{NAME}` with the actual service name.
 
 ```typescript
 import type { DrainContext, WideEvent } from '../types'
+import { getRuntimeConfig } from './_utils'
 
 // --- 1. Config Interface ---
 // Define all service-specific configuration fields.
@@ -45,23 +46,7 @@ export function to{Name}Event(event: WideEvent): {Name}Event {
   }
 }
 
-// --- 3. Runtime Config Helper ---
-// Dynamic require to avoid bundling issues outside Nitro.
-// Returns undefined when not in a Nitro context.
-function getRuntimeConfig(): {
-  evlog?: { {name}?: Partial<{Name}Config> }
-  {name}?: Partial<{Name}Config>
-} | undefined {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
-    return useRuntimeConfig()
-  } catch {
-    return undefined
-  }
-}
-
-// --- 4. Factory Function ---
+// --- 3. Factory Function ---
 // Returns a drain function that resolves config at call time.
 // Config priority: overrides > runtimeConfig.evlog.{name} > runtimeConfig.{name} > env vars
 

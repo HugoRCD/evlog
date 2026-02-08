@@ -51,7 +51,7 @@ Read [references/adapter-template.md](references/adapter-template.md) for the fu
 Key architecture rules:
 
 1. **Config interface** -- service-specific fields (API key, endpoint, etc.) plus optional `timeout?: number`
-2. **`getRuntimeConfig()` helper** -- dynamic `require('nitropack/runtime')` wrapped in try/catch
+2. **`getRuntimeConfig()`** -- import from `./_utils` (shared helper, do NOT redefine locally)
 3. **Config priority** (highest to lowest):
    - Overrides passed to `create{Name}Drain()`
    - `runtimeConfig.evlog.{name}`
