@@ -135,6 +135,54 @@ export interface ModuleOptions {
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
   }
+
+  /**
+   * PostHog adapter configuration.
+   * When configured, use `createPostHogDrain()` from `evlog/posthog` to send logs.
+   *
+   * @example
+   * ```ts
+   * posthog: {
+   *   apiKey: process.env.POSTHOG_API_KEY,
+   * }
+   * ```
+   */
+  posthog?: {
+    /** PostHog project API key */
+    apiKey: string
+    /** PostHog host URL. Default: https://us.i.posthog.com */
+    host?: string
+    /** PostHog event name. Default: evlog_wide_event */
+    eventName?: string
+    /** Override distinct_id (defaults to event.service) */
+    distinctId?: string
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
+
+  /**
+   * Sentry adapter configuration.
+   * When configured, use `createSentryDrain()` from `evlog/sentry` to send logs.
+   *
+   * @example
+   * ```ts
+   * sentry: {
+   *   dsn: process.env.SENTRY_DSN,
+   * }
+   * ```
+   */
+  sentry?: {
+    /** Sentry DSN */
+    dsn: string
+    /** Environment override (defaults to event.environment) */
+    environment?: string
+    /** Release version override (defaults to event.version) */
+    release?: string
+    /** Additional tags to attach as attributes */
+    tags?: Record<string, string>
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
 }
 
 export default defineNuxtModule<ModuleOptions>({

@@ -220,6 +220,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 | Axiom | `evlog/axiom` | Send logs to Axiom for querying and dashboards |
 | OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
 | PostHog | `evlog/posthog` | Send logs to PostHog as events for product analytics |
+| Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
 
 **Using Axiom Adapter:**
 
@@ -259,6 +260,19 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set environment variable: `NUXT_POSTHOG_API_KEY` (and optionally `NUXT_POSTHOG_HOST` for EU or self-hosted instances).
+
+**Using Sentry Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createSentryDrain } from 'evlog/sentry'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createSentryDrain())
+})
+```
+
+Set environment variable: `NUXT_SENTRY_DSN`.
 
 **Multiple Destinations:**
 

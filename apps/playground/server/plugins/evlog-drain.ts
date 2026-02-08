@@ -1,5 +1,6 @@
 // import { createAxiomDrain } from 'evlog/axiom'
 // import { createPostHogDrain } from 'evlog/posthog'
+// import { createSentryDrain } from 'evlog/sentry'
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', (ctx) => {
@@ -12,11 +13,12 @@ export default defineNitroPlugin((nitroApp) => {
     // const axiomDrain = createAxiomDrain({
     //   dataset: 'evlog',
     // })
-
     // axiomDrain(ctx)
 
     // const posthogDrain = createPostHogDrain()
-
     // posthogDrain(ctx)
+
+    // const sentryDrain = createSentryDrain()
+    // sentryDrain(ctx)
   })
 })

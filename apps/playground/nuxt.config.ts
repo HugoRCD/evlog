@@ -28,6 +28,7 @@ export default defineNuxtConfig({
         { status: 400 }, // Keep errors
         { duration: 500 }, // Keep slow requests (>500ms)
         { path: '/api/test/critical/**' }, // Keep critical paths
+        { path: '/api/test/drain' }, // Always keep drain test logs
       ],
     },
   },
