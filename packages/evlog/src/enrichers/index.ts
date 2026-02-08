@@ -108,7 +108,7 @@ function parseTraceparent(traceparent: string): Pick<TraceContextInfo, 'traceId'
   return { traceId: match[1], spanId: match[2] }
 }
 
-function mergeEventField<T extends Record<string, unknown>>(
+function mergeEventField<T extends object>(
   existing: unknown,
   computed: T,
   overwrite?: boolean,
@@ -200,20 +200,25 @@ export function createTraceContextEnricher(options: EnricherOptions = {}): (ctx:
     if (!traceparent && !tracestate) return
 
     const parsed = traceparent ? parseTraceparent(traceparent) : undefined
-    const traceContext: TraceContextInfo = {
+    const incomingTraceContext: TraceContextInfo = {
       traceparent,
       tracestate,
       traceId: parsed?.traceId ?? (ctx.event.traceId as string | undefined),
       spanId: parsed?.spanId ?? (ctx.event.spanId as string | undefined),
     }
 
-    if (traceContext.traceId && (options.overwrite || ctx.event.traceId === undefined)) {
-      ctx.event.traceId = traceContext.traceId
-    }
-    if (traceContext.spanId && (options.overwrite || ctx.event.spanId === undefined)) {
-      ctx.event.spanId = traceContext.spanId
-    }
+    const mergedTraceContext = mergeEventField<TraceContextInfo>(
+      ctx.event.traceContext,
+      incomingTraceContext,
+      options.overwrite,
+    )
+    ctx.event.traceContext = mergedTraceContext
 
-    ctx.event.traceContext = mergeEventField<TraceContextInfo>(ctx.event.traceContext, traceContext, options.overwrite)
+    if (mergedTraceContext.traceId && (options.overwrite || ctx.event.traceId === undefined)) {
+      ctx.event.traceId = mergedTraceContext.traceId
+    }
+    if (mergedTraceContext.spanId && (options.overwrite || ctx.event.spanId === undefined)) {
+      ctx.event.spanId = mergedTraceContext.spanId
+    }
   }
 }

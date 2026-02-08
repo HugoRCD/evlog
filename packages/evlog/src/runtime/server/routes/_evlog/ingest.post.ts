@@ -121,10 +121,13 @@ export default defineEventHandler(async (event) => {
   })
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+  // Otherwise, await the drain to prevent lost logs in serverless environments
   const waitUntilCtx = (event as unknown as { context: Record<string, unknown> }).context
   const cfCtx = (waitUntilCtx as { cloudflare?: { context?: { waitUntil?: (p: Promise<unknown>) => void } } }).cloudflare?.context ?? waitUntilCtx
   if (typeof (cfCtx as { waitUntil?: unknown }).waitUntil === 'function') {
     (cfCtx as { waitUntil: (p: Promise<unknown>) => void }).waitUntil(drainPromise)
+  } else {
+    await drainPromise
   }
 
   setResponseStatus(event, 204)

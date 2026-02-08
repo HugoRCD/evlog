@@ -112,7 +112,7 @@ function getResponseStatus(event: ServerEvent): number {
 function buildHookContext(event: ServerEvent): Omit<EnrichContext, 'event'> {
   const responseHeaders = getSafeResponseHeaders(event)
   return {
-    request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
+    request: { method: event.method, path: event.path },
     headers: getSafeHeaders(event),
     response: {
       status: getResponseStatus(event),
@@ -184,7 +184,7 @@ export default defineNitroPlugin((nitroApp) => {
 
     // Store start time for duration calculation in tail sampling
     e.context._evlogStartTime = Date.now()
-    
+
     let requestIdOverride: string | undefined = undefined
     if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
       const cfRay = getSafeHeaders(e)?.['cf-ray']
