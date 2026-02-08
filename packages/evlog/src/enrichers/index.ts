@@ -142,7 +142,7 @@ export function createUserAgentEnricher(options: EnricherOptions = {}): (ctx: En
  */
 export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
   return (ctx) => {
-    const headers = ctx.headers
+    const { headers } = ctx
     if (!headers) return
 
     const geo: GeoInfo = {
