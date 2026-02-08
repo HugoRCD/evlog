@@ -40,6 +40,8 @@ evlog/
 │       ├── src/
 │       │   ├── nuxt/        # Nuxt module
 │       │   ├── nitro/       # Nitro plugin
+│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry)
+│       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
 │       └── test/            # Tests
 └── .github/                  # CI/CD workflows
@@ -327,6 +329,66 @@ export default defineNuxtConfig({
   },
 })
 ```
+
+#### Event Enrichment
+
+Enrichers add derived context to wide events after emit, before drain. Use the `evlog:enrich` hook to register enrichers.
+
+> **Creating a new enricher?** Follow the skill at `.agents/skills/create-enricher/SKILL.md`. It covers all touchpoints: source code, tests, and documentation updates.
+
+**Built-in Enrichers:**
+
+| Enricher | Import | Event Field | Description |
+|----------|--------|-------------|-------------|
+| User Agent | `evlog/enrichers` | `userAgent` | Parse browser, OS, device type from User-Agent header |
+| Geo | `evlog/enrichers` | `geo` | Extract country, region, city from platform headers (Vercel, Cloudflare) |
+| Request Size | `evlog/enrichers` | `requestSize` | Capture request/response payload sizes from Content-Length |
+| Trace Context | `evlog/enrichers` | `traceContext` | Extract W3C trace context (traceId, spanId) from traceparent header |
+
+**Using Built-in Enrichers:**
+
+```typescript
+// server/plugins/evlog-enrich.ts
+import {
+  createUserAgentEnricher,
+  createGeoEnricher,
+  createRequestSizeEnricher,
+  createTraceContextEnricher,
+} from 'evlog/enrichers'
+
+export default defineNitroPlugin((nitroApp) => {
+  const enrichers = [
+    createUserAgentEnricher(),
+    createGeoEnricher(),
+    createRequestSizeEnricher(),
+    createTraceContextEnricher(),
+  ]
+
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    for (const enricher of enrichers) enricher(ctx)
+  })
+})
+```
+
+**Custom Enricher:**
+
+```typescript
+// server/plugins/evlog-enrich.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+    ctx.event.region = process.env.FLY_REGION
+  })
+})
+```
+
+The `EnrichContext` contains:
+- `event`: The emitted `WideEvent` (mutable — add or modify fields directly)
+- `request`: Optional request metadata (`method`, `path`, `requestId`)
+- `headers`: Safe HTTP headers (sensitive headers are filtered)
+- `response`: Optional response metadata (`status`, `headers`)
+
+All enrichers accept `{ overwrite?: boolean }` — defaults to `false` to preserve user-provided data.
 
 ### Nitro
 

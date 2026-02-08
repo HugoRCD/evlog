@@ -1,6 +1,6 @@
 {
   "name": "evlog",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
