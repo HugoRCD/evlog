@@ -1,4 +1,4 @@
-import type { DrainContext, WideEvent } from '../types'
+import type { DrainContext, LogLevel, WideEvent } from '../types'
 
 export interface SentryConfig {
   /** Sentry DSN */
@@ -7,30 +7,26 @@ export interface SentryConfig {
   environment?: string
   /** Release version override (defaults to event.version) */
   release?: string
-  /** Server name override */
-  serverName?: string
-  /** Logger name override. Default: evlog */
-  logger?: string
-  /** Message override (defaults to event.message/action/path) */
-  message?: string
-  /** Additional tags to attach */
+  /** Additional tags to attach as attributes */
   tags?: Record<string, string>
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
 }
 
-export interface SentryEvent {
-  event_id: string
-  timestamp: string
-  level: 'fatal' | 'error' | 'warning' | 'info' | 'debug'
-  platform: 'javascript'
-  logger?: string
-  environment?: string
-  release?: string
-  server_name?: string
-  message?: string
-  tags?: Record<string, string>
-  extra?: Record<string, unknown>
+/** Sentry Log attribute value with type annotation */
+export interface SentryAttributeValue {
+  value: string | number | boolean
+  type: 'string' | 'integer' | 'double' | 'boolean'
+}
+
+/** Sentry Structured Log payload */
+export interface SentryLog {
+  timestamp: number
+  trace_id: string
+  level: 'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal'
+  body: string
+  severity_number: number
+  attributes?: Record<string, SentryAttributeValue>
 }
 
 interface SentryDsnParts {
@@ -38,6 +34,14 @@ interface SentryDsnParts {
   projectId: string
   origin: string
   basePath: string
+}
+
+/** Based on OpenTelemetry Logs Data Model specification */
+const SEVERITY_MAP: Record<LogLevel, number> = {
+  debug: 5,
+  info: 9,
+  warn: 13,
+  error: 17,
 }
 
 /**
@@ -78,14 +82,14 @@ function parseSentryDsn(dsn: string): SentryDsnParts {
   }
 }
 
-function getSentryStoreUrl(dsn: string): { url: string, authHeader: string } {
+function getSentryEnvelopeUrl(dsn: string): { url: string, authHeader: string } {
   const { publicKey, projectId, origin, basePath } = parseSentryDsn(dsn)
-  const url = `${origin}${basePath}/api/${projectId}/store/`
+  const url = `${origin}${basePath}/api/${projectId}/envelope/`
   const authHeader = `Sentry sentry_version=7, sentry_key=${publicKey}, sentry_client=evlog`
   return { url, authHeader }
 }
 
-function createEventId(): string {
+function createTraceId(): string {
   if (typeof globalThis.crypto?.randomUUID === 'function') {
     return globalThis.crypto.randomUUID().replace(/-/g, '')
   }
@@ -101,49 +105,104 @@ function getFirstStringValue(event: WideEvent, keys: string[]): string | undefin
   return undefined
 }
 
-/**
- * Convert a WideEvent to a Sentry event payload.
- */
-export function toSentryEvent(event: WideEvent, config: SentryConfig): SentryEvent {
-  const { timestamp, level, service, environment, ...rest } = event
-  const levelMap: Record<WideEvent['level'], SentryEvent['level']> = {
-    info: 'info',
-    warn: 'warning',
-    error: 'error',
-    debug: 'debug',
+function toAttributeValue(value: unknown): SentryAttributeValue | undefined {
+  if (typeof value === 'string') {
+    return { value, type: 'string' }
   }
+  if (typeof value === 'boolean') {
+    return { value, type: 'boolean' }
+  }
+  if (typeof value === 'number') {
+    if (Number.isInteger(value)) {
+      return { value, type: 'integer' }
+    }
+    return { value, type: 'double' }
+  }
+  if (value === null || value === undefined) {
+    return undefined
+  }
+  return { value: JSON.stringify(value), type: 'string' }
+}
 
-  const message = config.message
-    ?? getFirstStringValue(event, ['message', 'action', 'path'])
+export function toSentryLog(event: WideEvent, config: SentryConfig): SentryLog {
+  const { timestamp, level, service, environment, version, ...rest } = event
+
+  const body = getFirstStringValue(event, ['message', 'action', 'path'])
     ?? 'evlog wide event'
 
-  const extra = { ...rest }
-  if (typeof extra.message === 'string') {
-    delete extra.message
+  const traceId = (typeof event.traceId === 'string' && event.traceId.length > 0)
+    ? event.traceId
+    : createTraceId()
+
+  const attributes: Record<string, SentryAttributeValue> = {}
+
+  const env = config.environment ?? environment
+  if (env) {
+    attributes['sentry.environment'] = { value: env, type: 'string' }
   }
 
-  const tags = {
-    service,
-    ...config.tags,
+  const rel = config.release ?? version
+  if (typeof rel === 'string' && rel.length > 0) {
+    attributes['sentry.release'] = { value: rel, type: 'string' }
+  }
+
+  attributes['service'] = { value: service, type: 'string' }
+
+  if (config.tags) {
+    for (const [key, value] of Object.entries(config.tags)) {
+      attributes[key] = { value, type: 'string' }
+    }
+  }
+
+  for (const [key, value] of Object.entries(rest)) {
+    if (key === 'traceId' || key === 'spanId') continue
+    if (value === undefined || value === null) continue
+    const attr = toAttributeValue(value)
+    if (attr) {
+      attributes[key] = attr
+    }
   }
 
   return {
-    event_id: createEventId(),
-    timestamp,
-    level: levelMap[level] ?? 'info',
-    platform: 'javascript',
-    logger: config.logger ?? 'evlog',
-    environment: config.environment ?? environment,
-    release: config.release ?? event.version,
-    server_name: config.serverName,
-    message,
-    tags,
-    extra,
+    timestamp: new Date(timestamp).getTime() / 1000,
+    trace_id: traceId,
+    level: level as SentryLog['level'],
+    body,
+    severity_number: SEVERITY_MAP[level] ?? 9,
+    attributes,
   }
 }
 
 /**
+ * Build the Sentry Envelope body for a list of logs.
+ *
+ * Envelope format (line-delimited):
+ * - Line 1: Envelope headers (dsn, sent_at)
+ * - Line 2: Item header (type: log, item_count, content_type)
+ * - Line 3: Item payload ({"items": [...]})
+ */
+function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
+  const envelopeHeader = JSON.stringify({
+    dsn,
+    sent_at: new Date().toISOString(),
+  })
+
+  const itemHeader = JSON.stringify({
+    type: 'log',
+    item_count: logs.length,
+    content_type: 'application/vnd.sentry.items.log+json',
+  })
+
+  const itemPayload = JSON.stringify({ items: logs })
+
+  return `${envelopeHeader}\n${itemHeader}\n${itemPayload}\n`
+}
+
+/**
  * Create a drain function for sending logs to Sentry.
+ *
+ * Sends wide events as Sentry Structured Logs, visible in Explore > Logs
+ * in the Sentry dashboard.
  *
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to createSentryDrain()
@@ -172,9 +231,6 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: Drai
       dsn: overrides?.dsn ?? evlogSentry?.dsn ?? rootSentry?.dsn ?? process.env.NUXT_SENTRY_DSN ?? process.env.SENTRY_DSN,
       environment: overrides?.environment ?? evlogSentry?.environment ?? rootSentry?.environment ?? process.env.NUXT_SENTRY_ENVIRONMENT ?? process.env.SENTRY_ENVIRONMENT,
       release: overrides?.release ?? evlogSentry?.release ?? rootSentry?.release ?? process.env.NUXT_SENTRY_RELEASE ?? process.env.SENTRY_RELEASE,
-      serverName: overrides?.serverName ?? evlogSentry?.serverName ?? rootSentry?.serverName ?? process.env.NUXT_SENTRY_SERVER_NAME ?? process.env.SENTRY_SERVER_NAME,
-      logger: overrides?.logger ?? evlogSentry?.logger ?? rootSentry?.logger,
-      message: overrides?.message ?? evlogSentry?.message ?? rootSentry?.message,
       tags: overrides?.tags ?? evlogSentry?.tags ?? rootSentry?.tags,
       timeout: overrides?.timeout ?? evlogSentry?.timeout ?? rootSentry?.timeout,
     }
@@ -187,13 +243,13 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: Drai
     try {
       await sendToSentry(ctx.event, config as SentryConfig)
     } catch (error) {
-      console.error('[evlog/sentry] Failed to send event:', error)
+      console.error('[evlog/sentry] Failed to send log:', error)
     }
   }
 }
 
 /**
- * Send a single event to Sentry.
+ * Send a single event to Sentry as a structured log.
  *
  * @example
  * ```ts
@@ -203,36 +259,11 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: Drai
  * ```
  */
 export async function sendToSentry(event: WideEvent, config: SentryConfig): Promise<void> {
-  const { url, authHeader } = getSentryStoreUrl(config.dsn)
-  const timeout = config.timeout ?? 5000
-  const payload = toSentryEvent(event, config)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'X-Sentry-Auth': authHeader,
-      },
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`Sentry API error: ${response.status} ${response.statusText} - ${safeText}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
+  await sendBatchToSentry([event], config)
 }
 
 /**
- * Send a batch of events to Sentry.
+ * Send a batch of events to Sentry as structured logs via the Envelope endpoint.
  *
  * @example
  * ```ts
@@ -244,8 +275,32 @@ export async function sendToSentry(event: WideEvent, config: SentryConfig): Prom
 export async function sendBatchToSentry(events: WideEvent[], config: SentryConfig): Promise<void> {
   if (events.length === 0) return
 
-  for (const event of events) {
-    // Sentry's store endpoint accepts one event at a time.
-    await sendToSentry(event, config)
+  const { url, authHeader } = getSentryEnvelopeUrl(config.dsn)
+  const timeout = config.timeout ?? 5000
+
+  const logs = events.map(event => toSentryLog(event, config))
+  const body = buildEnvelopeBody(logs, config.dsn)
+
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), timeout)
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/x-sentry-envelope',
+        'X-Sentry-Auth': authHeader,
+      },
+      body,
+      signal: controller.signal,
+    })
+
+    if (!response.ok) {
+      const text = await response.text().catch(() => 'Unknown error')
+      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
+      throw new Error(`Sentry API error: ${response.status} ${response.statusText} - ${safeText}`)
+    }
+  } finally {
+    clearTimeout(timeoutId)
   }
 }

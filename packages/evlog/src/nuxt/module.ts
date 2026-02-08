@@ -136,18 +136,19 @@ export interface ModuleOptions {
     timeout?: number
   }
 
-  /**
-   * Sentry adapter configuration.
-   * When configured, use `createSentryDrain()` from `evlog/sentry` to send logs.
-   *
-   * @example
-   * ```ts
-   * sentry: {
-   *   dsn: process.env.SENTRY_DSN,
-   *   environment: 'production',
-   * }
-   * ```
-   */
+  posthog?: {
+    /** PostHog project API key */
+    apiKey: string
+    /** PostHog host URL. Default: https://us.i.posthog.com */
+    host?: string
+    /** PostHog event name. Default: evlog_wide_event */
+    eventName?: string
+    /** Override distinct_id (defaults to event.service) */
+    distinctId?: string
+    /** Request timeout in milliseconds. Default: 5000 */
+    timeout?: number
+  }
+
   sentry?: {
     /** Sentry DSN */
     dsn: string
@@ -155,13 +156,7 @@ export interface ModuleOptions {
     environment?: string
     /** Release version override (defaults to event.version) */
     release?: string
-    /** Server name override */
-    serverName?: string
-    /** Logger name override. Default: evlog */
-    logger?: string
-    /** Message override (defaults to event.message/action/path) */
-    message?: string
-    /** Additional tags to attach */
+    /** Additional tags to attach as attributes */
     tags?: Record<string, string>
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
