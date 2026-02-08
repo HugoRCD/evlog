@@ -8,14 +8,14 @@ export interface EnricherOptions {
   overwrite?: boolean
 }
 
-interface UserAgentInfo {
+export interface UserAgentInfo {
   raw: string
   browser?: { name: string; version?: string }
   os?: { name: string; version?: string }
   device?: { type: 'mobile' | 'tablet' | 'desktop' | 'bot' | 'unknown' }
 }
 
-interface GeoInfo {
+export interface GeoInfo {
   country?: string
   region?: string
   regionCode?: string
@@ -24,12 +24,12 @@ interface GeoInfo {
   longitude?: number
 }
 
-interface RequestSizeInfo {
+export interface RequestSizeInfo {
   requestBytes?: number
   responseBytes?: number
 }
 
-interface TraceContextInfo {
+export interface TraceContextInfo {
   traceparent?: string
   tracestate?: string
   traceId?: string
@@ -38,9 +38,9 @@ interface TraceContextInfo {
 
 function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
   if (!headers) return undefined
-  if (headers[name]) return headers[name]
+  if (headers[name] !== undefined) return headers[name]
   const lowerName = name.toLowerCase()
-  if (headers[lowerName]) return headers[lowerName]
+  if (headers[lowerName] !== undefined) return headers[lowerName]
   for (const [key, value] of Object.entries(headers)) {
     if (key.toLowerCase() === lowerName) return value
   }
@@ -127,6 +127,7 @@ function normalizeNumber(value: string | undefined): number | undefined {
 
 /**
  * Enrich events with parsed user agent data.
+ * Sets `event.userAgent` with `UserAgentInfo` shape: `{ raw, browser?, os?, device? }`.
  */
 export function createUserAgentEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
   return (ctx) => {
@@ -138,7 +139,16 @@ export function createUserAgentEnricher(options: EnricherOptions = {}): (ctx: En
 }
 
 /**
- * Enrich events with geo data from Cloudflare/Vercel headers.
+ * Enrich events with geo data from platform headers.
+ * Sets `event.geo` with `GeoInfo` shape: `{ country?, region?, regionCode?, city?, latitude?, longitude? }`.
+ *
+ * Supports Vercel (`x-vercel-ip-*`) headers out of the box.
+ *
+ * **Cloudflare note:** Only `cf-ipcountry` is an actual HTTP header added by Cloudflare.
+ * The `cf-region`, `cf-city`, `cf-latitude`, `cf-longitude` headers are NOT standard
+ * Cloudflare headers — they are properties of `request.cf` which is not exposed as HTTP
+ * headers. For full geo data on Cloudflare, write a custom enricher that reads `request.cf`
+ * or use a Workers middleware to copy `cf` properties into custom headers.
  */
 export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
   return (ctx) => {
@@ -146,12 +156,12 @@ export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichCo
     if (!headers) return
 
     const geo: GeoInfo = {
-      country: getHeader(headers, 'cf-ipcountry') ?? getHeader(headers, 'x-vercel-ip-country'),
-      region: getHeader(headers, 'cf-region') ?? getHeader(headers, 'x-vercel-ip-country-region'),
-      regionCode: getHeader(headers, 'cf-region-code') ?? getHeader(headers, 'x-vercel-ip-country-region-code'),
-      city: getHeader(headers, 'cf-city') ?? getHeader(headers, 'x-vercel-ip-city'),
-      latitude: normalizeNumber(getHeader(headers, 'cf-latitude') ?? getHeader(headers, 'x-vercel-ip-latitude')),
-      longitude: normalizeNumber(getHeader(headers, 'cf-longitude') ?? getHeader(headers, 'x-vercel-ip-longitude')),
+      country: getHeader(headers, 'x-vercel-ip-country') ?? getHeader(headers, 'cf-ipcountry'),
+      region: getHeader(headers, 'x-vercel-ip-country-region') ?? getHeader(headers, 'cf-region'),
+      regionCode: getHeader(headers, 'x-vercel-ip-country-region-code') ?? getHeader(headers, 'cf-region-code'),
+      city: getHeader(headers, 'x-vercel-ip-city') ?? getHeader(headers, 'cf-city'),
+      latitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-latitude') ?? getHeader(headers, 'cf-latitude')),
+      longitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-longitude') ?? getHeader(headers, 'cf-longitude')),
     }
 
     if (Object.values(geo).every(value => value === undefined)) return
@@ -161,6 +171,7 @@ export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichCo
 
 /**
  * Enrich events with request/response payload sizes.
+ * Sets `event.requestSize` with `RequestSizeInfo` shape: `{ requestBytes?, responseBytes? }`.
  */
 export function createRequestSizeEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
   return (ctx) => {
@@ -179,6 +190,8 @@ export function createRequestSizeEnricher(options: EnricherOptions = {}): (ctx: 
 
 /**
  * Enrich events with W3C trace context data.
+ * Sets `event.traceContext` with `TraceContextInfo` shape: `{ traceparent?, tracestate?, traceId?, spanId? }`.
+ * Also sets `event.traceId` and `event.spanId` at the top level.
  */
 export function createTraceContextEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
   return (ctx) => {

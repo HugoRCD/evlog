@@ -2,6 +2,7 @@ import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost,
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
 import { getEnvironment } from '../../../../logger'
+import { filterSafeHeaders } from '../../../../utils'
 
 const VALID_LEVELS = ['info', 'error', 'warn', 'debug'] as const
 
@@ -76,26 +77,9 @@ function validatePayload(body: unknown): IngestPayload {
   }
 }
 
-const SENSITIVE_HEADERS = [
-  'authorization',
-  'cookie',
-  'set-cookie',
-  'x-api-key',
-  'x-auth-token',
-  'proxy-authorization',
-]
-
 function getSafeHeaders(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): Record<string, string> {
   const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
-  const safeHeaders: Record<string, string> = {}
-
-  for (const [key, value] of Object.entries(allHeaders)) {
-    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
-      safeHeaders[key] = value
-    }
-  }
-
-  return safeHeaders
+  return filterSafeHeaders(allHeaders)
 }
 
 export default defineEventHandler(async (event) => {
@@ -114,20 +98,33 @@ export default defineEventHandler(async (event) => {
     source: 'client',
   }
 
+  const headers = getSafeHeaders(event)
+  const request = { method: 'POST' as const, path: event.path }
+
   try {
     await nitroApp.hooks.callHook('evlog:enrich', {
       event: wideEvent,
-      request: { method: 'POST', path: event.path },
-      headers: getSafeHeaders(event),
+      request,
+      headers,
       response: { status: 204 },
     })
+  } catch (err) {
+    console.error('[evlog] enrich failed:', err)
+  }
 
-    await nitroApp.hooks.callHook('evlog:drain', {
-      event: wideEvent,
-      request: { method: 'POST', path: event.path },
-    })
-  } catch {
-    // Silently fail - don't break the client
+  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+    event: wideEvent,
+    request,
+    headers,
+  }).catch((err) => {
+    console.error('[evlog] drain failed:', err)
+  })
+
+  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+  const waitUntilCtx = (event as unknown as { context: Record<string, unknown> }).context
+  const cfCtx = (waitUntilCtx as { cloudflare?: { context?: { waitUntil?: (p: Promise<unknown>) => void } } }).cloudflare?.context ?? waitUntilCtx
+  if (typeof (cfCtx as { waitUntil?: unknown }).waitUntil === 'function') {
+    (cfCtx as { waitUntil: (p: Promise<unknown>) => void }).waitUntil(drainPromise)
   }
 
   setResponseStatus(event, 204)

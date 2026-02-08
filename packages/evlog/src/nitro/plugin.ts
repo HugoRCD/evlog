@@ -3,7 +3,7 @@ import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger } from '../logger'
 import type { EnrichContext, RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
-import { matchesPattern } from '../utils'
+import { filterSafeHeaders, matchesPattern } from '../utils'
 
 interface EvlogConfig {
   env?: Record<string, unknown>
@@ -62,28 +62,6 @@ function getServiceForPath(path: string, routes?: Record<string, RouteConfig>): 
   }
 
   return undefined
-}
-
-/** Headers that should never be passed to the drain hook for security */
-const SENSITIVE_HEADERS = [
-  'authorization',
-  'cookie',
-  'set-cookie',
-  'x-api-key',
-  'x-auth-token',
-  'proxy-authorization',
-]
-
-function filterSafeHeaders(headers: Record<string, string>): Record<string, string> {
-  const safeHeaders: Record<string, string> = {}
-
-  for (const [key, value] of Object.entries(headers)) {
-    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
-      safeHeaders[key] = value
-    }
-  }
-
-  return safeHeaders
 }
 
 function getSafeHeaders(event: ServerEvent): Record<string, string> {
@@ -209,7 +187,7 @@ export default defineNitroPlugin((nitroApp) => {
     
     let requestIdOverride: string | undefined = undefined
     if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
-      const cfRay = getSafeHeaders(event)?.['cf-ray']
+      const cfRay = getSafeHeaders(e)?.['cf-ray']
       if (cfRay) requestIdOverride = cfRay
     }
 
