@@ -98,8 +98,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "unbuild",
-    "dev:prepare": "unbuild",
+    "build": "tsdown",
+    "dev:prepare": "tsdown",
     "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -116,8 +116,8 @@
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.1",
-    "typescript": "^5.9.3",
-    "unbuild": "^3.6.1"
+    "tsdown": "^0.20.3",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
     "@nuxt/kit": "^4.3.1",
