@@ -18,6 +18,19 @@ declare module 'nitropack/types' {
     'evlog:emit:keep': (ctx: TailSamplingContext) => void | Promise<void>
 
     /**
+     * Enrichment hook - called after emit, before drain.
+     * Use this to enrich the event with derived context (e.g. geo, user agent).
+     *
+     * @example
+     * ```ts
+     * nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+     *   ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+     * })
+     * ```
+     */
+    'evlog:enrich': (ctx: EnrichContext) => void | Promise<void>
+
+    /**
      * Drain hook - called after emitting a log (fire-and-forget).
      * Use this to send logs to external services like Axiom, Loki, or custom endpoints.
      * Errors are logged but never block the request.
@@ -110,6 +123,28 @@ export interface TailSamplingContext {
    * Multiple hooks can set this - if any sets it to true, the log is kept.
    */
   shouldKeep?: boolean
+}
+
+/**
+ * Context passed to the evlog:enrich hook.
+ * Called after emit, before drain.
+ */
+export interface EnrichContext {
+  /** The emitted wide event (mutable). */
+  event: WideEvent
+  /** Request metadata (if available) */
+  request?: {
+    method?: string
+    path?: string
+    requestId?: string
+  }
+  /** Safe HTTP request headers (sensitive headers filtered out) */
+  headers?: Record<string, string>
+  /** Optional response metadata */
+  response?: {
+    status?: number
+    headers?: Record<string, string>
+  }
 }
 
 /**
