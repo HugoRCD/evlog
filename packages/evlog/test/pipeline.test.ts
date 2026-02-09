@@ -278,6 +278,21 @@ describe('createDrainPipeline', () => {
       expect(drain).not.toHaveBeenCalled()
     })
 
+    it('handles concurrent flush() calls safely', async () => {
+      const drain = vi.fn().mockResolvedValue(undefined)
+      const hook = createDrainPipeline({ batch: { size: 100, intervalMs: 60000 } })(drain)
+
+      hook(createTestContext(1))
+      hook(createTestContext(2))
+
+      const [r1, r2] = await Promise.all([hook.flush(), hook.flush()])
+
+      expect(r1).toBeUndefined()
+      expect(r2).toBeUndefined()
+      expect(drain).toHaveBeenCalledTimes(1)
+      expect(hook.pending).toBe(0)
+    })
+
     it('flush drains events that arrived during active flush', async () => {
       const drain = vi.fn().mockResolvedValue(undefined)
       const hook = createDrainPipeline({ batch: { size: 2, intervalMs: 60000 } })(drain)

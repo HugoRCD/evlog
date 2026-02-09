@@ -28,7 +28,26 @@ export interface PipelineDrainFn<T> {
   readonly pending: number
 }
 
-export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<T>): (drain: (ctx: T | T[]) => void | Promise<void>) => PipelineDrainFn<T> {
+/**
+ * Create a drain pipeline that batches events, retries on failure, and manages buffer overflow.
+ *
+ * Returns a higher-order function: pass your drain adapter to get a hook-compatible function.
+ *
+ * @example
+ * ```ts
+ * const pipeline = createDrainPipeline({ batch: { size: 50 } })
+ * const drain = pipeline(async (batch) => {
+ *   await sendToBackend(batch)
+ * })
+ *
+ * // Use as a hook
+ * nitroApp.hooks.hook('evlog:drain', drain)
+ *
+ * // Flush on shutdown
+ * nitroApp.hooks.hook('close', () => drain.flush())
+ * ```
+ */
+export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<T>): (drain: (batch: T[]) => void | Promise<void>) => PipelineDrainFn<T> {
   const batchSize = options?.batch?.size ?? 50
   const intervalMs = options?.batch?.intervalMs ?? 5000
   const maxBufferSize = options?.maxBufferSize ?? 1000
@@ -38,7 +57,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
   const maxDelayMs = options?.retry?.maxDelayMs ?? 30000
   const onDropped = options?.onDropped
 
-  return (drain: (ctx: T | T[]) => void | Promise<void>): PipelineDrainFn<T> => {
+  return (drain: (batch: T[]) => void | Promise<void>): PipelineDrainFn<T> => {
     const buffer: T[] = []
     let timer: ReturnType<typeof setTimeout> | null = null
     let activeFlush: Promise<void> | null = null
