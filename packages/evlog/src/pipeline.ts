@@ -100,8 +100,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
         try {
           await drain(batch)
           return
-        }
-        catch (error) {
+        } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
           if (attempt < maxAttempts) {
             await new Promise<void>(r => setTimeout(r, getRetryDelay(attempt)))
@@ -124,8 +123,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
         activeFlush = null
         if (buffer.length >= batchSize) {
           startFlush()
-        }
-        else if (buffer.length > 0) {
+        } else if (buffer.length > 0) {
           scheduleFlush()
         }
       })
@@ -141,8 +139,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
       if (buffer.length >= batchSize) {
         clearTimer()
         startFlush()
-      }
-      else if (!activeFlush) {
+      } else if (!activeFlush) {
         scheduleFlush()
       }
     }
