@@ -58,7 +58,11 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>): (ctx: DrainC
       return
     }
 
-    await sendBatchToAxiom(contexts.map(c => c.event), config as AxiomConfig)
+    try {
+      await sendBatchToAxiom(contexts.map(c => c.event), config as AxiomConfig)
+    } catch (error) {
+      console.error('[evlog/axiom] Failed to send events to Axiom:', error)
+    }
   }
 }
 

@@ -236,7 +236,11 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>): (ctx: Drai
       return
     }
 
-    await sendBatchToSentry(contexts.map(c => c.event), config as SentryConfig)
+    try {
+      await sendBatchToSentry(contexts.map(c => c.event), config as SentryConfig)
+    } catch (error) {
+      console.error('[evlog/sentry] Failed to send events to Sentry:', error)
+    }
   }
 }
 

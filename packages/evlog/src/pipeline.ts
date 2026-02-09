@@ -57,6 +57,25 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
   const maxDelayMs = options?.retry?.maxDelayMs ?? 30000
   const onDropped = options?.onDropped
 
+  if (batchSize <= 0 || !Number.isFinite(batchSize)) {
+    throw new Error(`[evlog/pipeline] batch.size must be a positive finite number, got: ${batchSize}`)
+  }
+  if (intervalMs <= 0 || !Number.isFinite(intervalMs)) {
+    throw new Error(`[evlog/pipeline] batch.intervalMs must be a positive finite number, got: ${intervalMs}`)
+  }
+  if (maxBufferSize <= 0 || !Number.isFinite(maxBufferSize)) {
+    throw new Error(`[evlog/pipeline] maxBufferSize must be a positive finite number, got: ${maxBufferSize}`)
+  }
+  if (maxAttempts <= 0 || !Number.isFinite(maxAttempts)) {
+    throw new Error(`[evlog/pipeline] retry.maxAttempts must be a positive finite number, got: ${maxAttempts}`)
+  }
+  if (initialDelayMs < 0 || !Number.isFinite(initialDelayMs)) {
+    throw new Error(`[evlog/pipeline] retry.initialDelayMs must be a non-negative finite number, got: ${initialDelayMs}`)
+  }
+  if (maxDelayMs < 0 || !Number.isFinite(maxDelayMs)) {
+    throw new Error(`[evlog/pipeline] retry.maxDelayMs must be a non-negative finite number, got: ${maxDelayMs}`)
+  }
+
   return (drain: (batch: T[]) => void | Promise<void>): PipelineDrainFn<T> => {
     const buffer: T[] = []
     let timer: ReturnType<typeof setTimeout> | null = null
@@ -149,7 +168,9 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
       if (activeFlush) {
         await activeFlush
       }
-      await drainBuffer()
+      while (buffer.length > 0) {
+        await drainBuffer()
+      }
     }
 
     const hookFn = push as PipelineDrainFn<T>

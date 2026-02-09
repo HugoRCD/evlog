@@ -353,4 +353,34 @@ describe('createDrainPipeline', () => {
       expect(drain).toHaveBeenCalledTimes(1)
     })
   })
+
+  describe('input validation', () => {
+    it('throws on batch.size <= 0', () => {
+      expect(() => createDrainPipeline({ batch: { size: 0 } })).toThrow('batch.size must be a positive finite number')
+    })
+
+    it('throws on batch.size = -1', () => {
+      expect(() => createDrainPipeline({ batch: { size: -1 } })).toThrow('batch.size must be a positive finite number')
+    })
+
+    it('throws on batch.intervalMs <= 0', () => {
+      expect(() => createDrainPipeline({ batch: { intervalMs: 0 } })).toThrow('batch.intervalMs must be a positive finite number')
+    })
+
+    it('throws on maxBufferSize <= 0', () => {
+      expect(() => createDrainPipeline({ maxBufferSize: 0 })).toThrow('maxBufferSize must be a positive finite number')
+    })
+
+    it('throws on retry.maxAttempts <= 0', () => {
+      expect(() => createDrainPipeline({ retry: { maxAttempts: 0 } })).toThrow('retry.maxAttempts must be a positive finite number')
+    })
+
+    it('throws on non-finite batch.size', () => {
+      expect(() => createDrainPipeline({ batch: { size: Infinity } })).toThrow('batch.size must be a positive finite number')
+    })
+
+    it('throws on NaN batch.size', () => {
+      expect(() => createDrainPipeline({ batch: { size: NaN } })).toThrow('batch.size must be a positive finite number')
+    })
+  })
 })

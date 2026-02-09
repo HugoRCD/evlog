@@ -85,7 +85,11 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>): (ctx: Dr
       return
     }
 
-    await sendBatchToPostHog(contexts.map(c => c.event), config as PostHogConfig)
+    try {
+      await sendBatchToPostHog(contexts.map(c => c.event), config as PostHogConfig)
+    } catch (error) {
+      console.error('[evlog/posthog] Failed to send events to PostHog:', error)
+    }
   }
 }
 

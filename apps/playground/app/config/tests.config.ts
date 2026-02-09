@@ -270,7 +270,7 @@ export const testConfig = {
       label: 'Pipeline',
       icon: 'i-lucide-layers',
       title: 'Drain Pipeline (Batching + Retry)',
-      description: 'Events are buffered and sent in batches (size: 5, interval: 2s). Watch the terminal for "[evlog/pipeline] Flushing batch of N events" messages.',
+      description: 'Events are buffered and sent in batches (size: 5, interval: 2s). Watch the terminal for batched drain output.',
       layout: 'cards',
       tests: [
         {
