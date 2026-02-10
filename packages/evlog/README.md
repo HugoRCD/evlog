@@ -524,6 +524,63 @@ export default defineNitroPlugin((nitroApp) => {
 
 > See the [full documentation](https://evlog.hrcd.fr/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
 
+## Drain Pipeline
+
+For production use, wrap your drain adapter with `createDrainPipeline` to get **batching**, **retry with backoff**, and **buffer overflow protection**.
+
+Without a pipeline, each event triggers a separate network call. The pipeline buffers events and sends them in batches, reducing overhead and handling transient failures automatically.
+
+```typescript
+// server/plugins/evlog-drain.ts
+import type { DrainContext } from 'evlog'
+import { createDrainPipeline } from 'evlog/pipeline'
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  const pipeline = createDrainPipeline<DrainContext>({
+    batch: { size: 50, intervalMs: 5000 },
+    retry: { maxAttempts: 3, backoff: 'exponential', initialDelayMs: 1000 },
+    onDropped: (events, error) => {
+      console.error(`[evlog] Dropped ${events.length} events:`, error?.message)
+    },
+  })
+
+  const drain = pipeline(createAxiomDrain())
+
+  nitroApp.hooks.hook('evlog:drain', drain)
+  nitroApp.hooks.hook('close', () => drain.flush())
+})
+```
+
+### How it works
+
+1. Events are buffered in memory as they arrive
+2. A batch is flushed when either the **batch size** is reached or the **interval** expires (whichever comes first)
+3. If the drain function fails, the batch is retried with the configured **backoff strategy**
+4. If all retries are exhausted, `onDropped` is called with the lost events
+5. If the buffer exceeds `maxBufferSize`, the oldest events are dropped to prevent memory leaks
+
+### Options
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `batch.size` | `50` | Maximum events per batch |
+| `batch.intervalMs` | `5000` | Max time (ms) before flushing a partial batch |
+| `retry.maxAttempts` | `3` | Total attempts (including first) |
+| `retry.backoff` | `'exponential'` | `'exponential'` \| `'linear'` \| `'fixed'` |
+| `retry.initialDelayMs` | `1000` | Base delay for first retry |
+| `retry.maxDelayMs` | `30000` | Upper bound for any retry delay |
+| `maxBufferSize` | `1000` | Max buffered events before dropping oldest |
+| `onDropped` | — | Callback when events are dropped |
+
+### Returned drain function
+
+The function returned by `pipeline(drain)` is hook-compatible and exposes:
+
+- **`drain(ctx)`** — Push a single event into the buffer
+- **`drain.flush()`** — Force-flush all buffered events (call on server shutdown)
+- **`drain.pending`** — Number of events currently buffered
+
 ## API Reference
 
 ### `initLogger(config)`

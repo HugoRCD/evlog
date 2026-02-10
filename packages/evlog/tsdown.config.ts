@@ -21,6 +21,7 @@ export default defineConfig({
     'adapters/posthog': 'src/adapters/posthog.ts',
     'adapters/sentry': 'src/adapters/sentry.ts',
     'enrichers': 'src/enrichers/index.ts',
+    'pipeline': 'src/pipeline.ts',
   },
   format: 'esm',
   dts: true,

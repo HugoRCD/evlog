@@ -61,8 +61,11 @@ export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHog
  * }))
  * ```
  */
-export function createPostHogDrain(overrides?: Partial<PostHogConfig>): (ctx: DrainContext) => Promise<void> {
-  return async (ctx: DrainContext) => {
+export function createPostHogDrain(overrides?: Partial<PostHogConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+  return async (ctx: DrainContext | DrainContext[]) => {
+    const contexts = Array.isArray(ctx) ? ctx : [ctx]
+    if (contexts.length === 0) return
+
     const runtimeConfig = getRuntimeConfig()
     // Support both runtimeConfig.evlog.posthog and runtimeConfig.posthog
     const evlogPostHog = runtimeConfig?.evlog?.posthog
@@ -83,9 +86,9 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>): (ctx: Dr
     }
 
     try {
-      await sendToPostHog(ctx.event, config as PostHogConfig)
+      await sendBatchToPostHog(contexts.map(c => c.event), config as PostHogConfig)
     } catch (error) {
-      console.error('[evlog/posthog] Failed to send event:', error)
+      console.error('[evlog/posthog] Failed to send events to PostHog:', error)
     }
   }
 }

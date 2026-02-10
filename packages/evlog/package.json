@@ -58,6 +58,10 @@
     "./enrichers": {
       "types": "./dist/enrichers.d.mts",
       "import": "./dist/enrichers.mjs"
+    },
+    "./pipeline": {
+      "types": "./dist/pipeline.d.mts",
+      "import": "./dist/pipeline.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -90,6 +94,9 @@
       ],
       "enrichers": [
         "./dist/enrichers.d.mts"
+      ],
+      "pipeline": [
+        "./dist/pipeline.d.mts"
       ]
     }
   },

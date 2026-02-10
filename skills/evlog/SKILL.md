@@ -36,6 +36,7 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
 | Log draining & adapters | See "Log Draining & Adapters" section below                        |
+| Drain pipeline          | [references/drain-pipeline.md](references/drain-pipeline.md)       |
 
 ## Important: Auto-imports in Nuxt
 
@@ -410,6 +411,35 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
+### Drain Pipeline (Production)
+
+For production use, wrap any adapter with `createDrainPipeline` to get batching, retry with backoff, and buffer overflow protection. Without a pipeline, each event triggers a separate network call.
+
+```typescript
+import type { DrainContext } from 'evlog'
+import { createDrainPipeline } from 'evlog/pipeline'
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineNitroPlugin((nitroApp) => {
+  const pipeline = createDrainPipeline<DrainContext>({
+    batch: { size: 50, intervalMs: 5000 },
+    retry: { maxAttempts: 3, backoff: 'exponential' },
+    onDropped: (events, error) => {
+      console.error(`[evlog] Dropped ${events.length} events:`, error?.message)
+    },
+  })
+
+  const drain = pipeline(createAxiomDrain())
+
+  nitroApp.hooks.hook('evlog:drain', drain)
+  nitroApp.hooks.hook('close', () => drain.flush())
+})
+```
+
+Key options: `batch.size` (default 50), `batch.intervalMs` (default 5000), `retry.maxAttempts` (default 3), `retry.backoff` (`'exponential'` | `'linear'` | `'fixed'`), `maxBufferSize` (default 1000).
+
+See [references/drain-pipeline.md](references/drain-pipeline.md) for full patterns and options.
+
 ## Security: Preventing Sensitive Data Leakage
 
 Wide events capture comprehensive context, making it easy to accidentally log sensitive data.
@@ -468,6 +498,7 @@ When reviewing code, check for:
 8. **Client-side logging** → Use `log` API for debugging in Vue components
 9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
 10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`) for production log export
+11. **No drain pipeline** → Wrap adapters with `createDrainPipeline()` for batching, retry, and buffer overflow protection
 
 ## Loading Reference Files
 
@@ -476,5 +507,6 @@ Load reference files based on what you're working on:
 - Designing wide events → [references/wide-events.md](references/wide-events.md)
 - Improving errors → [references/structured-errors.md](references/structured-errors.md)
 - Full code review → [references/code-review.md](references/code-review.md)
+- Drain pipeline setup → [references/drain-pipeline.md](references/drain-pipeline.md)
 
 **DO NOT load all files at once** - load only what's needed for the current task.
