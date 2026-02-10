@@ -301,6 +301,15 @@ export interface BaseWideEvent {
 export type WideEvent = BaseWideEvent & Record<string, unknown>
 
 /**
+ * Fields set internally by the evlog plugin (status, service, etc.).
+ * These are always accepted by `set()` regardless of the user-defined field type.
+ */
+export interface InternalFields {
+  status?: number
+  service?: string
+}
+
+/**
  * Request-scoped logger for building wide events
  *
  * @example
@@ -310,28 +319,42 @@ export type WideEvent = BaseWideEvent & Record<string, unknown>
  * logger.set({ cart: { items: 3 } })
  * // emit() is called automatically by the plugin
  * ```
+ *
+ * @example
+ * ```ts
+ * // With typed fields for compile-time safety
+ * interface MyFields {
+ *   user: { id: string; plan: string }
+ *   action: string
+ * }
+ * const logger = useLogger<MyFields>(event)
+ * logger.set({ user: { id: '123', plan: 'pro' } }) // OK
+ * logger.set({ action: 'checkout' })                 // OK
+ * logger.set({ status: 200 })                        // OK (internal field)
+ * logger.set({ account: '...' })                     // TS error
+ * ```
  */
-export interface RequestLogger {
+export interface RequestLogger<T extends object = Record<string, unknown>> {
   /**
    * Add context to the wide event (deep merge via defu)
    */
-  set: <T extends Record<string, unknown>>(context: T) => void
+  set: (context: Partial<T & InternalFields>) => void
 
   /**
    * Log an error and capture its details
    */
-  error: (error: Error | string, context?: Record<string, unknown>) => void
+  error: (error: Error | string, context?: Partial<T & InternalFields>) => void
 
   /**
    * Emit the final wide event with all accumulated context.
    * Returns the emitted WideEvent, or null if the log was sampled out.
    */
-  emit: (overrides?: Record<string, unknown>) => WideEvent | null
+  emit: (overrides?: Partial<T & InternalFields> & { _forceKeep?: boolean }) => WideEvent | null
 
   /**
    * Get the current accumulated context
    */
-  getContext: () => Record<string, unknown>
+  getContext: () => Partial<T & InternalFields> & Record<string, unknown>
 }
 
 /**

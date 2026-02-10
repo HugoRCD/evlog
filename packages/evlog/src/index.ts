@@ -11,6 +11,7 @@ export type {
   ErrorOptions,
   H3EventContext,
   IngestPayload,
+  InternalFields,
   Log,
   LoggerConfig,
   LogLevel,

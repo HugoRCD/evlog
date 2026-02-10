@@ -850,3 +850,96 @@ describe('tail sampling', () => {
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 })
+
+describe('typed fields', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    initLogger({ pretty: false })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('accepts typed fields via set()', () => {
+    interface MyFields {
+      user: { id: string; plan: string }
+      action: string
+    }
+
+    const logger = createRequestLogger<MyFields>({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123', plan: 'pro' } })
+    logger.set({ action: 'checkout' })
+
+    const ctx = logger.getContext()
+    expect(ctx.user).toEqual({ id: '123', plan: 'pro' })
+    expect(ctx.action).toBe('checkout')
+  })
+
+  it('accepts internal fields (status, service) alongside typed fields', () => {
+    interface MyFields {
+      user: { id: string }
+    }
+
+    const logger = createRequestLogger<MyFields>({})
+    logger.set({ user: { id: '123' } })
+    logger.set({ status: 200 })
+    logger.set({ service: 'checkout' })
+
+    const ctx = logger.getContext()
+    expect(ctx.user).toEqual({ id: '123' })
+    expect(ctx.status).toBe(200)
+    expect(ctx.service).toBe('checkout')
+  })
+
+  it('getContext returns typed fields', () => {
+    interface MyFields {
+      action: string
+      count: number
+    }
+
+    const logger = createRequestLogger<MyFields>({})
+    logger.set({ action: 'test', count: 42 })
+
+    const ctx = logger.getContext()
+    expect(ctx.action).toBe('test')
+    expect(ctx.count).toBe(42)
+  })
+
+  it('error() accepts typed context', () => {
+    interface MyFields {
+      order: { id: string }
+    }
+
+    const logger = createRequestLogger<MyFields>({})
+    logger.error(new Error('fail'), { order: { id: 'ord-1' } })
+
+    const ctx = logger.getContext()
+    expect(ctx.order).toEqual({ id: 'ord-1' })
+    expect(ctx.error).toBeDefined()
+  })
+
+  it('emit() accepts typed overrides', () => {
+    const infoSpy = vi.spyOn(console, 'info')
+    interface MyFields {
+      result: string
+    }
+
+    const logger = createRequestLogger<MyFields>({})
+    logger.emit({ result: 'success' })
+
+    expect(infoSpy).toHaveBeenCalled()
+    const [[output]] = infoSpy.mock.calls
+    expect(output).toContain('"result":"success"')
+  })
+
+  it('untyped createRequestLogger still accepts any fields', () => {
+    const logger = createRequestLogger({})
+    logger.set({ anything: true, nested: { deep: 'value' } })
+
+    const ctx = logger.getContext()
+    expect(ctx.anything).toBe(true)
+    expect(ctx.nested).toEqual({ deep: 'value' })
+  })
+})
