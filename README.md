@@ -390,6 +390,46 @@ Notes:
 - `request.cf` is included (colo, country, asn) unless disabled
 - Use `headerAllowlist` to avoid logging sensitive headers
 
+## Hono
+
+Use the standalone API to create one wide event per request from a Hono middleware.
+
+```typescript
+// src/index.ts
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
+import { createRequestLogger, initLogger } from 'evlog'
+
+initLogger({
+  env: { service: 'hono-api' },
+})
+
+const app = new Hono()
+
+app.use('*', async (c, next) => {
+  const startedAt = Date.now()
+  const log = createRequestLogger({ method: c.req.method, path: c.req.path })
+
+  try {
+    await next()
+  } catch (error) {
+    log.error(error as Error)
+    throw error
+  } finally {
+    log.emit({
+      status: c.res.status,
+      duration: Date.now() - startedAt,
+    })
+  }
+})
+
+app.get('/health', (c) => c.json({ ok: true }))
+
+serve({ fetch: app.fetch, port: 3000 })
+```
+
+See the full [hono example](https://github.com/HugoRCD/evlog/tree/main/examples/hono) for a complete working project.
+
 ## Enrichment Hook
 
 Use the `evlog:enrich` hook to add derived context after emit, before drain.
