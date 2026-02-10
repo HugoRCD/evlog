@@ -117,14 +117,16 @@ describe('better-stack adapter', () => {
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
       const body = JSON.parse(options.body as string)
-      expect(body).toEqual([{
-        dt: '2024-01-01T12:00:00.000Z',
-        level: 'info',
-        service: 'test-service',
-        environment: 'test',
-        action: 'test-action',
-        userId: '123',
-      }])
+      expect(body).toEqual([
+        {
+          dt: '2024-01-01T12:00:00.000Z',
+          level: 'info',
+          service: 'test-service',
+          environment: 'test',
+          action: 'test-action',
+          userId: '123',
+        }
+      ])
     })
 
     it('throws error on non-OK response', async () => {
