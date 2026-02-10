@@ -16,7 +16,7 @@ export interface BetterStackConfig {
  */
 export function toBetterStackEvent(event: WideEvent): Record<string, unknown> {
   const { timestamp, ...rest } = event
-  return { dt: timestamp, ...rest }
+  return { ...rest, dt: timestamp }
 }
 
 /**
