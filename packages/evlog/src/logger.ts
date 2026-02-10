@@ -1,4 +1,5 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import { defu } from 'defu'
+import type { EnvironmentContext, InsetWideEvent, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -27,6 +28,7 @@ let globalEnv: EnvironmentContext = {
 let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
+let globalInset: string | undefined = undefined
 
 /**
  * Initialize the logger with configuration.
@@ -46,6 +48,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalPretty = config.pretty ?? isDev()
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
+  globalInset = config.inset ?? undefined
 }
 
 /**
@@ -92,12 +95,19 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | InsetWideEvent | null {
   if (!skipSamplingCheck && !shouldSample(level)) {
     return null
   }
 
-  const formatted: WideEvent = {
+  const formatted: InsetWideEvent | WideEvent = !globalPretty && globalInset ? {
+    [`$${globalInset}`]: {
+      timestamp: new Date().toISOString(),
+      level,
+      ...globalEnv,
+      ...event,
+    }
+  } : {
     timestamp: new Date().toISOString(),
     level,
     ...globalEnv,
@@ -256,7 +266,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
-    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
+    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | InsetWideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'

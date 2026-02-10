@@ -390,3 +390,88 @@ log.set({
   pm: 'card',
 })
 ```
+
+## Inset: Nested Wide Events
+
+By default, wide events are emitted as flat root-level JSON. The `inset` option wraps the entire wide event inside a named property (prefixed with `$`), which is useful when your observability platform injects its own metadata at the root level.
+
+### Default Output (no inset)
+
+```json
+{
+  "timestamp": "2026-01-24T10:23:45.235Z",
+  "level": "info",
+  "service": "api",
+  "method": "POST",
+  "path": "/checkout",
+  "duration": "234ms",
+  "user": { "id": "user_123", "plan": "premium" },
+  "cart": { "items": 3, "total": 9999 }
+}
+```
+
+### With Inset (`inset: 'evlog'`)
+
+```json
+{
+  "$evlog": {
+    "timestamp": "2026-01-24T10:23:45.235Z",
+    "level": "info",
+    "service": "api",
+    "method": "POST",
+    "path": "/checkout",
+    "duration": "234ms",
+    "user": { "id": "user_123", "plan": "premium" },
+    "cart": { "items": 3, "total": 9999 }
+  }
+}
+```
+
+### Cloudflare Workers Observability Example
+
+Cloudflare injects `$metadata` and `$workers` at the root level. With inset, your data stays cleanly separated:
+
+```json
+{
+  "$evlog": {
+    "timestamp": "2026-02-05T06:48:18.122Z",
+    "level": "info",
+    "service": "edge-api",
+    "method": "POST",
+    "path": "/api/checkout",
+    "duration": "456ms",
+    "user": { "id": "user_789", "plan": "enterprise" },
+    "cart": { "items": 5, "total": 24999 },
+    "checkout": { "step": "payment", "paymentMethod": "card" },
+    "fraud": { "score": 12, "riskLevel": "low", "passed": true }
+  },
+  "$metadata": { "..." },
+  "$workers": { "..." }
+}
+```
+
+This makes it easy to query all your application data under a single namespace (e.g., `$evlog.user.plan` or `$evlog.cart.total`) without collision with platform fields.
+
+### Configuration
+
+```typescript
+// Nuxt
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    inset: 'evlog',  // → logs nested under $evlog
+  },
+})
+
+// Standalone
+initLogger({
+  env: { service: 'my-worker' },
+  inset: 'data',  // → logs nested under $data
+})
+```
+
+### Important Considerations
+
+- **Pretty mode is unaffected.** Inset only applies to JSON output (`pretty: false`). Development pretty-print remains unchanged.
+- **Property prefix.** The value is prefixed with `$` automatically: `inset: 'evlog'` → `$evlog`.
+- **Platform compatibility.** Do not enable inset if your logging system expects fields like `level`, `requestId`, or `timestamp` at the root level (e.g., Axiom, Datadog, Grafana). Only use when the platform adds its own root-level metadata.

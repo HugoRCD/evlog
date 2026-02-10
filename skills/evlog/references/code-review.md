@@ -273,6 +273,11 @@ export default defineEventHandler(async (event) => {
 - [ ] Business context is domain-specific and useful for debugging
 - [ ] No sensitive data in logs (passwords, tokens, full card numbers)
 
+### Configuration
+
+- [ ] `inset` is only enabled when the platform adds root-level metadata (e.g., Cloudflare Workers Observability)
+- [ ] `inset` is not used with systems expecting flat root-level JSON (Axiom, Datadog, Grafana)
+
 ## Anti-Pattern Summary
 
 | Anti-Pattern | Fix |
@@ -283,6 +288,7 @@ export default defineEventHandler(async (event) => {
 | No logging in request handlers | Add `useLogger(event)` (Nuxt/Nitro) or `createRequestLogger()` (standalone) |
 | Flat log data | Grouped objects: `{ user: {...}, cart: {...} }` |
 | Abbreviated field names | Descriptive names: `userId` not `uid` |
+| `inset` with flat-log consumers | Only use `inset` for platforms that add root-level metadata (e.g., Cloudflare) |
 
 ## Suggested Review Comments
 

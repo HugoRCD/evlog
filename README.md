@@ -594,6 +594,7 @@ initLogger({
   pretty?: boolean       // Pretty print (default: true in dev)
   stringify?: boolean    // JSON.stringify output (default: true, false for Workers)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
+  inset?: string         // Nest all log data inside this property
   sampling?: {
     rates?: {            // Head sampling (random per level)
       info?: number      // 0-100, default 100
@@ -666,6 +667,29 @@ export default defineNitroPlugin((nitroApp) => {
     }
   })
 })
+```
+
+### Inset - Nesting Logs
+
+By default, ```pretty``` is disabled, soevlog will log the object at root level when logging in production; however, for services like Cloudflare Observability, you may wish to nest the data inside an arbitrary property name. This can help organize your data and make it easier to query and analyze.
+
+> **Note**: Nesting can have adverse effects if your logging system expects root-level json data, such as requestIds, or tracing ids.
+
+
+In this example, your logs will then be nested under the `data` property:
+
+```json [Observability Logs]
+{
+  "$data": {
+    "timestamp": "2026-02-05T06:48:18.122Z",
+    "level": "info",
+    "message": "This is an info log",
+    "method": "GET",
+    ...
+  },
+  "$metadata": {...},
+  "$workers": {...}
+}
 ```
 
 ### Pretty Output Format

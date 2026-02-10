@@ -134,8 +134,28 @@ export interface ModuleOptions {
     headers?: Record<string, string>
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
-  }
-
+  },
+  /**
+   * Nest logs inside a specific property instead of the root of the log object. 
+   * 
+   * @default undefined
+   * Logs will be root level objects
+   *
+   * @example
+   * ```ts
+   * inset: "evlog"
+   *
+   * // Resulting Logs
+   * // {
+   * //   $evlog: {
+   * //     level: 'info',
+   * //     message: 'Hello World',
+   * //     timestamp: '2023-03-01T12:00:00.000Z',
+   * //   }
+   * // }
+   * ```
+   */
+  inset?: string,
   /**
    * PostHog adapter configuration.
    * When configured, use `createPostHogDrain()` from `evlog/posthog` to send logs.

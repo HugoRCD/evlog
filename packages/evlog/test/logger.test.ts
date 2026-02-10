@@ -729,3 +729,40 @@ describe('tail sampling', () => {
     expect(errorSpy).toHaveBeenCalledTimes(0)
   })
 })
+
+describe('inset configuration', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('wraps wide event in $<inset> property when pretty is false', () => {
+    initLogger({ inset: 'evlog', pretty: false })
+
+    log.info({ action: 'test' })
+
+    expect(infoSpy).toHaveBeenCalled()
+    const [[output]] = infoSpy.mock.calls
+    const parsed = JSON.parse(output)
+    expect(parsed).toHaveProperty('$evlog')
+    expect(parsed.$evlog).toHaveProperty('level', 'info')
+    expect(parsed.$evlog).toHaveProperty('action', 'test')
+  })
+
+  it('pretty mode outputs correctly even when inset is configured', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    initLogger({ inset: 'evlog', pretty: true })
+
+    log.info({ action: 'test' })
+
+    expect(logSpy).toHaveBeenCalled()
+    const allOutput = logSpy.mock.calls.map(c => c[0]).join('\n')
+    expect(allOutput).toContain('INFO')
+    expect(allOutput).toMatch(/action:.*test/)
+  })
+})
