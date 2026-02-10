@@ -1,0 +1,5 @@
+{
+  "$schema": "https://raw.githubusercontent.com/HugoRCD/shelve/main/packages/types/schema.json",
+  "project": "evlog-playground",
+  "slug": "hrcd"
+}

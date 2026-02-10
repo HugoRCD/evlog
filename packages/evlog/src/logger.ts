@@ -1,4 +1,4 @@
-import type { EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { DrainContext, EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -27,6 +27,7 @@ let globalEnv: EnvironmentContext = {
 let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
+let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
 
 /**
  * Initialize the logger with configuration.
@@ -46,6 +47,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalPretty = config.pretty ?? isDev()
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
+  globalDrain = config.drain
 }
 
 /**
@@ -110,6 +112,12 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
     console[getConsoleMethod(level)](JSON.stringify(formatted))
   } else {
     console[getConsoleMethod(level)](formatted)
+  }
+
+  if (globalDrain) {
+    Promise.resolve(globalDrain({ event: formatted })).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    })
   }
 
   return formatted

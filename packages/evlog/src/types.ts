@@ -248,6 +248,38 @@ export interface LoggerConfig {
    * @default true
    */
   stringify?: boolean
+  /**
+   * Drain callback called with every emitted event (fire-and-forget).
+   * Use this to send logs to external services outside of Nitro.
+   * Compatible with drain adapters (`createAxiomDrain()`) and pipeline-wrapped drains.
+   *
+   * @example
+   * ```ts
+   * import { initLogger, log } from 'evlog'
+   * import { createAxiomDrain } from 'evlog/axiom'
+   *
+   * initLogger({
+   *   drain: createAxiomDrain({ dataset: 'logs', token: '...' }),
+   * })
+   *
+   * log.info({ action: 'user_login' }) // automatically drained
+   * ```
+   *
+   * @example
+   * ```ts
+   * // With pipeline for batching and retry
+   * import { createDrainPipeline } from 'evlog/pipeline'
+   *
+   * const pipeline = createDrainPipeline({ batch: { size: 25 } })
+   * const drain = pipeline(createAxiomDrain({ dataset: 'logs', token: '...' }))
+   *
+   * initLogger({ drain })
+   *
+   * // Flush on shutdown
+   * process.on('beforeExit', () => drain.flush())
+   * ```
+   */
+  drain?: (ctx: DrainContext) => void | Promise<void>
 }
 
 /**

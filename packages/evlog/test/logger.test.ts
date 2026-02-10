@@ -338,6 +338,89 @@ describe('createRequestLogger', () => {
   })
 })
 
+describe('drain callback', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    initLogger({ pretty: false })
+  })
+
+  it('calls drain with DrainContext on log.info()', async () => {
+    const drain = vi.fn()
+    initLogger({ pretty: false, drain })
+
+    log.info({ action: 'test' })
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+
+    const ctx = drain.mock.calls[0][0]
+    expect(ctx.event).toBeDefined()
+    expect(ctx.event.level).toBe('info')
+    expect(ctx.event.action).toBe('test')
+  })
+
+  it('calls drain on requestLogger.emit()', async () => {
+    const drain = vi.fn()
+    initLogger({ pretty: false, drain })
+
+    const logger = createRequestLogger({ method: 'POST', path: '/checkout' })
+    logger.set({ userId: '123' })
+    logger.emit()
+
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+
+    const ctx = drain.mock.calls[0][0]
+    expect(ctx.event.method).toBe('POST')
+    expect(ctx.event.path).toBe('/checkout')
+    expect(ctx.event.userId).toBe('123')
+  })
+
+  it('does not call drain when event is sampled out', () => {
+    const drain = vi.fn()
+    initLogger({
+      pretty: false,
+      drain,
+      sampling: { rates: { info: 0 } },
+    })
+
+    log.info({ action: 'sampled-out' })
+    expect(drain).not.toHaveBeenCalled()
+  })
+
+  it('catches drain errors without throwing', async () => {
+    const errorSpy = vi.spyOn(console, 'error')
+    const drain = vi.fn().mockRejectedValue(new Error('drain error'))
+    initLogger({ pretty: false, drain })
+
+    log.info({ action: 'test' })
+
+    await vi.waitFor(() =>
+      expect(errorSpy).toHaveBeenCalledWith('[evlog] drain failed:', expect.any(Error)),
+    )
+  })
+
+  it('works with async drain functions', async () => {
+    const events: unknown[] = []
+    const drain = vi.fn(async (ctx: { event: unknown }) => {
+      events.push(ctx.event)
+    })
+    initLogger({ pretty: false, drain })
+
+    log.info({ action: 'async-test' })
+    await vi.waitFor(() => expect(events).toHaveLength(1))
+  })
+
+  it('does not call drain when no drain is configured', () => {
+    initLogger({ pretty: false })
+    // Should not throw
+    log.info({ action: 'no-drain' })
+  })
+})
+
 describe('sampling', () => {
   let infoSpy: ReturnType<typeof vi.spyOn>
   let errorSpy: ReturnType<typeof vi.spyOn>
