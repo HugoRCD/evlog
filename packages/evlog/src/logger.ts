@@ -100,7 +100,7 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
     return null
   }
 
-  const formatted: InsetWideEvent | WideEvent = !globalPretty && globalInset && globalInset !== undefined ? {
+  const formatted: InsetWideEvent | WideEvent = !globalPretty && globalInset ? {
     [`$${globalInset}`]: {
       timestamp: new Date().toISOString(),
       level,
