@@ -33,7 +33,6 @@ export function useLogger(event: ServerEvent, service?: string): RequestLogger {
     )
   }
 
-  // Override service if provided
   if (service) {
     log.set({ service })
   }

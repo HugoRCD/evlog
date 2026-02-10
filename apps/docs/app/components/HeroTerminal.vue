@@ -121,7 +121,7 @@ onUnmounted(() => {
 }
 
 .log-line[data-type="wide"] {
-  color: var(--color-evlog-blue);
+  color: var(--color-primary);
 }
 
 :root.dark .log-line {
@@ -145,6 +145,6 @@ onUnmounted(() => {
 }
 
 :root.dark .log-line[data-type="wide"] {
-  color: var(--color-evlog-blue);
+  color: var(--color-primary);
 }
 </style>

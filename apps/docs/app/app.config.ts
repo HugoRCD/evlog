@@ -33,6 +33,7 @@ export default defineAppConfig({
         items: [
           'How do I configure sampling?',
           'How do I send logs to Axiom?',
+          'How do I send logs to PostHog?',
         ],
       },
     ],
@@ -45,22 +46,6 @@ export default defineAppConfig({
     button: {
       slots: {
         base: 'active:translate-y-px transition-transform duration-300',
-      },
-    },
-    prose: {
-      slots: {
-        h1: {
-          base: 'font-serif tracking-tight',
-        },
-        h2: {
-          base: 'font-serif tracking-tight',
-        },
-        h3: {
-          base: 'font-serif tracking-tight',
-        },
-        h4: {
-          base: 'font-serif tracking-tight',
-        },
       },
     },
     contentSurround: {

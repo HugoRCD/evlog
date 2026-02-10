@@ -77,6 +77,28 @@ export function getLevelColor(level: string): string {
   }
 }
 
+/** Headers that should never be passed to hooks for security */
+export const SENSITIVE_HEADERS = [
+  'authorization',
+  'cookie',
+  'set-cookie',
+  'x-api-key',
+  'x-auth-token',
+  'proxy-authorization',
+]
+
+export function filterSafeHeaders(headers: Record<string, string>): Record<string, string> {
+  const safeHeaders: Record<string, string> = {}
+
+  for (const [key, value] of Object.entries(headers)) {
+    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+      safeHeaders[key] = value
+    }
+  }
+
+  return safeHeaders
+}
+
 /**
  * Match a path against a glob pattern.
  * Supports * (any chars except /) and ** (any chars including /).

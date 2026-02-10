@@ -2,8 +2,8 @@ import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger } from '../logger'
-import type { RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
-import { matchesPattern } from '../utils'
+import type { EnrichContext, RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
+import { filterSafeHeaders, matchesPattern } from '../utils'
 
 interface EvlogConfig {
   env?: Record<string, unknown>
@@ -65,27 +65,30 @@ function getServiceForPath(path: string, routes?: Record<string, RouteConfig>): 
   return undefined
 }
 
-/** Headers that should never be passed to the drain hook for security */
-const SENSITIVE_HEADERS = [
-  'authorization',
-  'cookie',
-  'set-cookie',
-  'x-api-key',
-  'x-auth-token',
-  'proxy-authorization',
-]
-
 function getSafeHeaders(event: ServerEvent): Record<string, string> {
   const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
-  const safeHeaders: Record<string, string> = {}
+  return filterSafeHeaders(allHeaders)
+}
 
-  for (const [key, value] of Object.entries(allHeaders)) {
-    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
-      safeHeaders[key] = value
+function getSafeResponseHeaders(event: ServerEvent): Record<string, string> | undefined {
+  const headers: Record<string, string> = {}
+  const nodeRes = event.node?.res as { getHeaders?: () => Record<string, unknown> } | undefined
+
+  if (nodeRes?.getHeaders) {
+    for (const [key, value] of Object.entries(nodeRes.getHeaders())) {
+      if (value === undefined) continue
+      headers[key] = Array.isArray(value) ? value.join(', ') : String(value)
     }
   }
 
-  return safeHeaders
+  if (event.response?.headers) {
+    event.response.headers.forEach((value, key) => {
+      headers[key] = value
+    })
+  }
+
+  if (Object.keys(headers).length === 0) return undefined
+  return filterSafeHeaders(headers)
 }
 
 function getResponseStatus(event: ServerEvent): number {
@@ -107,25 +110,59 @@ function getResponseStatus(event: ServerEvent): number {
   return 200
 }
 
-function callDrainHook(nitroApp: NitroApp, emittedEvent: WideEvent | null, event: ServerEvent): void {
+function buildHookContext(event: ServerEvent): Omit<EnrichContext, 'event'> {
+  const responseHeaders = getSafeResponseHeaders(event)
+  return {
+    request: { method: event.method, path: event.path },
+    headers: getSafeHeaders(event),
+    response: {
+      status: getResponseStatus(event),
+      headers: responseHeaders,
+    },
+  }
+}
+
+function callDrainHook(
+  nitroApp: NitroApp,
+  emittedEvent: WideEvent | null,
+  event: ServerEvent,
+  request: EnrichContext['request'],
+  headers: EnrichContext['headers'],
+): void {
   if (!emittedEvent) return
 
   const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
     event: emittedEvent,
-    request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
-    headers: getSafeHeaders(event),
+    request,
+    headers,
   }).catch((err) => {
     console.error('[evlog] drain failed:', err)
   })
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
   // This ensures drains complete before the runtime terminates
-  const waitUntil = event.context.cloudflare?.context?.waitUntil
-    ?? event.context.waitUntil
-
-  if (typeof waitUntil === 'function') {
-    waitUntil(drainPromise)
+  const waitUntilCtx = event.context.cloudflare?.context ?? event.context
+  if (typeof waitUntilCtx?.waitUntil === 'function') {
+    waitUntilCtx.waitUntil(drainPromise)
   }
+}
+
+async function callEnrichAndDrain(
+  nitroApp: NitroApp,
+  emittedEvent: WideEvent | null,
+  event: ServerEvent,
+): Promise<void> {
+  if (!emittedEvent) return
+
+  const hookContext = buildHookContext(event)
+
+  try {
+    await nitroApp.hooks.callHook('evlog:enrich', { event: emittedEvent, ...hookContext })
+  } catch (err) {
+    console.error('[evlog] enrich failed:', err)
+  }
+
+  callDrainHook(nitroApp, emittedEvent, event, hookContext.request, hookContext.headers)
 }
 
 export default defineNitroPlugin((nitroApp) => {
@@ -150,10 +187,16 @@ export default defineNitroPlugin((nitroApp) => {
     // Store start time for duration calculation in tail sampling
     e.context._evlogStartTime = Date.now()
 
+    let requestIdOverride: string | undefined = undefined
+    if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
+      const cfRay = getSafeHeaders(e)?.['cf-ray']
+      if (cfRay) requestIdOverride = cfRay
+    }
+
     const log = createRequestLogger({
       method: e.method,
       path: e.path,
-      requestId: e.context.requestId || crypto.randomUUID(),
+      requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
     })
 
     // Apply route-based service configuration if a matching route is found
@@ -196,7 +239,7 @@ export default defineNitroPlugin((nitroApp) => {
       e.context._evlogEmitted = true
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-      callDrainHook(nitroApp, emittedEvent, e)
+      await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })
 
@@ -225,7 +268,7 @@ export default defineNitroPlugin((nitroApp) => {
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
       const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-      callDrainHook(nitroApp, emittedEvent, e)
+      await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })
 })

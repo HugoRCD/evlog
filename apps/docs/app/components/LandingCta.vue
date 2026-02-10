@@ -18,11 +18,11 @@ onMounted(() => {
           :transition="{ duration: 0.5 }"
           :in-view-options="{ once: true }"
         >
-          <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+          <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
             Get Started
           </p>
-          <h2 class="editorial-title mb-6 text-3xl font-bold text-highlighted md:text-4xl lg:text-5xl">
-            Stop grep-ing through chaos<span class="evlog-dot">.</span>
+          <h2 class="mb-6 section-title">
+            Stop grep-ing through chaos<span class="text-primary">.</span>
           </h2>
           <p class="max-w-lg text-base text-muted mb-10 leading-relaxed">
             Wide events, structured errors, zero config.
@@ -33,7 +33,7 @@ onMounted(() => {
             <UButton
               to="/getting-started/introduction"
               size="lg"
-              class="bg-evlog-blue hover:bg-evlog-blue/90 text-white border-0"
+              class="bg-primary hover:bg-primary/90 text-white border-0"
             >
               Get Started
               <template #trailing>

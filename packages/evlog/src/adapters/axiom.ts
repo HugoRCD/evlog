@@ -1,4 +1,5 @@
 import type { DrainContext, WideEvent } from '../types'
+import { getRuntimeConfig } from './_utils'
 
 export interface AxiomConfig {
   /** Axiom dataset name */
@@ -11,21 +12,6 @@ export interface AxiomConfig {
   baseUrl?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
-}
-
-/**
- * Try to get runtime config from Nitro/Nuxt environment.
- * Returns undefined if not in a Nitro context.
- */
-function getRuntimeConfig(): { evlog?: { axiom?: Partial<AxiomConfig> }, axiom?: Partial<AxiomConfig> } | undefined {
-  try {
-    // Dynamic import to avoid bundling issues when not in Nitro
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
-    return useRuntimeConfig()
-  } catch {
-    return undefined
-  }
 }
 
 /**

@@ -13,9 +13,6 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
   const error = computed(() => state.getError(testId))
   const status = computed(() => state.getStatus(testId))
 
-  /**
-   * Execute a test function
-   */
   async function execute(fn?: () => Promise<any> | void) {
     state.setStatus(testId, 'loading')
     state.clearResults(testId)
@@ -23,13 +20,11 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
     try {
       let response
 
-      // If endpoint is provided, fetch it
       if (options?.endpoint) {
         response = await $fetch(options.endpoint, {
           method: options.method || 'GET',
         })
       } else if (fn) {
-        // Otherwise execute the provided function
         response = await fn()
       }
 
@@ -47,9 +42,6 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
     }
   }
 
-  /**
-   * Reset test state
-   */
   function reset() {
     state.clearTest(testId)
   }

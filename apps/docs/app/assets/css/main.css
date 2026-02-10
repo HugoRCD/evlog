@@ -2,11 +2,9 @@
 @import "@nuxt/ui";
 
 @theme {
-  --font-serif: "Redaction", serif;
   --font-sans: "Geist", sans-serif;
-  --font-mono: ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, monospace;
-  --font-redaction: "Redaction", serif;
-  --color-evlog-blue: #2853FF;
+  --font-mono: "Geist Mono", monospace;
+  --font-pixel: "Geist Pixel Line", monospace;
 }
 
 :root {
@@ -24,27 +22,18 @@
   }
 }
 
-/* Editorial title - Redaction font */
-.editorial-title {
-  font-family: var(--font-redaction);
-  letter-spacing: -0.02em;
-  line-height: 1.1;
-}
-
-/* Blue dot accent */
-.evlog-dot {
-  color: var(--color-evlog-blue);
-}
-
 /* Section label with dot */
 .section-label::before {
   content: '';
   display: inline-block;
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background-color: var(--color-evlog-blue);
-  margin-right: 0.5rem;
+  width: 4px;
+  height: 4px;
+  background-color: var(--color-primary);
+  margin-right: 0.1rem;
+}
+
+.section-title {
+  @apply font-pixel text-3xl md:text-4xl lg:text-5xl;
 }
 
 /* Subtle dot grid for hero */
@@ -60,24 +49,4 @@
 /* Fade mask for scroll areas */
 .fade-bottom {
   mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
-}
-
-/* Animated underline for links */
-.animated-underline {
-  position: relative;
-}
-
-.animated-underline::after {
-  content: '';
-  position: absolute;
-  bottom: -2px;
-  left: 0;
-  width: 0;
-  height: 1px;
-  background-color: var(--color-evlog-blue);
-  transition: width 0.3s ease;
-}
-
-.animated-underline:hover::after {
-  width: 100%;
 }

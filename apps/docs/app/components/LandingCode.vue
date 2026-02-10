@@ -18,11 +18,11 @@ onMounted(() => {
         :in-view-options="{ once: true }"
         class="mb-12"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
           Simple API
         </p>
-        <h2 class="editorial-title text-3xl font-bold text-highlighted md:text-4xl max-w-lg">
-          Three lines of code.<br>Full observability<span class="evlog-dot">.</span>
+        <h2 class="section-title max-w-lg">
+          Three lines of code.<br>Full observability<span class="text-primary">.</span>
         </h2>
       </Motion>
 
@@ -111,13 +111,13 @@ onMounted(() => {
         :in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.3 }"
         :in-view-options="{ once: true }"
-        class="mt-12"
+        class="mt-24"
       >
-        <p class="section-label mb-4 font-mono text-xs uppercase tracking-widest text-muted">
+        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
           Structured Errors
         </p>
-        <h3 class="editorial-title text-2xl font-bold text-highlighted md:text-3xl max-w-lg mb-6">
-          Errors that explain why<span class="evlog-dot">.</span>
+        <h3 class="section-title max-w-lg mb-6">
+          Errors that explain why<span class="text-primary">.</span>
         </h3>
       </Motion>
 

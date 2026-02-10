@@ -390,6 +390,96 @@ Notes:
 - `request.cf` is included (colo, country, asn) unless disabled
 - Use `headerAllowlist` to avoid logging sensitive headers
 
+## Enrichment Hook
+
+Use the `evlog:enrich` hook to add derived context after emit, before drain.
+
+```typescript
+// server/plugins/evlog-enrich.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+  })
+})
+```
+
+### Built-in Enrichers
+
+```typescript
+// server/plugins/evlog-enrich.ts
+import {
+  createGeoEnricher,
+  createRequestSizeEnricher,
+  createTraceContextEnricher,
+  createUserAgentEnricher,
+} from 'evlog/enrichers'
+
+export default defineNitroPlugin((nitroApp) => {
+  const enrich = [
+    createUserAgentEnricher(),
+    createGeoEnricher(),
+    createRequestSizeEnricher(),
+    createTraceContextEnricher(),
+  ]
+
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    for (const enricher of enrich) enricher(ctx)
+  })
+})
+```
+
+Each enricher adds a specific field to the event:
+
+| Enricher | Event Field | Shape |
+|----------|-------------|-------|
+| `createUserAgentEnricher()` | `event.userAgent` | `{ raw, browser?: { name, version? }, os?: { name, version? }, device?: { type } }` |
+| `createGeoEnricher()` | `event.geo` | `{ country?, region?, regionCode?, city?, latitude?, longitude? }` |
+| `createRequestSizeEnricher()` | `event.requestSize` | `{ requestBytes?, responseBytes? }` |
+| `createTraceContextEnricher()` | `event.traceContext` + `event.traceId` + `event.spanId` | `{ traceparent?, tracestate?, traceId?, spanId? }` |
+
+All enrichers accept an optional `{ overwrite?: boolean }` option. By default (`overwrite: false`), user-provided data on the event takes precedence over enricher-computed values. Set `overwrite: true` to always replace existing fields.
+
+> **Cloudflare geo note:** Only `cf-ipcountry` is a real Cloudflare HTTP header. The `cf-region`, `cf-city`, `cf-latitude`, `cf-longitude` headers are NOT standard — they are properties of `request.cf`. For full geo data on Cloudflare, write a custom enricher that reads `request.cf`, or use a Workers middleware to forward `cf` properties as custom headers.
+
+### Custom Enrichers
+
+The `evlog:enrich` hook receives an `EnrichContext` with these fields:
+
+```typescript
+interface EnrichContext {
+  event: WideEvent        // The emitted wide event (mutable — modify it directly)
+  request?: {             // Request metadata
+    method?: string
+    path?: string
+    requestId?: string
+  }
+  headers?: Record<string, string>  // Safe HTTP headers (sensitive headers filtered)
+  response?: {            // Response metadata
+    status?: number
+    headers?: Record<string, string>
+  }
+}
+```
+
+Example custom enricher:
+
+```typescript
+// server/plugins/evlog-enrich.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    // Add deployment metadata
+    ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+    ctx.event.region = process.env.FLY_REGION
+
+    // Extract data from headers
+    const tenantId = ctx.headers?.['x-tenant-id']
+    if (tenantId) {
+      ctx.event.tenantId = tenantId
+    }
+  })
+})
+```
+
 ## Adapters
 
 Send your logs to external observability platforms with built-in adapters.
@@ -429,6 +519,23 @@ Set environment variables:
 
 ```bash
 NUXT_OTLP_ENDPOINT=http://localhost:4318
+```
+
+### Sentry
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createSentryDrain } from 'evlog/sentry'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createSentryDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_SENTRY_DSN=https://public@o0.ingest.sentry.io/123
 ```
 
 ### Multiple Destinations

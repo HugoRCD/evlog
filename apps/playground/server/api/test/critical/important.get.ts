@@ -1,4 +1,3 @@
-// Critical path - should always be logged due to path pattern matching
 export default defineEventHandler((event) => {
   const log = useLogger(event)
 

@@ -65,7 +65,6 @@ export class EvlogError extends Error {
   }
 
   override toString(): string {
-    // Use colors only on server (terminal)
     const useColors = isServer()
 
     const red = useColors ? colors.red : ''

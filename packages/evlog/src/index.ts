@@ -6,6 +6,7 @@ export { parseError } from './runtime/utils/parseError'
 export type {
   BaseWideEvent,
   DrainContext,
+  EnrichContext,
   EnvironmentContext,
   ErrorOptions,
   H3EventContext,

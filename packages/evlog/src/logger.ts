@@ -2,6 +2,24 @@ import { defu } from 'defu'
 import type { EnvironmentContext, InsetWideEvent, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
+function isPlainObject(val: unknown): val is Record<string, unknown> {
+  return val !== null && typeof val === 'object' && !Array.isArray(val)
+}
+
+function deepDefaults(base: Record<string, unknown>, defaults: Record<string, unknown>): Record<string, unknown> {
+  const result = { ...base }
+  for (const key in defaults) {
+    const baseVal = result[key]
+    const defaultVal = defaults[key]
+    if (baseVal === undefined || baseVal === null) {
+      result[key] = defaultVal
+    } else if (isPlainObject(baseVal) && isPlainObject(defaultVal)) {
+      result[key] = deepDefaults(baseVal, defaultVal)
+    }
+  }
+  return result
+}
+
 let globalEnv: EnvironmentContext = {
   service: 'app',
   environment: 'development',
@@ -230,7 +248,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
 
   return {
     set<T extends Record<string, unknown>>(data: T): void {
-      context = defu(data, context) as Record<string, unknown>
+      context = deepDefaults(data, context) as Record<string, unknown>
     },
 
     error(error: Error | string, errorContext?: Record<string, unknown>): void {
@@ -245,7 +263,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
           stack: err.stack,
         },
       }
-      context = defu(errorData, context) as Record<string, unknown>
+      context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
     emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {

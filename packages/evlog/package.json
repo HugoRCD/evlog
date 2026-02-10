@@ -1,6 +1,6 @@
 {
   "name": "evlog",
-  "version": "1.4.0",
+  "version": "1.7.0",
   "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -46,6 +46,18 @@
     "./otlp": {
       "types": "./dist/adapters/otlp.d.mts",
       "import": "./dist/adapters/otlp.mjs"
+    },
+    "./posthog": {
+      "types": "./dist/adapters/posthog.d.mts",
+      "import": "./dist/adapters/posthog.mjs"
+    },
+    "./sentry": {
+      "types": "./dist/adapters/sentry.d.mts",
+      "import": "./dist/adapters/sentry.mjs"
+    },
+    "./enrichers": {
+      "types": "./dist/enrichers.d.mts",
+      "import": "./dist/enrichers.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -69,6 +81,15 @@
       ],
       "otlp": [
         "./dist/adapters/otlp.d.mts"
+      ],
+      "posthog": [
+        "./dist/adapters/posthog.d.mts"
+      ],
+      "sentry": [
+        "./dist/adapters/sentry.d.mts"
+      ],
+      "enrichers": [
+        "./dist/enrichers.d.mts"
       ]
     }
   },
@@ -77,8 +98,8 @@
     "README.md"
   ],
   "scripts": {
-    "build": "unbuild",
-    "dev:prepare": "unbuild",
+    "build": "tsdown",
+    "dev:prepare": "tsdown",
     "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -87,27 +108,27 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "echo 'Typecheck handled by build'"
   },
-  "dependencies": {
-    "@nuxt/kit": "^4.3.0",
-    "defu": "^6.1.4"
-  },
   "devDependencies": {
     "@nuxt/devtools": "^3.1.1",
-    "@nuxt/schema": "^4.3.0",
+    "@nuxt/schema": "^4.3.1",
     "@nuxt/test-utils": "^3.23.0",
     "changelogen": "^0.6.2",
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
-    "nuxt": "^4.3.0",
-    "typescript": "^5.9.3",
-    "unbuild": "^3.6.1"
+    "nuxt": "^4.3.1",
+    "tsdown": "^0.20.3",
+    "typescript": "^5.9.3"
   },
   "peerDependencies": {
+    "@nuxt/kit": "^4.3.1",
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1"
   },
   "peerDependenciesMeta": {
+    "@nuxt/kit": {
+      "optional": true
+    },
     "h3": {
       "optional": true
     },
