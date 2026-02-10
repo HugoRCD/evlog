@@ -1,4 +1,4 @@
-import type { DrainContext, EnvironmentContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -235,7 +235,7 @@ export const log: Log = {
  * log.emit()
  * ```
  */
-export function createRequestLogger(options: RequestLoggerOptions = {}): RequestLogger {
+export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
   const startTime = Date.now()
   let context: Record<string, unknown> = {
     method: options.method,
@@ -245,16 +245,16 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
   let hasError = false
 
   return {
-    set<T extends Record<string, unknown>>(data: T): void {
-      context = deepDefaults(data, context) as Record<string, unknown>
+    set(data: FieldContext<T>): void {
+      context = deepDefaults(data as Record<string, unknown>, context) as Record<string, unknown>
     },
 
-    error(error: Error | string, errorContext?: Record<string, unknown>): void {
+    error(error: Error | string, errorContext?: FieldContext<T>): void {
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
       const errorData = {
-        ...errorContext,
+        ...(errorContext as Record<string, unknown>),
         error: {
           name: err.name,
           message: err.message,
@@ -268,13 +268,13 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
-    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
+    emit(overrides?: FieldContext<T> & { _forceKeep?: boolean }): WideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'
 
       // Extract _forceKeep from overrides (set by evlog:emit:keep hook)
-      const { _forceKeep, ...restOverrides } = overrides ?? {}
+      const { _forceKeep, ...restOverrides } = (overrides ?? {}) as Record<string, unknown> & { _forceKeep?: boolean }
 
       // Build tail sampling context
       const tailCtx: TailSamplingContext = {
@@ -300,7 +300,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       }, true)
     },
 
-    getContext(): Record<string, unknown> {
+    getContext(): FieldContext<T> & Record<string, unknown> {
       return { ...context }
     },
   }

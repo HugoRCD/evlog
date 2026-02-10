@@ -22,9 +22,18 @@ import type { RequestLogger, ServerEvent } from '../../types'
  *   log.set({ foo: 'bar' })
  *   // ...
  * })
+ *
+ * @example
+ * // Typed fields — must use explicit import for type checking to work
+ * import { useLogger } from 'evlog'
+ *
+ * interface MyFields { user: { id: string; plan: string } }
+ * const log = useLogger<MyFields>(event)
+ * log.set({ user: { id: '123', plan: 'pro' } }) // OK
+ * log.set({ foo: 'bar' })                        // TS error
  */
-export function useLogger(event: ServerEvent, service?: string): RequestLogger {
-  const log = event.context.log as RequestLogger | undefined
+export function useLogger<T extends object = Record<string, unknown>>(event: ServerEvent, service?: string): RequestLogger<T> {
+  const log = event.context.log as RequestLogger<T> | undefined
 
   if (!log) {
     throw new Error(
@@ -34,7 +43,8 @@ export function useLogger(event: ServerEvent, service?: string): RequestLogger {
   }
 
   if (service) {
-    log.set({ service })
+    const untyped = log as unknown as RequestLogger
+    untyped.set({ service })
   }
 
   return log

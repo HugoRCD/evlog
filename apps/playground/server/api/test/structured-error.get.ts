@@ -1,14 +1,60 @@
-import { createError } from 'evlog'
+import { createError, useLogger } from 'evlog'
+
+interface PurchaseFlowFields {
+  user: {
+    id: string
+    email: string
+    plan: string
+    accessLevel: string
+    companyId: string
+    companyName: string
+  }
+  action: string
+  flow: string
+  order: {
+    id: string
+    items: number
+    subtotal: number
+    tax: number
+    total: number
+    currency: string
+  }
+  verification: {
+    threeDSecure: boolean
+    threeDSecureVersion: string
+    authenticationStatus: string
+    challengeCompleted: boolean
+  }
+  riskAssessment: {
+    score: number
+    level: string
+    signals: string[]
+    requiresReview: boolean
+  }
+  attempt: {
+    number: number
+    maxRetries: number
+    processorLatency: number
+    timeout: boolean
+  }
+  billing: {
+    method: string
+    cardId: string
+    cardBrand: string
+    cardLast4: string
+    billingEmail: string
+  }
+}
 
 export default defineEventHandler(async (event) => {
-  const logger = useLogger(event)
+  const logger = useLogger<PurchaseFlowFields>(event)
 
   logger.set({
     user: {
       id: 'user_789',
       email: 'alex.johnson@enterprise.com',
       plan: 'premium',
-      accountType: 'business',
+      accessLevel: 'admin',
       companyId: 'comp_xyz789',
       companyName: 'Enterprise Corp',
     },

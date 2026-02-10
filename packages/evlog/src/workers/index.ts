@@ -78,18 +78,20 @@ function pickCfContext(request: Request): Record<string, unknown> {
  * }
  * ```
  */
-export function createWorkersLogger(request: Request, options: WorkersLoggerOptions = {}): RequestLogger {
+export function createWorkersLogger<T extends object = Record<string, unknown>>(request: Request, options: WorkersLoggerOptions = {}): RequestLogger<T> {
   const url = new URL(request.url)
   const cfRay = request.headers.get('cf-ray') ?? undefined
   const traceparent = request.headers.get('traceparent') ?? undefined
 
-  const log = createRequestLogger({
+  const log = createRequestLogger<T>({
     method: request.method,
     path: url.pathname,
     requestId: options.requestId ?? cfRay,
   })
 
-  log.set({
+  // Cast needed: CF-specific enrichment fields (cfRay, traceparent, etc.) aren't in user's T
+  const untyped = log as unknown as RequestLogger
+  untyped.set({
     cfRay,
     traceparent,
     ...pickCfContext(request),
