@@ -357,7 +357,7 @@ describe('drain callback', () => {
     log.info({ action: 'test' })
     await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
 
-    const ctx = drain.mock.calls[0][0]
+    const [[ctx]] = drain.mock.calls
     expect(ctx.event).toBeDefined()
     expect(ctx.event.level).toBe('info')
     expect(ctx.event.action).toBe('test')
@@ -373,7 +373,7 @@ describe('drain callback', () => {
 
     await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
 
-    const ctx = drain.mock.calls[0][0]
+    const [[ctx]] = drain.mock.calls
     expect(ctx.event.method).toBe('POST')
     expect(ctx.event.path).toBe('/checkout')
     expect(ctx.event.userId).toBe('123')
@@ -405,7 +405,7 @@ describe('drain callback', () => {
 
   it('works with async drain functions', async () => {
     const events: unknown[] = []
-    const drain = vi.fn(async (ctx: { event: unknown }) => {
+    const drain = vi.fn((ctx: { event: unknown }) => {
       events.push(ctx.event)
     })
     initLogger({ pretty: false, drain })

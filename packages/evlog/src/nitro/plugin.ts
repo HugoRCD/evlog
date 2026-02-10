@@ -121,31 +121,6 @@ function buildHookContext(event: ServerEvent): Omit<EnrichContext, 'event'> {
   }
 }
 
-function callDrainHook(
-  nitroApp: NitroApp,
-  emittedEvent: WideEvent | null,
-  event: ServerEvent,
-  request: EnrichContext['request'],
-  headers: EnrichContext['headers'],
-): void {
-  if (!emittedEvent) return
-
-  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
-    event: emittedEvent,
-    request,
-    headers,
-  }).catch((err) => {
-    console.error('[evlog] drain failed:', err)
-  })
-
-  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
-  // This ensures drains complete before the runtime terminates
-  const waitUntilCtx = event.context.cloudflare?.context ?? event.context
-  if (typeof waitUntilCtx?.waitUntil === 'function') {
-    waitUntilCtx.waitUntil(drainPromise)
-  }
-}
-
 async function callEnrichAndDrain(
   nitroApp: NitroApp,
   emittedEvent: WideEvent | null,
@@ -161,7 +136,20 @@ async function callEnrichAndDrain(
     console.error('[evlog] enrich failed:', err)
   }
 
-  callDrainHook(nitroApp, emittedEvent, event, hookContext.request, hookContext.headers)
+  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+    event: emittedEvent,
+    request: hookContext.request,
+    headers: hookContext.headers,
+  }).catch((err) => {
+    console.error('[evlog] drain failed:', err)
+  })
+
+  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
+  // This ensures drains complete before the runtime terminates
+  const waitUntilCtx = event.context.cloudflare?.context ?? event.context
+  if (typeof waitUntilCtx?.waitUntil === 'function') {
+    waitUntilCtx.waitUntil(drainPromise)
+  }
 }
 
 export default defineNitroPlugin((nitroApp) => {
