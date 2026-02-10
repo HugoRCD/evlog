@@ -168,8 +168,14 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
       if (activeFlush) {
         await activeFlush
       }
-      while (buffer.length > 0) {
-        await drainBuffer()
+      // Snapshot the buffer length to avoid infinite loop if push() is called during flush
+      const snapshot = buffer.length
+      if (snapshot > 0) {
+        const toFlush = buffer.splice(0, snapshot)
+        while (toFlush.length > 0) {
+          const batch = toFlush.splice(0, batchSize)
+          await sendWithRetry(batch)
+        }
       }
     }
 

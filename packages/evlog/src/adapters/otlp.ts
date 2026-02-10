@@ -215,8 +215,11 @@ function buildResourceAttributes(
  * }))
  * ```
  */
-export function createOTLPDrain(overrides?: Partial<OTLPConfig>): (ctx: DrainContext) => Promise<void> {
-  return async (ctx: DrainContext) => {
+export function createOTLPDrain(overrides?: Partial<OTLPConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+  return async (ctx: DrainContext | DrainContext[]) => {
+    const contexts = Array.isArray(ctx) ? ctx : [ctx]
+    if (contexts.length === 0) return
+
     const runtimeConfig = getRuntimeConfig()
     // Support both runtimeConfig.evlog.otlp and runtimeConfig.otlp
     const evlogOtlp = runtimeConfig?.evlog?.otlp
@@ -269,9 +272,9 @@ export function createOTLPDrain(overrides?: Partial<OTLPConfig>): (ctx: DrainCon
     }
 
     try {
-      await sendToOTLP(ctx.event, config as OTLPConfig)
+      await sendBatchToOTLP(contexts.map(c => c.event), config as OTLPConfig)
     } catch (error) {
-      console.error('[evlog/otlp] Failed to send event:', error)
+      console.error('[evlog/otlp] Failed to send events to OTLP:', error)
     }
   }
 }
