@@ -266,7 +266,7 @@ export interface BaseWideEvent {
 }
 
 /** 
- * Wide event inside a nested propery from global config: inset
+ * Wide event inside a nested property from global config: inset
  */
 export type InsetWideEvent = {
    [key: string]: BaseWideEvent & Record<string, unknown>

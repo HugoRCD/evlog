@@ -809,8 +809,6 @@ try {
 }
 ```
 
-
-
 ## Framework Support
 
 evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
