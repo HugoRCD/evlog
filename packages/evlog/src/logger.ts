@@ -266,7 +266,7 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
       context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
-    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | null {
+    emit(overrides?: Record<string, unknown> & { _forceKeep?: boolean }): WideEvent | InsetWideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'

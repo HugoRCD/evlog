@@ -303,7 +303,7 @@ export interface RequestLogger {
    * Emit the final wide event with all accumulated context.
    * Returns the emitted WideEvent, or null if the log was sampled out.
    */
-  emit: (overrides?: Record<string, unknown>) => WideEvent | null
+  emit: (overrides?: Record<string, unknown>) => WideEvent | InsetWideEvent | null
 
   /**
    * Get the current accumulated context
