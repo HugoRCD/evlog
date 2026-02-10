@@ -40,7 +40,7 @@ evlog/
 │       ├── src/
 │       │   ├── nuxt/        # Nuxt module
 │       │   ├── nitro/       # Nitro plugin
-│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry)
+│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
 │       └── test/            # Tests
@@ -223,6 +223,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 | OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
 | PostHog | `evlog/posthog` | Send logs to PostHog as events for product analytics |
 | Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
+| Better Stack | `evlog/better-stack` | Send logs to Better Stack for log management and alerting |
 
 **Using Axiom Adapter:**
 
@@ -275,6 +276,19 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set environment variable: `NUXT_SENTRY_DSN`.
+
+**Using Better Stack Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createBetterStackDrain } from 'evlog/better-stack'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createBetterStackDrain())
+})
+```
+
+Set environment variable: `NUXT_BETTER_STACK_SOURCE_TOKEN`.
 
 **Multiple Destinations:**
 

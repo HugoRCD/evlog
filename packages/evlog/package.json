@@ -55,6 +55,10 @@
       "types": "./dist/adapters/sentry.d.mts",
       "import": "./dist/adapters/sentry.mjs"
     },
+    "./better-stack": {
+      "types": "./dist/adapters/better-stack.d.mts",
+      "import": "./dist/adapters/better-stack.mjs"
+    },
     "./enrichers": {
       "types": "./dist/enrichers.d.mts",
       "import": "./dist/enrichers.mjs"
@@ -91,6 +95,9 @@
       ],
       "sentry": [
         "./dist/adapters/sentry.d.mts"
+      ],
+      "better-stack": [
+        "./dist/adapters/better-stack.d.mts"
       ],
       "enrichers": [
         "./dist/enrichers.d.mts"

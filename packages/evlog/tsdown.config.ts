@@ -20,6 +20,7 @@ export default defineConfig({
     'adapters/otlp': 'src/adapters/otlp.ts',
     'adapters/posthog': 'src/adapters/posthog.ts',
     'adapters/sentry': 'src/adapters/sentry.ts',
+    'adapters/better-stack': 'src/adapters/better-stack.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
   },
