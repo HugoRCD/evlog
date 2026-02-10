@@ -1,6 +1,7 @@
 // import { createAxiomDrain } from 'evlog/axiom'
 // import { createPostHogDrain } from 'evlog/posthog'
 // import { createSentryDrain } from 'evlog/sentry'
+// import { createBetterStackDrain } from 'evlog/better-stack'
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', (ctx) => {
@@ -20,5 +21,8 @@ export default defineNitroPlugin((nitroApp) => {
 
     // const sentryDrain = createSentryDrain()
     // sentryDrain(ctx)
+
+    // const betterStackDrain = createBetterStackDrain()
+    // betterStackDrain(ctx)
   })
 })

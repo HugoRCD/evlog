@@ -44,7 +44,7 @@ export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>): 
     const contexts = Array.isArray(ctx) ? ctx : [ctx]
     if (contexts.length === 0) return
 
-    const runtimeConfig = getRuntimeConfig() as Record<string, any> | undefined
+    const runtimeConfig = getRuntimeConfig()
     const evlogBetterStack = runtimeConfig?.evlog?.betterStack
     const rootBetterStack = runtimeConfig?.betterStack
 
