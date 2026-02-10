@@ -209,6 +209,44 @@ describe('createRequestLogger', () => {
     expect(context.step).toBe('payment')
   })
 
+  it('captures custom error properties (statusCode, data, cause)', () => {
+    const logger = createRequestLogger({})
+    const error = Object.assign(new Error('Something went wrong'), {
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+      data: { code: 'VALIDATION_ERROR', why: 'Invalid input' },
+      cause: new Error('original cause'),
+    })
+
+    logger.error(error)
+
+    const context = logger.getContext()
+    expect(context.error).toEqual({
+      name: 'Error',
+      message: 'Something went wrong',
+      stack: expect.any(String),
+      statusCode: 500,
+      statusMessage: 'Internal Server Error',
+      data: { code: 'VALIDATION_ERROR', why: 'Invalid input' },
+      cause: expect.any(Error),
+    })
+  })
+
+  it('does not include custom properties when absent', () => {
+    const logger = createRequestLogger({})
+    logger.error(new Error('Plain error'))
+
+    const context = logger.getContext()
+    expect(context.error).toEqual({
+      name: 'Error',
+      message: 'Plain error',
+      stack: expect.any(String),
+    })
+    expect(context.error).not.toHaveProperty('statusCode')
+    expect(context.error).not.toHaveProperty('data')
+    expect(context.error).not.toHaveProperty('cause')
+  })
+
   it('accepts string error', () => {
     const logger = createRequestLogger({})
     logger.error('Something went wrong')

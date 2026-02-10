@@ -259,6 +259,10 @@ export function createRequestLogger(options: RequestLoggerOptions = {}): Request
           name: err.name,
           message: err.message,
           stack: err.stack,
+          ...('statusCode' in err && { statusCode: (err as Record<string, unknown>).statusCode }),
+          ...('statusMessage' in err && { statusMessage: (err as Record<string, unknown>).statusMessage }),
+          ...('data' in err && { data: (err as Record<string, unknown>).data }),
+          ...('cause' in err && { cause: (err as unknown as Record<string, unknown>).cause }),
         },
       }
       context = deepDefaults(errorData, context) as Record<string, unknown>
