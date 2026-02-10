@@ -8,9 +8,9 @@ interface PurchaseFlowFields {
     accessLevel: string
     companyId: string
     companyName: string
-  },
-  action: string,
-  flow: string,
+  }
+  action: string
+  flow: string
   order: {
     id: string
     items: number

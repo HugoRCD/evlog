@@ -90,7 +90,7 @@ export function createWorkersLogger<T extends object = Record<string, unknown>>(
   })
 
   // Cast needed: CF-specific enrichment fields (cfRay, traceparent, etc.) aren't in user's T
-  const untyped: RequestLogger = log
+  const untyped = log as unknown as RequestLogger
   untyped.set({
     cfRay,
     traceparent,

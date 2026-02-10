@@ -1,4 +1,4 @@
-import type { DrainContext, EnvironmentContext, InternalFields, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -245,11 +245,11 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
   let hasError = false
 
   return {
-    set(data: Partial<T & InternalFields>): void {
+    set(data: FieldContext<T>): void {
       context = deepDefaults(data as Record<string, unknown>, context) as Record<string, unknown>
     },
 
-    error(error: Error | string, errorContext?: Partial<T & InternalFields>): void {
+    error(error: Error | string, errorContext?: FieldContext<T>): void {
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
@@ -268,7 +268,7 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
       context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
-    emit(overrides?: Partial<T & InternalFields> & { _forceKeep?: boolean }): WideEvent | null {
+    emit(overrides?: FieldContext<T> & { _forceKeep?: boolean }): WideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : 'info'
@@ -300,7 +300,7 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
       }, true)
     },
 
-    getContext(): Partial<T & InternalFields> & Record<string, unknown> {
+    getContext(): FieldContext<T> & Record<string, unknown> {
       return { ...context }
     },
   }

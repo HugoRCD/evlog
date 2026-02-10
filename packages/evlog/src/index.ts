@@ -5,10 +5,12 @@ export { parseError } from './runtime/utils/parseError'
 
 export type {
   BaseWideEvent,
+  DeepPartial,
   DrainContext,
   EnrichContext,
   EnvironmentContext,
   ErrorOptions,
+  FieldContext,
   H3EventContext,
   IngestPayload,
   InternalFields,

@@ -43,7 +43,8 @@ export function useLogger<T extends object = Record<string, unknown>>(event: Ser
   }
 
   if (service) {
-    (log as RequestLogger).set({ service })
+    const untyped = log as unknown as RequestLogger
+    untyped.set({ service })
   }
 
   return log

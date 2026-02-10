@@ -301,6 +301,16 @@ export interface BaseWideEvent {
 export type WideEvent = BaseWideEvent & Record<string, unknown>
 
 /**
+ * Recursively makes all properties optional.
+ * Arrays are kept as-is (not deeply partial).
+ */
+export type DeepPartial<T> = T extends Array<unknown>
+  ? T
+  : T extends object
+    ? { [K in keyof T]?: DeepPartial<T[K]> }
+    : T
+
+/**
  * Fields set internally by the evlog plugin (status, service, etc.).
  * These are always accepted by `set()` regardless of the user-defined field type.
  */
@@ -308,6 +318,15 @@ export interface InternalFields {
   status?: number
   service?: string
 }
+
+/**
+ * Resolved context type for logger methods.
+ * User fields are deeply partial (matching deep merge behavior) with internal
+ * field keys omitted to avoid intersection conflicts, then internal fields
+ * are added back with their canonical types.
+ */
+export type FieldContext<T extends object = Record<string, unknown>> =
+  DeepPartial<Omit<T, keyof InternalFields>> & InternalFields
 
 /**
  * Request-scoped logger for building wide events
@@ -329,6 +348,7 @@ export interface InternalFields {
  * }
  * const logger = useLogger<MyFields>(event)
  * logger.set({ user: { id: '123', plan: 'pro' } }) // OK
+ * logger.set({ user: { id: '123' } })               // OK (deep partial)
  * logger.set({ action: 'checkout' })                 // OK
  * logger.set({ status: 200 })                        // OK (internal field)
  * logger.set({ account: '...' })                     // TS error
@@ -338,23 +358,23 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
   /**
    * Add context to the wide event (deep merge via defu)
    */
-  set: (context: Partial<T & InternalFields>) => void
+  set: (context: FieldContext<T>) => void
 
   /**
    * Log an error and capture its details
    */
-  error: (error: Error | string, context?: Partial<T & InternalFields>) => void
+  error: (error: Error | string, context?: FieldContext<T>) => void
 
   /**
    * Emit the final wide event with all accumulated context.
    * Returns the emitted WideEvent, or null if the log was sampled out.
    */
-  emit: (overrides?: Partial<T & InternalFields> & { _forceKeep?: boolean }) => WideEvent | null
+  emit: (overrides?: FieldContext<T> & { _forceKeep?: boolean }) => WideEvent | null
 
   /**
    * Get the current accumulated context
    */
-  getContext: () => Partial<T & InternalFields> & Record<string, unknown>
+  getContext: () => FieldContext<T> & Record<string, unknown>
 }
 
 /**
