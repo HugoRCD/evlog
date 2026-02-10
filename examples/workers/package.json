@@ -7,7 +7,7 @@
     "deploy": "wrangler deploy"
   },
   "dependencies": {
-    "evlog": "file:../../packages/evlog"
+    "evlog": "workspace:*"
   },
   "devDependencies": {
     "wrangler": "^3.101.0"

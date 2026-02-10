@@ -22,7 +22,7 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 | # | File | Action |
 |---|------|--------|
 | 1 | `packages/evlog/src/adapters/{name}.ts` | Create adapter source |
-| 2 | `packages/evlog/build.config.ts` | Add build entry |
+| 2 | `packages/evlog/tsdown.config.ts` | Add build entry |
 | 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` entries |
 | 4 | `packages/evlog/test/adapters/{name}.test.ts` | Create tests |
 | 5 | `apps/docs/content/3.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
@@ -65,13 +65,13 @@ Key architecture rules:
 
 ## Step 2: Build Config
 
-Add a build entry in `packages/evlog/build.config.ts` alongside the existing adapters:
+Add a build entry in `packages/evlog/tsdown.config.ts` alongside the existing adapters:
 
 ```typescript
-{ input: 'src/adapters/{name}', name: 'adapters/{name}' },
+'adapters/{name}': 'src/adapters/{name}.ts',
 ```
 
-Place it after the last adapter entry (currently `posthog` at line ~21).
+Place it after the last adapter entry (currently `sentry` at line 22).
 
 ## Step 3: Package Exports
 

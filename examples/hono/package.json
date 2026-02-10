@@ -4,12 +4,15 @@
   "type": "module",
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "start": "tsx src/index.ts"
+    "start": "tsx src/index.ts",
+    "health": "curl http://localhost:3000/health",
+    "checkout": "curl http://localhost:3000/checkout",
+    "users:1": "curl http://localhost:3000/users/1"
   },
   "dependencies": {
     "@hono/node-server": "^1.13.8",
-    "evlog": "file:../../packages/evlog",
-    "hono": "^4.8.5"
+    "evlog": "workspace:*",
+    "hono": "^4.11.9"
   },
   "devDependencies": {
     "tsx": "^4.20.6"

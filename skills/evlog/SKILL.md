@@ -351,6 +351,8 @@ evlog provides built-in adapters to send logs to external observability platform
 |---------|--------|----------|
 | Axiom | `evlog/axiom` | Axiom datasets for querying and dashboards |
 | OTLP | `evlog/otlp` | OpenTelemetry for Grafana, Datadog, Honeycomb, etc. |
+| PostHog | `evlog/posthog` | PostHog for product analytics and event tracking |
+| Sentry | `evlog/sentry` | Sentry for error tracking and performance monitoring |
 
 ### Quick Setup
 
@@ -379,6 +381,32 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set `NUXT_OTLP_ENDPOINT` environment variable.
+
+**PostHog:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createPostHogDrain } from 'evlog/posthog'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createPostHogDrain())
+})
+```
+
+Set `NUXT_POSTHOG_API_KEY` and `NUXT_POSTHOG_HOST` environment variables.
+
+**Sentry:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createSentryDrain } from 'evlog/sentry'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createSentryDrain())
+})
+```
+
+Set `NUXT_SENTRY_DSN` environment variable.
 
 ### Multiple Destinations
 
@@ -497,7 +525,7 @@ When reviewing code, check for:
 7. **Sensitive data in logs** → Check for passwords, tokens, full card numbers, PII
 8. **Client-side logging** → Use `log` API for debugging in Vue components
 9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
-10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`) for production log export
+10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`, `evlog/posthog`, `evlog/sentry`) for production log export
 11. **No drain pipeline** → Wrap adapters with `createDrainPipeline()` for batching, retry, and buffer overflow protection
 
 ## Loading Reference Files
