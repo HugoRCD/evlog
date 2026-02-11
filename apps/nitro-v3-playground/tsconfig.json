@@ -4,8 +4,6 @@
     "moduleResolution": "bundler",
     "paths": {
       "~/*": ["./*"],
-      "evlog": ["../../packages/evlog/src/index.ts"],
-      "evlog/*": ["../../packages/evlog/src/*"]
     }
   }
 }
