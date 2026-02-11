@@ -13,11 +13,11 @@ import { EvlogError } from '../error'
  *
  * Usage in nitro.config.ts:
  * ```ts
- * import { defineConfig } from 'nitro'
- * import evlogErrorHandler from 'evlog/nitro/v3/errorHandler'
- *
+ * // errorHandler.ts
+ * export { default } from 'evlog/nitro/v3/errorHandler'
+ * // nitro.config.ts
  * export default defineConfig({
- *   errorHandler: evlogErrorHandler,
+ *   errorHandler: './errorHandler',
  * })
  * ```
  */

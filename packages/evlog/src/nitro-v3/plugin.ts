@@ -119,6 +119,15 @@ async function callEnrichAndDrain(
   callDrainHook(hooks, emittedEvent, event, hookContext.request, hookContext.headers)
 }
 
+/**
+ * Nitro v3 plugin entry point.
+ *
+ * Usage in Nitro v3:
+ * ```ts
+ * // plugins/evlog.ts
+ * export { default } from 'evlog/nitro/v3'
+ * ```
+ */
 export default definePlugin((nitroApp) => {
   const config = useRuntimeConfig()
   const evlogConfig = config.evlog as EvlogConfig | undefined
