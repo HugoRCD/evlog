@@ -252,10 +252,10 @@ const noopLogger: RequestLogger = {
   set() {},
   error() {},
   emit() {
-    return null 
+    return null
   },
   getContext() {
-    return {} 
+    return {}
   },
 }
 
