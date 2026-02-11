@@ -2,13 +2,16 @@ name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches:
+      - main
   workflow_dispatch:
 
+concurrency: ${{ github.workflow }}-${{ github.ref }}
+
 permissions:
+  contents: write
+  pull-requests: write
   id-token: write
-  contents: read
 
 jobs:
   release:
@@ -16,8 +19,6 @@ jobs:
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
-        with:
-          fetch-depth: 0
 
       - uses: actions/setup-node@v6
         with:
@@ -28,20 +29,23 @@ jobs:
         with:
           bun-version: latest
 
-      - name: Use latest npm
-        run: npm install -g npm@latest
-
       - name: Install dependencies
         run: bun install
 
-      - name: Build (stub)
+      - name: Prepare
         run: bun run dev:prepare
 
-      - name: Build package
-        run: bun run build:package
+      - name: Build packages
+        run: turbo run build --filter='./packages/*'
 
-      - name: Publish to npm
-        working-directory: packages/evlog
-        run: npm publish --access public
+      - name: Create Release PR or Publish
+        id: changesets
+        uses: changesets/action@v1
+        with:
+          title: "chore(repo): version packages"
+          version: bun run version
+          publish: bun run release
         env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true

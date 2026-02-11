@@ -32,3 +32,4 @@ logs
 apps/web/.data
 apps/chat/.data
 .codex/environments/
+apps/nuxthub-playground/.data

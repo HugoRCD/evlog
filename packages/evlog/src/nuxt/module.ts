@@ -183,6 +183,13 @@ export interface ModuleOptions {
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
   }
+
+  /**
+   * How long to retain events before cleanup (used by @evlog/nuxthub).
+   * Supports "30d" (days), "24h" (hours), "60m" (minutes).
+   * @default '30d'
+   */
+  retention?: string
 }
 
 export default defineNuxtModule<ModuleOptions>({

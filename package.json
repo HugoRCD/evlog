@@ -12,19 +12,24 @@
   "scripts": {
     "dev": "turbo run dev --filter=evlog-playground",
     "dev:nitro": "turbo run dev --filter=evlog-nitro-playground",
+    "dev:nuxthub": "turbo run dev --filter=evlog-nuxthub-playground",
     "dev:prepare": "turbo run dev:prepare",
     "dev:docs": "turbo run dev --filter=evlog-docs",
     "docs": "turbo run dev --filter=evlog-docs",
     "build": "turbo run build",
-    "build:package": "turbo run build --filter=evlog",
+    "build:package": "turbo run build --filter='./packages/*'",
     "build:docs": "turbo run build --filter=evlog-docs",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
-    "automd": "automd --config .github/automd.json"
+    "automd": "automd --config .github/automd.json",
+    "changeset": "changeset",
+    "version": "changeset version",
+    "release": "turbo run build --filter='./packages/*' && changeset publish"
   },
   "devDependencies": {
+    "@changesets/cli": "^2.29.4",
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
     "automd": "^0.4.3",

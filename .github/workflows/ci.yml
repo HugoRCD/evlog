@@ -90,4 +90,4 @@ jobs:
       - name: Build package
         run: bun run build:package
       - name: Publish preview
-        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog'
+        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog' './packages/nuxthub'
