@@ -1,7 +1,10 @@
+export { createBrowserDrain } from './browser'
 export { EvlogError, createError, createEvlogError } from './error'
 export { createRequestLogger, getEnvironment, initLogger, isEnabled, log, shouldKeep } from './logger'
 export { useLogger } from './runtime/server/useLogger'
 export { parseError } from './runtime/utils/parseError'
+
+export type { BrowserDrainOptions } from './browser'
 
 export type {
   BaseWideEvent,
