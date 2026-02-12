@@ -35,10 +35,6 @@ function extractRow(ctx: DrainContext): EventRow {
     'requestId',
     'source',
     'error',
-    // Also exclude base fields that are already captured
-    'version',
-    'commitHash',
-    'region',
   ])
 
   // Collect remaining fields into data
