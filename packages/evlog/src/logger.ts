@@ -240,6 +240,8 @@ export const log: Log = {
 const noopLogger: RequestLogger = {
   set() {},
   error() {},
+  info() {},
+  warn() {},
   emit() {
     return null
   },
