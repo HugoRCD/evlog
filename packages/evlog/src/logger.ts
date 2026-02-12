@@ -230,12 +230,14 @@ function createLogMethod(level: LogLevel) {
  * log.error({ action: 'payment', error: 'failed' })
  * ```
  */
-export const log: Log = {
+const _log: Log = {
   info: createLogMethod('info'),
   error: createLogMethod('error'),
   warn: createLogMethod('warn'),
   debug: createLogMethod('debug'),
 }
+
+export { _log as log }
 
 const noopLogger: RequestLogger = {
   set() {},

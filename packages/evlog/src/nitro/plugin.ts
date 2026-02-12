@@ -183,7 +183,7 @@ export default defineNitroPlugin((nitroApp) => {
       if (cfRay) requestIdOverride = cfRay
     }
 
-    const log = createRequestLogger({
+    const requestLog = createRequestLogger({
       method: e.method,
       path: e.path,
       requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
@@ -192,23 +192,23 @@ export default defineNitroPlugin((nitroApp) => {
     // Apply route-based service configuration if a matching route is found
     const routeService = getServiceForPath(e.path, evlogConfig?.routes)
     if (routeService) {
-      log.set({ service: routeService })
+      requestLog.set({ service: routeService })
     }
 
-    e.context.log = log
+    e.context.log = requestLog
   })
 
   nitroApp.hooks.hook('error', async (error, { event }) => {
     const e = event as ServerEvent | undefined
     if (!e) return
 
-    const log = e.context.log as RequestLogger | undefined
-    if (log) {
-      log.error(error as Error)
+    const requestLog = e.context.log as RequestLogger | undefined
+    if (requestLog) {
+      requestLog.error(error as Error)
 
       // Get the actual error status code
       const errorStatus = (error as { statusCode?: number }).statusCode ?? 500
-      log.set({ status: errorStatus })
+      requestLog.set({ status: errorStatus })
 
       // Build tail sampling context
       const startTime = e.context._evlogStartTime as number | undefined
@@ -219,7 +219,7 @@ export default defineNitroPlugin((nitroApp) => {
         duration: durationMs,
         path: e.path,
         method: e.method,
-        context: log.getContext(),
+        context: requestLog.getContext(),
         shouldKeep: false,
       }
 
@@ -228,7 +228,7 @@ export default defineNitroPlugin((nitroApp) => {
 
       e.context._evlogEmitted = true
 
-      const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
+      const emittedEvent = requestLog.emit({ _forceKeep: tailCtx.shouldKeep })
       await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })
@@ -238,10 +238,10 @@ export default defineNitroPlugin((nitroApp) => {
     // Skip if already emitted by error hook
     if (e.context._evlogEmitted) return
 
-    const log = e.context.log as RequestLogger | undefined
-    if (log) {
+    const requestLog = e.context.log as RequestLogger | undefined
+    if (requestLog) {
       const status = getResponseStatus(e)
-      log.set({ status })
+      requestLog.set({ status })
 
       const startTime = e.context._evlogStartTime as number | undefined
       const durationMs = startTime ? Date.now() - startTime : undefined
@@ -251,13 +251,13 @@ export default defineNitroPlugin((nitroApp) => {
         duration: durationMs,
         path: e.path,
         method: e.method,
-        context: log.getContext(),
+        context: requestLog.getContext(),
         shouldKeep: false,
       }
 
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
 
-      const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
+      const emittedEvent = requestLog.emit({ _forceKeep: tailCtx.shouldKeep })
       await callEnrichAndDrain(nitroApp, emittedEvent, e)
     }
   })

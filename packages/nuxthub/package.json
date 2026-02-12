@@ -56,5 +56,8 @@
     "drizzle-orm": {
       "optional": false
     }
+  },
+  "publishConfig": {
+    "access": "public"
   }
 }

@@ -95,9 +95,11 @@ function createLogMethod(level: LogLevel) {
   }
 }
 
-export const log: Log = {
+const _clientLog: Log = {
   info: createLogMethod('info'),
   error: createLogMethod('error'),
   warn: createLogMethod('warn'),
   debug: createLogMethod('debug'),
 }
+
+export { _clientLog as log }
