@@ -1,6 +1,6 @@
 {
   "name": "@evlog/nuxthub",
-  "version": "0.0.1-alpha.1",
+  "version": "0.0.1-alpha.14",
   "description": "Self-hosted log retention for evlog using NuxtHub database storage",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -13,40 +13,25 @@
   "type": "module",
   "exports": {
     ".": {
-      "types": "./dist/module.d.mts",
+      "types": "./dist/types.d.mts",
       "import": "./dist/module.mjs"
-    },
-    "./schema/sqlite": {
-      "types": "./dist/schema/sqlite.d.mts",
-      "import": "./dist/schema/sqlite.mjs"
-    },
-    "./schema/postgresql": {
-      "types": "./dist/schema/postgresql.d.mts",
-      "import": "./dist/schema/postgresql.mjs"
-    },
-    "./schema/mysql": {
-      "types": "./dist/schema/mysql.d.mts",
-      "import": "./dist/schema/mysql.mjs"
     }
   },
   "main": "./dist/module.mjs",
-  "types": "./dist/module.d.mts",
+  "types": "./dist/types.d.mts",
   "files": [
-    "dist",
-    "src/runtime",
-    "src/schema",
-    "README.md"
+    "dist"
   ],
   "scripts": {
-    "build": "tsdown",
-    "dev:prepare": "tsdown"
+    "build": "nuxt-module-build build",
+    "dev:prepare": "nuxt-module-build prepare"
   },
   "dependencies": {
-    "evlog": "workspace:*",
+    "evlog": "^1.7.0",
     "@nuxthub/core": "^0.10.6"
   },
   "devDependencies": {
-    "tsdown": "^0.20.3",
+    "@nuxt/module-builder": "^0.8.4",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {

@@ -1,5 +1,5 @@
 export default defineNuxtConfig({
-  modules: ['@nuxthub/core', '@evlog/nuxthub'],
+  modules: ['@evlog/nuxthub'],
 
   compatibilityDate: 'latest',
 

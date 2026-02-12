@@ -1,19 +1,10 @@
-import { existsSync, promises as fsp } from 'node:fs'
-import { fileURLToPath } from 'node:url'
+import { existsSync, mkdirSync, promises as fsp, readFileSync, writeFileSync } from 'node:fs'
 import { join, resolve } from 'node:path'
-import { addServerHandler, addServerPlugin, defineNuxtModule } from '@nuxt/kit'
+import { addServerHandler, addServerPlugin, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule } from '@nuxt/kit'
 import { consola } from 'consola'
 import type { NitroConfig } from 'nitropack'
 import { createEvlogError } from 'evlog'
-
-export interface ModuleOptions {
-  /**
-   * How long to retain events before cleanup.
-   * Supports "30d" (days), "24h" (hours), "60m" (minutes).
-   * @default '30d'
-   */
-  retention?: string
-}
+import { name, version } from '../package.json'
 
 function retentionToCron(retention: string): string {
   const match = retention.match(/^(\d+)(d|h|m)$/)
@@ -65,13 +56,10 @@ function retentionToCron(retention: string): string {
   return `0 */${halfHours} * * *`
 }
 
-export default defineNuxtModule<ModuleOptions>({
+export default defineNuxtModule({
   meta: {
-    name: '@evlog/nuxthub',
-    version: '0.0.1-alpha.1',
-  },
-  moduleDependencies: {
-    'evlog/nuxt': {},
+    name,
+    version
   },
   async onInstall(nuxt) {
     const shouldSetup = await consola.prompt(
@@ -102,32 +90,56 @@ export default defineNuxtModule<ModuleOptions>({
     await fsp.writeFile(vercelJsonPath, `${JSON.stringify(config, null, 2)}\n`, 'utf-8')
     consola.success('Created vercel.json with evlog cleanup cron schedule')
   },
-  setup(_moduleOptions, nuxt) {
-    // Read nuxthub options from evlog config key
-    const evlogConfig = (nuxt.options as any).evlog || {}
-    const options: Required<ModuleOptions> = {
-      retention: evlogConfig.retention ?? '30d',
+  async setup(_moduleOptions, nuxt) {
+    const { resolve } = createResolver(import.meta.url)
+
+    // Auto-install evlog/nuxt and @nuxthub/core if not already registered
+    if (!hasNuxtModule('evlog/nuxt')) {
+      await installModule('evlog/nuxt')
+    }
+    if (!hasNuxtModule('@nuxthub/core')) {
+      await installModule('@nuxthub/core')
     }
 
-    // Runtime files must be resolved from src/ so Nitro can bundle them
-    // and resolve virtual imports like @nuxthub/db
-    const distDir = fileURLToPath(new URL('.', import.meta.url))
-    const srcDir = resolve(distDir, '..', 'src')
-    const runtimeDir = join(srcDir, 'runtime')
-
-    // Extend NuxtHub DB schema with dialect-specific evlog_events table
-    // @ts-expect-error hub:db:schema:extend hook exists but is not in NuxtHooks type
-    nuxt.hook('hub:db:schema:extend', ({ paths, dialect }: { paths: string[], dialect: string }) => {
-      paths.push(resolve(srcDir, 'schema', `${dialect}.ts`))
+    // Augment evlog/nuxt ModuleOptions with retention (not yet in published evlog)
+    addTypeTemplate({
+      filename: 'types/evlog-nuxthub.d.ts',
+      getContents: () => [
+        'declare module \'evlog/nuxt\' {',
+        '  interface ModuleOptions {',
+        '    retention?: string',
+        '  }',
+        '}',
+        'export {}',
+      ].join('\n'),
     })
 
-    // Register the drain server plugin
-    addServerPlugin(join(runtimeDir, 'drain'))
+    // Read nuxthub options from evlog config key
+    const evlogConfig = (nuxt.options as any).evlog || {}
+    const retention: string = evlogConfig.retention ?? '30d'
+
+    // Extend NuxtHub DB schema with dialect-specific evlog_events table
+    // Copy schema to .nuxt/ so NuxtHub's tsdown inlines it (files in node_modules/ get code-split into missing chunks)
+    // @ts-expect-error hub:db:schema:extend hook exists but is not in NuxtHooks type
+    nuxt.hook('hub:db:schema:extend', ({ paths, dialect }: { paths: string[], dialect: string }) => {
+      const source = resolve(`./runtime/db/schema/events.${dialect}.js`)
+      const content = readFileSync(source, 'utf-8')
+
+      const destDir = join(nuxt.options.buildDir, 'evlog/schema')
+      mkdirSync(destDir, { recursive: true })
+      const destPath = join(destDir, `events.${dialect}.ts`)
+      writeFileSync(destPath, content)
+
+      paths.push(destPath)
+    })
+
+    // Register the drain server plugin (resolved from dist/runtime/)
+    addServerPlugin(resolve('./runtime/drain'))
 
     // Register the cron API route (works as Vercel cron target or manual trigger)
     addServerHandler({
       route: '/api/_cron/evlog-cleanup',
-      handler: join(runtimeDir, 'api', '_cron', 'evlog-cleanup'),
+      handler: resolve('./runtime/api/_cron/evlog-cleanup'),
     })
 
     // Register the cleanup task with automatic cron schedule based on retention
@@ -140,11 +152,11 @@ export default defineNuxtModule<ModuleOptions>({
       // Register the task handler
       nitroConfig.tasks = nitroConfig.tasks || {}
       nitroConfig.tasks['evlog:cleanup'] = {
-        handler: join(runtimeDir, 'tasks', 'evlog-cleanup'),
+        handler: resolve('./runtime/tasks/evlog-cleanup'),
       }
 
       // Schedule based on retention (e.g., 1m → every 1 min, 1h → every 30 min, 30d → daily 3AM)
-      const cron = retentionToCron(options.retention!)
+      const cron = retentionToCron(retention)
       nitroConfig.scheduledTasks = nitroConfig.scheduledTasks || {}
       const existing = nitroConfig.scheduledTasks[cron]
       if (Array.isArray(existing)) {
