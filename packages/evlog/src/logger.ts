@@ -28,12 +28,14 @@ let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
+let globalEnabled = true
 
 /**
  * Initialize the logger with configuration.
  * Call this once at application startup.
  */
 export function initLogger(config: LoggerConfig = {}): void {
+  globalEnabled = config.enabled ?? true
   const detected = detectEnvironment()
 
   globalEnv = {
@@ -48,6 +50,13 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
+}
+
+/**
+ * Check if logging is globally enabled.
+ */
+export function isEnabled(): boolean {
+  return globalEnabled
 }
 
 /**
@@ -95,6 +104,8 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
 }
 
 function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+  if (!globalEnabled) return null
+
   if (!skipSamplingCheck && !shouldSample(level)) {
     return null
   }
@@ -124,6 +135,8 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
+  if (!globalEnabled) return
+
   if (globalPretty) {
     if (!shouldSample(level)) {
       return
@@ -224,6 +237,17 @@ export const log: Log = {
   debug: createLogMethod('debug'),
 }
 
+const noopLogger: RequestLogger = {
+  set() {},
+  error() {},
+  emit() {
+    return null
+  },
+  getContext() {
+    return {}
+  },
+}
+
 /**
  * Create a request-scoped logger for building wide events.
  *
@@ -236,6 +260,8 @@ export const log: Log = {
  * ```
  */
 export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
+  if (!globalEnabled) return noopLogger as RequestLogger<T>
+
   const startTime = Date.now()
   let context: Record<string, unknown> = {
     method: options.method,

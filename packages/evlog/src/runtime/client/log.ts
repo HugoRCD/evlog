@@ -3,6 +3,7 @@ import { getConsoleMethod } from '../../utils'
 
 const isClient = typeof window !== 'undefined'
 
+let clientEnabled = true
 let clientPretty = true
 let clientService = 'client'
 let transportEnabled = false
@@ -15,7 +16,8 @@ const LEVEL_COLORS: Record<string, string> = {
   debug: 'color: #6b7280; font-weight: bold',
 }
 
-export function initLog(options: { pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
+export function initLog(options: { enabled?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
+  clientEnabled = options.enabled ?? true
   clientPretty = options.pretty ?? true
   clientService = options.service ?? 'client'
   transportEnabled = options.transport?.enabled ?? false
@@ -39,6 +41,8 @@ async function sendToServer(event: Record<string, unknown>): Promise<void> {
 }
 
 function emitLog(level: LogLevel, event: Record<string, unknown>): void {
+  if (!clientEnabled) return
+
   const formatted = {
     timestamp: new Date().toISOString(),
     level,
@@ -59,6 +63,8 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
+  if (!clientEnabled) return
+
   if (clientPretty) {
     console[getConsoleMethod(level)](`%c[${tag}]%c ${message}`, LEVEL_COLORS[level] || '', 'color: inherit')
     sendToServer({

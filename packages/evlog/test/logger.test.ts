@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRequestLogger, getEnvironment, initLogger, log } from '../src/logger'
+import { createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../src/logger'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -1023,5 +1023,96 @@ describe('typed fields', () => {
     const ctx = logger.getContext()
     expect(ctx.anything).toBe(true)
     expect(ctx.nested).toEqual({ deep: 'value' })
+  })
+})
+
+describe('enabled option', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    initLogger({ pretty: false })
+  })
+
+  it('defaults to enabled', () => {
+    initLogger()
+    expect(isEnabled()).toBe(true)
+  })
+
+  it('can be explicitly enabled', () => {
+    initLogger({ enabled: true })
+    expect(isEnabled()).toBe(true)
+  })
+
+  it('silences log.info/error/warn/debug when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    log.info('test', 'should not log')
+    log.error('test', 'should not log')
+    log.warn('test', 'should not log')
+    log.debug('test', 'should not log')
+
+    expect(infoSpy).not.toHaveBeenCalled()
+    expect(console.error).not.toHaveBeenCalled()
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
+  it('silences wide event objects when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    log.info({ action: 'test' })
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('makes createRequestLogger().emit() return null when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('makes createRequestLogger().set/error no-op and getContext returns {}', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123' } })
+    logger.error(new Error('fail'))
+
+    expect(logger.getContext()).toEqual({})
+  })
+
+  it('does not call drain when disabled', () => {
+    const drain = vi.fn()
+    initLogger({ enabled: false, pretty: false, drain })
+
+    log.info({ action: 'test' })
+    const logger = createRequestLogger({})
+    logger.emit()
+
+    expect(drain).not.toHaveBeenCalled()
+  })
+
+  it('works normally when enabled (default)', () => {
+    initLogger({ pretty: false })
+
+    log.info('test', 'should log')
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123' } })
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('level', 'info')
   })
 })

@@ -624,6 +624,7 @@ Initialize the logger. Required for standalone usage, automatic with Nuxt/Nitro 
 
 ```typescript
 initLogger({
+  enabled: boolean       // Optional. Enable/disable all logging (default: true)
   env: {
     service: string      // Service name
     environment: string  // 'production' | 'development' | 'test'

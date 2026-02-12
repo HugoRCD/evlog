@@ -236,6 +236,12 @@ export interface EnvironmentContext {
  * Logger configuration options
  */
 export interface LoggerConfig {
+  /**
+   * Enable or disable all logging globally.
+   * When false, all emits, tagged logs, and request logger operations become no-ops.
+   * @default true
+   */
+  enabled?: boolean
   /** Environment context overrides */
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
