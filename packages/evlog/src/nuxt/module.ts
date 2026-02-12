@@ -12,6 +12,13 @@ import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig }
 
 export interface ModuleOptions {
   /**
+   * Enable or disable all logging globally.
+   * When false, all emits, tagged logs, and request logger operations become no-ops.
+   * @default true
+   */
+  enabled?: boolean
+
+  /**
    * Environment context overrides.
    */
   env?: Partial<EnvironmentContext>
@@ -214,6 +221,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
+      enabled: options.enabled,
       pretty: options.pretty,
       transport: {
         enabled: transportEnabled,

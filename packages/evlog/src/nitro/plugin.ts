@@ -1,11 +1,12 @@
 import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
 import { getHeaders } from 'h3'
-import { createRequestLogger, initLogger } from '../logger'
+import { createRequestLogger, initLogger, isEnabled } from '../logger'
 import type { EnrichContext, RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders, matchesPattern } from '../utils'
 
 interface EvlogConfig {
+  enabled?: boolean
   env?: Record<string, unknown>
   pretty?: boolean
   include?: string[]
@@ -157,10 +158,13 @@ export default defineNitroPlugin((nitroApp) => {
   const evlogConfig = config.evlog as EvlogConfig | undefined
 
   initLogger({
+    enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
     sampling: evlogConfig?.sampling,
   })
+
+  if (!isEnabled()) return
 
   nitroApp.hooks.hook('request', (event) => {
     const e = event as ServerEvent

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRequestLogger, getEnvironment, initLogger, log } from '../src/logger'
+import { createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../src/logger'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -207,6 +207,88 @@ describe('createRequestLogger', () => {
       stack: expect.any(String),
     })
     expect(context.step).toBe('payment')
+  })
+
+  it('captures info messages in requestLogs array', () => {
+    const logger = createRequestLogger({})
+
+    logger.info('Cache miss, fetching from database')
+
+    const context = logger.getContext()
+    expect(context.requestLogs).toEqual([
+      {
+        level: 'info',
+        message: 'Cache miss, fetching from database',
+        timestamp: expect.any(String),
+      },
+    ])
+  })
+
+  it('captures warning messages in requestLogs array and escalates final level', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({})
+
+    logger.warn('Deprecated parameter used')
+    logger.emit()
+
+    const context = logger.getContext()
+    expect(context.requestLogs).toEqual([
+      {
+        level: 'warn',
+        message: 'Deprecated parameter used',
+        timestamp: expect.any(String),
+      },
+    ])
+
+    expect(warnSpy).toHaveBeenCalled()
+    const output = warnSpy.mock.calls[0]?.[0]
+    expect(output).toContain('"level":"warn"')
+  })
+
+  it('preserves chronological request logs and escalates warn over info', () => {
+    const logger = createRequestLogger({})
+
+    logger.info('User authenticated')
+    logger.info('Cache miss')
+    logger.warn('Deprecated parameter used')
+
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('level', 'warn')
+    expect(result).toHaveProperty('requestLogs')
+    expect(Array.isArray(result?.requestLogs)).toBe(true)
+    expect((result?.requestLogs as Array<Record<string, unknown>>).map(entry => entry.level)).toEqual(['info', 'info', 'warn'])
+    expect((result?.requestLogs as Array<Record<string, unknown>>).map(entry => entry.message)).toEqual([
+      'User authenticated',
+      'Cache miss',
+      'Deprecated parameter used',
+    ])
+  })
+
+  it('merges context passed to info() and warn()', () => {
+    const logger = createRequestLogger({})
+
+    logger.info('Starting request', { user: { id: '123' } })
+    logger.warn('Slow downstream call', { downstream: { service: 'billing' } })
+
+    const context = logger.getContext()
+    expect(context.user).toEqual({ id: '123' })
+    expect(context.downstream).toEqual({ service: 'billing' })
+  })
+
+  it('does not clobber requestLogs when context contains requestLogs key', () => {
+    const logger = createRequestLogger({})
+
+    logger.info('First entry')
+    logger.info('Second entry', { requestLogs: 'should be ignored' } as any)
+    logger.warn('Third entry', { requestLogs: [{ fake: true }] } as any)
+
+    const context = logger.getContext()
+    expect(context.requestLogs).toHaveLength(3)
+    expect(context.requestLogs[0].message).toBe('First entry')
+    expect(context.requestLogs[1].message).toBe('Second entry')
+    expect(context.requestLogs[2].message).toBe('Third entry')
   })
 
   it('captures custom error properties (statusCode, data, cause)', () => {
@@ -941,5 +1023,96 @@ describe('typed fields', () => {
     const ctx = logger.getContext()
     expect(ctx.anything).toBe(true)
     expect(ctx.nested).toEqual({ deep: 'value' })
+  })
+})
+
+describe('enabled option', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    initLogger({ pretty: false })
+  })
+
+  it('defaults to enabled', () => {
+    initLogger()
+    expect(isEnabled()).toBe(true)
+  })
+
+  it('can be explicitly enabled', () => {
+    initLogger({ enabled: true })
+    expect(isEnabled()).toBe(true)
+  })
+
+  it('silences log.info/error/warn/debug when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    log.info('test', 'should not log')
+    log.error('test', 'should not log')
+    log.warn('test', 'should not log')
+    log.debug('test', 'should not log')
+
+    expect(infoSpy).not.toHaveBeenCalled()
+    expect(console.error).not.toHaveBeenCalled()
+    expect(console.warn).not.toHaveBeenCalled()
+  })
+
+  it('silences wide event objects when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    log.info({ action: 'test' })
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('makes createRequestLogger().emit() return null when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('makes createRequestLogger().set/error no-op and getContext returns {}', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123' } })
+    logger.error(new Error('fail'))
+
+    expect(logger.getContext()).toEqual({})
+  })
+
+  it('does not call drain when disabled', () => {
+    const drain = vi.fn()
+    initLogger({ enabled: false, pretty: false, drain })
+
+    log.info({ action: 'test' })
+    const logger = createRequestLogger({})
+    logger.emit()
+
+    expect(drain).not.toHaveBeenCalled()
+  })
+
+  it('works normally when enabled (default)', () => {
+    initLogger({ pretty: false })
+
+    log.info('test', 'should log')
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123' } })
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('level', 'info')
   })
 })

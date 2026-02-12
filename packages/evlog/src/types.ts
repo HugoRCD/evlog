@@ -236,6 +236,12 @@ export interface EnvironmentContext {
  * Logger configuration options
  */
 export interface LoggerConfig {
+  /**
+   * Enable or disable all logging globally.
+   * When false, all emits, tagged logs, and request logger operations become no-ops.
+   * @default true
+   */
+  enabled?: boolean
   /** Environment context overrides */
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
@@ -317,6 +323,16 @@ export type DeepPartial<T> = T extends Array<unknown>
 export interface InternalFields {
   status?: number
   service?: string
+  requestLogs?: RequestLogEntry[]
+}
+
+/**
+ * Request-scoped log entry captured during a request lifecycle.
+ */
+export interface RequestLogEntry {
+  level: 'info' | 'warn'
+  message: string
+  timestamp: string
 }
 
 /**
@@ -364,6 +380,16 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
    * Log an error and capture its details
    */
   error: (error: Error | string, context?: FieldContext<T>) => void
+
+  /**
+   * Capture an informational message inside the request wide event.
+   */
+  info: (message: string, context?: FieldContext<T>) => void
+
+  /**
+   * Capture a warning message inside the request wide event.
+   */
+  warn: (message: string, context?: FieldContext<T>) => void
 
   /**
    * Emit the final wide event with all accumulated context.

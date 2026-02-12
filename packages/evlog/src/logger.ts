@@ -28,12 +28,14 @@ let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
+let globalEnabled = true
 
 /**
  * Initialize the logger with configuration.
  * Call this once at application startup.
  */
 export function initLogger(config: LoggerConfig = {}): void {
+  globalEnabled = config.enabled ?? true
   const detected = detectEnvironment()
 
   globalEnv = {
@@ -48,6 +50,13 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
+}
+
+/**
+ * Check if logging is globally enabled.
+ */
+export function isEnabled(): boolean {
+  return globalEnabled
 }
 
 /**
@@ -95,6 +104,8 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
 }
 
 function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+  if (!globalEnabled) return null
+
   if (!skipSamplingCheck && !shouldSample(level)) {
     return null
   }
@@ -124,6 +135,8 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
+  if (!globalEnabled) return
+
   if (globalPretty) {
     if (!shouldSample(level)) {
       return
@@ -224,6 +237,17 @@ export const log: Log = {
   debug: createLogMethod('debug'),
 }
 
+const noopLogger: RequestLogger = {
+  set() {},
+  error() {},
+  emit() {
+    return null
+  },
+  getContext() {
+    return {}
+  },
+}
+
 /**
  * Create a request-scoped logger for building wide events.
  *
@@ -236,6 +260,8 @@ export const log: Log = {
  * ```
  */
 export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
+  if (!globalEnabled) return noopLogger as RequestLogger<T>
+
   const startTime = Date.now()
   let context: Record<string, unknown> = {
     method: options.method,
@@ -243,6 +269,24 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
     requestId: options.requestId,
   }
   let hasError = false
+  let hasWarn = false
+
+  function addRequestLog(level: 'info' | 'warn', message: string): void {
+    const entry = {
+      level,
+      message,
+      timestamp: new Date().toISOString(),
+    }
+
+    const requestLogs = Array.isArray(context.requestLogs)
+      ? [...context.requestLogs, entry]
+      : [entry]
+
+    context = {
+      ...context,
+      requestLogs,
+    }
+  }
 
   return {
     set(data: FieldContext<T>): void {
@@ -268,10 +312,27 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
       context = deepDefaults(errorData, context) as Record<string, unknown>
     },
 
+    info(message: string, infoContext?: FieldContext<T>): void {
+      addRequestLog('info', message)
+      if (infoContext) {
+        const { requestLogs: _, ...rest } = infoContext as Record<string, unknown>
+        context = deepDefaults(rest, context) as Record<string, unknown>
+      }
+    },
+
+    warn(message: string, warnContext?: FieldContext<T>): void {
+      hasWarn = true
+      addRequestLog('warn', message)
+      if (warnContext) {
+        const { requestLogs: _, ...rest } = warnContext as Record<string, unknown>
+        context = deepDefaults(rest, context) as Record<string, unknown>
+      }
+    },
+
     emit(overrides?: FieldContext<T> & { _forceKeep?: boolean }): WideEvent | null {
       const durationMs = Date.now() - startTime
       const duration = formatDuration(durationMs)
-      const level: LogLevel = hasError ? 'error' : 'info'
+      const level: LogLevel = hasError ? 'error' : hasWarn ? 'warn' : 'info'
 
       // Extract _forceKeep from overrides (set by evlog:emit:keep hook)
       const { _forceKeep, ...restOverrides } = (overrides ?? {}) as Record<string, unknown> & { _forceKeep?: boolean }
