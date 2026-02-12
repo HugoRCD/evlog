@@ -289,7 +289,8 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
     info(message: string, infoContext?: FieldContext<T>): void {
       addRequestLog('info', message)
       if (infoContext) {
-        context = deepDefaults(infoContext as Record<string, unknown>, context) as Record<string, unknown>
+        const { logs: _, ...rest } = infoContext as Record<string, unknown>
+        context = deepDefaults(rest, context) as Record<string, unknown>
       }
     },
 
@@ -297,7 +298,8 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
       hasWarn = true
       addRequestLog('warn', message)
       if (warnContext) {
-        context = deepDefaults(warnContext as Record<string, unknown>, context) as Record<string, unknown>
+        const { logs: _, ...rest } = warnContext as Record<string, unknown>
+        context = deepDefaults(rest, context) as Record<string, unknown>
       }
     },
 

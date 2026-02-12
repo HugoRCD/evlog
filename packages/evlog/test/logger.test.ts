@@ -277,6 +277,20 @@ describe('createRequestLogger', () => {
     expect(context.downstream).toEqual({ service: 'billing' })
   })
 
+  it('does not clobber logs when context contains logs key', () => {
+    const logger = createRequestLogger({})
+
+    logger.info('First entry')
+    logger.info('Second entry', { logs: 'should be ignored' } as any)
+    logger.warn('Third entry', { logs: [{ fake: true }] } as any)
+
+    const context = logger.getContext()
+    expect(context.logs).toHaveLength(3)
+    expect(context.logs[0].message).toBe('First entry')
+    expect(context.logs[1].message).toBe('Second entry')
+    expect(context.logs[2].message).toBe('Third entry')
+  })
+
   it('captures custom error properties (statusCode, data, cause)', () => {
     const logger = createRequestLogger({})
     const error = Object.assign(new Error('Something went wrong'), {
