@@ -98,7 +98,7 @@ describe('createBrowserDrain', () => {
       drain(createTestContext(1))
       await vi.runAllTimersAsync()
 
-      const options = fetchMock.mock.calls[0]![1]
+      const [, options] = fetchMock.mock.calls[0]!
       expect(options.headers['X-Custom']).toBe('value')
       expect(options.headers['Authorization']).toBe('Bearer token')
       expect(options.headers['Content-Type']).toBe('application/json')
