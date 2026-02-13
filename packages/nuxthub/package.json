@@ -1,6 +1,6 @@
 {
   "name": "@evlog/nuxthub",
-  "version": "0.0.1-alpha.14",
+  "version": "0.0.1-alpha.15",
   "description": "Self-hosted log retention for evlog using NuxtHub database storage",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -24,14 +24,14 @@
   ],
   "scripts": {
     "build": "nuxt-module-build build",
-    "dev:prepare": "nuxt-module-build prepare"
+    "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare"
   },
   "dependencies": {
     "evlog": "^1.7.0",
     "@nuxthub/core": "^0.10.6"
   },
   "devDependencies": {
-    "@nuxt/module-builder": "^0.8.4",
+    "@nuxt/module-builder": "^1.0.2",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {

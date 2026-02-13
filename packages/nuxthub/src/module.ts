@@ -81,7 +81,7 @@ export default defineNuxtModule({
     const crons: Array<{ path: string, schedule: string }> = config.crons || []
     const existing = crons.findIndex(c => c.path === '/api/_cron/evlog-cleanup')
     if (existing >= 0) {
-      crons[existing].schedule = cron
+      crons[existing]!.schedule = cron
     } else {
       crons.push({ path: '/api/_cron/evlog-cleanup', schedule: cron })
     }
@@ -119,18 +119,9 @@ export default defineNuxtModule({
     const retention: string = evlogConfig.retention ?? '30d'
 
     // Extend NuxtHub DB schema with dialect-specific evlog_events table
-    // Copy schema to .nuxt/ so NuxtHub's tsdown inlines it (files in node_modules/ get code-split into missing chunks)
     // @ts-expect-error hub:db:schema:extend hook exists but is not in NuxtHooks type
-    nuxt.hook('hub:db:schema:extend', ({ paths, dialect }: { paths: string[], dialect: string }) => {
-      const source = resolve(`./runtime/db/schema/events.${dialect}.js`)
-      const content = readFileSync(source, 'utf-8')
-
-      const destDir = join(nuxt.options.buildDir, 'evlog/schema')
-      mkdirSync(destDir, { recursive: true })
-      const destPath = join(destDir, `events.${dialect}.ts`)
-      writeFileSync(destPath, content)
-
-      paths.push(destPath)
+    nuxt.hook('hub:db:schema:extend', ({ dialect, paths }: { dialect: string, paths: string[] }) => {
+      paths.push(resolve(`./runtime/db/schema/events.${dialect}`))
     })
 
     // Register the drain server plugin (resolved from dist/runtime/)
@@ -143,7 +134,6 @@ export default defineNuxtModule({
     })
 
     // Register the cleanup task with automatic cron schedule based on retention
-    // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
     nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
       // Enable experimental tasks
       nitroConfig.experimental = nitroConfig.experimental || {}
