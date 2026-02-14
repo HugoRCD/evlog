@@ -17,8 +17,8 @@ const LEVEL_COLORS: Record<string, string> = {
 }
 
 export function initLog(options: { enabled?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
-  clientEnabled = options.enabled ?? true
-  clientPretty = options.pretty ?? true
+  clientEnabled = typeof options.enabled === 'boolean' ? options.enabled : true
+  clientPretty = typeof options.pretty === 'boolean' ? options.pretty : true
   clientService = options.service ?? 'client'
   transportEnabled = options.transport?.enabled ?? false
   transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
@@ -64,7 +64,6 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!clientEnabled) return
-
   if (clientPretty) {
     console[getConsoleMethod(level)](`%c[${tag}]%c ${message}`, LEVEL_COLORS[level] || '', 'color: inherit')
     sendToServer({

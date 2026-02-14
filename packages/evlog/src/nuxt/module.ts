@@ -221,7 +221,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
-      enabled: options.enabled,
+      enabled: options.enabled ?? true,
       pretty: options.pretty,
       transport: {
         enabled: transportEnabled,

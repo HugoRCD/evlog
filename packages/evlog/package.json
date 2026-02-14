@@ -113,6 +113,7 @@
   ],
   "scripts": {
     "build": "tsdown",
+    "dev": "tsdown --watch",
     "dev:prepare": "tsdown",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
