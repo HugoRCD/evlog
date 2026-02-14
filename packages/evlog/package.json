@@ -66,6 +66,10 @@
     "./pipeline": {
       "types": "./dist/pipeline.d.mts",
       "import": "./dist/pipeline.mjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.mts",
+      "import": "./dist/browser.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -104,6 +108,9 @@
       ],
       "pipeline": [
         "./dist/pipeline.d.mts"
+      ],
+      "browser": [
+        "./dist/browser.d.mts"
       ]
     }
   },
@@ -128,6 +135,7 @@
     "@nuxt/test-utils": "^4.0.0",
     "changelogen": "^0.6.2",
     "h3": "^1.15.5",
+    "happy-dom": "^20.6.1",
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.1",
     "tsdown": "^0.20.3",

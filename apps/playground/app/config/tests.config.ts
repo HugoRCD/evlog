@@ -304,6 +304,58 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'browser-drain',
+      label: 'Browser Drain',
+      icon: 'i-lucide-globe',
+      title: 'Browser Drain',
+      description: 'Send browser logs to your server via fetch/sendBeacon. Events are batched and flushed automatically. Check the terminal for [BROWSER DRAIN] output.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'browser-drain-quick',
+          label: 'Quick Setup',
+          description: 'Creates a browser drain, pushes a single event via initLogger + log.info, and flushes immediately.',
+          color: 'primary',
+          badge: {
+            label: 'fetch POST',
+            color: 'blue',
+          },
+          toastOnSuccess: {
+            title: 'Browser drain event sent',
+            description: 'Check terminal for [BROWSER DRAIN] output',
+          },
+        },
+        {
+          id: 'browser-drain-batch',
+          label: 'Batch 5 Events',
+          description: 'Creates the drain, pushes 5 events, and flushes. Demonstrates batching.',
+          color: 'success',
+          badge: {
+            label: '5 events batched',
+            color: 'green',
+          },
+          toastOnSuccess: {
+            title: '5 events batched and sent',
+            description: 'Check terminal for [BROWSER DRAIN] output',
+          },
+        },
+        {
+          id: 'browser-drain-beacon',
+          label: 'Auto-flush (Page Hidden)',
+          description: 'Pushes events with autoFlush enabled (default). Switch tabs or navigate away — the visibilitychange listener flushes via sendBeacon automatically.',
+          color: 'warning',
+          badge: {
+            label: 'sendBeacon',
+            color: 'warning',
+          },
+          toastOnSuccess: {
+            title: 'Events buffered',
+            description: 'Navigate away or switch tabs — events will flush via sendBeacon',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'drains',
       label: 'Drains',
       icon: 'i-lucide-database',

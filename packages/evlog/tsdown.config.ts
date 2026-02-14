@@ -23,6 +23,7 @@ export default defineConfig({
     'adapters/better-stack': 'src/adapters/better-stack.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
+    'browser': 'src/browser.ts',
   },
   format: 'esm',
   dts: true,

@@ -1,0 +1,19 @@
+{
+  "name": "evlog-browser-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build:client": "esbuild src/client.ts --bundle --format=esm --outfile=dist/client.js",
+    "dev": "bun run build:client && tsx watch src/server.ts",
+    "start": "bun run build:client && tsx src/server.ts"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "evlog": "workspace:*",
+    "hono": "^4.11.9"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0",
+    "tsx": "^4.20.6"
+  }
+}

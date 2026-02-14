@@ -1,4 +1,5 @@
 <script setup lang="ts">
+import { createBrowserLogDrain } from 'evlog/browser'
 import { parseError } from 'evlog'
 
 const toast = useToast()
@@ -45,6 +46,54 @@ async function handlePipelineBatch() {
   )
 }
 
+// Build DrainContext manually — the Nuxt module auto-imports its own `log`
+// so we can't call initLogger/log from 'evlog' without conflicts.
+// The standalone example (examples/browser) shows the idiomatic initLogger + log pattern.
+function makeDrainEvent(action: string, extra?: Record<string, unknown>) {
+  return {
+    event: {
+      timestamp: new Date().toISOString(),
+      level: 'info' as const,
+      service: 'browser',
+      environment: 'development',
+      action,
+      ...extra,
+    },
+  }
+}
+
+async function handleBrowserDrainQuick() {
+  const drain = createBrowserLogDrain({
+    drain: { endpoint: '/api/test/browser-ingest' },
+    pipeline: { batch: { size: 1, intervalMs: 500 } },
+    autoFlush: false,
+  })
+  drain(makeDrainEvent('browser_drain_test'))
+  await drain.flush()
+}
+
+async function handleBrowserDrainBatch() {
+  const drain = createBrowserLogDrain({
+    drain: { endpoint: '/api/test/browser-ingest' },
+    pipeline: { batch: { size: 10, intervalMs: 500 } },
+    autoFlush: false,
+  })
+  for (let i = 0; i < 5; i++) {
+    drain(makeDrainEvent('browser_batch_test', { index: i }))
+  }
+  await drain.flush()
+}
+
+function handleBrowserDrainBeacon() {
+  const drain = createBrowserLogDrain({
+    drain: { endpoint: '/api/test/browser-ingest' },
+    pipeline: { batch: { size: 25, intervalMs: 60000 } },
+  })
+  for (let i = 0; i < 3; i++) {
+    drain(makeDrainEvent('browser_beacon_test', { index: i }))
+  }
+}
+
 // Get custom onClick for specific tests
 function getOnClick(testId: string) {
   if (testId === 'structured-error-toast') {
@@ -55,6 +104,15 @@ function getOnClick(testId: string) {
   }
   if (testId === 'pipeline-batch') {
     return handlePipelineBatch
+  }
+  if (testId === 'browser-drain-quick') {
+    return handleBrowserDrainQuick
+  }
+  if (testId === 'browser-drain-batch') {
+    return handleBrowserDrainBatch
+  }
+  if (testId === 'browser-drain-beacon') {
+    return handleBrowserDrainBeacon
   }
   return undefined
 }
