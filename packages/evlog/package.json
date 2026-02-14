@@ -66,6 +66,10 @@
     "./pipeline": {
       "types": "./dist/pipeline.d.mts",
       "import": "./dist/pipeline.mjs"
+    },
+    "./browser": {
+      "types": "./dist/browser.d.mts",
+      "import": "./dist/browser.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -104,6 +108,9 @@
       ],
       "pipeline": [
         "./dist/pipeline.d.mts"
+      ],
+      "browser": [
+        "./dist/browser.d.mts"
       ]
     }
   },

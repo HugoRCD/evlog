@@ -47,6 +47,17 @@
         "tailwindcss": "^4.1.18",
       },
     },
+    "examples/browser": {
+      "name": "evlog-browser-example",
+      "dependencies": {
+        "@hono/node-server": "^1.13.8",
+        "evlog": "workspace:*",
+        "hono": "^4.11.9",
+      },
+      "devDependencies": {
+        "tsx": "^4.20.6",
+      },
+    },
     "examples/bun-script": {
       "name": "evlog-bun-script-example",
       "dependencies": {
@@ -1571,6 +1582,8 @@
     "eventsource-parser": ["eventsource-parser@3.0.6", "", {}, "sha512-Vo1ab+QXPzZ4tCa8SwIHJFaSzy4R6SHf7BY79rFBDf0idraZWAkYrDjDj8uWaSm3S2TK+hJ7/t1CEmZ7jXw+pg=="],
 
     "evlog": ["evlog@workspace:packages/evlog"],
+
+    "evlog-browser-example": ["evlog-browser-example@workspace:examples/browser"],
 
     "evlog-bun-script-example": ["evlog-bun-script-example@workspace:examples/bun-script"],
 
@@ -3195,6 +3208,8 @@
     "globals/type-fest": ["type-fest@0.20.2", "", {}, "sha512-Ne+eE4r0/iWnpAxD852z3A+N0Bt5RN//NjJwRd2VFHEmrywxf5vsZlh4R6lixl6B+wz/8d+maTSAkN1FIkI3LQ=="],
 
     "globby/ignore": ["ignore@7.0.5", "", {}, "sha512-Hs59xBNfUIunMFgWAbGX5cq6893IbWg4KnrjbYwX3tx0ztorVgTDA6B2sxf8ejHJ4wz8BqGUMYlnzNBer5NvGg=="],
+
+    "h3-next/crossws": ["crossws@0.4.4", "", { "peerDependencies": { "srvx": ">=0.7.1" }, "optionalPeers": ["srvx"] }, "sha512-w6c4OdpRNnudVmcgr7brb/+/HmYjMQvYToO/oTrprTwxRUiom3LYWU1PMWuD006okbUWpII1Ea9/+kwpUfmyRg=="],
 
     "hast-util-raw/parse5": ["parse5@7.3.0", "", { "dependencies": { "entities": "^6.0.0" } }, "sha512-IInvU7fabl34qmi9gY8XOVxhYyMyuH2xUNpb2q8/Y+7552KlejkRvqvD19nMoUW/uQGGbqNpA6Tufu5FL5BZgw=="],
 
