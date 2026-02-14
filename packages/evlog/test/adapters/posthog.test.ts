@@ -313,7 +313,7 @@ describe('posthog adapter', () => {
       expect(payload.resourceLogs).toHaveLength(1)
       expect(payload.resourceLogs[0]).toHaveProperty('resource')
       expect(payload.resourceLogs[0]).toHaveProperty('scopeLogs')
-      const logRecords = payload.resourceLogs[0].scopeLogs[0].logRecords
+      const [, { logRecords }] = payload.resourceLogs[0].scopeLogs
       expect(logRecords).toHaveLength(1)
       expect(logRecords[0]).toHaveProperty('timeUnixNano')
       expect(logRecords[0]).toHaveProperty('severityNumber')
