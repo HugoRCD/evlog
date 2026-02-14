@@ -114,8 +114,7 @@ describe('createBrowserDrain', () => {
     afterEach(() => {
       if (originalVisibilityState) {
         Object.defineProperty(document, 'visibilityState', originalVisibilityState)
-      }
-      else {
+      } else {
         delete (document as Record<string, unknown>).visibilityState
       }
     })

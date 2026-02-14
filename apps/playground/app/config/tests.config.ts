@@ -341,8 +341,8 @@ export const testConfig = {
         },
         {
           id: 'browser-drain-beacon',
-          label: 'sendBeacon (Page Hidden)',
-          description: 'Pushes events without flushing. Events would be sent via sendBeacon when the page becomes hidden (navigate away to test).',
+          label: 'Auto-flush (Page Hidden)',
+          description: 'Pushes events with autoFlush enabled (default). Switch tabs or navigate away — the visibilitychange listener flushes via sendBeacon automatically.',
           color: 'warning',
           badge: {
             label: 'sendBeacon',

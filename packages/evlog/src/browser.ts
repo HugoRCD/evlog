@@ -76,8 +76,7 @@ export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainCon
       if (!response.ok) {
         throw new Error(`[evlog/browser] Server responded with ${response.status}`)
       }
-    }
-    finally {
+    } finally {
       clearTimeout(timeoutId)
     }
   }
