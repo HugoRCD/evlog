@@ -42,6 +42,22 @@ describe('createBrowserDrain', () => {
     expect(options?.credentials).toBe('same-origin')
   })
 
+  it('sends custom headers with fetch', async () => {
+    const drain = createBrowserDrain({
+      endpoint: '/api/logs',
+      headers: { 'Authorization': 'Bearer tok_123', 'X-API-Key': 'key_456' },
+    })
+
+    await drain([createTestContext(1)])
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(options?.headers).toEqual({
+      'Content-Type': 'application/json',
+      'Authorization': 'Bearer tok_123',
+      'X-API-Key': 'key_456',
+    })
+  })
+
   it('skips empty batches', async () => {
     const drain = createBrowserDrain({ endpoint: '/api/logs' })
 

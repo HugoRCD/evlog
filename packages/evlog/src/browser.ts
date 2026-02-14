@@ -5,6 +5,8 @@ import { createDrainPipeline } from './pipeline'
 export interface BrowserDrainConfig {
   /** URL of the server ingest endpoint */
   endpoint: string
+  /** Custom headers sent with each fetch request (e.g. Authorization, X-API-Key). Not applied to sendBeacon — see `useBeacon`. */
+  headers?: Record<string, string>
   /** Request timeout in milliseconds. @default 5000 */
   timeout?: number
   /** Use sendBeacon when the page is hidden. @default true */
@@ -37,7 +39,7 @@ export interface BrowserLogDrainOptions {
  * ```
  */
 export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainContext[]) => Promise<void> {
-  const { endpoint, timeout = 5000, useBeacon = true } = config
+  const { endpoint, headers: customHeaders, timeout = 5000, useBeacon = true } = config
 
   return async (batch: DrainContext[]): Promise<void> => {
     if (batch.length === 0) return
@@ -64,7 +66,7 @@ export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainCon
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...customHeaders },
         body,
         signal: controller.signal,
         keepalive: true,
