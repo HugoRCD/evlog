@@ -1,4 +1,6 @@
 import type { DrainContext, WideEvent } from '../types'
+import { sendBatchToOTLP } from './otlp'
+import type { OTLPConfig } from './otlp'
 import { getRuntimeConfig } from './_utils'
 
 export interface PostHogConfig {
@@ -151,5 +153,74 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogCon
     }
   } finally {
     clearTimeout(timeoutId)
+  }
+}
+
+export interface PostHogLogsConfig {
+  /** PostHog project API key */
+  apiKey: string
+  /** PostHog host URL. Default: https://us.i.posthog.com */
+  host?: string
+  /** Request timeout in milliseconds. Default: 5000 */
+  timeout?: number
+}
+
+/**
+ * Create a drain function for sending logs to PostHog Logs via OTLP.
+ *
+ * PostHog Logs uses the standard OTLP log format. This drain wraps
+ * `sendBatchToOTLP()` with PostHog-specific defaults (endpoint, auth).
+ *
+ * Configuration priority (highest to lowest):
+ * 1. Overrides passed to createPostHogLogsDrain()
+ * 2. runtimeConfig.evlog.posthog
+ * 3. runtimeConfig.posthog
+ * 4. Environment variables: NUXT_POSTHOG_*, POSTHOG_*
+ *
+ * @example
+ * ```ts
+ * // Zero config - just set NUXT_POSTHOG_API_KEY env var
+ * nitroApp.hooks.hook('evlog:drain', createPostHogLogsDrain())
+ *
+ * // With overrides
+ * nitroApp.hooks.hook('evlog:drain', createPostHogLogsDrain({
+ *   apiKey: 'phc_...',
+ *   host: 'https://eu.i.posthog.com',
+ * }))
+ * ```
+ */
+export function createPostHogLogsDrain(overrides?: Partial<PostHogLogsConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+  return async (ctx: DrainContext | DrainContext[]) => {
+    const contexts = Array.isArray(ctx) ? ctx : [ctx]
+    if (contexts.length === 0) return
+
+    const runtimeConfig = getRuntimeConfig()
+    const evlogPostHog = runtimeConfig?.evlog?.posthog
+    const rootPostHog = runtimeConfig?.posthog
+
+    const config: Partial<PostHogLogsConfig> = {
+      apiKey: overrides?.apiKey ?? evlogPostHog?.apiKey ?? rootPostHog?.apiKey ?? process.env.NUXT_POSTHOG_API_KEY ?? process.env.POSTHOG_API_KEY,
+      host: overrides?.host ?? evlogPostHog?.host ?? rootPostHog?.host ?? process.env.NUXT_POSTHOG_HOST ?? process.env.POSTHOG_HOST,
+      timeout: overrides?.timeout ?? evlogPostHog?.timeout ?? rootPostHog?.timeout,
+    }
+
+    if (!config.apiKey) {
+      console.error('[evlog/posthog] Missing apiKey. Set NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY env var or pass to createPostHogLogsDrain()')
+      return
+    }
+
+    const host = (config.host ?? 'https://us.i.posthog.com').replace(/\/$/, '')
+
+    const otlpConfig: OTLPConfig = {
+      endpoint: `${host}/i`,
+      headers: { Authorization: `Bearer ${config.apiKey}` },
+      timeout: config.timeout,
+    }
+
+    try {
+      await sendBatchToOTLP(contexts.map(c => c.event), otlpConfig)
+    } catch (error) {
+      console.error('[evlog/posthog] Failed to send logs to PostHog Logs:', error)
+    }
   }
 }
