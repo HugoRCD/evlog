@@ -82,6 +82,27 @@ describe('posthog adapter', () => {
 
       expect(result.properties.environment).toBe('production')
     })
+
+    it('uses userId as distinct_id when no config distinctId', () => {
+      const event = createTestEvent({ userId: 'usr_123' })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
+      expect(result.distinct_id).toBe('usr_123')
+    })
+
+    it('config distinctId takes priority over event userId', () => {
+      const event = createTestEvent({ userId: 'usr_123' })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test', distinctId: 'config-id' })
+
+      expect(result.distinct_id).toBe('config-id')
+    })
+
+    it('falls back to service when userId is not a string', () => {
+      const event = createTestEvent({ userId: 42 })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
+      expect(result.distinct_id).toBe('test-service')
+    })
   })
 
   describe('sendToPostHog', () => {
@@ -169,7 +190,7 @@ describe('posthog adapter', () => {
       const body = JSON.parse(options.body as string)
       expect(body.batch).toHaveLength(1)
       expect(body.batch[0].event).toBe('evlog_wide_event')
-      expect(body.batch[0].distinct_id).toBe('test-service')
+      expect(body.batch[0].distinct_id).toBe('123')
       expect(body.batch[0].properties.action).toBe('test-action')
     })
 

@@ -8,6 +8,15 @@ let clientPretty = true
 let clientService = 'client'
 let transportEnabled = false
 let transportEndpoint = '/api/_evlog/ingest'
+let identityContext: Record<string, unknown> = {}
+
+export function setIdentity(identity: Record<string, unknown>): void {
+  identityContext = { ...identity }
+}
+
+export function clearIdentity(): void {
+  identityContext = {}
+}
 
 const LEVEL_COLORS: Record<string, string> = {
   error: 'color: #ef4444; font-weight: bold',
@@ -47,6 +56,7 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
     timestamp: new Date().toISOString(),
     level,
     service: clientService,
+    ...identityContext,
     ...event,
   }
 
@@ -70,6 +80,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
       timestamp: new Date().toISOString(),
       level,
       service: clientService,
+      ...identityContext,
       tag,
       message,
     })

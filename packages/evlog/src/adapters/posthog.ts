@@ -30,7 +30,7 @@ export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHog
 
   return {
     event: config.eventName ?? 'evlog_wide_event',
-    distinct_id: config.distinctId ?? service,
+    distinct_id: config.distinctId ?? (typeof event.userId === 'string' ? event.userId : undefined) ?? service,
     timestamp,
     properties: {
       level,
