@@ -14,12 +14,6 @@ export default defineNuxtConfig({
     name: 'evlog MCP',
   },
 
-  vite: {
-    optimizeDeps: {
-      include: ['@vercel/oidc'],
-    },
-  },
-
   content: {
     experimental: {
       sqliteConnector: 'native'

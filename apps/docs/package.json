@@ -2,9 +2,9 @@
   "name": "evlog-docs",
   "private": true,
   "scripts": {
-    "dev": "nuxt dev --extends docus",
-    "dev:prepare": "nuxt prepare --extends docus",
-    "build": "nuxt build --extends docus",
+    "dev": "nuxt dev",
+    "dev:prepare": "nuxt prepare",
+    "build": "nuxt build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "typecheck": "vue-tsc --noEmit"
@@ -13,8 +13,8 @@
     "@vercel/analytics": "^1.6.1",
     "@vercel/speed-insights": "^1.3.1",
     "better-sqlite3": "^12.6.2",
-    "docus": "^5.5.0",
-    "motion-v": "latest",
+    "docus": "^5.5.1",
+    "motion-v": "^1.10.3",
     "nuxt": "^4.3.1"
   },
   "devDependencies": {
