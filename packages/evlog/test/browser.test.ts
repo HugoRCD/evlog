@@ -225,13 +225,28 @@ describe('createBrowserLogDrain', () => {
   it('registers visibilitychange listener by default', () => {
     const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
 
-    createBrowserLogDrain({
+    const drain = createBrowserLogDrain({
       drain: { endpoint: '/api/logs' },
     })
 
     expect(addEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
 
+    drain.dispose()
     addEventListenerSpy.mockRestore()
+  })
+
+  it('dispose removes visibilitychange listener', () => {
+    const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener')
+
+    const drain = createBrowserLogDrain({
+      drain: { endpoint: '/api/logs' },
+    })
+
+    drain.dispose()
+
+    expect(removeEventListenerSpy).toHaveBeenCalledWith('visibilitychange', expect.any(Function))
+
+    removeEventListenerSpy.mockRestore()
   })
 
   it('does not register visibilitychange listener when autoFlush is false', () => {

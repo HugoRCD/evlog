@@ -100,7 +100,7 @@ export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainCon
  * log.info({ action: 'page_view', path: location.pathname })
  * ```
  */
-export function createBrowserLogDrain(options: BrowserLogDrainOptions): PipelineDrainFn<DrainContext> {
+export function createBrowserLogDrain(options: BrowserLogDrainOptions): PipelineDrainFn<DrainContext> & { dispose: () => void } {
   const { autoFlush = true } = options
 
   const pipeline = createDrainPipeline<DrainContext>({
@@ -109,14 +109,24 @@ export function createBrowserLogDrain(options: BrowserLogDrainOptions): Pipeline
     ...options.pipeline,
   })
 
-  const drain = pipeline(createBrowserDrain(options.drain))
+  const drain = pipeline(createBrowserDrain(options.drain)) as PipelineDrainFn<DrainContext> & { dispose: () => void }
+
+  let onVisibilityChange: (() => void) | undefined
 
   if (autoFlush && typeof document !== 'undefined') {
-    document.addEventListener('visibilitychange', () => {
+    onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         drain.flush()
       }
-    })
+    }
+    document.addEventListener('visibilitychange', onVisibilityChange)
+  }
+
+  drain.dispose = () => {
+    if (onVisibilityChange) {
+      document.removeEventListener('visibilitychange', onVisibilityChange)
+      onVisibilityChange = undefined
+    }
   }
 
   return drain

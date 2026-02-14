@@ -46,6 +46,9 @@ async function handlePipelineBatch() {
   )
 }
 
+// Build DrainContext manually — the Nuxt module auto-imports its own `log`
+// so we can't call initLogger/log from 'evlog' without conflicts.
+// The standalone example (examples/browser) shows the idiomatic initLogger + log pattern.
 function makeDrainEvent(action: string, extra?: Record<string, unknown>) {
   return {
     event: {
