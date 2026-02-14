@@ -314,6 +314,25 @@ describe('createRequestLogger', () => {
     })
   })
 
+  it('captures status/statusText from new-style H3 errors (Nuxt v4.3+)', () => {
+    const logger = createRequestLogger({})
+    const error = Object.assign(new Error('Not Found'), {
+      status: 404,
+      statusText: 'Not Found',
+    })
+
+    logger.error(error)
+
+    const context = logger.getContext()
+    expect(context.error).toEqual({
+      name: 'Error',
+      message: 'Not Found',
+      stack: expect.any(String),
+      status: 404,
+      statusText: 'Not Found',
+    })
+  })
+
   it('does not include custom properties when absent', () => {
     const logger = createRequestLogger({})
     logger.error(new Error('Plain error'))
@@ -325,6 +344,7 @@ describe('createRequestLogger', () => {
       stack: expect.any(String),
     })
     expect(context.error).not.toHaveProperty('statusCode')
+    expect(context.error).not.toHaveProperty('status')
     expect(context.error).not.toHaveProperty('data')
     expect(context.error).not.toHaveProperty('cause')
   })

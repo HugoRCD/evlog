@@ -94,6 +94,25 @@ function handleBrowserDrainBeacon() {
   }
 }
 
+// Identity tests
+function handleIdentitySet() {
+  setIdentity({ userId: 'usr_123', orgId: 'org_456' })
+  log.info({ action: 'identity_set', message: 'Identity set to usr_123 / org_456' })
+}
+
+function handleIdentityLog() {
+  log.info({ action: 'checkout', item: 'pro_plan' })
+}
+
+function handleIdentityOverride() {
+  log.info({ action: 'impersonate', userId: 'usr_admin_override' })
+}
+
+function handleIdentityClear() {
+  clearIdentity()
+  log.info({ action: 'identity_cleared', message: 'Identity context cleared' })
+}
+
 // Get custom onClick for specific tests
 function getOnClick(testId: string) {
   if (testId === 'structured-error-toast') {
@@ -113,6 +132,18 @@ function getOnClick(testId: string) {
   }
   if (testId === 'browser-drain-beacon') {
     return handleBrowserDrainBeacon
+  }
+  if (testId === 'identity-set') {
+    return handleIdentitySet
+  }
+  if (testId === 'identity-log') {
+    return handleIdentityLog
+  }
+  if (testId === 'identity-override') {
+    return handleIdentityOverride
+  }
+  if (testId === 'identity-clear') {
+    return handleIdentityClear
   }
   return undefined
 }

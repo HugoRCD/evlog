@@ -100,6 +100,55 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'identity',
+      label: 'Identity',
+      icon: 'i-lucide-user',
+      title: 'Client Identity',
+      description: 'Attach user identity to all client logs via setIdentity(). Identity fields are included in every log and transported to the server. PostHog auto-maps userId → distinct_id.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'identity-set',
+          label: 'setIdentity()',
+          description: 'Sets userId and orgId on all future client logs. Open the console and check the transport payload.',
+          color: 'primary',
+          badge: {
+            label: 'setIdentity',
+            color: 'blue',
+          },
+        },
+        {
+          id: 'identity-log',
+          label: 'log.info() with identity',
+          description: 'Emits a log — identity fields (userId, orgId) are automatically included.',
+          badge: {
+            label: 'Auto-enriched',
+            color: 'green',
+          },
+        },
+        {
+          id: 'identity-override',
+          label: 'Override userId',
+          description: 'Per-event fields take priority over identity. This log overrides userId.',
+          color: 'warning',
+          badge: {
+            label: 'Event > Identity',
+            color: 'warning',
+          },
+        },
+        {
+          id: 'identity-clear',
+          label: 'clearIdentity()',
+          description: 'Clears identity context. Future logs will no longer include userId/orgId.',
+          color: 'error',
+          badge: {
+            label: 'clearIdentity',
+            color: 'red',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'wide-events',
       label: 'Wide Events',
       icon: 'i-lucide-server',

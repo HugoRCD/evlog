@@ -250,6 +250,14 @@ export default defineNuxtModule<ModuleOptions>({
         from: resolver.resolve('../runtime/client/log'),
       },
       {
+        name: 'setIdentity',
+        from: resolver.resolve('../runtime/client/log'),
+      },
+      {
+        name: 'clearIdentity',
+        from: resolver.resolve('../runtime/client/log'),
+      },
+      {
         name: 'createEvlogError',
         from: resolver.resolve('../error'),
       },
