@@ -33,41 +33,17 @@ export function emitErrorAndRespond(log: RequestLogger, error: unknown): NextRes
   const parsed = parseError(error)
   const status = parsed.status ?? 500
 
-  log.set({
-    failure: {
+  // Keep route code simple: always emit a structured error payload.
+  log.error(parsed.message, {
+    error: {
+      status,
+      message: parsed.message,
       why: parsed.why,
       fix: parsed.fix,
       link: parsed.link,
     },
   })
-
-  if (status >= 500) {
-    log.error(error as Error, {
-      error: {
-        why: parsed.why,
-        fix: parsed.fix,
-        link: parsed.link,
-      },
-    })
-  } else {
-    // Keep 4xx logs at error level, but avoid noisy Next stack traces.
-    const cleanError = {
-      name: 'EvlogError',
-      message: parsed.message,
-      status,
-    } as Error
-
-    log.error(cleanError, {
-      error: {
-        status,
-        message: parsed.message,
-        why: parsed.why,
-        fix: parsed.fix,
-        link: parsed.link,
-      },
-    })
-  }
-  log.emit({ status, _forceKeep: true })
+  log.emit({ status })
 
   return NextResponse.json({
     message: parsed.message,

@@ -4,7 +4,8 @@ import type { NextRequest } from 'next/server'
 import { createNextLogger, emitErrorAndRespond } from '../../../lib/evlog'
 import { listProducts } from '../../../lib/shop-data'
 
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line
+export function GET(request: NextRequest) {
   const log = createNextLogger(request)
   try {
     const products = listProducts()

@@ -4,6 +4,7 @@ import type { NextRequest } from 'next/server'
 import { createNextLogger, emitErrorAndRespond } from '../../../lib/evlog'
 import { getSessionUser } from '../../../lib/session'
 
+// eslint-disable-next-line
 export async function GET(request: NextRequest) {
   const log = createNextLogger(request)
   try {

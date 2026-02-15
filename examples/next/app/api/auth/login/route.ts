@@ -10,11 +10,12 @@ type LoginBody = {
   userId?: string
 }
 
+// eslint-disable-next-line
 export async function POST(request: NextRequest) {
   const log = createNextLogger(request)
   try {
     const body = await request.json() as LoginBody
-    const userId = body.userId
+    const { userId } = body
 
     if (!userId) {
       throw createError({

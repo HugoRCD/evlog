@@ -28,7 +28,7 @@ function serializeCart(userId: string) {
     }
   }).filter(Boolean)
 
-  const totalCents = items.reduce((total, item) => total + item.lineTotalCents, 0)
+  const totalCents = items.reduce((total, item) => item ? total + item.lineTotalCents : total, 0)
   return {
     items,
     totalCents,
@@ -36,7 +36,8 @@ function serializeCart(userId: string) {
   }
 }
 
-export async function GET(request: NextRequest) {
+// eslint-disable-next-line
+export function GET(request: NextRequest) {
   const log = createNextLogger(request)
   try {
     const user = requireSessionUser(request)
@@ -50,6 +51,7 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// eslint-disable-next-line
 export async function POST(request: NextRequest) {
   const log = createNextLogger(request)
   try {

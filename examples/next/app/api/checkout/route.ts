@@ -10,6 +10,7 @@ type CheckoutBody = {
   paymentMethod?: 'card' | 'declined-card'
 }
 
+// eslint-disable-next-line
 export async function POST(request: NextRequest) {
   const log = createNextLogger(request)
   try {

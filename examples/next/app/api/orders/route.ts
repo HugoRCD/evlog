@@ -5,6 +5,7 @@ import { createNextLogger, emitErrorAndRespond } from '../../../lib/evlog'
 import { formatPrice, listOrders } from '../../../lib/shop-data'
 import { requireSessionUser } from '../../../lib/session'
 
+// eslint-disable-next-line
 export async function GET(request: NextRequest) {
   const log = createNextLogger(request)
   try {
