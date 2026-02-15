@@ -1,5 +1,9 @@
-import type { DrainContext, LogLevel, WideEvent } from '../types'
-import { getRuntimeConfig } from './_utils'
+import type { WideEvent } from '../types'
+import type { ConfigField } from './_config'
+import { resolveAdapterConfig } from './_config'
+import { defineDrain } from './_drain'
+import { httpPost } from './_http'
+import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from './_severity'
 
 export interface OTLPConfig {
   /** OTLP HTTP endpoint (e.g., http://localhost:4318) */
@@ -53,23 +57,13 @@ interface ExportLogsServiceRequest {
   }>
 }
 
-/**
- * Map evlog levels to OTLP severity numbers.
- * Based on OpenTelemetry Logs Data Model specification.
- */
-const SEVERITY_MAP: Record<LogLevel, number> = {
-  debug: 5, // DEBUG
-  info: 9, // INFO
-  warn: 13, // WARN
-  error: 17, // ERROR
-}
-
-const SEVERITY_TEXT_MAP: Record<LogLevel, string> = {
-  debug: 'DEBUG',
-  info: 'INFO',
-  warn: 'WARN',
-  error: 'ERROR',
-}
+const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
+  { key: 'endpoint', env: ['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT'] },
+  { key: 'serviceName', env: ['NUXT_OTLP_SERVICE_NAME', 'OTEL_SERVICE_NAME'] },
+  { key: 'headers' },
+  { key: 'resourceAttributes' },
+  { key: 'timeout' },
+]
 
 /**
  * Convert a value to OTLP attribute value format.
@@ -118,8 +112,8 @@ export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
 
   const record: OTLPLogRecord = {
     timeUnixNano: String(timestamp),
-    severityNumber: SEVERITY_MAP[level] ?? 9,
-    severityText: SEVERITY_TEXT_MAP[level] ?? 'INFO',
+    severityNumber: OTEL_SEVERITY_NUMBER[level] ?? 9,
+    severityText: OTEL_SEVERITY_TEXT[level] ?? 'INFO',
     body: { stringValue: JSON.stringify(event) },
     attributes,
   }
@@ -196,6 +190,36 @@ function buildResourceAttributes(
 }
 
 /**
+ * Build headers from OTEL env vars.
+ * Kept inline as OTLP-specific (parses OTEL_EXPORTER_OTLP_HEADERS=key=val,key=val).
+ */
+function getHeadersFromEnv(): Record<string, string> | undefined {
+  const headersEnv = process.env.OTEL_EXPORTER_OTLP_HEADERS || process.env.NUXT_OTLP_HEADERS
+  if (headersEnv) {
+    const headers: Record<string, string> = {}
+    const decoded = decodeURIComponent(headersEnv)
+    for (const pair of decoded.split(',')) {
+      const eqIndex = pair.indexOf('=')
+      if (eqIndex > 0) {
+        const key = pair.slice(0, eqIndex).trim()
+        const value = pair.slice(eqIndex + 1).trim()
+        if (key && value) {
+          headers[key] = value
+        }
+      }
+    }
+    if (Object.keys(headers).length > 0) return headers
+  }
+
+  const auth = process.env.NUXT_OTLP_AUTH
+  if (auth) {
+    return { Authorization: auth }
+  }
+
+  return undefined
+}
+
+/**
  * Create a drain function for sending logs to an OTLP endpoint.
  *
  * Configuration priority (highest to lowest):
@@ -215,68 +239,25 @@ function buildResourceAttributes(
  * }))
  * ```
  */
-export function createOTLPDrain(overrides?: Partial<OTLPConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
-  return async (ctx: DrainContext | DrainContext[]) => {
-    const contexts = Array.isArray(ctx) ? ctx : [ctx]
-    if (contexts.length === 0) return
+export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
+  return defineDrain<OTLPConfig>({
+    name: 'otlp',
+    resolve: () => {
+      const config = resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
 
-    const runtimeConfig = getRuntimeConfig()
-    // Support both runtimeConfig.evlog.otlp and runtimeConfig.otlp
-    const evlogOtlp = runtimeConfig?.evlog?.otlp
-    const rootOtlp = runtimeConfig?.otlp
-
-    // Build headers from env vars (supports multiple formats)
-    const getHeadersFromEnv = (): Record<string, string> | undefined => {
-      // OTEL standard: OTEL_EXPORTER_OTLP_HEADERS=Authorization=Basic xxx
-      // or Grafana format: Authorization=Basic%20xxx
-      const headersEnv = process.env.OTEL_EXPORTER_OTLP_HEADERS || process.env.NUXT_OTLP_HEADERS
-      if (headersEnv) {
-        const headers: Record<string, string> = {}
-        // Decode URL encoding if present
-        const decoded = decodeURIComponent(headersEnv)
-        // Parse key=value pairs (comma-separated)
-        for (const pair of decoded.split(',')) {
-          const eqIndex = pair.indexOf('=')
-          if (eqIndex > 0) {
-            const key = pair.slice(0, eqIndex).trim()
-            const value = pair.slice(eqIndex + 1).trim()
-            if (key && value) {
-              headers[key] = value
-            }
-          }
-        }
-        if (Object.keys(headers).length > 0) return headers
+      // OTLP-specific: resolve headers from env if not provided via config
+      if (!config.headers) {
+        config.headers = getHeadersFromEnv()
       }
 
-      // Simple format: NUXT_OTLP_AUTH=Basic xxx → Authorization: Basic xxx
-      const auth = process.env.NUXT_OTLP_AUTH
-      if (auth) {
-        return { Authorization: auth }
+      if (!config.endpoint) {
+        console.error('[evlog/otlp] Missing endpoint. Set NUXT_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT env var, or pass to createOTLPDrain()')
+        return null
       }
-
-      return undefined
-    }
-
-    // Build config with fallbacks: overrides > evlog.otlp > otlp > env vars (NUXT_OTLP_* or OTEL_*)
-    const config: Partial<OTLPConfig> = {
-      endpoint: overrides?.endpoint ?? evlogOtlp?.endpoint ?? rootOtlp?.endpoint ?? process.env.NUXT_OTLP_ENDPOINT ?? process.env.OTEL_EXPORTER_OTLP_ENDPOINT,
-      serviceName: overrides?.serviceName ?? evlogOtlp?.serviceName ?? rootOtlp?.serviceName ?? process.env.NUXT_OTLP_SERVICE_NAME ?? process.env.OTEL_SERVICE_NAME,
-      headers: overrides?.headers ?? evlogOtlp?.headers ?? rootOtlp?.headers ?? getHeadersFromEnv(),
-      resourceAttributes: overrides?.resourceAttributes ?? evlogOtlp?.resourceAttributes ?? rootOtlp?.resourceAttributes,
-      timeout: overrides?.timeout ?? evlogOtlp?.timeout ?? rootOtlp?.timeout,
-    }
-
-    if (!config.endpoint) {
-      console.error('[evlog/otlp] Missing endpoint. Set NUXT_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT env var, or pass to createOTLPDrain()')
-      return
-    }
-
-    try {
-      await sendBatchToOTLP(contexts.map(c => c.event), config as OTLPConfig)
-    } catch (error) {
-      console.error('[evlog/otlp] Failed to send events to OTLP:', error)
-    }
-  }
+      return config as OTLPConfig
+    },
+    send: sendBatchToOTLP,
+  })
 }
 
 /**
@@ -306,7 +287,6 @@ export async function sendToOTLP(event: WideEvent, config: OTLPConfig): Promise<
 export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): Promise<void> {
   if (events.length === 0) return
 
-  const timeout = config.timeout ?? 5000
   const url = `${config.endpoint.replace(/\/$/, '')}/v1/logs`
 
   // Group events by service for proper resource attribution
@@ -335,23 +315,11 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
     ...config.headers,
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`OTLP API error: ${response.status} ${response.statusText} - ${safeText}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
+  await httpPost({
+    url,
+    headers,
+    body: JSON.stringify(payload),
+    timeout: config.timeout ?? 5000,
+    label: 'OTLP',
+  })
 }

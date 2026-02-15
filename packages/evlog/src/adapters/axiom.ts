@@ -1,5 +1,8 @@
-import type { DrainContext, WideEvent } from '../types'
-import { getRuntimeConfig } from './_utils'
+import type { WideEvent } from '../types'
+import type { ConfigField } from './_config'
+import { resolveAdapterConfig } from './_config'
+import { defineDrain } from './_drain'
+import { httpPost } from './_http'
 
 export interface AxiomConfig {
   /** Axiom dataset name */
@@ -13,6 +16,14 @@ export interface AxiomConfig {
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
 }
+
+const AXIOM_FIELDS: ConfigField<AxiomConfig>[] = [
+  { key: 'dataset', env: ['NUXT_AXIOM_DATASET', 'AXIOM_DATASET'] },
+  { key: 'token', env: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'] },
+  { key: 'orgId', env: ['NUXT_AXIOM_ORG_ID', 'AXIOM_ORG_ID'] },
+  { key: 'baseUrl', env: ['NUXT_AXIOM_URL', 'AXIOM_URL'] },
+  { key: 'timeout' },
+]
 
 /**
  * Create a drain function for sending logs to Axiom.
@@ -34,36 +45,19 @@ export interface AxiomConfig {
  * }))
  * ```
  */
-export function createAxiomDrain(overrides?: Partial<AxiomConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
-  return async (ctx: DrainContext | DrainContext[]) => {
-    const contexts = Array.isArray(ctx) ? ctx : [ctx]
-    if (contexts.length === 0) return
-
-    const runtimeConfig = getRuntimeConfig()
-    // Support both runtimeConfig.evlog.axiom and runtimeConfig.axiom
-    const evlogAxiom = runtimeConfig?.evlog?.axiom
-    const rootAxiom = runtimeConfig?.axiom
-
-    // Build config with fallbacks: overrides > evlog.axiom > axiom > env vars (NUXT_AXIOM_* or AXIOM_*)
-    const config: Partial<AxiomConfig> = {
-      dataset: overrides?.dataset ?? evlogAxiom?.dataset ?? rootAxiom?.dataset ?? process.env.NUXT_AXIOM_DATASET ?? process.env.AXIOM_DATASET,
-      token: overrides?.token ?? evlogAxiom?.token ?? rootAxiom?.token ?? process.env.NUXT_AXIOM_TOKEN ?? process.env.AXIOM_TOKEN,
-      orgId: overrides?.orgId ?? evlogAxiom?.orgId ?? rootAxiom?.orgId ?? process.env.NUXT_AXIOM_ORG_ID ?? process.env.AXIOM_ORG_ID,
-      baseUrl: overrides?.baseUrl ?? evlogAxiom?.baseUrl ?? rootAxiom?.baseUrl ?? process.env.NUXT_AXIOM_URL ?? process.env.AXIOM_URL,
-      timeout: overrides?.timeout ?? evlogAxiom?.timeout ?? rootAxiom?.timeout,
-    }
-
-    if (!config.dataset || !config.token) {
-      console.error('[evlog/axiom] Missing dataset or token. Set NUXT_AXIOM_TOKEN/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
-      return
-    }
-
-    try {
-      await sendBatchToAxiom(contexts.map(c => c.event), config as AxiomConfig)
-    } catch (error) {
-      console.error('[evlog/axiom] Failed to send events to Axiom:', error)
-    }
-  }
+export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
+  return defineDrain<AxiomConfig>({
+    name: 'axiom',
+    resolve: () => {
+      const config = resolveAdapterConfig<AxiomConfig>('axiom', AXIOM_FIELDS, overrides)
+      if (!config.dataset || !config.token) {
+        console.error('[evlog/axiom] Missing dataset or token. Set NUXT_AXIOM_TOKEN/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
+        return null
+      }
+      return config as AxiomConfig
+    },
+    send: sendBatchToAxiom,
+  })
 }
 
 /**
@@ -94,7 +88,6 @@ export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promis
  */
 export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig): Promise<void> {
   const baseUrl = config.baseUrl ?? 'https://api.axiom.co'
-  const timeout = config.timeout ?? 5000
   const url = `${baseUrl}/v1/datasets/${encodeURIComponent(config.dataset)}/ingest`
 
   const headers: Record<string, string> = {
@@ -106,23 +99,11 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
     headers['X-Axiom-Org-Id'] = config.orgId
   }
 
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(events),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`Axiom API error: ${response.status} ${response.statusText} - ${safeText}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
+  await httpPost({
+    url,
+    headers,
+    body: JSON.stringify(events),
+    timeout: config.timeout ?? 5000,
+    label: 'Axiom',
+  })
 }

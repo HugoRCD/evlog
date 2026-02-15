@@ -460,7 +460,7 @@ describe('posthog adapter', () => {
       await drain(createDrainContext())
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        '[evlog/posthog] Failed to send logs to PostHog Logs:',
+        '[evlog/posthog] Failed to send events:',
         expect.any(Error),
       )
     })
