@@ -6,6 +6,8 @@
 .vinxi
 .cache
 dist
+.next
+*.tsbuildinfo
 
 # Node dependencies
 node_modules

@@ -1,6 +1,6 @@
 # Next.js Example
 
-Demonstrates [evlog](https://github.com/hugorcd/evlog) integration with Next.js App Router route handlers.
+Demonstrates [evlog](https://github.com/hugorcd/evlog) integration in a real Next.js App Router mini shop.
 
 ## Setup
 
@@ -9,12 +9,24 @@ bun install
 bun run dev:next
 ```
 
-## Routes
+Open `http://localhost:3000` and test directly from the UI:
 
-- `GET /api/hello` - simple wide event with `log.set(...)`
-- `POST /api/checkout` - structured error flow with `createError(...)`
+- login as demo user
+- add products to cart
+- checkout with success (`card`) or forced error (`declined-card`)
 
-## DX pattern used
+Check terminal output to inspect wide events and structured errors emitted by evlog.
+
+## API routes used by the UI
+
+- `POST /api/auth/login` / `POST /api/auth/logout`
+- `GET /api/me`
+- `GET /api/products`
+- `GET /api/cart` / `POST /api/cart`
+- `POST /api/checkout`
+- `GET /api/orders`
+
+## DX pattern
 
 `lib/evlog.ts` exposes `withEvlog(handler)`:
 
@@ -23,4 +35,4 @@ bun run dev:next
 - Emits one final wide event with status and duration
 - Converts thrown errors to structured JSON responses via `parseError`
 
-This keeps route handlers focused on business logic while still producing rich logs.
+This keeps handlers focused on business logic while still producing rich logs.

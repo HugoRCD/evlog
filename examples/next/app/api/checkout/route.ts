@@ -2,47 +2,51 @@ import { NextResponse } from 'next/server'
 import { createError } from 'evlog'
 
 import { withEvlog } from '../../../lib/evlog'
+import { createOrder, formatPrice, getCart, getProductById, clearCart } from '../../../lib/shop-data'
+import { requireSessionUser } from '../../../lib/session'
 
 type CheckoutBody = {
-  productId?: string
-  quantity?: number
-  failPayment?: boolean
+  paymentMethod?: 'card' | 'declined-card'
 }
 
 export const POST = withEvlog(async ({ request, log }) => {
+  const user = requireSessionUser(request)
   const body = await request.json() as CheckoutBody
-  const quantity = Math.max(1, body.quantity ?? 1)
+  const paymentMethod = body.paymentMethod ?? 'card'
+  const cartLines = getCart(user.id)
 
-  log.set({
-    checkout: {
-      productId: body.productId ?? null,
-      quantity,
-    },
-  })
+  log.set({ user: { id: user.id, tier: user.tier } })
+  log.set({ checkout: { paymentMethod, lines: cartLines.length } })
 
-  if (!body.productId) {
+  if (cartLines.length === 0) {
     throw createError({
-      message: 'Missing product',
-      status: 400,
-      why: 'The request body has no productId',
-      fix: 'Send { "productId": "sku_123" } in the JSON body',
+      message: 'Your cart is empty',
+      status: 422,
+      why: 'Checkout cannot run without at least one item in cart',
+      fix: 'Add one product from the catalog then retry checkout',
     })
   }
 
-  if (body.failPayment) {
+  if (paymentMethod === 'declined-card') {
     throw createError({
       message: 'Payment failed',
       status: 402,
-      why: 'Card declined by issuer',
-      fix: 'Use another card or retry later',
+      why: 'The selected payment method intentionally simulates a declined card',
+      fix: 'Switch payment method to "card" then retry',
     })
   }
 
-  const orderId = `ord_${Math.random().toString(36).slice(2, 10)}`
-  log.set({ order: { id: orderId, status: 'created' } })
+  const order = createOrder({
+    userId: user.id,
+    lines: cartLines,
+    paymentMethod,
+  })
+  clearCart(user.id)
+  log.set({ order: { id: order.id, total: order.totalCents, paymentMethod } })
 
   return NextResponse.json({
     ok: true,
-    orderId,
+    orderId: order.id,
+    total: formatPrice(order.totalCents),
   }, { status: 201 })
 })

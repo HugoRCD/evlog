@@ -2,15 +2,15 @@ import { NextResponse } from 'next/server'
 
 import { withEvlog } from '../../../lib/evlog'
 import { getSessionUser } from '../../../lib/session'
+import { listUsers } from '../../../lib/shop-data'
 
 export const GET = withEvlog(async ({ request, log }) => {
   const user = getSessionUser(request)
-  log.set({ action: 'hello', adapter: 'next-route-handler', authenticated: !!user })
+  log.set({ session: { authenticated: !!user } })
 
   return NextResponse.json({
-    ok: true,
-    message: user
-      ? `Hello ${user.name}, welcome back to the demo store`
-      : 'Hello from Next + evlog',
+    authenticated: !!user,
+    user,
+    users: listUsers(),
   })
 })
