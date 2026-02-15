@@ -57,7 +57,11 @@ jobs:
             name=$(echo "$pkg" | jq -r '.name')
             version=$(echo "$pkg" | jq -r '.version')
             tag="${name}@${version}"
-            gh release create "$tag" --title "$tag" --generate-notes --draft
+            if gh release view "$tag" > /dev/null 2>&1; then
+              echo "Release $tag already exists, skipping"
+            else
+              gh release create "$tag" --title "$tag" --generate-notes --draft
+            fi
           done
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
