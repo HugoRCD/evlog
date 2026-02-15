@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -90,10 +89,10 @@
     "examples/solidstart": {
       "name": "evlog-solidstart-example",
       "dependencies": {
-        "@solidjs/router": "latest",
-        "@solidjs/start": "latest",
+        "@solidjs/router": "^0.15.4",
+        "@solidjs/start": "^1.2.1",
         "evlog": "workspace:*",
-        "solid-js": "latest",
+        "solid-js": "^1.9.11",
       },
       "devDependencies": {
         "typescript": "^5.7.0",
