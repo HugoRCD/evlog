@@ -70,16 +70,15 @@ function callDrainHook(
   hooks: Hooks,
   emittedEvent: WideEvent | null,
   event: HTTPEvent,
-  request: EnrichContext['request'],
-  headers: EnrichContext['headers'],
+  hookContext: Omit<EnrichContext, 'event'>,
 ): void {
   if (!emittedEvent) return
   let drainPromise: Promise<any> | undefined
   try {
     drainPromise = hooks.callHook('evlog:drain', {
       event: emittedEvent,
-      request,
-      headers,
+      request: hookContext.request,
+      headers: hookContext.headers,
     })
   } catch (err) {
     console.error('[evlog] drain failed:', err)
@@ -108,7 +107,7 @@ async function callEnrichAndDrain(
     console.error('[evlog] enrich failed:', err)
   }
 
-  callDrainHook(hooks, emittedEvent, event, hookContext.request, hookContext.headers)
+  callDrainHook(hooks, emittedEvent, event, hookContext)
 }
 
 /**

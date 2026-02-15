@@ -1,12 +1,12 @@
 import type { DrainContext, WideEvent } from '../types'
 
-export interface DrainOptions<C> {
+export interface DrainOptions<TConfig> {
   name: string
-  resolve: () => C | null
-  send: (events: WideEvent[], config: C) => Promise<void>
+  resolve: () => TConfig | null
+  send: (events: WideEvent[], config: TConfig) => Promise<void>
 }
 
-export function defineDrain<C>(options: DrainOptions<C>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
+export function defineDrain<TConfig>(options: DrainOptions<TConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
   return async (ctx: DrainContext | DrainContext[]) => {
     const contexts = Array.isArray(ctx) ? ctx : [ctx]
     if (contexts.length === 0) return
