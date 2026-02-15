@@ -42,7 +42,20 @@ export function withEvlog(handler: EvlogRouteHandler) {
       const parsed = parseError(error)
       const status = parsed.status ?? 500
 
-      log.error(error as Error)
+      if (status >= 500) {
+        log.error(error as Error)
+      } else {
+        // Keep business errors readable in dev output (no giant stack traces).
+        log.warn(parsed.message, {
+          error: {
+            status,
+            message: parsed.message,
+            why: parsed.why,
+            fix: parsed.fix,
+            link: parsed.link,
+          },
+        })
+      }
       log.emit({ status, _forceKeep: true })
 
       return NextResponse.json({
