@@ -1,11 +1,18 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-import { withEvlog } from '../../../lib/evlog'
+import { createNextLogger, emitErrorAndRespond } from '../../../lib/evlog'
 import { listProducts } from '../../../lib/shop-data'
 
-export const GET = withEvlog(async ({ log }) => {
-  const products = listProducts()
-  log.set({ catalog: { count: products.length } })
-
-  return NextResponse.json({ products })
-})
+export async function GET(request: NextRequest) {
+  const log = createNextLogger(request)
+  try {
+    const products = listProducts()
+    log.set({ catalog: { count: products.length } })
+    const response = NextResponse.json({ products })
+    log.emit({ status: response.status })
+    return response
+  } catch (error) {
+    return emitErrorAndRespond(log, error)
+  }
+}

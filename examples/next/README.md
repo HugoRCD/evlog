@@ -26,13 +26,13 @@ Check terminal output to inspect wide events and structured errors emitted by ev
 - `POST /api/checkout`
 - `GET /api/orders`
 
-## DX pattern
+## Error and logging flow
 
-`lib/evlog.ts` exposes `withEvlog(handler)`:
+Each route shows the full control flow explicitly (no route wrapper):
 
-- Initializes `evlog` once (`initLogger`)
-- Creates request-scoped logger automatically from `NextRequest`
-- Emits one final wide event with status and duration
-- Converts thrown errors to structured JSON responses via `parseError`
+- Initialize request-scoped logger with `createNextLogger(request)`
+- Run business logic and throw `createError(...)` when a condition fails
+- Emit success status with `log.emit({ status })`
+- In `catch`, map errors to structured responses via `emitErrorAndRespond(log, error)`
 
-This keeps handlers focused on business logic while still producing rich logs.
+This keeps `createError` visible in real route code while preserving clean logs.

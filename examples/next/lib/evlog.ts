@@ -1,5 +1,6 @@
 import type { NextRequest } from 'next/server'
 import { NextResponse } from 'next/server'
+import type { RequestLogger } from 'evlog'
 import { createRequestLogger, initLogger, parseError } from 'evlog'
 
 declare global {
@@ -19,51 +20,38 @@ function ensureEvlogInit() {
   globalThis.__evlogNextInitialized = true
 }
 
-type EvlogRouteHandler = (context: {
-  request: NextRequest
-  log: ReturnType<typeof createRequestLogger>
-}) => Promise<Response> | Response
+export function createNextLogger(request: NextRequest): RequestLogger {
+  ensureEvlogInit()
+  return createRequestLogger({
+    method: request.method,
+    path: request.nextUrl.pathname,
+    requestId: request.headers.get('x-request-id') ?? undefined,
+  })
+}
 
-export function withEvlog(handler: EvlogRouteHandler) {
-  return async (request: NextRequest): Promise<Response> => {
-    ensureEvlogInit()
+export function emitErrorAndRespond(log: RequestLogger, error: unknown): NextResponse {
+  const parsed = parseError(error)
+  const status = parsed.status ?? 500
 
-    const log = createRequestLogger({
-      method: request.method,
-      path: request.nextUrl.pathname,
-      requestId: request.headers.get('x-request-id') ?? undefined,
-    })
-
-    try {
-      const response = await handler({ request, log })
-      log.emit({ status: response.status })
-      return response
-    } catch (error) {
-      const parsed = parseError(error)
-      const status = parsed.status ?? 500
-
-      if (status >= 500) {
-        log.error(error as Error)
-      } else {
-        // Keep business errors readable in dev output (no giant stack traces).
-        log.warn(parsed.message, {
-          error: {
-            status,
-            message: parsed.message,
-            why: parsed.why,
-            fix: parsed.fix,
-            link: parsed.link,
-          },
-        })
-      }
-      log.emit({ status, _forceKeep: true })
-
-      return NextResponse.json({
+  if (status >= 500) {
+    log.error(error as Error)
+  } else {
+    log.warn(parsed.message, {
+      error: {
+        status,
         message: parsed.message,
         why: parsed.why,
         fix: parsed.fix,
         link: parsed.link,
-      }, { status })
-    }
+      },
+    })
   }
+  log.emit({ status, _forceKeep: true })
+
+  return NextResponse.json({
+    message: parsed.message,
+    why: parsed.why,
+    fix: parsed.fix,
+    link: parsed.link,
+  }, { status })
 }
