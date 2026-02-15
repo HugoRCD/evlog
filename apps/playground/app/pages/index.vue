@@ -1,186 +1,58 @@
 <script setup lang="ts">
-import { createBrowserLogDrain } from 'evlog/browser'
-import { parseError } from 'evlog'
+import { testConfig } from '~/config/tests.config'
 
-const toast = useToast()
-const { sections } = await useTestConfig()
+const sections = testConfig.sections
+const activeSection = ref(sections[0]?.id)
 
-// Handle structured error with toast
-async function handleStructuredError() {
-  try {
-    await $fetch('/api/test/structured-error')
-  } catch (err) {
-    const error = parseError(err)
-
-    toast.add({
-      title: error.message,
-      description: error.why,
-      color: 'error',
-      actions: error.link
-        ? [
-          {
-            label: 'Learn more',
-            onClick: () => window.open(error.link, '_blank'),
-          },
-        ]
-        : undefined,
-    })
-
-    if (error.fix) {
-      console.info(`💡 Fix: ${error.fix}`)
-    }
-  }
-}
-
-// Handle batch request for tail sampling
-async function handleBatchRequest() {
-  // Make 20 requests in parallel
-  await Promise.all(
-    Array.from({ length: 20 }, () => $fetch('/api/test/tail-sampling/fast')),
-  )
-}
-
-async function handlePipelineBatch() {
-  await Promise.all(
-    Array.from({ length: 10 }, () => $fetch('/api/test/success')),
-  )
-}
-
-// Build DrainContext manually — the Nuxt module auto-imports its own `log`
-// so we can't call initLogger/log from 'evlog' without conflicts.
-// The standalone example (examples/browser) shows the idiomatic initLogger + log pattern.
-function makeDrainEvent(action: string, extra?: Record<string, unknown>) {
-  return {
-    event: {
-      timestamp: new Date().toISOString(),
-      level: 'info' as const,
-      service: 'browser',
-      environment: 'development',
-      action,
-      ...extra,
-    },
-  }
-}
-
-async function handleBrowserDrainQuick() {
-  const drain = createBrowserLogDrain({
-    drain: { endpoint: '/api/test/browser-ingest' },
-    pipeline: { batch: { size: 1, intervalMs: 500 } },
-    autoFlush: false,
-  })
-  drain(makeDrainEvent('browser_drain_test'))
-  await drain.flush()
-}
-
-async function handleBrowserDrainBatch() {
-  const drain = createBrowserLogDrain({
-    drain: { endpoint: '/api/test/browser-ingest' },
-    pipeline: { batch: { size: 10, intervalMs: 500 } },
-    autoFlush: false,
-  })
-  for (let i = 0; i < 5; i++) {
-    drain(makeDrainEvent('browser_batch_test', { index: i }))
-  }
-  await drain.flush()
-}
-
-function handleBrowserDrainBeacon() {
-  const drain = createBrowserLogDrain({
-    drain: { endpoint: '/api/test/browser-ingest' },
-    pipeline: { batch: { size: 25, intervalMs: 60000 } },
-  })
-  for (let i = 0; i < 3; i++) {
-    drain(makeDrainEvent('browser_beacon_test', { index: i }))
-  }
-}
-
-// Identity tests
-function handleIdentitySet() {
-  setIdentity({ userId: 'usr_123', orgId: 'org_456' })
-  log.info({ action: 'identity_set', message: 'Identity set to usr_123 / org_456' })
-}
-
-function handleIdentityLog() {
-  log.info({ action: 'checkout', item: 'pro_plan' })
-}
-
-function handleIdentityOverride() {
-  log.info({ action: 'impersonate', userId: 'usr_admin_override' })
-}
-
-function handleIdentityClear() {
-  clearIdentity()
-  log.info({ action: 'identity_cleared', message: 'Identity context cleared' })
-}
-
-// Get custom onClick for specific tests
-function getOnClick(testId: string) {
-  if (testId === 'structured-error-toast') {
-    return handleStructuredError
-  }
-  if (testId === 'tail-fast-batch') {
-    return handleBatchRequest
-  }
-  if (testId === 'pipeline-batch') {
-    return handlePipelineBatch
-  }
-  if (testId === 'browser-drain-quick') {
-    return handleBrowserDrainQuick
-  }
-  if (testId === 'browser-drain-batch') {
-    return handleBrowserDrainBatch
-  }
-  if (testId === 'browser-drain-beacon') {
-    return handleBrowserDrainBeacon
-  }
-  if (testId === 'identity-set') {
-    return handleIdentitySet
-  }
-  if (testId === 'identity-log') {
-    return handleIdentityLog
-  }
-  if (testId === 'identity-override') {
-    return handleIdentityOverride
-  }
-  if (testId === 'identity-clear') {
-    return handleIdentityClear
-  }
-  return undefined
-}
+const currentSection = computed(() =>
+  sections.find(s => s.id === activeSection.value),
+)
 </script>
 
 <template>
-  <div class="min-h-dvh bg-default">
-    <header class="border-b border-primary/10">
-      <div class="max-w-7xl mx-auto px-8 py-6">
-        <h1 class="text-3xl font-bold text-highlighted">
+  <div class="flex h-dvh bg-default">
+    <aside class="w-60 shrink-0 border-r border-primary/10 overflow-y-auto bg-elevated/50">
+      <header class="px-4 py-4 border-b border-primary/10">
+        <h1 class="text-lg font-bold text-highlighted">
           evlog Playground
         </h1>
-        <p class="text-muted text-sm mt-1">
-          Test logging, wide events, and structured errors
+        <p class="text-muted text-xs mt-0.5">
+          Test logging & wide events
         </p>
-      </div>
-    </header>
-
-    <div class="max-w-7xl mx-auto px-8 py-10 space-y-16">
-      <template v-for="section in sections" :key="section.id">
-        <PlaygroundTestSection
-          :id="section.id"
-          :title="section.title"
-          :description="section.description"
+      </header>
+      <nav class="p-2 space-y-0.5">
+        <button
+          v-for="section in sections"
+          :key="section.id"
+          :class="[
+            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left',
+            activeSection === section.id
+              ? 'bg-primary/10 text-highlighted font-medium'
+              : 'text-muted hover:bg-elevated hover:text-highlighted',
+          ]"
+          @click="activeSection = section.id"
         >
-          <div class="grid gap-5 md:grid-cols-2 xl:grid-cols-3">
-            <PlaygroundTestCard
-              v-for="test in section.tests"
-              :key="test.id"
-              v-bind="test"
-              :on-click="getOnClick(test.id) || test.onClick"
-            />
-          </div>
-        </PlaygroundTestSection>
+          <UIcon v-if="section.icon" :name="section.icon" class="size-4 shrink-0" />
+          {{ section.label }}
+        </button>
+      </nav>
+    </aside>
 
-        <USeparator v-if="section !== sections[sections.length - 1]" />
-      </template>
-    </div>
+    <main class="flex-1 overflow-y-auto p-6">
+      <PlaygroundTestSection
+        v-if="currentSection"
+        :id="currentSection.id"
+        :title="currentSection.title"
+        :description="currentSection.description"
+      >
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+          <PlaygroundTestCard
+            v-for="test in currentSection.tests"
+            :key="test.id"
+            v-bind="test"
+          />
+        </div>
+      </PlaygroundTestSection>
+    </main>
   </div>
 </template>

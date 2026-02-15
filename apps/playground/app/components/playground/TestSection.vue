@@ -7,12 +7,12 @@ defineProps<{
 </script>
 
 <template>
-  <section :id class="space-y-6">
-    <div class="space-y-2">
-      <h2 class="text-2xl font-bold text-highlighted">
+  <section :id class="space-y-4">
+    <div class="space-y-1">
+      <h2 class="text-xl font-bold text-highlighted">
         {{ title }}
       </h2>
-      <p class="text-muted leading-relaxed">
+      <p class="text-sm text-muted leading-relaxed">
         {{ description }}
       </p>
     </div>

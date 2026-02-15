@@ -40,9 +40,9 @@ async function handleClick() {
 </script>
 
 <template>
-  <div class="h-full p-5 rounded-lg bg-elevated border border-primary/5 hover:border-primary/10 transition-colors flex flex-col">
-    <div class="flex items-start justify-between gap-3 mb-3">
-      <h3 class="text-sm font-semibold text-highlighted leading-tight">
+  <div class="h-full p-3 rounded-lg bg-elevated border border-primary/5 hover:border-primary/10 transition-colors flex flex-col">
+    <div class="flex items-center gap-2 mb-2">
+      <h3 class="text-sm font-semibold text-highlighted leading-tight truncate">
         {{ label }}
       </h3>
       <UBadge
@@ -55,13 +55,13 @@ async function handleClick() {
       </UBadge>
     </div>
 
-    <p v-if="description" class="text-sm text-muted leading-relaxed mb-4 grow">
+    <p v-if="description" class="text-xs text-muted leading-snug mb-3 grow truncate" :title="description">
       {{ description }}
     </p>
 
     <div class="mt-auto">
       <UButton
-        block
+        size="sm"
         :color="color as any"
         :loading="isLoading"
         @click="handleClick"
@@ -76,7 +76,7 @@ async function handleClick() {
       :response="result"
       :error
       compact
-      class="mt-4"
+      class="mt-3"
     />
   </div>
 </template>

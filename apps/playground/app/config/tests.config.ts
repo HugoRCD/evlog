@@ -1,4 +1,5 @@
-import { createError } from 'evlog'
+import { createError, parseError } from 'evlog'
+import { createBrowserLogDrain } from 'evlog/browser'
 
 export interface TestConfig {
   id: string
@@ -33,6 +34,19 @@ export interface TestSection {
   tests: TestConfig[]
   layout?: 'buttons' | 'cards' | 'grid'
   gridCols?: number
+}
+
+function makeDrainEvent(action: string, extra?: Record<string, unknown>) {
+  return {
+    event: {
+      timestamp: new Date().toISOString(),
+      level: 'info' as const,
+      service: 'browser',
+      environment: 'development',
+      action,
+      ...extra,
+    },
+  }
 }
 
 export const testConfig = {
@@ -112,6 +126,10 @@ export const testConfig = {
           label: 'setIdentity()',
           description: 'Sets userId and orgId on all future client logs. Open the console and check the transport payload.',
           color: 'primary',
+          onClick: () => {
+            setIdentity({ userId: 'usr_123', orgId: 'org_456' })
+            log.info({ action: 'identity_set', message: 'Identity set to usr_123 / org_456' })
+          },
           badge: {
             label: 'setIdentity',
             color: 'blue',
@@ -121,6 +139,9 @@ export const testConfig = {
           id: 'identity-log',
           label: 'log.info() with identity',
           description: 'Emits a log — identity fields (userId, orgId) are automatically included.',
+          onClick: () => {
+            log.info({ action: 'checkout', item: 'pro_plan' })
+          },
           badge: {
             label: 'Auto-enriched',
             color: 'green',
@@ -131,6 +152,9 @@ export const testConfig = {
           label: 'Override userId',
           description: 'Per-event fields take priority over identity. This log overrides userId.',
           color: 'warning',
+          onClick: () => {
+            log.info({ action: 'impersonate', userId: 'usr_admin_override' })
+          },
           badge: {
             label: 'Event > Identity',
             color: 'warning',
@@ -141,6 +165,10 @@ export const testConfig = {
           label: 'clearIdentity()',
           description: 'Clears identity context. Future logs will no longer include userId/orgId.',
           color: 'error',
+          onClick: () => {
+            clearIdentity()
+            log.info({ action: 'identity_cleared', message: 'Identity context cleared' })
+          },
           badge: {
             label: 'clearIdentity',
             color: 'red',
@@ -205,8 +233,28 @@ export const testConfig = {
         {
           id: 'structured-error-toast',
           label: 'Trigger API Error',
-          description: 'Server-side structured error automatically displayed as a rich toast with context, suggested fix, and helpful links',
+          description: 'Server-side structured error displayed as a rich toast with context, suggested fix, and helpful links',
           color: 'error',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/structured-error')
+            }
+            catch (err) {
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: error.why,
+                color: 'error',
+                actions: error.link
+                  ? [{ label: 'Learn more', onClick: () => window.open(error.link, '_blank') }]
+                  : undefined,
+              })
+              if (error.fix) {
+                console.info(`💡 Fix: ${error.fix}`)
+              }
+            }
+          },
           badge: {
             label: 'parseError()',
             color: 'red',
@@ -239,6 +287,11 @@ export const testConfig = {
           label: '20 Requests',
           description: 'Fast requests - only ~10% will appear in logs.',
           color: 'neutral',
+          onClick: async () => {
+            await Promise.all(
+              Array.from({ length: 20 }, () => $fetch('/api/test/tail-sampling/fast')),
+            )
+          },
           badge: {
             label: 'Head Sampling Only (10%)',
             color: 'gray',
@@ -341,6 +394,11 @@ export const testConfig = {
           id: 'pipeline-batch',
           label: 'Fire 10 Requests',
           description: 'Fires 10 requests in parallel - should produce 2 batches of 5 events',
+          onClick: async () => {
+            await Promise.all(
+              Array.from({ length: 10 }, () => $fetch('/api/test/success')),
+            )
+          },
           badge: {
             label: '2 batches',
             color: 'green',
@@ -363,8 +421,17 @@ export const testConfig = {
         {
           id: 'browser-drain-quick',
           label: 'Quick Setup',
-          description: 'Creates a browser drain, pushes a single event via initLogger + log.info, and flushes immediately.',
+          description: 'Creates a browser drain, pushes a single event, and flushes immediately.',
           color: 'primary',
+          onClick: async () => {
+            const drain = createBrowserLogDrain({
+              drain: { endpoint: '/api/test/browser-ingest' },
+              pipeline: { batch: { size: 1, intervalMs: 500 } },
+              autoFlush: false,
+            })
+            drain(makeDrainEvent('browser_drain_test'))
+            await drain.flush()
+          },
           badge: {
             label: 'fetch POST',
             color: 'blue',
@@ -379,6 +446,17 @@ export const testConfig = {
           label: 'Batch 5 Events',
           description: 'Creates the drain, pushes 5 events, and flushes. Demonstrates batching.',
           color: 'success',
+          onClick: async () => {
+            const drain = createBrowserLogDrain({
+              drain: { endpoint: '/api/test/browser-ingest' },
+              pipeline: { batch: { size: 10, intervalMs: 500 } },
+              autoFlush: false,
+            })
+            for (let i = 0; i < 5; i++) {
+              drain(makeDrainEvent('browser_batch_test', { index: i }))
+            }
+            await drain.flush()
+          },
           badge: {
             label: '5 events batched',
             color: 'green',
@@ -391,8 +469,17 @@ export const testConfig = {
         {
           id: 'browser-drain-beacon',
           label: 'Auto-flush (Page Hidden)',
-          description: 'Pushes events with autoFlush enabled (default). Switch tabs or navigate away — the visibilitychange listener flushes via sendBeacon automatically.',
+          description: 'Pushes events with autoFlush enabled. Switch tabs or navigate away to flush via sendBeacon.',
           color: 'warning',
+          onClick: () => {
+            const drain = createBrowserLogDrain({
+              drain: { endpoint: '/api/test/browser-ingest' },
+              pipeline: { batch: { size: 25, intervalMs: 60000 } },
+            })
+            for (let i = 0; i < 3; i++) {
+              drain(makeDrainEvent('browser_beacon_test', { index: i }))
+            }
+          },
           badge: {
             label: 'sendBeacon',
             color: 'warning',
