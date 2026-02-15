@@ -455,6 +455,70 @@ serve({ fetch: app.fetch, port: 3000 })
 
 See the full [hono example](https://github.com/HugoRCD/evlog/tree/main/examples/hono) for a complete working project.
 
+## Next.js
+
+Use a small wrapper around route handlers for great DX: initialize once, create request logger automatically, and emit once with response status.
+
+```typescript
+// lib/evlog.ts
+import type { NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import { createRequestLogger, initLogger, parseError } from 'evlog'
+
+let initialized = false
+
+function ensureInit() {
+  if (initialized) return
+  initLogger({ env: { service: 'next-app' } })
+  initialized = true
+}
+
+export function withEvlog(handler: (ctx: { request: NextRequest, log: ReturnType<typeof createRequestLogger> }) => Promise<Response> | Response) {
+  return async (request: NextRequest) => {
+    ensureInit()
+    const log = createRequestLogger({ method: request.method, path: request.nextUrl.pathname })
+    try {
+      const response = await handler({ request, log })
+      log.emit({ status: response.status })
+      return response
+    } catch (error) {
+      const parsed = parseError(error)
+      const status = parsed.status ?? 500
+      log.error(error as Error)
+      log.emit({ status, _forceKeep: true })
+      return NextResponse.json(parsed, { status })
+    }
+  }
+}
+```
+
+Use it in route handlers:
+
+```typescript
+// app/api/checkout/route.ts
+import { NextResponse } from 'next/server'
+import { createError } from 'evlog'
+import { withEvlog } from '@/lib/evlog'
+
+export const POST = withEvlog(async ({ request, log }) => {
+  const body = await request.json()
+  log.set({ checkout: { productId: body.productId } })
+
+  if (!body.productId) {
+    throw createError({
+      message: 'Missing product',
+      status: 400,
+      why: 'No productId in request body',
+      fix: 'Send { "productId": "sku_123" }',
+    })
+  }
+
+  return NextResponse.json({ ok: true }, { status: 201 })
+})
+```
+
+See the full [next example](https://github.com/HugoRCD/evlog/tree/main/examples/next) for a complete working project.
+
 ## Enrichment Hook
 
 Use the `evlog:enrich` hook to add derived context after emit, before drain.
@@ -853,7 +917,7 @@ try {
 
 ## Framework Support
 
-evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
+evlog works with Nuxt/Nitro and standalone runtimes:
 
 | Framework | Integration |
 |-----------|-------------|
@@ -864,6 +928,9 @@ evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
 | **TanStack Start** | Nitro v2 module setup |
+| **Next.js** | `createRequestLogger()` with route handler wrapper ([example](./examples/next)) |
+| **Hono** | `createRequestLogger()` in middleware ([example](./examples/hono)) |
+| **Cloudflare Workers** | `evlog/workers` adapter ([example](./examples/workers)) |
 
 ## Agent Skills
 
