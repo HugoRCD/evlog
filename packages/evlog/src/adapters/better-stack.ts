@@ -1,5 +1,8 @@
-import type { DrainContext, WideEvent } from '../types'
-import { getRuntimeConfig } from './_utils'
+import type { WideEvent } from '../types'
+import type { ConfigField } from './_config'
+import { resolveAdapterConfig } from './_config'
+import { defineDrain } from './_drain'
+import { httpPost } from './_http'
 
 export interface BetterStackConfig {
   /** Better Stack source token */
@@ -9,6 +12,12 @@ export interface BetterStackConfig {
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
 }
+
+const BETTER_STACK_FIELDS: ConfigField<BetterStackConfig>[] = [
+  { key: 'sourceToken', env: ['NUXT_BETTER_STACK_SOURCE_TOKEN', 'BETTER_STACK_SOURCE_TOKEN'] },
+  { key: 'endpoint', env: ['NUXT_BETTER_STACK_ENDPOINT', 'BETTER_STACK_ENDPOINT'] },
+  { key: 'timeout' },
+]
 
 /**
  * Transform an evlog wide event into a Better Stack event.
@@ -39,32 +48,19 @@ export function toBetterStackEvent(event: WideEvent): Record<string, unknown> {
  * }))
  * ```
  */
-export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
-  return async (ctx: DrainContext | DrainContext[]) => {
-    const contexts = Array.isArray(ctx) ? ctx : [ctx]
-    if (contexts.length === 0) return
-
-    const runtimeConfig = getRuntimeConfig()
-    const evlogBetterStack = runtimeConfig?.evlog?.betterStack
-    const rootBetterStack = runtimeConfig?.betterStack
-
-    const config: Partial<BetterStackConfig> = {
-      sourceToken: overrides?.sourceToken ?? evlogBetterStack?.sourceToken ?? rootBetterStack?.sourceToken ?? process.env.NUXT_BETTER_STACK_SOURCE_TOKEN ?? process.env.BETTER_STACK_SOURCE_TOKEN,
-      endpoint: overrides?.endpoint ?? evlogBetterStack?.endpoint ?? rootBetterStack?.endpoint ?? process.env.NUXT_BETTER_STACK_ENDPOINT ?? process.env.BETTER_STACK_ENDPOINT,
-      timeout: overrides?.timeout ?? evlogBetterStack?.timeout ?? rootBetterStack?.timeout,
-    }
-
-    if (!config.sourceToken) {
-      console.error('[evlog/better-stack] Missing source token. Set NUXT_BETTER_STACK_SOURCE_TOKEN env var or pass to createBetterStackDrain()')
-      return
-    }
-
-    try {
-      await sendBatchToBetterStack(contexts.map(c => c.event), config as BetterStackConfig)
-    } catch (error) {
-      console.error('[evlog/better-stack] Failed to send events to Better Stack:', error)
-    }
-  }
+export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>) {
+  return defineDrain<BetterStackConfig>({
+    name: 'better-stack',
+    resolve: () => {
+      const config = resolveAdapterConfig<BetterStackConfig>('betterStack', BETTER_STACK_FIELDS, overrides)
+      if (!config.sourceToken) {
+        console.error('[evlog/better-stack] Missing source token. Set NUXT_BETTER_STACK_SOURCE_TOKEN env var or pass to createBetterStackDrain()')
+        return null
+      }
+      return config as BetterStackConfig
+    },
+    send: sendBatchToBetterStack,
+  })
 }
 
 /**
@@ -93,30 +89,15 @@ export async function sendToBetterStack(event: WideEvent, config: BetterStackCon
  */
 export async function sendBatchToBetterStack(events: WideEvent[], config: BetterStackConfig): Promise<void> {
   const endpoint = (config.endpoint ?? 'https://in.logs.betterstack.com').replace(/\/+$/, '')
-  const timeout = config.timeout ?? 5000
 
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${config.sourceToken}`,
-  }
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(endpoint, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(events.map(toBetterStackEvent)),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`Better Stack API error: ${response.status} ${response.statusText} - ${safeText}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
+  await httpPost({
+    url: endpoint,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.sourceToken}`,
+    },
+    body: JSON.stringify(events.map(toBetterStackEvent)),
+    timeout: config.timeout ?? 5000,
+    label: 'Better Stack',
+  })
 }
