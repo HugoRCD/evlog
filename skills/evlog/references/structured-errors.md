@@ -421,40 +421,11 @@ try {
 
 ## Error Message Templates
 
-Use these as starting points:
+Common patterns -- adapt fields to each specific case:
 
-```typescript
-// Resource not found
-createError({
-  message: '${Resource} not found',
-  status: 404,
-  why: 'No ${resource} with ${identifier} "${value}" exists',
-  fix: 'Verify the ${identifier} is correct',
-})
-
-// External service failure
-createError({
-  message: 'Unable to ${action}',
-  status: 503,
-  why: '${Service} returned error: ${code}',
-  fix: '${actionable_step}',
-  link: '${service_docs_url}',
-  cause: error,
-})
-
-// Validation failure
-createError({
-  message: 'Invalid ${field}',
-  status: 400,
-  why: '"${value}" ${reason}',
-  fix: '${expected_format}',
-})
-
-// Permission denied
-createError({
-  message: 'Access denied',
-  status: 403,
-  why: '${reason} required for this action',
-  fix: '${how_to_get_access}',
-})
-```
+| Pattern | Status | Fields |
+|---------|--------|--------|
+| Resource not found | 404 | `why`: what's missing, `fix`: verify identifier |
+| External service failure | 503 | `why`: service error, `fix`: actionable step, `link`: service docs, `cause`: original error |
+| Validation failure | 400 | `why`: what's invalid, `fix`: expected format |
+| Permission denied | 403 | `why`: what's required, `fix`: how to get access |

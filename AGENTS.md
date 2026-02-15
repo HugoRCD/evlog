@@ -405,15 +405,48 @@ The `EnrichContext` contains:
 
 All enrichers accept `{ overwrite?: boolean }` — defaults to `false` to preserve user-provided data.
 
-### Nitro
+### Nitro v3
 
 ```typescript
-// nitro.config.ts or nuxt.config.ts
-export default defineNuxtConfig({
-  nitro: {
-    plugins: ['evlog/nitro'],
-  },
+// nitro.config.ts
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
 })
+```
+
+Import `useLogger` from `evlog/nitro/v3` in routes:
+
+```typescript
+import { defineHandler } from 'nitro/h3'
+import { useLogger } from 'evlog/nitro/v3'
+import { createError } from 'evlog'
+```
+
+### Nitro v2
+
+```typescript
+// nitro.config.ts
+import { defineNitroConfig } from 'nitropack/config'
+import evlog from 'evlog/nitro'
+
+export default defineNitroConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
+})
+```
+
+Import `useLogger` from `evlog/nitro` in routes:
+
+```typescript
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 ```
 
 ## Development Guidelines
@@ -571,7 +604,8 @@ skills/
     └── references/
         ├── wide-events.md    # Wide events patterns
         ├── structured-errors.md # Error handling guide
-        └── code-review.md    # Review checklist
+        ├── code-review.md    # Review checklist
+        └── drain-pipeline.md # Drain pipeline patterns
 ```
 
 ### Using Skills

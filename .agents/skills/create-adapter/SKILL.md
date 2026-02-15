@@ -113,109 +113,24 @@ Required test categories:
 
 Create `apps/docs/content/3.adapters/{n}.{name}.md` where `{n}` is the next number before `custom.md` (custom should always be last).
 
-Use this frontmatter structure:
-
-```yaml
----
-title: "{Name} Adapter"
-description: "Send logs to {Name} for [value prop]. Zero-config setup with environment variables."
-navigation:
-  title: "{Name}"
-  icon: i-simple-icons-{name}  # or i-lucide-* for generic
-links:
-  - label: "{Name} Dashboard"
-    icon: i-lucide-external-link
-    to: https://{service-url}
-    target: _blank
-    color: neutral
-    variant: subtle
-  - label: "OTLP Adapter"
-    icon: i-simple-icons-opentelemetry
-    to: /adapters/otlp
-    color: neutral
-    variant: subtle
----
-```
-
-Sections to include:
-
-1. **Intro paragraph** -- what the service is and what the adapter does
-2. **Installation** -- import path `evlog/{name}`
-3. **Quick Setup** -- Nitro plugin with `create{Name}Drain()`
-4. **Configuration** -- table of env vars and config options
-5. **Configuration Priority** -- overrides > runtimeConfig > env vars
-6. **Advanced** -- custom options, event transformation details
-7. **Querying/Using** -- how to find evlog events in the target service
-8. **Troubleshooting** -- common errors (missing config, auth failures)
-9. **Direct API Usage** -- `sendTo{Name}()` and `sendBatchTo{Name}()` examples
-10. **Next Steps** -- links to other adapters and best practices
-
-Use the existing Axiom adapter page (`apps/docs/content/3.adapters/2.axiom.md`) as a reference for tone, structure, and depth.
+Use the existing Axiom adapter page (`apps/docs/content/3.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
 
 ## Step 6: Update Adapters Overview Page
 
-Edit `apps/docs/content/3.adapters/1.overview.md` to add the new adapter in **three** places:
+Edit `apps/docs/content/3.adapters/1.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
 
-### 6a. Frontmatter `links` array
-
-Add a link entry alongside the existing adapters:
-
-```yaml
-- label: "{Name}"
-  icon: i-simple-icons-{name}
-  to: /adapters/{name}
-  color: neutral
-  variant: subtle
-```
-
-### 6b. `::card-group` section
-
-Add a card block for the new adapter (before the Custom card):
-
-```markdown
-  :::card
-  ---
-  icon: i-simple-icons-{name}
-  title: {Name}
-  to: /adapters/{name}
-  ---
-  [Short description of what the adapter does.]
-  :::
-```
-
-### 6c. Zero-Config Setup `.env` example
-
-Add the adapter's env vars in the `.env` code block. The variable names depend on the service (e.g., `NUXT_AXIOM_TOKEN`, `NUXT_OTLP_ENDPOINT`, `NUXT_POSTHOG_API_KEY`):
-
-```bash
-# {Name}
-NUXT_{NAME}_<RELEVANT_VAR>=xxx
-```
+1. **Frontmatter `links` array** -- add a link entry with icon and path
+2. **`::card-group` section** -- add a card block before the Custom card
+3. **Zero-Config Setup `.env` example** -- add the adapter's env vars
 
 ## Step 7: Update AGENTS.md
 
-Add the new adapter to the **"Built-in Adapters"** table in the root `AGENTS.md` file, in the "Log Draining & Adapters" section:
+In the root `AGENTS.md` file, "Log Draining & Adapters" section:
 
-```markdown
-| {Name} | `evlog/{name}` | Send logs to {Name} for [description] |
-```
+1. Add a row to the **"Built-in Adapters"** table
+2. Add a **"Using {Name} Adapter"** usage example block with `create{Name}Drain()` and env vars
 
-Also add a usage example block (following the pattern of existing adapters in AGENTS.md):
-
-```markdown
-**Using {Name} Adapter:**
-
-\`\`\`typescript
-// server/plugins/evlog-drain.ts
-import { create{Name}Drain } from 'evlog/{name}'
-
-export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook('evlog:drain', create{Name}Drain())
-})
-\`\`\`
-
-Set the required environment variables (e.g., \`NUXT_{NAME}_TOKEN\`, \`NUXT_{NAME}_ENDPOINT\`, etc. -- depends on the service).
-```
+Follow the pattern of existing adapters in the file.
 
 ## Step 8: Renumber `custom.md`
 

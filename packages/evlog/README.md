@@ -10,7 +10,7 @@
 
 **Your logs are lying to you.**
 
-A single request generates 10+ log lines. When production breaks at 3am, you're grep-ing through noise, praying you'll find signal. Your errors say "Something went wrong" – thanks, very helpful.
+A single request generates 10+ log lines. When production breaks at 3am, you're grep-ing through noise, praying you'll find signal. Your errors say "Something went wrong" -- thanks, very helpful.
 
 **evlog fixes this.** One log per request. All context included. Errors that explain themselves.
 
@@ -21,13 +21,13 @@ A single request generates 10+ log lines. When production breaks at 3am, you're 
 ```typescript
 // server/api/checkout.post.ts
 
-// ❌ Scattered logs - impossible to debug
+// Scattered logs - impossible to debug
 console.log('Request received')
 console.log('User:', user.id)
 console.log('Cart loaded')
 console.log('Payment failed')  // Good luck finding this at 3am
 
-throw new Error('Something went wrong')  // 🤷‍♂️
+throw new Error('Something went wrong')
 ```
 
 ### The Solution
@@ -36,7 +36,7 @@ throw new Error('Something went wrong')  // 🤷‍♂️
 // server/api/checkout.post.ts
 import { useLogger } from 'evlog'
 
-// ✅ One comprehensive event per request
+// One comprehensive event per request
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)  // Auto-injected by evlog
 
@@ -176,18 +176,43 @@ The wide event emitted at the end contains **everything**:
 
 Works with **any framework powered by Nitro**: Nuxt, Analog, Vinxi, SolidStart, TanStack Start, and more.
 
+### Nitro v3
+
 ```typescript
 // nitro.config.ts
-export default defineNitroConfig({
-  plugins: ['evlog/nitro'],
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
 })
 ```
 
-Same API, same wide events:
+### Nitro v2
+
+```typescript
+// nitro.config.ts
+import { defineNitroConfig } from 'nitropack/config'
+import evlog from 'evlog/nitro'
+
+export default defineNitroConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
+})
+```
+
+Then use `useLogger` in any route. Import from `evlog/nitro/v3` (v3) or `evlog/nitro` (v2):
 
 ```typescript
 // routes/api/documents/[id]/export.post.ts
-import { useLogger, createError } from 'evlog'
+// Nitro v3: import { defineHandler } from 'nitro/h3' + import { useLogger } from 'evlog/nitro/v3'
+// Nitro v2: import { defineEventHandler } from 'h3' + import { useLogger } from 'evlog/nitro'
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)
@@ -246,47 +271,6 @@ Output when the export completes:
   "export": { "format": "pdf", "size": 1240000, "pages": 24 },
   "status": 200
 }
-```
-
-## Structured Errors
-
-Errors should tell you **what** happened, **why**, and **how to fix it**.
-
-```typescript
-// server/api/repos/sync.post.ts
-import { useLogger, createError } from 'evlog'
-
-export default defineEventHandler(async (event) => {
-  const log = useLogger(event)
-
-  log.set({ repo: { owner: 'acme', name: 'my-project' } })
-
-  try {
-    const result = await syncWithGitHub()
-    log.set({ sync: { commits: result.commits, files: result.files } })
-    return result
-  } catch (error) {
-    log.error(error, { step: 'github-sync' })
-
-    throw createError({
-      message: 'Failed to sync repository',
-      status: 503,
-      why: 'GitHub API rate limit exceeded',
-      fix: 'Wait 1 hour or use a different token',
-      link: 'https://docs.github.com/en/rest/rate-limit',
-      cause: error,
-    })
-  }
-})
-```
-
-Console output (development):
-
-```
-Error: Failed to sync repository
-Why: GitHub API rate limit exceeded
-Fix: Wait 1 hour or use a different token
-More info: https://docs.github.com/en/rest/rate-limit
 ```
 
 ## Standalone TypeScript
@@ -390,6 +374,130 @@ Notes:
 - `request.cf` is included (colo, country, asn) unless disabled
 - Use `headerAllowlist` to avoid logging sensitive headers
 
+## Hono
+
+Use the standalone API to create one wide event per request from a Hono middleware.
+
+```typescript
+// src/index.ts
+import { serve } from '@hono/node-server'
+import { Hono } from 'hono'
+import { createRequestLogger, initLogger } from 'evlog'
+
+initLogger({
+  env: { service: 'hono-api' },
+})
+
+const app = new Hono()
+
+app.use('*', async (c, next) => {
+  const startedAt = Date.now()
+  const log = createRequestLogger({ method: c.req.method, path: c.req.path })
+
+  try {
+    await next()
+  } catch (error) {
+    log.error(error as Error)
+    throw error
+  } finally {
+    log.emit({
+      status: c.res.status,
+      duration: Date.now() - startedAt,
+    })
+  }
+})
+
+app.get('/health', (c) => c.json({ ok: true }))
+
+serve({ fetch: app.fetch, port: 3000 })
+```
+
+See the full [hono example](https://github.com/HugoRCD/evlog/tree/main/examples/hono) for a complete working project.
+
+## Browser
+
+Use the `log` API on the client side for structured browser logging:
+
+```typescript
+import { log } from 'evlog/browser'
+
+log.info('checkout', 'User initiated checkout')
+log.error({ action: 'payment', error: 'validation_failed' })
+```
+
+In Nuxt, `log` is auto-imported -- no import needed in Vue components:
+
+```vue
+<script setup>
+log.info('checkout', 'User initiated checkout')
+</script>
+```
+
+Client logs output to the browser console with colored tags in development.
+
+### Client Transport
+
+To send client logs to the server for centralized logging, enable the transport:
+
+```typescript
+// nuxt.config.ts
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: {
+    transport: {
+      enabled: true,  // Send client logs to server
+    },
+  },
+})
+```
+
+When enabled:
+1. Client logs are sent to `/api/_evlog/ingest` via POST
+2. Server enriches with environment context (service, version, etc.)
+3. `evlog:drain` hook is called with `source: 'client'`
+4. External services receive the log
+
+## Structured Errors
+
+Errors should tell you **what** happened, **why**, and **how to fix it**.
+
+```typescript
+// server/api/repos/sync.post.ts
+import { useLogger, createError } from 'evlog'
+
+export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
+
+  log.set({ repo: { owner: 'acme', name: 'my-project' } })
+
+  try {
+    const result = await syncWithGitHub()
+    log.set({ sync: { commits: result.commits, files: result.files } })
+    return result
+  } catch (error) {
+    log.error(error, { step: 'github-sync' })
+
+    throw createError({
+      message: 'Failed to sync repository',
+      status: 503,
+      why: 'GitHub API rate limit exceeded',
+      fix: 'Wait 1 hour or use a different token',
+      link: 'https://docs.github.com/en/rest/rate-limit',
+      cause: error,
+    })
+  }
+})
+```
+
+Console output (development):
+
+```
+Error: Failed to sync repository
+Why: GitHub API rate limit exceeded
+Fix: Wait 1 hour or use a different token
+More info: https://docs.github.com/en/rest/rate-limit
+```
+
 ## Enrichment Hook
 
 Use the `evlog:enrich` hook to add derived context after emit, before drain.
@@ -424,6 +532,58 @@ export default defineNitroPlugin((nitroApp) => {
 
   nitroApp.hooks.hook('evlog:enrich', (ctx) => {
     for (const enricher of enrich) enricher(ctx)
+  })
+})
+```
+
+Each enricher adds a specific field to the event:
+
+| Enricher | Event Field | Shape |
+|----------|-------------|-------|
+| `createUserAgentEnricher()` | `event.userAgent` | `{ raw, browser?: { name, version? }, os?: { name, version? }, device?: { type } }` |
+| `createGeoEnricher()` | `event.geo` | `{ country?, region?, regionCode?, city?, latitude?, longitude? }` |
+| `createRequestSizeEnricher()` | `event.requestSize` | `{ requestBytes?, responseBytes? }` |
+| `createTraceContextEnricher()` | `event.traceContext` + `event.traceId` + `event.spanId` | `{ traceparent?, tracestate?, traceId?, spanId? }` |
+
+All enrichers accept an optional `{ overwrite?: boolean }` option. By default (`overwrite: false`), user-provided data on the event takes precedence over enricher-computed values. Set `overwrite: true` to always replace existing fields.
+
+> **Cloudflare geo note:** Only `cf-ipcountry` is a real Cloudflare HTTP header. The `cf-region`, `cf-city`, `cf-latitude`, `cf-longitude` headers are NOT standard -- they are properties of `request.cf`. For full geo data on Cloudflare, write a custom enricher that reads `request.cf`, or use a Workers middleware to forward `cf` properties as custom headers.
+
+### Custom Enrichers
+
+The `evlog:enrich` hook receives an `EnrichContext` with these fields:
+
+```typescript
+interface EnrichContext {
+  event: WideEvent        // The emitted wide event (mutable -- modify it directly)
+  request?: {             // Request metadata
+    method?: string
+    path?: string
+    requestId?: string
+  }
+  headers?: Record<string, string>  // Safe HTTP headers (sensitive headers filtered)
+  response?: {            // Response metadata
+    status?: number
+    headers?: Record<string, string>
+  }
+}
+```
+
+Example custom enricher:
+
+```typescript
+// server/plugins/evlog-enrich.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    // Add deployment metadata
+    ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+    ctx.event.region = process.env.FLY_REGION
+
+    // Extract data from headers
+    const tenantId = ctx.headers?.['x-tenant-id']
+    if (tenantId) {
+      ctx.event.tenantId = tenantId
+    }
   })
 })
 ```
@@ -469,6 +629,24 @@ Set environment variables:
 NUXT_OTLP_ENDPOINT=http://localhost:4318
 ```
 
+### PostHog
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createPostHogDrain } from 'evlog/posthog'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createPostHogDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_POSTHOG_API_KEY=phc_your-key
+NUXT_POSTHOG_HOST=https://us.i.posthog.com  # Optional: for EU or self-hosted
+```
+
 ### Sentry
 
 ```typescript
@@ -484,6 +662,23 @@ Set environment variables:
 
 ```bash
 NUXT_SENTRY_DSN=https://public@o0.ingest.sentry.io/123
+```
+
+### Better Stack
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createBetterStackDrain } from 'evlog/better-stack'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createBetterStackDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_BETTER_STACK_SOURCE_TOKEN=your-source-token
 ```
 
 ### Multiple Destinations
@@ -571,15 +766,15 @@ export default defineNitroPlugin((nitroApp) => {
 | `retry.initialDelayMs` | `1000` | Base delay for first retry |
 | `retry.maxDelayMs` | `30000` | Upper bound for any retry delay |
 | `maxBufferSize` | `1000` | Max buffered events before dropping oldest |
-| `onDropped` | — | Callback when events are dropped |
+| `onDropped` | -- | Callback when events are dropped |
 
 ### Returned drain function
 
 The function returned by `pipeline(drain)` is hook-compatible and exposes:
 
-- **`drain(ctx)`** — Push a single event into the buffer
-- **`drain.flush()`** — Force-flush all buffered events (call on server shutdown)
-- **`drain.pending`** — Number of events currently buffered
+- **`drain(ctx)`** -- Push a single event into the buffer
+- **`drain.flush()`** -- Force-flush all buffered events (call on server shutdown)
+- **`drain.pending`** -- Number of events currently buffered
 
 ## API Reference
 
@@ -589,7 +784,7 @@ Initialize the logger. Required for standalone usage, automatic with Nuxt/Nitro 
 
 ```typescript
 initLogger({
-  enabled: boolean       // (optional) Enable/disable all logging (default: true)
+  enabled: boolean       // Optional. Enable/disable all logging (default: true)
   env: {
     service: string      // Service name
     environment: string  // 'production' | 'development' | 'test'
@@ -680,9 +875,9 @@ In development, evlog uses a compact tree format:
 
 ```
 16:45:31.060 INFO [my-app] GET /api/checkout 200 in 234ms
-  ├─ user: id=123 plan=premium
-  ├─ cart: items=3 total=9999
-  └─ payment: id=pay_xyz method=card
+  |- user: id=123 plan=premium
+  |- cart: items=3 total=9999
+  +- payment: id=pay_xyz method=card
 ```
 
 In production (`pretty: false`), logs are emitted as JSON for machine parsing.
@@ -798,11 +993,12 @@ evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
 | Framework | Integration |
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
-| **Analog** | `plugins: ['evlog/nitro']` |
-| **Vinxi** | `plugins: ['evlog/nitro']` |
-| **SolidStart** | `plugins: ['evlog/nitro']` |
-| **TanStack Start** | `plugins: ['evlog/nitro']` |
-| **Standalone Nitro** | `plugins: ['evlog/nitro']` |
+| **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
+| **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
+| **Analog** | Nitro v2 module setup |
+| **Vinxi** | Nitro v2 module setup |
+| **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
+| **TanStack Start** | Nitro v2 module setup |
 
 ## Agent Skills
 
