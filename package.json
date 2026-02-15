@@ -8,7 +8,7 @@
   },
   "author": "HugoRCD",
   "license": "MIT",
-  "packageManager": "bun@1.2.4",
+  "packageManager": "bun@1.2.22",
   "scripts": {
     "dev": "turbo run dev --filter=evlog-playground",
     "dev:nitro": "turbo run dev --filter=evlog-nitro-playground",
