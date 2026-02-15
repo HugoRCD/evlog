@@ -1,9 +1,10 @@
 {
-  "extends": ["nitro/tsconfig"],
   "compilerOptions": {
+    "target": "ESNext",
+    "module": "ESNext",
     "moduleResolution": "bundler",
     "paths": {
-      "~/*": ["./*"],
+      "~/*": ["./*"]
     }
   }
 }

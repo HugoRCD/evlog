@@ -50,6 +50,14 @@ declare module 'nitropack/types' {
   }
 }
 
+declare module 'nitro/types' {
+  interface NitroRuntimeHooks {
+    'evlog:emit:keep': (ctx: TailSamplingContext) => void | Promise<void>
+    'evlog:enrich': (ctx: EnrichContext) => void | Promise<void>
+    'evlog:drain': (ctx: DrainContext) => void | Promise<void>
+  }
+}
+
 /**
  * Transport configuration for sending client logs to the server
  */
@@ -135,7 +143,7 @@ export interface EnrichContext {
   /** Request metadata (if available) */
   request?: {
     method?: string
-    path?: string
+    path: string
     requestId?: string
   }
   /** Safe HTTP request headers (sensitive headers filtered out) */

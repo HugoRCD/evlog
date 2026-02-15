@@ -1,5 +1,8 @@
-import { defineNitroErrorHandler } from 'nitropack/runtime'
+// Import from specific subpath — the barrel 'nitropack/runtime' re-exports from
+// internal/app.mjs which imports virtual modules that crash outside rollup builds.
+import { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils'
 import { getRequestURL, setResponseHeader, setResponseStatus, send } from 'h3'
+import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } from '../nitro'
 
 /**
  * Custom Nitro error handler that properly serializes EvlogError.
@@ -10,21 +13,14 @@ import { getRequestURL, setResponseHeader, setResponseStatus, send } from 'h3'
  * sanitizing internal error details in production for 5xx errors.
  */
 export default defineNitroErrorHandler((error, event) => {
-  // Check if this is an EvlogError (by name or by checking cause)
-  const evlogError = error.name === 'EvlogError'
-    ? error
-    : (error.cause as Error)?.name === 'EvlogError'
-      ? error.cause as Error
-      : null
+  const evlogError = resolveEvlogError(error)
 
   const isDev = process.env.NODE_ENV === 'development'
   const url = getRequestURL(event, { xForwardedHost: true }).pathname
 
   // For non-EvlogError, preserve Nitro's default response shape
   if (!evlogError) {
-    const status = (error as { statusCode?: number }).statusCode
-      ?? (error as { status?: number }).status
-      ?? 500
+    const status = extractErrorStatus(error)
 
     // Derive message from statusText/statusMessage/message for cross-version compatibility
     const rawMessage = ((error as { statusText?: string }).statusText
@@ -39,7 +35,6 @@ export default defineNitroErrorHandler((error, event) => {
     setResponseStatus(event, status)
     setResponseHeader(event, 'Content-Type', 'application/json')
 
-    // Preserve Nitro's default response shape with both legacy and modern fields
     return send(event, JSON.stringify({
       url,
       status,
@@ -51,26 +46,10 @@ export default defineNitroErrorHandler((error, event) => {
     }))
   }
 
-  // Derive status from evlogError to ensure consistency between
-  // HTTP response status and response body
-  const status = (evlogError as { status?: number }).status
-    ?? (evlogError as { statusCode?: number }).statusCode
-    ?? 500
+  const status = extractErrorStatus(evlogError)
 
   setResponseStatus(event, status)
   setResponseHeader(event, 'Content-Type', 'application/json')
 
-  // Serialize EvlogError with all its data, preserving Nitro's response shape
-  const { data } = evlogError as { data?: unknown }
-  const statusMessage = (evlogError as { statusMessage?: string }).statusMessage || evlogError.message
-  return send(event, JSON.stringify({
-    url,
-    status,
-    statusCode: status,
-    statusText: statusMessage,
-    statusMessage,
-    message: evlogError.message,
-    error: true,
-    ...(data !== undefined && { data }),
-  }))
+  return send(event, JSON.stringify(serializeEvlogErrorResponse(evlogError, url)))
 })

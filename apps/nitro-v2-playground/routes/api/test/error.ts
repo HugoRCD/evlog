@@ -1,8 +1,8 @@
-import { HTTPError, defineHandler } from 'nitro/h3'
-import { useLogger } from 'evlog'
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 
-export default defineHandler(async (event) => {
-  // @ts-expect-error - TODO: update on v3 release
+export default defineEventHandler(async (event) => {
   const logger = useLogger(event)
 
   logger.set({
@@ -64,8 +64,11 @@ export default defineHandler(async (event) => {
 
   logger.emit()
 
-  throw new HTTPError({
-    statusCode: 400,
+  throw createError({
+    status: 400,
     message: 'Payment processing failed',
+    why: 'Card declined by issuer',
+    fix: 'Try a different payment method',
+    link: 'https://docs.example.com/payments/declined',
   })
 })

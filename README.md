@@ -176,18 +176,43 @@ The wide event emitted at the end contains **everything**:
 
 Works with **any framework powered by Nitro**: Nuxt, Analog, Vinxi, SolidStart, TanStack Start, and more.
 
+### Nitro v3
+
 ```typescript
 // nitro.config.ts
-export default defineNitroConfig({
-  plugins: ['evlog/nitro'],
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
 })
 ```
 
-Same API, same wide events:
+### Nitro v2
+
+```typescript
+// nitro.config.ts
+import { defineNitroConfig } from 'nitropack/config'
+import evlog from 'evlog/nitro'
+
+export default defineNitroConfig({
+  modules: [
+    evlog({ env: { service: 'my-api' } })
+  ],
+})
+```
+
+Then use `useLogger` in any route. Import from `evlog/nitro/v3` (v3) or `evlog/nitro` (v2):
 
 ```typescript
 // routes/api/documents/[id]/export.post.ts
-import { useLogger, createError } from 'evlog'
+// Nitro v3: import { defineHandler } from 'nitro/h3' + import { useLogger } from 'evlog/nitro/v3'
+// Nitro v2: import { defineEventHandler } from 'h3' + import { useLogger } from 'evlog/nitro'
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)
@@ -833,11 +858,12 @@ evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
 | Framework | Integration |
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
-| **Analog** | `plugins: ['evlog/nitro']` |
-| **Vinxi** | `plugins: ['evlog/nitro']` |
-| **SolidStart** | `plugins: ['evlog/nitro']` |
-| **TanStack Start** | `plugins: ['evlog/nitro']` |
-| **Standalone Nitro** | `plugins: ['evlog/nitro']` |
+| **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
+| **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
+| **Analog** | Nitro v2 module setup |
+| **Vinxi** | Nitro v2 module setup |
+| **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
+| **TanStack Start** | Nitro v2 module setup |
 
 ## Agent Skills
 

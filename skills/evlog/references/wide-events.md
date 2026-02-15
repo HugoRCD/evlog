@@ -138,7 +138,10 @@ With the evlog module, use `useLogger(event)` - it's auto-created and auto-emitt
 
 ```typescript
 // server/api/checkout.post.ts
-import { useLogger, createError } from 'evlog'
+// Nuxt: useLogger and createError are auto-imported
+// Nitro v3: import { useLogger } from 'evlog/nitro/v3'
+// Nitro v2: import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)  // Auto-created by evlog
@@ -229,7 +232,10 @@ export default defineEventHandler(async (event) => {
 
 ```typescript
 // server/api/checkout.post.ts
-import { useLogger, createError } from 'evlog'
+// Nuxt: useLogger and createError are auto-imported
+// Nitro v3: import { useLogger } from 'evlog/nitro/v3'
+// Nitro v2: import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)

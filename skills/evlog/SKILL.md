@@ -214,13 +214,52 @@ export default defineNuxtConfig({
 })
 ```
 
-### Nitro Integration
+### Nitro v3 Integration
 
 ```typescript
 // nitro.config.ts
-export default defineNitroConfig({
-  plugins: ['evlog/nitro'],
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  modules: [
+    evlog({
+      env: { service: 'my-api' },
+    })
+  ],
 })
+```
+
+Import `useLogger` from `evlog/nitro/v3` in routes:
+
+```typescript
+import { defineHandler } from 'nitro/h3'
+import { useLogger } from 'evlog/nitro/v3'
+import { createError } from 'evlog'
+```
+
+### Nitro v2 Integration
+
+```typescript
+// nitro.config.ts
+import { defineNitroConfig } from 'nitropack/config'
+import evlog from 'evlog/nitro'
+
+export default defineNitroConfig({
+  modules: [
+    evlog({
+      env: { service: 'my-api' },
+    })
+  ],
+})
+```
+
+Import `useLogger` from `evlog/nitro` in routes:
+
+```typescript
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
+import { createError } from 'evlog'
 ```
 
 ## Structured Error Levels
