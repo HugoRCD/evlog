@@ -238,8 +238,7 @@ export const testConfig = {
           onClick: async () => {
             try {
               await $fetch('/api/test/structured-error')
-            }
-            catch (err) {
+            } catch (err) {
               const error = parseError(err)
               const toast = useToast()
               toast.add({

@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import { testConfig } from '~/config/tests.config'
 
-const sections = testConfig.sections
+const { sections } = testConfig
 const activeSection = ref(sections[0]?.id)
 
 const currentSection = computed(() =>
