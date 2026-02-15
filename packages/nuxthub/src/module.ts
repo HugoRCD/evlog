@@ -1,65 +1,15 @@
-import { existsSync, mkdirSync, promises as fsp, readFileSync, writeFileSync } from 'node:fs'
-import { join, resolve } from 'node:path'
+import { existsSync, promises as fsp } from 'node:fs'
+import { resolve } from 'node:path'
 import { addServerHandler, addServerPlugin, addTypeTemplate, createResolver, defineNuxtModule, hasNuxtModule, installModule } from '@nuxt/kit'
 import { consola } from 'consola'
 import type { NitroConfig } from 'nitropack'
-import { createEvlogError } from 'evlog'
 import { name, version } from '../package.json'
-
-function retentionToCron(retention: string): string {
-  const match = retention.match(/^(\d+)(d|h|m)$/)
-  if (!match) {
-    throw createEvlogError({
-      message: `[evlog/nuxthub] Invalid retention format: "${retention}"`,
-      why: 'The retention value must be a number followed by a unit: d (days), h (hours), or m (minutes)',
-      fix: `Change retention to a valid format, e.g., "30d", "24h", or "60m"`,
-      link: 'https://evlog.dev/nuxthub/retention',
-    })
-  }
-
-  const [, numStr, unit] = match
-  const num = Number(numStr)
-
-  // Convert retention to minutes
-  let totalMinutes: number
-  switch (unit) {
-    case 'm':
-      totalMinutes = num
-      break
-    case 'h':
-      totalMinutes = num * 60
-      break
-    case 'd':
-      totalMinutes = num * 24 * 60
-      break
-    default:
-      throw createEvlogError({
-        message: `[evlog/nuxthub] Unknown retention unit: "${unit}"`,
-        why: 'The retention value must use one of the supported units: d (days), h (hours), or m (minutes)',
-        fix: `Change retention to a valid format, e.g., "30d", "24h", or "60m"`,
-        link: 'https://evlog.dev/nuxthub/retention',
-      })
-  }
-
-  // Cleanup runs every half-retention period
-  const halfMinutes = Math.max(1, Math.floor(totalMinutes / 2))
-
-  if (halfMinutes < 60) {
-    return `*/${halfMinutes} * * * *`
-  }
-
-  const halfHours = Math.floor(halfMinutes / 60)
-  if (halfHours >= 24) {
-    return '0 3 * * *'
-  }
-
-  return `0 */${halfHours} * * *`
-}
+import { retentionToCron } from './runtime/utils/retention'
 
 export default defineNuxtModule({
   meta: {
     name,
-    version
+    version,
   },
   async onInstall(nuxt) {
     const shouldSetup = await consola.prompt(
@@ -75,7 +25,7 @@ export default defineNuxtModule({
     }
 
     const evlogConfig = (nuxt.options as any).evlog || {}
-    const retention = evlogConfig.retention ?? '30d'
+    const retention = evlogConfig.retention ?? '7d'
     const cron = retentionToCron(retention)
 
     const crons: Array<{ path: string, schedule: string }> = config.crons || []
@@ -116,7 +66,7 @@ export default defineNuxtModule({
 
     // Read nuxthub options from evlog config key
     const evlogConfig = (nuxt.options as any).evlog || {}
-    const retention: string = evlogConfig.retention ?? '30d'
+    const retention: string = evlogConfig.retention ?? '7d'
 
     // Extend NuxtHub DB schema with dialect-specific evlog_events table
     // @ts-expect-error hub:db:schema:extend hook exists but is not in NuxtHooks type

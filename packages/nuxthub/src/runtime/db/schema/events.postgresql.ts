@@ -1,7 +1,7 @@
 import { index, integer, jsonb, pgTable, text } from 'drizzle-orm/pg-core'
 
 export const evlogEvents = pgTable('evlog_events', {
-  id: text('id').primaryKey().$defaultFn(() => crypto.randomUUID()),
+  id: text('id').primaryKey(),
   timestamp: text('timestamp').notNull(),
   level: text('level').notNull(),
   service: text('service').notNull(),
@@ -14,7 +14,7 @@ export const evlogEvents = pgTable('evlog_events', {
   source: text('source'),
   error: jsonb('error'),
   data: jsonb('data'),
-  createdAt: text('created_at').notNull().$defaultFn(() => new Date().toISOString()),
+  createdAt: text('created_at').notNull(),
 }, table => [
   index('evlog_events_timestamp_idx').on(table.timestamp),
   index('evlog_events_level_idx').on(table.level),

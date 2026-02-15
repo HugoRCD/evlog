@@ -47,5 +47,16 @@ jobs:
           publish: bun run release
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
+
+      - name: Create GitHub Releases
+        if: steps.changesets.outputs.published == 'true'
+        run: |
+          for pkg in $(echo '${{ steps.changesets.outputs.publishedPackages }}' | jq -c '.[]'); do
+            name=$(echo "$pkg" | jq -r '.name')
+            version=$(echo "$pkg" | jq -r '.version')
+            tag="${name}@${version}"
+            gh release create "$tag" --title "$tag" --generate-notes --draft
+          done
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

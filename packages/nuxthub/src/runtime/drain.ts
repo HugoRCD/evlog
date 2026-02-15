@@ -48,7 +48,15 @@ function extractRow(ctx: DrainContext): EventRow {
   const errorValue = event.error
   let errorJson: string | null = null
   if (errorValue !== undefined && errorValue !== null) {
-    errorJson = typeof errorValue === 'string' ? errorValue : JSON.stringify(errorValue)
+    if (typeof errorValue === 'string') {
+      errorJson = errorValue
+    } else {
+      try {
+        errorJson = JSON.stringify(errorValue)
+      } catch {
+        errorJson = String(errorValue)
+      }
+    }
   }
 
   return {

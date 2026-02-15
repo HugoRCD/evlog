@@ -9,8 +9,12 @@
     "url": "git+https://github.com/HugoRCD/evlog.git",
     "directory": "packages/nuxthub"
   },
+  "bugs": {
+    "url": "https://github.com/HugoRCD/evlog/issues"
+  },
   "license": "MIT",
   "type": "module",
+  "sideEffects": false,
   "exports": {
     ".": {
       "types": "./dist/types.d.mts",
@@ -20,25 +24,38 @@
   "main": "./dist/module.mjs",
   "types": "./dist/types.d.mts",
   "files": [
-    "dist"
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "nuxthub",
+    "evlog",
+    "logging",
+    "nuxt",
+    "drizzle",
+    "database"
   ],
   "scripts": {
     "build": "nuxt-module-build build",
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare"
-  },
-  "dependencies": {
-    "evlog": "^1.7.0",
-    "@nuxthub/core": "^0.10.6"
   },
   "devDependencies": {
     "@nuxt/module-builder": "^1.0.2",
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
+    "evlog": "^1.7.0",
+    "@nuxthub/core": "^0.10.6",
     "drizzle-orm": ">=0.45.1"
   },
   "peerDependenciesMeta": {
     "drizzle-orm": {
+      "optional": false
+    },
+    "evlog": {
+      "optional": false
+    },
+    "@nuxthub/core": {
       "optional": false
     }
   },
