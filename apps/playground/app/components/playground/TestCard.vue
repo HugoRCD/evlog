@@ -26,6 +26,17 @@ const { execute, isLoading, result, error, status } = useTestRunner(props.id, {
   },
 })
 
+const accentColor = computed(() => {
+  const map: Record<string, string> = {
+    error: 'var(--color-red-500)',
+    warning: 'var(--color-amber-500)',
+    success: 'var(--color-emerald-500)',
+    primary: 'var(--ui-primary)',
+    neutral: 'var(--color-zinc-600)',
+  }
+  return map[props.color || ''] || 'var(--ui-primary)'
+})
+
 async function handleClick() {
   try {
     if (props.onClick) {
@@ -40,43 +51,40 @@ async function handleClick() {
 </script>
 
 <template>
-  <div class="h-full p-3 rounded-lg bg-elevated border border-primary/5 hover:border-primary/10 transition-colors flex flex-col">
-    <div class="flex items-center gap-2 mb-2">
-      <h3 class="text-sm font-semibold text-highlighted leading-tight truncate">
-        {{ label }}
-      </h3>
+  <div
+    class="h-full bg-elevated border border-[var(--ui-border)] border-l-2 flex flex-col"
+    :style="{ borderLeftColor: accentColor }"
+  >
+    <div
+      class="p-4 flex-1 flex flex-col cursor-pointer transition-colors hover:bg-white/[0.02] active:bg-white/[0.04] relative"
+      @click="handleClick"
+    >
+      <UIcon
+        v-if="isLoading"
+        name="i-lucide-loader-circle"
+        class="size-3.5 animate-spin text-primary absolute top-4 right-4"
+      />
+
       <UBadge
         v-if="badge"
-        :color="badge.color as any"
+        color="neutral"
         variant="subtle"
-        class="shrink-0"
+        class="mb-2.5 w-fit"
       >
         {{ badge.label }}
       </UBadge>
-    </div>
 
-    <p v-if="description" class="text-xs text-muted leading-snug mb-3 grow truncate" :title="description">
-      {{ description }}
-    </p>
-
-    <div class="mt-auto">
-      <UButton
-        size="sm"
-        :color="color as any"
-        :loading="isLoading"
-        @click="handleClick"
-      >
+      <h3 class="text-sm font-medium text-highlighted leading-snug">
         {{ label }}
-      </UButton>
+      </h3>
+
+      <p v-if="description" class="text-xs text-muted leading-relaxed mt-1.5 line-clamp-2" :title="description">
+        {{ description }}
+      </p>
     </div>
 
-    <PlaygroundTestResult
-      v-if="showResult"
-      :status
-      :response="result"
-      :error
-      compact
-      class="mt-3"
-    />
+    <div v-if="showResult" class="px-4 pb-4" @click.stop>
+      <PlaygroundTestResult :status :response="result" :error compact />
+    </div>
   </div>
 </template>

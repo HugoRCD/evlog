@@ -11,41 +11,42 @@ const currentSection = computed(() =>
 
 <template>
   <div class="flex h-dvh bg-default">
-    <aside class="w-60 shrink-0 border-r border-primary/10 overflow-y-auto bg-elevated/50">
-      <header class="px-4 py-4 border-b border-primary/10">
-        <h1 class="text-lg font-bold text-highlighted">
-          evlog Playground
+    <aside class="w-56 shrink-0 border-r border-[var(--ui-border)] overflow-y-auto">
+      <div class="px-4 pt-5 pb-4">
+        <h1 class="text-sm font-semibold text-highlighted tracking-tight">
+          evlog
         </h1>
-        <p class="text-muted text-xs mt-0.5">
-          Test logging & wide events
+        <p class="text-[11px] text-muted mt-0.5">
+          Playground
         </p>
-      </header>
-      <nav class="p-2 space-y-0.5">
+      </div>
+      <nav class="px-2 pb-3 space-y-px">
         <button
           v-for="section in sections"
           :key="section.id"
           :class="[
-            'w-full flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm transition-colors text-left',
+            'w-full flex items-center gap-2.5 px-3 py-2 text-[13px] transition-colors text-left',
             activeSection === section.id
-              ? 'bg-primary/10 text-highlighted font-medium'
-              : 'text-muted hover:bg-elevated hover:text-highlighted',
+              ? 'bg-primary/5 text-primary font-medium'
+              : 'text-muted hover:text-highlighted',
           ]"
           @click="activeSection = section.id"
         >
           <UIcon v-if="section.icon" :name="section.icon" class="size-4 shrink-0" />
-          {{ section.label }}
+          <span class="flex-1 truncate">{{ section.label }}</span>
+          <span class="text-[10px] tabular-nums opacity-40">{{ section.tests.length }}</span>
         </button>
       </nav>
     </aside>
 
-    <main class="flex-1 overflow-y-auto p-6">
+    <main class="flex-1 overflow-y-auto p-8">
       <PlaygroundTestSection
         v-if="currentSection"
         :id="currentSection.id"
         :title="currentSection.title"
         :description="currentSection.description"
       >
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
           <PlaygroundTestCard
             v-for="test in currentSection.tests"
             :key="test.id"
