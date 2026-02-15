@@ -36,7 +36,14 @@ export function emitErrorAndRespond(log: RequestLogger, error: unknown): NextRes
   if (status >= 500) {
     log.error(error as Error)
   } else {
-    log.warn(parsed.message, {
+    // Keep 4xx logs at error level, but avoid noisy Next stack traces.
+    const cleanError = {
+      name: 'EvlogError',
+      message: parsed.message,
+      status,
+    } as Error
+
+    log.error(cleanError, {
       error: {
         status,
         message: parsed.message,
