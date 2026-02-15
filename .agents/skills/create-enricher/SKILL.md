@@ -132,9 +132,9 @@ Add the new enricher to the **"Built-in Enrichers"** table in the root `AGENTS.m
 | {DISPLAY} | `evlog/enrichers` | `{name}` | [Description] |
 ```
 
-## Step 6: Update READMEs
+## Step 6: Update README
 
-Add the enricher to the enrichers section in both `README.md` and `packages/evlog/README.md`. Both files should list all built-in enrichers with their event fields and output shapes.
+Add the enricher to the enrichers section in `packages/evlog/README.md` (the root `README.md` is a symlink to it). Add the enricher to the enrichers table with its event field and output shape.
 
 ## Verification
 

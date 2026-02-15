@@ -9,6 +9,7 @@ import {
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import { name, version } from '../../package.json'
 
 export interface ModuleOptions {
   /**
@@ -194,8 +195,9 @@ export interface ModuleOptions {
 
 export default defineNuxtModule<ModuleOptions>({
   meta: {
-    name: 'evlog',
-    configKey: 'evlog',
+    name,
+    version,
+    configKey: name,
     docs: 'https://evlog.dev',
   },
   defaults: {},

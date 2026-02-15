@@ -1,10 +1,10 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Detects console.log spam, unstructured errors, and missing context. Guides wide event design, structured error handling, request-scoped logging, and log draining with adapters (Axiom, OTLP).
+description: Review code for logging patterns and suggest evlog adoption. Detects console.log spam, unstructured errors, and missing context. Guides wide event design, structured error handling, request-scoped logging, and log draining with adapters (Axiom, OTLP, PostHog, Sentry, Better Stack).
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.3"
+  version: "0.4"
 ---
 
 # Review logging patterns
@@ -13,20 +13,11 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 
 ## When to Use
 
-**Use this skill when:**
-
 - Reviewing code for logging best practices
-- User asks to improve their logging
 - Converting console.log statements to structured logging
 - Improving error handling with better context
 - Setting up request-scoped logging in API routes
-- Debugging why logs are hard to search/filter
-
-**Key transformations:**
-
-- `console.log` spam → wide events with `useLogger(event)`
-- `throw new Error('...')` → `createError({ message, status, why, fix })`
-- Scattered request logs → `useLogger(event)` (Nuxt/Nitro) or `createRequestLogger()` (standalone)
+- Configuring log draining to external services
 
 ## Quick Reference
 
@@ -35,59 +26,25 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 | Wide events patterns    | [references/wide-events.md](references/wide-events.md)             |
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
-| Log draining & adapters | See "Log Draining & Adapters" section below                        |
 | Drain pipeline          | [references/drain-pipeline.md](references/drain-pipeline.md)       |
 
 ## Important: Auto-imports in Nuxt
 
-In Nuxt applications, all evlog functions are **auto-imported** - no import statements needed:
+In Nuxt applications, all evlog functions are **auto-imported** -- no import statements needed:
 
 ```typescript
 // server/api/checkout.post.ts
 export default defineEventHandler(async (event) => {
-  // useLogger is auto-imported - no import needed!
-  const log = useLogger(event)
+  const log = useLogger(event) // auto-imported
   log.set({ user: { id: 1, plan: 'pro' } })
   return { success: true }
 })
 ```
 
 ```vue
-<!-- In Vue components - log is auto-imported -->
 <script setup>
 log.info('checkout', 'User initiated checkout')
 </script>
-```
-
-## Core Philosophy
-
-### The Problem with Traditional Logging
-
-```typescript
-// ❌ Scattered logs - impossible to correlate during incidents
-console.log('Request received')
-console.log('User authenticated')
-console.log('Loading cart')
-console.log('Processing payment')
-console.log('Payment failed')
-```
-
-### The Solution: Wide Events
-
-```typescript
-// server/api/checkout.post.ts
-// No import needed in Nuxt - useLogger is auto-imported!
-
-// ✅ One comprehensive event per request
-export default defineEventHandler(async (event) => {
-  const log = useLogger(event)
-
-  log.set({ user: { id: '123', plan: 'premium' } })
-  log.set({ cart: { items: 3, total: 9999 } })
-  log.error(error, { step: 'payment' })
-
-  // emit() called automatically at request end
-})
 ```
 
 ## Anti-Patterns to Detect
@@ -95,34 +52,22 @@ export default defineEventHandler(async (event) => {
 ### 1. Console.log Spam
 
 ```typescript
-// ❌ Multiple logs for one logical operation
+// Multiple logs for one logical operation
 console.log('Starting checkout')
 console.log('User:', userId)
 console.log('Cart:', cart)
-console.log('Payment result:', result)
 ```
 
 **Transform to:**
 
 ```typescript
-// ✅ Single wide event
-log.info({
-  action: 'checkout',
-  userId,
-  cart,
-  result,
-  duration: '1.2s'
-})
+log.info({ action: 'checkout', userId, cart, duration: '1.2s' })
 ```
 
 ### 2. Generic Error Messages
 
 ```typescript
-// ❌ Useless error
 throw new Error('Something went wrong')
-
-// ❌ Missing context
-throw new Error('Payment failed')
 ```
 
 **Transform to:**
@@ -130,27 +75,19 @@ throw new Error('Payment failed')
 ```typescript
 import { createError } from 'evlog'
 
-// ✅ Self-documenting error
 throw createError({
   message: 'Payment failed',
   status: 402,
   why: 'Card declined by issuer',
   fix: 'Try a different payment method or contact your bank',
-  link: 'https://docs.example.com/payments/declined',
-  cause: originalError,
 })
 ```
 
 ### 3. Missing Request Context
 
 ```typescript
-// server/api/orders.post.ts
-
-// ❌ No way to correlate logs
 export default defineEventHandler(async (event) => {
   console.log('Processing request')
-  const user = await getUser(event)
-  console.log('Got user', user.id)
   // ...
 })
 ```
@@ -158,18 +95,9 @@ export default defineEventHandler(async (event) => {
 **Transform to (Nuxt/Nitro):**
 
 ```typescript
-// server/api/orders.post.ts
-// useLogger is auto-imported in Nuxt - no import needed!
-
-// ✅ Request-scoped with full context
 export default defineEventHandler(async (event) => {
   const log = useLogger(event)
-
-  const user = await getUser(event)
   log.set({ user: { id: user.id, plan: user.plan } })
-
-  // ... do work, accumulate context ...
-
   // emit() called automatically
 })
 ```
@@ -177,15 +105,14 @@ export default defineEventHandler(async (event) => {
 **Transform to (Standalone TypeScript):**
 
 ```typescript
-// scripts/process-job.ts
 import { createRequestLogger } from 'evlog'
 
 const log = createRequestLogger({ jobId: job.id, type: 'sync' })
-
 log.set({ source: job.source, target: job.target })
-// ... do work ...
-log.emit()  // Manual emit for standalone usage
+log.emit()  // Manual emit for standalone
 ```
+
+See [references/code-review.md](references/code-review.md) for the full review checklist and transformation examples.
 
 ## Installation
 
@@ -193,78 +120,186 @@ log.emit()  // Manual emit for standalone usage
 npm install evlog
 ```
 
-### Nuxt Integration
+### Nuxt
 
 ```typescript
 // nuxt.config.ts
 export default defineNuxtConfig({
   modules: ['evlog/nuxt'],
   evlog: {
-    env: {
-      service: 'my-app',
-      environment: process.env.NODE_ENV,
-    },
-    // Optional: only log specific routes (supports glob patterns)
+    env: { service: 'my-app' },
     include: ['/api/**'],
-    // Optional: send client logs to server (default: false)
-    transport: {
-      enabled: true,
-    },
   },
 })
 ```
 
-### Nitro v3 Integration
+### Nitro v3
 
 ```typescript
-// nitro.config.ts
 import { defineConfig } from 'nitro'
 import evlog from 'evlog/nitro/v3'
 
 export default defineConfig({
-  modules: [
-    evlog({
-      env: { service: 'my-api' },
-    })
-  ],
+  modules: [evlog({ env: { service: 'my-api' } })],
 })
 ```
 
-Import `useLogger` from `evlog/nitro/v3` in routes:
+Import `useLogger` from `evlog/nitro/v3` in routes.
+
+### Nitro v2
 
 ```typescript
-import { defineHandler } from 'nitro/h3'
-import { useLogger } from 'evlog/nitro/v3'
-import { createError } from 'evlog'
-```
-
-### Nitro v2 Integration
-
-```typescript
-// nitro.config.ts
 import { defineNitroConfig } from 'nitropack/config'
 import evlog from 'evlog/nitro'
 
 export default defineNitroConfig({
-  modules: [
-    evlog({
-      env: { service: 'my-api' },
-    })
-  ],
+  modules: [evlog({ env: { service: 'my-api' } })],
 })
 ```
 
-Import `useLogger` from `evlog/nitro` in routes:
+Import `useLogger` from `evlog/nitro` in routes.
+
+### Standalone TypeScript
 
 ```typescript
-import { defineEventHandler } from 'h3'
-import { useLogger } from 'evlog/nitro'
-import { createError } from 'evlog'
+import { initLogger } from 'evlog'
+
+initLogger({
+  env: { service: 'my-worker', environment: 'production' },
+  drain: createAxiomDrain(), // optional: direct drain without Nitro hooks
+})
 ```
 
-## Structured Error Levels
+## Configuration Options
 
-Not all errors need the same level of detail. Use the appropriate level:
+All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), and standalone (`initLogger()`).
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| `enabled` | `boolean` | `true` | Global toggle. When `false`, all operations become no-ops |
+| `env.service` | `string` | `'app'` | Service name in logs |
+| `env.environment` | `string` | Auto-detected | `'production'` \| `'development'` \| `'test'` |
+| `env.version` | `string` | Auto-detected | App version (from package.json) |
+| `env.commitHash` | `string` | Auto-detected | Git commit (from CI env vars) |
+| `env.region` | `string` | Auto-detected | Deployment region (from cloud env vars) |
+| `pretty` | `boolean` | `true` in dev | Pretty tree format vs JSON output |
+| `stringify` | `boolean` | `true` | JSON.stringify output. Set `false` for Workers (expects objects) |
+| `include` | `string[]` | All routes | Route glob patterns to log (e.g., `['/api/**']`) |
+| `exclude` | `string[]` | None | Route glob patterns to exclude (takes precedence over `include`) |
+| `routes` | `Record<string, { service }>` | -- | Route-specific service names |
+| `sampling` | `SamplingConfig` | -- | See sampling section below |
+| `transport` | `TransportConfig` | -- | Client log transport (Nuxt only) |
+| `drain` | `(ctx) => void` | -- | Direct drain callback (standalone only, no Nitro hooks) |
+
+### Sampling
+
+Two strategies, composable:
+
+```typescript
+evlog: {
+  sampling: {
+    // Head sampling: random % per level (decided before request completes)
+    rates: {
+      info: 10,    // Keep 10% of info logs
+      warn: 50,    // Keep 50%
+      debug: 0,    // Disable
+      error: 100,  // Always kept (default)
+    },
+    // Tail sampling: force-keep based on outcome (OR logic)
+    keep: [
+      { status: 400 },              // Keep if status >= 400
+      { duration: 1000 },           // Keep if duration >= 1000ms
+      { path: '/api/critical/**' }, // Keep if path matches
+    ],
+  },
+}
+```
+
+**Custom tail sampling hook** (Nitro) for business logic:
+
+```typescript
+// server/plugins/evlog-custom.ts
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:emit:keep', (ctx) => {
+    if (ctx.context.user?.premium) ctx.shouldKeep = true
+  })
+})
+```
+
+**Production tip** -- use `$production` in Nuxt to sample only in production:
+
+```typescript
+export default defineNuxtConfig({
+  modules: ['evlog/nuxt'],
+  evlog: { env: { service: 'my-app' } },
+  $production: {
+    evlog: { sampling: { rates: { info: 10, debug: 0 }, keep: [{ status: 400 }] } },
+  },
+})
+```
+
+### Route-Specific Config
+
+```typescript
+evlog: {
+  routes: {
+    '/api/billing/**': { service: 'billing-api' },
+    '/api/auth/**': { service: 'auth-api' },
+  },
+}
+```
+
+### Client Transport (Nuxt only)
+
+```typescript
+evlog: {
+  transport: {
+    enabled: true,                    // Send client logs to server (default: false)
+    endpoint: '/api/_evlog/ingest',   // Default endpoint
+  },
+}
+```
+
+When enabled, client `log.*` calls are sent to the server -> enriched -> drained via `evlog:drain` with `source: 'client'`.
+
+### Event Enrichment
+
+Add derived context after emit, before drain:
+
+```typescript
+// server/plugins/evlog-enrich.ts
+import { createUserAgentEnricher, createGeoEnricher } from 'evlog/enrichers'
+
+export default defineNitroPlugin((nitroApp) => {
+  const enrichers = [createUserAgentEnricher(), createGeoEnricher()]
+
+  nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+    for (const enricher of enrichers) enricher(ctx)
+  })
+})
+```
+
+Built-in enrichers: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()` -- all from `evlog/enrichers`. Accept `{ overwrite?: boolean }`.
+
+Custom enrichment -- mutate `ctx.event` directly:
+
+```typescript
+nitroApp.hooks.hook('evlog:enrich', (ctx) => {
+  ctx.event.deploymentId = process.env.DEPLOYMENT_ID
+  if (ctx.headers?.['x-tenant-id']) ctx.event.tenantId = ctx.headers['x-tenant-id']
+})
+```
+
+### Nitro Hooks
+
+| Hook | When | Use |
+|------|------|-----|
+| `evlog:enrich` | After emit, before drain | Add derived context to events |
+| `evlog:drain` | After enrichment | Send events to external services |
+| `evlog:emit:keep` | During emit | Custom tail sampling logic |
+| `close` | Server shutdown | Flush drain pipeline buffers |
+
+## Structured Error Levels
 
 ### Minimal (internal errors)
 
@@ -294,90 +329,26 @@ throw createError({
 })
 ```
 
-## Frontend Integration
+See [references/structured-errors.md](references/structured-errors.md) for common error patterns and templates.
 
-evlog errors work with any Nitro-powered framework. When thrown, they're automatically converted to HTTP responses with structured data.
+## Frontend Integration
 
 Use `parseError()` to extract all fields at the top level:
 
 ```typescript
-import { createError, parseError } from 'evlog'
+import { parseError } from 'evlog'
 
-// Backend - just throw the error
-throw createError({
-  message: 'Payment failed',
-  status: 402,
-  why: 'Card declined',
-  fix: 'Try another card',
-  link: 'https://docs.example.com/payments',
-})
-
-// Frontend - use parseError() for direct access
 try {
   await $fetch('/api/checkout')
 } catch (err) {
   const error = parseError(err)
-
   // Direct access: error.message, error.why, error.fix, error.link
   toast.add({
     title: error.message,
     description: error.why,
     color: 'error',
-    actions: error.link
-      ? [{ label: 'Learn more', onClick: () => window.open(error.link) }]
-      : undefined,
   })
-
-  if (error.fix) console.info(`💡 Fix: ${error.fix}`)
 }
-```
-
-**The difference**: A generic error shows "An error occurred". A structured error shows the message, explains why, suggests a fix, and links to docs.
-
-## Client-Side Logging
-
-The `log` API works on both server and client. In Nuxt, it's auto-imported:
-
-```typescript
-// In Vue components, composables, or client-side code
-log.info('checkout', 'User initiated checkout')
-log.error({ action: 'payment', error: 'validation_failed' })
-log.warn('form', 'Invalid email format')
-log.debug({ component: 'CartDrawer', itemCount: 3 })
-```
-
-Client logs output to the browser console with colored tags in development.
-
-### Client Transport
-
-To send client logs to the server for centralized logging, enable the transport:
-
-```typescript
-// nuxt.config.ts
-export default defineNuxtConfig({
-  modules: ['evlog/nuxt'],
-  evlog: {
-    transport: {
-      enabled: true,  // Send client logs to server
-    },
-  },
-})
-```
-
-When enabled:
-1. Client logs are sent to `/api/_evlog/ingest` via POST
-2. Server enriches with environment context (service, version, etc.)
-3. `evlog:drain` hook is called with `source: 'client'`
-4. External services receive the log
-
-Identify client logs in your drain hook:
-
-```typescript
-nitroApp.hooks.hook('evlog:drain', async (ctx) => {
-  if (ctx.event.source === 'client') {
-    // Handle client logs specifically
-  }
-})
 ```
 
 ## Log Draining & Adapters
@@ -386,16 +357,17 @@ evlog provides built-in adapters to send logs to external observability platform
 
 ### Built-in Adapters
 
-| Adapter | Import | Use Case |
+| Adapter | Import | Env Vars |
 |---------|--------|----------|
-| Axiom | `evlog/axiom` | Axiom datasets for querying and dashboards |
-| OTLP | `evlog/otlp` | OpenTelemetry for Grafana, Datadog, Honeycomb, etc. |
-| PostHog | `evlog/posthog` | PostHog for product analytics and event tracking |
-| Sentry | `evlog/sentry` | Sentry for error tracking and performance monitoring |
+| Axiom | `evlog/axiom` | `NUXT_AXIOM_TOKEN`, `NUXT_AXIOM_DATASET` |
+| OTLP | `evlog/otlp` | `NUXT_OTLP_ENDPOINT` |
+| PostHog | `evlog/posthog` | `NUXT_POSTHOG_API_KEY`, `NUXT_POSTHOG_HOST` |
+| Sentry | `evlog/sentry` | `NUXT_SENTRY_DSN` |
+| Better Stack | `evlog/better-stack` | `NUXT_BETTER_STACK_SOURCE_TOKEN` |
 
 ### Quick Setup
 
-**Axiom:**
+All adapters follow the same pattern:
 
 ```typescript
 // server/plugins/evlog-drain.ts
@@ -405,47 +377,6 @@ export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
 })
 ```
-
-Set `NUXT_AXIOM_TOKEN` and `NUXT_AXIOM_DATASET` environment variables.
-
-**OTLP:**
-
-```typescript
-// server/plugins/evlog-drain.ts
-import { createOTLPDrain } from 'evlog/otlp'
-
-export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook('evlog:drain', createOTLPDrain())
-})
-```
-
-Set `NUXT_OTLP_ENDPOINT` environment variable.
-
-**PostHog:**
-
-```typescript
-// server/plugins/evlog-drain.ts
-import { createPostHogDrain } from 'evlog/posthog'
-
-export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook('evlog:drain', createPostHogDrain())
-})
-```
-
-Set `NUXT_POSTHOG_API_KEY` and `NUXT_POSTHOG_HOST` environment variables.
-
-**Sentry:**
-
-```typescript
-// server/plugins/evlog-drain.ts
-import { createSentryDrain } from 'evlog/sentry'
-
-export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook('evlog:drain', createSentryDrain())
-})
-```
-
-Set `NUXT_SENTRY_DSN` environment variable.
 
 ### Multiple Destinations
 
@@ -468,7 +399,6 @@ export default defineNitroPlugin((nitroApp) => {
 ```typescript
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', async (ctx) => {
-    // ctx.event contains the full wide event
     await fetch('https://your-service.com/logs', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -480,7 +410,7 @@ export default defineNitroPlugin((nitroApp) => {
 
 ### Drain Pipeline (Production)
 
-For production use, wrap any adapter with `createDrainPipeline` to get batching, retry with backoff, and buffer overflow protection. Without a pipeline, each event triggers a separate network call.
+Wrap any adapter with `createDrainPipeline` for batching, retry with backoff, and buffer overflow protection.
 
 ```typescript
 import type { DrainContext } from 'evlog'
@@ -503,77 +433,25 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-Key options: `batch.size` (default 50), `batch.intervalMs` (default 5000), `retry.maxAttempts` (default 3), `retry.backoff` (`'exponential'` | `'linear'` | `'fixed'`), `maxBufferSize` (default 1000).
+See [references/drain-pipeline.md](references/drain-pipeline.md) for full options and patterns.
 
-See [references/drain-pipeline.md](references/drain-pipeline.md) for full patterns and options.
-
-## Security: Preventing Sensitive Data Leakage
-
-Wide events capture comprehensive context, making it easy to accidentally log sensitive data.
-
-### What NOT to Log
-
-| Category | Examples | Risk |
-|----------|----------|------|
-| Credentials | Passwords, API keys, tokens | Account compromise |
-| Payment data | Full card numbers, CVV | PCI violation |
-| Personal data (PII) | SSN, unmasked emails | GDPR/CCPA violation |
-| Authentication | Session tokens, JWTs | Session hijacking |
-
-### Safe Logging Pattern
+## Security: Sensitive Data
 
 ```typescript
-// ❌ DANGEROUS - logs everything including password
-const body = await readBody(event)
+// DANGEROUS - logs everything including password
 log.set({ user: body })
 
-// ✅ SAFE - explicitly select fields
-log.set({
-  user: {
-    id: body.id,
-    plan: body.plan,
-    // password: body.password ← NEVER include
-  },
-})
+// SAFE - explicitly select fields
+log.set({ user: { id: body.id, plan: body.plan } })
 ```
 
-### Sanitization Helpers
-
-```typescript
-// server/utils/sanitize.ts
-export function maskEmail(email: string): string {
-  const [local, domain] = email.split('@')
-  return `${local[0]}***@${domain}`
-}
-
-export function maskCard(card: string): string {
-  return `****${card.slice(-4)}`
-}
-```
-
-## Review Checklist
-
-When reviewing code, check for:
-
-1. **Console.log statements** → Replace with `useLogger(event).set()` or wide events
-2. **Generic errors** → Add `status`, `why`, `fix`, and `link` fields with `createError()`
-3. **Scattered request logs** → Use `useLogger(event)` (Nuxt/Nitro) or `createRequestLogger()` (standalone)
-4. **Missing context** → Add user, business, and outcome context with `log.set()`
-5. **No duration tracking** → Let `emit()` handle it automatically
-6. **No frontend error handling** → Catch errors and display toasts with structured data
-7. **Sensitive data in logs** → Check for passwords, tokens, full card numbers, PII
-8. **Client-side logging** → Use `log` API for debugging in Vue components
-9. **Client log centralization** → Enable `transport.enabled: true` to send client logs to server
-10. **Missing log draining** → Set up adapters (`evlog/axiom`, `evlog/otlp`, `evlog/posthog`, `evlog/sentry`) for production log export
-11. **No drain pipeline** → Wrap adapters with `createDrainPipeline()` for batching, retry, and buffer overflow protection
+Never log passwords, tokens, API keys, full card numbers, or PII. See [references/wide-events.md](references/wide-events.md) for sanitization helpers and production checklist.
 
 ## Loading Reference Files
 
-Load reference files based on what you're working on:
+Load based on what you're working on -- **do not load all at once**:
 
-- Designing wide events → [references/wide-events.md](references/wide-events.md)
-- Improving errors → [references/structured-errors.md](references/structured-errors.md)
-- Full code review → [references/code-review.md](references/code-review.md)
-- Drain pipeline setup → [references/drain-pipeline.md](references/drain-pipeline.md)
-
-**DO NOT load all files at once** - load only what's needed for the current task.
+- Designing wide events -> [references/wide-events.md](references/wide-events.md)
+- Improving errors -> [references/structured-errors.md](references/structured-errors.md)
+- Full code review -> [references/code-review.md](references/code-review.md)
+- Drain pipeline setup -> [references/drain-pipeline.md](references/drain-pipeline.md)
