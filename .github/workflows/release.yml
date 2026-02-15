@@ -36,7 +36,7 @@ jobs:
         run: bun run dev:prepare
 
       - name: Build packages
-        run: turbo run build --filter='./packages/*'
+        run: bun run build:package
 
       - name: Create Release PR or Publish
         id: changesets
