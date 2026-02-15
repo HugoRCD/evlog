@@ -1,5 +1,6 @@
 {
   "name": "evlog-nitro-playground",
+  "private": true,
   "type": "module",
   "scripts": {
     "build": "nitro build",
