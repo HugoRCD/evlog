@@ -16,7 +16,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare
@@ -46,7 +46,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare
@@ -62,7 +62,7 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare
@@ -82,7 +82,7 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2"
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Prepare
