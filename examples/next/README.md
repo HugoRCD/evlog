@@ -36,3 +36,4 @@ Each route shows the full control flow explicitly (no route wrapper):
 - In `catch`, map errors to structured responses via `emitErrorAndRespond(log, error)`
 
 This keeps `createError` visible in real route code while preserving clean logs.
+The emitted wide event includes `why`, `fix`, and `link` fields for failed flows.

@@ -22,6 +22,7 @@ export async function POST(request: NextRequest) {
         status: 400,
         why: 'No userId was sent in login payload',
         fix: 'Send one of the available demo user IDs from /api/me',
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 
@@ -32,6 +33,7 @@ export async function POST(request: NextRequest) {
         status: 404,
         why: `User "${userId}" does not exist in demo fixtures`,
         fix: `Use one of these users: ${listUsers().map(u => u.id).join(', ')}`,
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 

@@ -21,6 +21,7 @@ export function requireSessionUser(request: NextRequest): DemoUser {
       status: 401,
       why: 'No authenticated demo user in session',
       fix: 'Login from the UI before calling this endpoint',
+      link: 'https://evlog.dev/core-concepts/structured-errors',
     })
   }
   return user

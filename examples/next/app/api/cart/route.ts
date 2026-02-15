@@ -63,6 +63,7 @@ export async function POST(request: NextRequest) {
         status: 400,
         why: 'No productId provided in add-to-cart payload',
         fix: 'Send { "productId": "sku_hoodie", "quantity": 1 }',
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 
@@ -73,6 +74,7 @@ export async function POST(request: NextRequest) {
         status: 404,
         why: `Product "${body.productId}" does not exist`,
         fix: 'Use one of the products returned by GET /api/products',
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 

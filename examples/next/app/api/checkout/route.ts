@@ -27,6 +27,7 @@ export async function POST(request: NextRequest) {
         status: 422,
         why: 'Checkout cannot run without at least one item in cart',
         fix: 'Add one product from the catalog then retry checkout',
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 
@@ -36,6 +37,7 @@ export async function POST(request: NextRequest) {
         status: 402,
         why: 'The selected payment method intentionally simulates a declined card',
         fix: 'Switch payment method to "card" then retry',
+        link: 'https://evlog.dev/core-concepts/structured-errors',
       })
     }
 

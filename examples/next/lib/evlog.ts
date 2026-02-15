@@ -33,8 +33,22 @@ export function emitErrorAndRespond(log: RequestLogger, error: unknown): NextRes
   const parsed = parseError(error)
   const status = parsed.status ?? 500
 
+  log.set({
+    failure: {
+      why: parsed.why,
+      fix: parsed.fix,
+      link: parsed.link,
+    },
+  })
+
   if (status >= 500) {
-    log.error(error as Error)
+    log.error(error as Error, {
+      error: {
+        why: parsed.why,
+        fix: parsed.fix,
+        link: parsed.link,
+      },
+    })
   } else {
     // Keep 4xx logs at error level, but avoid noisy Next stack traces.
     const cleanError = {
