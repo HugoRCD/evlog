@@ -130,7 +130,6 @@
     "build": "tsdown",
     "dev": "tsdown --watch",
     "dev:prepare": "tsdown",
-    "release": "bun run lint && bun run test && bun run build && changelogen --release && npm publish && git push --follow-tags",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "test": "vitest run",

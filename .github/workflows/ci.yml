@@ -16,9 +16,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.22"
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Prepare
         run: bun run dev:prepare
       - name: Build package
@@ -30,9 +30,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.22"
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Prepare
         run: bun run dev:prepare
       - name: Build package
@@ -46,9 +46,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.22"
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Prepare
         run: bun run dev:prepare
       - name: Build package
@@ -62,9 +62,9 @@ jobs:
       - uses: actions/checkout@v6
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.22"
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Prepare
         run: bun run dev:prepare
       - name: Build package
@@ -82,12 +82,12 @@ jobs:
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: "1.2.22"
       - name: Install dependencies
-        run: bun install --frozen-lockfile
+        run: bun install
       - name: Prepare
         run: bun run dev:prepare
       - name: Build package
         run: bun run build:package
       - name: Publish preview
-        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog'
+        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog' './packages/nuxthub'

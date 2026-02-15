@@ -34,3 +34,4 @@ apps/web/.data
 apps/chat/.data
 .codex/environments/
 .claude/
+apps/nuxthub-playground/.data
