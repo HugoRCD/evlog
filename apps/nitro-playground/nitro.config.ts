@@ -1,6 +1,13 @@
 import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
 
 export default defineConfig({
   serverDir: './',
-  // plugins: ['evlog/nitro'], TODO: update on v3 release
+  modules: [
+    evlog({
+      env: {
+        service: 'nitro-playground'
+      }
+    })
+  ],
 })

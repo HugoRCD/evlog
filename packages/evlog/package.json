@@ -32,8 +32,12 @@
       "import": "./dist/nuxt/module.mjs"
     },
     "./nitro": {
-      "types": "./dist/nitro/plugin.d.mts",
-      "import": "./dist/nitro/plugin.mjs"
+      "types": "./dist/nitro/module.d.mts",
+      "import": "./dist/nitro/module.mjs"
+    },
+    "./nitro/v3": {
+      "types": "./dist/nitro/v3/index.d.mts",
+      "import": "./dist/nitro/v3/index.mjs"
     },
     "./workers": {
       "types": "./dist/workers.d.mts",
@@ -83,7 +87,10 @@
         "./dist/nuxt/module.d.mts"
       ],
       "nitro": [
-        "./dist/nitro/plugin.d.mts"
+        "./dist/nitro/module.d.mts"
+      ],
+      "nitro/v3": [
+        "./dist/nitro/v3/index.d.mts"
       ],
       "workers": [
         "./dist/workers.d.mts"
@@ -130,12 +137,15 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
+    "ufo": "^1.6.3",
     "@nuxt/devtools": "^3.1.1",
     "@nuxt/schema": "^4.3.1",
     "@nuxt/test-utils": "^4.0.0",
     "changelogen": "^0.6.2",
+    "consola": "^3.4.2",
     "h3": "^1.15.5",
     "happy-dom": "^20.6.1",
+    "nitro": "^3.0.1-alpha.2",
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.1",
     "tsdown": "^0.20.3",
@@ -145,7 +155,8 @@
     "@nuxt/kit": "^4.3.1",
     "h3": "^1.15.5",
     "nitropack": "^2.13.1",
-    "ofetch": "^1.5.1"
+    "ofetch": "^1.5.1",
+    "nitro": "^3.0.1-alpha.2"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -158,6 +169,9 @@
       "optional": true
     },
     "ofetch": {
+      "optional": true
+    },
+    "nitro": {
       "optional": true
     }
   }

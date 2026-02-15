@@ -1,69 +1,15 @@
 import type { NitroApp } from 'nitropack/types'
-import { defineNitroPlugin, useRuntimeConfig } from 'nitropack/runtime'
+// Import from specific subpaths to avoid the barrel 'nitropack/runtime' which
+// re-exports from internal/app.mjs — that file imports #nitro-internal-virtual/*
+// modules that only exist inside rollup builds and crash when loaded externally
+// (nitropack dev loads plugins outside the bundle via Worker threads).
+import { defineNitroPlugin } from 'nitropack/runtime/internal/plugin'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger, isEnabled } from '../logger'
-import type { EnrichContext, RequestLogger, RouteConfig, SamplingConfig, ServerEvent, TailSamplingContext, WideEvent } from '../types'
-import { filterSafeHeaders, matchesPattern } from '../utils'
-
-interface EvlogConfig {
-  enabled?: boolean
-  env?: Record<string, unknown>
-  pretty?: boolean
-  include?: string[]
-  exclude?: string[]
-  routes?: Record<string, RouteConfig>
-  sampling?: SamplingConfig
-}
-
-function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
-  // Check exclusions first (they take precedence)
-  if (exclude && exclude.length > 0) {
-    if (exclude.some(pattern => matchesPattern(path, pattern))) {
-      return false
-    }
-  }
-
-  // If no include patterns, log everything (that wasn't excluded)
-  if (!include || include.length === 0) {
-    return true
-  }
-
-  // Log only if path matches at least one include pattern
-  return include.some(pattern => matchesPattern(path, pattern))
-}
-
-/**
- * Find the service name for a given path based on route patterns.
- *
- * When multiple patterns match the same path, the first matching pattern wins
- * based on object iteration order. To ensure predictable behavior, order your
- * route patterns from most specific to most general.
- *
- * @param path - The request path to match
- * @param routes - Route configuration mapping patterns to service names
- * @returns The service name for the matching route, or undefined if no match
- *
- * @example
- * ```ts
- * // Good: specific patterns first, general patterns last
- * routes: {
- *   '/api/auth/admin/**': { service: 'admin-service' },
- *   '/api/auth/**': { service: 'auth-service' },
- *   '/api/**': { service: 'api-service' },
- * }
- * ```
- */
-function getServiceForPath(path: string, routes?: Record<string, RouteConfig>): string | undefined {
-  if (!routes) return undefined
-
-  for (const [pattern, config] of Object.entries(routes)) {
-    if (matchesPattern(path, pattern)) {
-      return config.service
-    }
-  }
-
-  return undefined
-}
+import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
+import type { EvlogConfig } from '../nitro'
+import type { EnrichContext, RequestLogger, ServerEvent, TailSamplingContext, WideEvent } from '../types'
+import { filterSafeHeaders } from '../utils'
 
 function getSafeHeaders(event: ServerEvent): Record<string, string> {
   const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
@@ -153,9 +99,22 @@ async function callEnrichAndDrain(
   }
 }
 
-export default defineNitroPlugin((nitroApp) => {
-  const config = useRuntimeConfig()
-  const evlogConfig = config.evlog as EvlogConfig | undefined
+export default defineNitroPlugin(async (nitroApp) => {
+  // Config resolution: process.env bridge first (always set by the module),
+  // then lazy useRuntimeConfig() for production builds where env may not persist.
+  let evlogConfig: EvlogConfig | undefined
+  if (process.env.__EVLOG_CONFIG) {
+    evlogConfig = JSON.parse(process.env.__EVLOG_CONFIG)
+  } else {
+    try {
+      // nitropack/runtime/internal/config imports virtual modules —
+      // only works inside rollup-bundled output (production builds).
+      const { useRuntimeConfig } = await import('nitropack/runtime/internal/config')
+      evlogConfig = (useRuntimeConfig() as Record<string, any>).evlog
+    } catch {
+      // Expected in dev mode — virtual modules unavailable outside rollup
+    }
+  }
 
   initLogger({
     enabled: evlogConfig?.enabled,
@@ -206,8 +165,7 @@ export default defineNitroPlugin((nitroApp) => {
     if (requestLog) {
       requestLog.error(error as Error)
 
-      // Get the actual error status code
-      const errorStatus = (error as { statusCode?: number }).statusCode ?? 500
+      const errorStatus = extractErrorStatus(error)
       requestLog.set({ status: errorStatus })
 
       // Build tail sampling context

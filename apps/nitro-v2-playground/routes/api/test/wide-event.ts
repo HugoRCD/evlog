@@ -1,8 +1,7 @@
-import { defineHandler } from 'nitro/h3'
-import { useLogger } from 'evlog'
+import { defineEventHandler } from 'h3'
+import { useLogger } from 'evlog/nitro'
 
-export default defineHandler(async (event) => {
-  // @ts-expect-error - TODO: update on v3 release
+export default defineEventHandler(async (event) => {
   const logger = useLogger(event)
 
   await new Promise(resolve => setTimeout(resolve, 100))

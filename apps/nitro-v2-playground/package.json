@@ -1,0 +1,17 @@
+{
+  "name": "evlog-nitro-v2-playground",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "nitropack dev",
+    "build": "nitropack build",
+    "preview": "node .output/server/index.mjs"
+  },
+  "dependencies": {
+    "evlog": "workspace:*"
+  },
+  "devDependencies": {
+    "h3": "^1.15.3",
+    "nitropack": "^2.11.12"
+  }
+}
