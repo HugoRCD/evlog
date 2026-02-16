@@ -1,16 +1,17 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
       "devDependencies": {
         "@changesets/changelog-github": "^0.5.2",
-        "@changesets/cli": "^2.29.4",
+        "@changesets/cli": "^2.29.8",
         "@hrcd/eslint-config": "^3.0.3",
         "@types/node": "latest",
         "automd": "^0.4.3",
         "eslint": "^9.39.2",
-        "turbo": "^2.8.3",
+        "turbo": "^2.8.9",
         "typescript": "^5.9.3",
         "vitest": "^4.0.18",
         "vue-tsc": "^3.2.4",
@@ -46,18 +47,18 @@
         "evlog": "workspace:*",
       },
       "devDependencies": {
-        "h3": "^1.15.3",
-        "nitropack": "^2.11.12",
+        "h3": "^1.15.5",
+        "nitropack": "^2.13.1",
       },
     },
     "apps/nuxthub-playground": {
       "name": "evlog-nuxthub-playground",
       "dependencies": {
-        "@ai-sdk/vue": "^3.0.81",
+        "@ai-sdk/vue": "^3.0.86",
         "@evlog/nuxthub": "workspace:*",
         "@libsql/client": "^0.17.0",
         "@nuxthub/core": "^0.10.6",
-        "ai": "^6.0.81",
+        "ai": "^6.0.86",
         "drizzle-kit": "^0.31.9",
         "drizzle-orm": "^0.45.1",
         "evlog": "workspace:*",
@@ -127,9 +128,9 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "1.8.0",
+      "version": "1.9.0",
       "devDependencies": {
-        "@nuxt/devtools": "^3.1.1",
+        "@nuxt/devtools": "^3.2.1",
         "@nuxt/schema": "^4.3.1",
         "@nuxt/test-utils": "^4.0.0",
         "changelogen": "^0.6.2",
@@ -160,7 +161,7 @@
     },
     "packages/nuxthub": {
       "name": "@evlog/nuxthub",
-      "version": "0.0.1-alpha.15",
+      "version": "1.0.0",
       "devDependencies": {
         "@nuxt/module-builder": "^1.0.2",
         "evlog": "workspace:*",
@@ -169,7 +170,7 @@
       "peerDependencies": {
         "@nuxthub/core": "^0.10.6",
         "drizzle-orm": ">=0.45.1",
-        "evlog": "^1.7.0",
+        "evlog": "^1.9.0",
       },
     },
   },
