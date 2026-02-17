@@ -1,7 +1,7 @@
 export default defineNuxtConfig({
   extends: ['docus'],
 
-  modules: ['motion-v/nuxt'],
+  modules: ['motion-v/nuxt', 'nuxt-studio'],
 
   css: ['~/assets/css/main.css'],
 
