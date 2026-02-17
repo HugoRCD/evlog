@@ -12,17 +12,17 @@ Self-hosted log retention for [evlog](https://evlog.dev) using [NuxtHub](https:/
 
 ## Setup
 
-Install the package:
+Install the packages:
 
 ```bash
-npx nuxi module add @evlog/nuxthub
+npx nuxi module add @nuxthub/core @evlog/nuxthub
 ```
 
 Add the module to your `nuxt.config.ts`:
 
 ```typescript
 export default defineNuxtConfig({
-  modules: ['@evlog/nuxthub'],
+  modules: ['@nuxthub/core', '@evlog/nuxthub'],
 
   evlog: {
     retention: '7d',
@@ -30,7 +30,7 @@ export default defineNuxtConfig({
 })
 ```
 
-> `evlog/nuxt` and `@nuxthub/core` are auto-installed if not already registered.
+> `evlog/nuxt` and `@nuxthub/core` can be auto-installed if missing, but we recommend installing `@nuxthub/core` explicitly and registering it in `modules`.
 
 ## Configuration
 
