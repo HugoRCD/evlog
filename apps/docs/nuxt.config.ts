@@ -10,6 +10,17 @@ export default defineNuxtConfig({
     url: 'https://evlog.dev',
   },
 
+  studio: {
+    route: '/_studio',
+    repository: {
+      provider: 'github',
+      owner: 'hugorcd',
+      repo: 'evlog',
+      branch: 'main',
+      rootDir: 'apps/docs',
+    },
+  },
+
   mcp: {
     name: 'evlog MCP',
   },
