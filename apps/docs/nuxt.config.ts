@@ -11,12 +11,9 @@ export default defineNuxtConfig({
   },
 
   studio: {
-    route: '/_studio',
     repository: {
-      provider: 'github',
-      owner: 'hugorcd',
+      owner: 'HugoRCD',
       repo: 'evlog',
-      branch: 'main',
       rootDir: 'apps/docs',
     },
   },
