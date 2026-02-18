@@ -103,26 +103,26 @@ log.info({ action: 'click' })
     </Motion>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <Motion
-        v-for="(feature, index) in features"
-        :key="feature.title"
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-        :in-view="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.4, delay: index * 0.05 }"
-        :in-view-options="{ once: true }"
-      >
-        <div class="group h-full border border-muted/50 bg-muted/30 p-5 transition-colors duration-300 hover:border-muted">
-          <h3 class="mb-2 font-pixel font-semibold text-primary">
-            {{ feature.title }}
-          </h3>
-          <p class="mb-4 text-sm leading-relaxed text-toned">
-            {{ feature.description }}
-          </p>
-          <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px]' }} }">
+      <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px]' }} }">
+        <Motion
+          v-for="(feature, index) in features"
+          :key="feature.title"
+          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
+          :in-view="{ opacity: 1, y: 0 }"
+          :transition="{ duration: 0.4, delay: index * 0.05 }"
+          :in-view-options="{ once: true }"
+        >
+          <div class="group h-full border border-muted/50 bg-muted/30 p-5 transition-colors duration-300 hover:border-muted">
+            <h3 class="mb-2 font-pixel font-semibold text-primary">
+              {{ feature.title }}
+            </h3>
+            <p class="mb-4 text-sm leading-relaxed text-toned">
+              {{ feature.description }}
+            </p>
             <MDC :value="feature.code" />
-          </UTheme>
-        </div>
-      </Motion>
+          </div>
+        </Motion>
+      </UTheme>
     </div>
   </UPageSection>
 </template>
