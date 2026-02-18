@@ -79,28 +79,31 @@ log.info({ action: 'click' })
   "fix": "Try another card"
 }`,
   },
-]
+].map(feature => ({
+  ...feature,
+  code: `\`\`\`ts\n${feature.code}\n\`\`\``,
+}))
 </script>
 
 <template>
-  <section class="bg-default py-24 lg:py-32">
-    <div class="mx-auto w-full max-w-6xl px-6">
-      <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
-        :in-view="{ opacity: 1, y: 0 }"
-        :transition="{ duration: 0.5 }"
-        :in-view-options="{ once: true }"
-        class="mb-12"
-      >
-        <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
-          Features
-        </p>
-        <h2 class="section-title">
-          Everything you need<span class="text-primary">.</span>
-        </h2>
-      </Motion>
+  <UPageSection :ui="{ container: 'gap-0 lg:gap-0'}">
+    <Motion
+      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :in-view="{ opacity: 1, y: 0 }"
+      :transition="{ duration: 0.5 }"
+      :in-view-options="{ once: true }"
+      class="mb-12"
+    >
+      <p class="section-label mb-4 font-pixel text-xs uppercase tracking-widest text-muted">
+        Features
+      </p>
+      <h2 class="section-title">
+        Everything you need<span class="text-primary">.</span>
+      </h2>
+    </Motion>
 
-      <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+    <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px] *:data-[slot=leadingIcon]:size-3' }} }">
         <Motion
           v-for="(feature, index) in features"
           :key="feature.title"
@@ -116,12 +119,10 @@ log.info({ action: 'click' })
             <p class="mb-4 text-sm leading-relaxed text-toned">
               {{ feature.description }}
             </p>
-            <div class="dark overflow-hidden border border-zinc-800 bg-zinc-950 p-3 transition-colors duration-300 group-hover:border-zinc-700">
-              <pre class="font-mono text-[11px] leading-relaxed text-zinc-500 transition-colors duration-300 group-hover:text-zinc-400">{{ feature.code }}</pre>
-            </div>
+            <MDC :value="feature.code" />
           </div>
         </Motion>
-      </div>
+      </UTheme>
     </div>
-  </section>
+  </UPageSection>
 </template>
