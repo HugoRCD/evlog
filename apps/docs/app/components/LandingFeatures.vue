@@ -103,7 +103,7 @@ log.info({ action: 'click' })
     </Motion>
 
     <div class="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-      <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px]' }} }">
+      <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px] [&>span]:size-3' }} }">
         <Motion
           v-for="(feature, index) in features"
           :key="feature.title"
