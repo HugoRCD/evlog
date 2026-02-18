@@ -118,7 +118,7 @@ log.info({ action: 'click' })
           <p class="mb-4 text-sm leading-relaxed text-toned">
             {{ feature.description }}
           </p>
-          <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre' }} }">
+          <UTheme :ui="{ prose: { pre: { base: 'whitespace-pre text-xs px-2 py-2', copy: 'top-[6px] right-[6px]' }} }">
             <MDC :value="feature.code" />
           </UTheme>
         </div>
