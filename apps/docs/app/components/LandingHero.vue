@@ -153,145 +153,143 @@ function getLevelColor(level: string) {
 </script>
 
 <template>
-  <section class="relative bg-default dot-grid overflow-hidden">
-    <div class="mx-auto w-full max-w-6xl px-6 py-16 lg:py-24">
-      <div class="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
-        <Motion
-          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
-          :animate="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.5 }"
+  <UPageSection class="relative bg-default dot-grid overflow-hidden">
+    <div class="grid gap-12 lg:grid-cols-2 lg:gap-16 items-center">
+      <Motion
+        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.5 }"
+      >
+        <button
+          class="group mb-2 flex items-center gap-2 font-pixel text-sm transition-colors cursor-copy"
+          :class="copied ? 'text-emerald-500' : 'text-muted hover:text-highlighted'"
+          @click="copyCommand"
         >
-          <button
-            class="group mb-2 flex items-center gap-2 font-pixel text-sm transition-colors cursor-copy"
-            :class="copied ? 'text-emerald-500' : 'text-muted hover:text-highlighted'"
-            @click="copyCommand"
-          >
-            <span v-if="copied">Copied!</span>
-            <span v-else>$ npx skills add hugorcd/evlog</span>
-          </button>
+          <span v-if="copied">Copied!</span>
+          <span v-else>$ npx skills add hugorcd/evlog</span>
+        </button>
 
-          <h1 class="font-pixel mb-6 text-5xl sm:text-6xl lg:text-7xl">
-            Logging that<br>makes sense<span class="text-primary">.</span>
-          </h1>
+        <h1 class="font-pixel mb-6 text-5xl sm:text-6xl lg:text-7xl">
+          Logging that<br>makes sense<span class="text-primary">.</span>
+        </h1>
 
-          <p class="mb-8 max-w-md text-base text-muted leading-relaxed">
-            Wide events and structured errors for TypeScript.
-            One log per request. Full context. Errors that explain why.
-          </p>
+        <p class="mb-8 max-w-md text-base text-muted leading-relaxed">
+          Wide events and structured errors for TypeScript.
+          One log per request. Full context. Errors that explain why.
+        </p>
 
-          <div class="flex flex-wrap items-center gap-4">
-            <UButton
-              to="/getting-started/installation"
-              size="lg"
-              class="bg-primary hover:bg-primary/90 text-white border-0"
-              trailing-icon="i-lucide-arrow-right"
-              label="Get Started"
-            />
-            <UButton
-              to="https://github.com/hugorcd/evlog"
-              target="_blank"
-              size="lg"
-              variant="outline"
-              color="neutral"
-              label="GitHub"
-              leading-icon="i-simple-icons-github"
-            />
+        <div class="flex flex-wrap items-center gap-4">
+          <UButton
+            to="/getting-started/installation"
+            size="lg"
+            class="bg-primary hover:bg-primary/90 text-white border-0"
+            trailing-icon="i-lucide-arrow-right"
+            label="Get Started"
+          />
+          <UButton
+            to="https://github.com/hugorcd/evlog"
+            target="_blank"
+            size="lg"
+            variant="outline"
+            color="neutral"
+            label="GitHub"
+            leading-icon="i-simple-icons-github"
+          />
+        </div>
+      </Motion>
+
+      <Motion
+        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :animate="{ opacity: 1, y: 0 }"
+        :transition="{ duration: 0.5, delay: 0.15 }"
+      >
+        <div class="dark overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
+          <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
+            <div class="flex gap-1.5">
+              <div class="size-3 rounded-full bg-zinc-700" />
+              <div class="size-3 rounded-full bg-zinc-700" />
+              <div class="size-3 rounded-full bg-zinc-700" />
+            </div>
+            <div class="flex-1" />
+            <button
+              class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
+              @click="isPaused = !isPaused"
+            >
+              {{ isPaused ? '▶' : '⏸' }}
+            </button>
           </div>
-        </Motion>
 
-        <Motion
-          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
-          :animate="{ opacity: 1, y: 0 }"
-          :transition="{ duration: 0.5, delay: 0.15 }"
-        >
-          <div class="dark overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
-            <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
-              <div class="flex gap-1.5">
-                <div class="size-3 rounded-full bg-zinc-700" />
-                <div class="size-3 rounded-full bg-zinc-700" />
-                <div class="size-3 rounded-full bg-zinc-700" />
+          <div class="flex border-b border-zinc-800">
+            <button
+              class="px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px"
+              :class="mode === 'chaos'
+                ? 'text-white border-primary'
+                : 'text-zinc-500 border-transparent hover:text-zinc-300'"
+              @click="mode = 'chaos'"
+            >
+              Traditional Logs
+            </button>
+            <button
+              class="px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px"
+              :class="mode === 'wide'
+                ? 'text-white border-primary'
+                : 'text-zinc-500 border-transparent hover:text-zinc-300'"
+              @click="mode = 'wide'"
+            >
+              Wide Events
+            </button>
+          </div>
+
+          <div class="h-[300px] overflow-hidden">
+            <div v-show="mode === 'chaos'" class="h-full flex flex-col">
+              <div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
+                <div v-for="log in chaosLogs" :key="log.id" class="flex gap-3 py-0.5">
+                  <span class="shrink-0 tabular-nums text-zinc-600">{{ log.timestamp }}</span>
+                  <span :class="getLevelColor(log.level)" class="w-10 shrink-0 uppercase font-medium">
+                    {{ log.level }}
+                  </span>
+                  <span class="text-zinc-300">{{ log.text }}</span>
+                </div>
               </div>
-              <div class="flex-1" />
-              <button
-                class="text-xs text-zinc-600 hover:text-zinc-400 transition-colors"
-                @click="isPaused = !isPaused"
-              >
-                {{ isPaused ? '▶' : '⏸' }}
-              </button>
+              <div class="border-t border-zinc-800 px-4 py-3 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
+                <span><span class="text-red-500 mr-1.5">✗</span>Which request failed?</span>
+                <span><span class="text-red-500 mr-1.5">✗</span>Who was the user?</span>
+              </div>
             </div>
 
-            <div class="flex border-b border-zinc-800">
-              <button
-                class="px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px"
-                :class="mode === 'chaos'
-                  ? 'text-white border-primary'
-                  : 'text-zinc-500 border-transparent hover:text-zinc-300'"
-                @click="mode = 'chaos'"
-              >
-                Traditional Logs
-              </button>
-              <button
-                class="px-4 py-2.5 text-xs font-medium transition-colors border-b-2 -mb-px"
-                :class="mode === 'wide'
-                  ? 'text-white border-primary'
-                  : 'text-zinc-500 border-transparent hover:text-zinc-300'"
-                @click="mode = 'wide'"
-              >
-                Wide Events
-              </button>
-            </div>
-
-            <div class="h-[300px] overflow-hidden">
-              <div v-show="mode === 'chaos'" class="h-full flex flex-col">
-                <div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
-                  <div v-for="log in chaosLogs" :key="log.id" class="flex gap-3 py-0.5">
-                    <span class="shrink-0 tabular-nums text-zinc-600">{{ log.timestamp }}</span>
-                    <span :class="getLevelColor(log.level)" class="w-10 shrink-0 uppercase font-medium">
-                      {{ log.level }}
+            <div v-show="mode === 'wide'" class="h-full flex flex-col">
+              <div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
+                <div v-for="event in wideEvents" :key="event.id" class="mb-3 last:mb-0">
+                  <div class="flex items-baseline gap-3">
+                    <span class="shrink-0 tabular-nums text-zinc-600">{{ event.timestamp }}</span>
+                    <span :class="getLevelColor(event.level)" class="w-10 shrink-0 uppercase font-medium">
+                      {{ event.level }}
                     </span>
-                    <span class="text-zinc-300">{{ log.text }}</span>
+                    <span class="text-violet-400">{{ event.method }}</span>
+                    <span class="text-amber-400">{{ event.path }}</span>
+                    <span class="ml-auto flex items-center gap-2">
+                      <span :class="event.status >= 400 ? 'text-red-500' : 'text-emerald-500'">
+                        {{ event.status }}
+                      </span>
+                      <span class="text-zinc-600">({{ event.duration }})</span>
+                    </span>
                   </div>
-                </div>
-                <div class="border-t border-zinc-800 px-4 py-3 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
-                  <span><span class="text-red-500 mr-1.5">✗</span>Which request failed?</span>
-                  <span><span class="text-red-500 mr-1.5">✗</span>Who was the user?</span>
+                  <div class="mt-1 pl-[88px] space-y-0.5">
+                    <div v-for="ctx in event.context" :key="ctx.key">
+                      <span class="text-sky-400">{{ ctx.key }}</span><span class="text-zinc-600">:</span>
+                      <span class="text-zinc-500"> {{ ctx.value }}</span>
+                    </div>
+                  </div>
                 </div>
               </div>
-
-              <div v-show="mode === 'wide'" class="h-full flex flex-col">
-                <div class="flex-1 overflow-y-auto p-4 font-mono text-xs leading-relaxed">
-                  <div v-for="event in wideEvents" :key="event.id" class="mb-3 last:mb-0">
-                    <div class="flex items-baseline gap-3">
-                      <span class="shrink-0 tabular-nums text-zinc-600">{{ event.timestamp }}</span>
-                      <span :class="getLevelColor(event.level)" class="w-10 shrink-0 uppercase font-medium">
-                        {{ event.level }}
-                      </span>
-                      <span class="text-violet-400">{{ event.method }}</span>
-                      <span class="text-amber-400">{{ event.path }}</span>
-                      <span class="ml-auto flex items-center gap-2">
-                        <span :class="event.status >= 400 ? 'text-red-500' : 'text-emerald-500'">
-                          {{ event.status }}
-                        </span>
-                        <span class="text-zinc-600">({{ event.duration }})</span>
-                      </span>
-                    </div>
-                    <div class="mt-1 pl-[88px] space-y-0.5">
-                      <div v-for="ctx in event.context" :key="ctx.key">
-                        <span class="text-sky-400">{{ ctx.key }}</span><span class="text-zinc-600">:</span>
-                        <span class="text-zinc-500"> {{ ctx.value }}</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-                <div class="border-t border-zinc-800 px-4 py-3 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
-                  <span><span class="text-emerald-500 mr-1.5">✓</span>One log per request</span>
-                  <span><span class="text-emerald-500 mr-1.5">✓</span>Full context</span>
-                </div>
+              <div class="border-t border-zinc-800 px-4 py-3 flex flex-wrap justify-center gap-6 text-xs text-zinc-500">
+                <span><span class="text-emerald-500 mr-1.5">✓</span>One log per request</span>
+                <span><span class="text-emerald-500 mr-1.5">✓</span>Full context</span>
               </div>
             </div>
           </div>
-        </Motion>
-      </div>
+        </div>
+      </Motion>
     </div>
-  </section>
+  </UPageSection>
 </template>
