@@ -1,6 +1,6 @@
 {
   "name": "@evlog/nuxthub",
-  "version": "2.0.0",
+  "version": "1.1.0",
   "description": "Self-hosted log retention for evlog using NuxtHub database storage",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
