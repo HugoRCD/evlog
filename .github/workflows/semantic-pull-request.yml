@@ -24,7 +24,8 @@ jobs:
           scopes: |
             docs
             playground
-            module
+            evlog
+            nuxthub
             deps
             repo
           types: |

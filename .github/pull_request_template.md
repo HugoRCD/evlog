@@ -21,7 +21,8 @@ Here are the available types and scopes:
 ### Scopes
 - docs (the documentation)
 - playground (the playground)
-- module (the module)
+- evlog (the evlog package)
+- nuxthub (the nuxthub package)
 - deps (the dependencies)
 - repo (the repository)
 -->
