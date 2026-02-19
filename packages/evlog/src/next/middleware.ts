@@ -42,8 +42,7 @@ export function evlogMiddleware(config?: EvlogMiddlewareConfig) {
     const requestId = existingId || crypto.randomUUID()
 
     // Forward modified headers to the route handler
-    const requestHeaders = new Headers()
-    request.headers.get('x-request-id') // Ensure it's enumerable if needed
+    const requestHeaders = new Headers(request.headers as HeadersInit)
 
     requestHeaders.set('x-request-id', requestId)
     requestHeaders.set('x-evlog-start', String(Date.now()))

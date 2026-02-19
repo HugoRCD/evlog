@@ -142,7 +142,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
       let requestId = crypto.randomUUID()
 
       if (isRequest) {
-        ;({ method, path, headers } = extractRequestInfo(firstArg))
+        ({ method, path, headers } = extractRequestInfo(firstArg))
 
         // Reuse request-id from middleware if present
         const middlewareRequestId = firstArg.headers.get('x-request-id')
@@ -176,22 +176,26 @@ export function createWithEvlog(options: NextEvlogOptions) {
         // Extract response status
         let { status } = { status: 200 }
         if (result instanceof Response) {
-          ;({ status } = result)
+          ({ status } = result)
         }
         logger.set({ status })
 
         // Build tail sampling context and call keep callback
         let forceKeep = false
         if (state.options.keep) {
-          const tailCtx: TailSamplingContext = {
-            status,
-            path,
-            method,
-            context: logger.getContext(),
-            shouldKeep: false,
+          try {
+            const tailCtx: TailSamplingContext = {
+              status,
+              path,
+              method,
+              context: logger.getContext(),
+              shouldKeep: false,
+            }
+            await state.options.keep(tailCtx)
+            forceKeep = tailCtx.shouldKeep ?? false
+          } catch (err) {
+            console.error('[evlog] keep callback failed:', err)
           }
-          await state.options.keep(tailCtx)
-          forceKeep = tailCtx.shouldKeep ?? false
         }
 
         const emittedEvent = logger.emit({ _forceKeep: forceKeep })
@@ -209,22 +213,26 @@ export function createWithEvlog(options: NextEvlogOptions) {
         // Build tail sampling context and call keep callback
         let forceKeep = false
         if (state.options.keep) {
-          const tailCtx: TailSamplingContext = {
-            status: errorStatus,
-            path,
-            method,
-            context: logger.getContext(),
-            shouldKeep: false,
+          try {
+            const tailCtx: TailSamplingContext = {
+              status: errorStatus,
+              path,
+              method,
+              context: logger.getContext(),
+              shouldKeep: false,
+            }
+            await state.options.keep(tailCtx)
+            forceKeep = tailCtx.shouldKeep ?? false
+          } catch (err) {
+            console.error('[evlog] keep callback failed:', err)
           }
-          await state.options.keep(tailCtx)
-          forceKeep = tailCtx.shouldKeep ?? false
         }
 
         const emittedEvent = logger.emit({ _forceKeep: forceKeep })
         await callEnrichAndDrain(emittedEvent, { method, path, requestId }, headers, errorStatus)
 
         // Return structured JSON response for EvlogErrors (like H3 does for Nuxt)
-        if (error instanceof EvlogError) {
+        if (isRequest && error instanceof EvlogError) {
           return Response.json(error.toJSON(), { status: error.status }) as Awaited<TReturn>
         }
 

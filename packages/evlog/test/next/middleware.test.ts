@@ -102,7 +102,7 @@ describe('evlogMiddleware', () => {
     const apiRequest = createMockRequest('/api/test')
     await middleware(apiRequest as any)
     expect(mockNextResponse.next).toHaveBeenCalledTimes(1)
-    const apiCallArgs = mockNextResponse.next.mock.calls[0][0]
+    const [[apiCallArgs]] = mockNextResponse.next.mock.calls
     expect(apiCallArgs.request.headers.get('x-request-id')).toBeDefined()
 
     vi.clearAllMocks()
@@ -111,7 +111,7 @@ describe('evlogMiddleware', () => {
     const pageRequest = createMockRequest('/about')
     await middleware(pageRequest as any)
     expect(mockNextResponse.next).toHaveBeenCalledTimes(1)
-    const pageCallArgs = mockNextResponse.next.mock.calls[0]
+    const [pageCallArgs] = mockNextResponse.next.mock.calls
     expect(pageCallArgs[0]).toBeUndefined()
   })
 })

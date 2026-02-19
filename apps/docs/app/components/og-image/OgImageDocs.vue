@@ -11,7 +11,7 @@ const { headline = '' } = defineProps<{
 
 function truncate(str: string, max: number) {
   if (!str || str.length <= max) return str
-  return `${str.slice(0, str.lastIndexOf(' ', max)) }…`
+  return `${str.slice(0, str.lastIndexOf(' ', max))}…`
 }
 </script>
 
