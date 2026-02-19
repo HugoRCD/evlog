@@ -51,6 +51,7 @@ export interface EvlogProviderProps {
  * }
  * ```
  */
+// eslint-disable-next-line @typescript-eslint/naming-convention
 export function EvlogProvider({ service, pretty, transport, enabled, children }: EvlogProviderProps) {
   useEffect(() => {
     initLog({

@@ -64,10 +64,10 @@ describe('evlogMiddleware', () => {
     await middleware(request as any)
 
     expect(mockNextResponse.next).toHaveBeenCalled()
-    const callArgs = mockNextResponse.next.mock.calls[0][0]
+    const [[callArgs]] = mockNextResponse.next.mock.calls
     expect(callArgs.request.headers).toBeInstanceOf(Headers)
 
-    const headers = callArgs.request.headers
+    const { headers } = callArgs.request
     expect(headers.get('x-request-id')).toBeDefined()
     expect(headers.get('x-evlog-start')).toBeDefined()
   })
@@ -77,8 +77,8 @@ describe('evlogMiddleware', () => {
     const request = createMockRequest('/api/test')
     await middleware(request as any)
 
-    const callArgs = mockNextResponse.next.mock.calls[0][0]
-    const startTime = Number(callArgs.request.headers.get('x-evlog-start'))
+    const [[callArgs2]] = mockNextResponse.next.mock.calls
+    const startTime = Number(callArgs2.request.headers.get('x-evlog-start'))
     expect(startTime).toBeGreaterThan(0)
     expect(startTime).toBeLessThanOrEqual(Date.now())
   })
@@ -90,9 +90,9 @@ describe('evlogMiddleware', () => {
 
     // Should call NextResponse.next() without custom headers
     expect(mockNextResponse.next).toHaveBeenCalled()
-    const callArgs = mockNextResponse.next.mock.calls[0]
+    const [excludedCallArgs] = mockNextResponse.next.mock.calls
     // For excluded routes, no request headers are passed
-    expect(callArgs[0]).toBeUndefined()
+    expect(excludedCallArgs[0]).toBeUndefined()
   })
 
   it('respects include patterns', async () => {

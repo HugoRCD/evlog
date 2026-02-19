@@ -1,8 +1,8 @@
+import { log } from '../logger'
+import { createError, createEvlogError } from '../error'
 import type { NextEvlogOptions } from './types'
 import { createWithEvlog } from './handler'
 import { useLogger } from './storage'
-import { log } from '../logger'
-import { createError, createEvlogError } from '../error'
 
 export type { NextEvlogOptions, EvlogMiddlewareConfig } from './types'
 

@@ -1,5 +1,5 @@
-import type { EvlogMiddlewareConfig } from './types'
 import { shouldLog } from '../shared/routes'
+import type { EvlogMiddlewareConfig } from './types'
 
 type NextRequest = {
   nextUrl: { pathname: string }
@@ -33,8 +33,8 @@ export function evlogMiddleware(config?: EvlogMiddlewareConfig) {
 
     // Check include/exclude patterns
     if (!shouldLog(path, config?.include, config?.exclude)) {
-      const { NextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
-      return NextResponse.next()
+      const { NextResponse: nextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
+      return nextResponse.next()
     }
 
     // Generate or reuse request ID
@@ -48,8 +48,8 @@ export function evlogMiddleware(config?: EvlogMiddlewareConfig) {
     requestHeaders.set('x-request-id', requestId)
     requestHeaders.set('x-evlog-start', String(Date.now()))
 
-    const { NextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
-    const response = NextResponse.next({
+    const { NextResponse: nextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
+    const response = nextResponse.next({
       request: { headers: requestHeaders },
     })
 

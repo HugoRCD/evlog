@@ -1,9 +1,9 @@
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
-import type { NextEvlogOptions } from './types'
 import { createRequestLogger, initLogger, isEnabled } from '../logger'
 import { filterSafeHeaders } from '../utils'
 import { shouldLog, getServiceForPath } from '../shared/routes'
 import { EvlogError } from '../error'
+import type { NextEvlogOptions } from './types'
 import { evlogStorage } from './storage'
 
 interface WithEvlogState {
@@ -36,7 +36,7 @@ export function configureHandler(options: NextEvlogOptions): void {
 }
 
 function extractRequestInfo(request: Request): { method: string, path: string, headers: Record<string, string> } {
-  const method = request.method
+  const { method } = request
   const url = new URL(request.url, 'http://localhost')
   const path = url.pathname
 
@@ -133,7 +133,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
       }
 
       // Extract request info from first argument if it's a Request
-      const firstArg = args[0]
+      const [firstArg] = args
       const isRequest = firstArg instanceof Request
 
       let method = 'UNKNOWN'
@@ -142,10 +142,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
       let requestId = crypto.randomUUID()
 
       if (isRequest) {
-        const info = extractRequestInfo(firstArg)
-        method = info.method
-        path = info.path
-        headers = info.headers
+        ;({ method, path, headers } = extractRequestInfo(firstArg))
 
         // Reuse request-id from middleware if present
         const middlewareRequestId = firstArg.headers.get('x-request-id')
@@ -177,9 +174,9 @@ export function createWithEvlog(options: NextEvlogOptions) {
         const result = await evlogStorage.run(logger, () => handler(...args))
 
         // Extract response status
-        let status = 200
+        let { status } = { status: 200 }
         if (result instanceof Response) {
-          status = result.status
+          ;({ status } = result)
         }
         logger.set({ status })
 

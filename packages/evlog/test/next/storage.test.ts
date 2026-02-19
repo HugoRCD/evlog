@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
 import { AsyncLocalStorage } from 'node:async_hooks'
+import { describe, expect, it } from 'vitest'
 import { evlogStorage, useLogger } from '../../src/next/storage'
 
 describe('evlogStorage', () => {
