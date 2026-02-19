@@ -4,7 +4,6 @@
 [![npm downloads](https://img.shields.io/npm/dm/evlog?color=black)](https://npm.chart.dev/evlog)
 [![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Nuxt](https://img.shields.io/badge/Nuxt-black?logo=nuxt&logoColor=white)](https://nuxt.com/)
 [![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev)
 [![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
@@ -853,11 +852,10 @@ try {
 
 ## Framework Support
 
-evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
-
 | Framework | Integration |
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
+| **Next.js** | `createEvlog()` factory with `import { createEvlog } from 'evlog/next'` ([example](./examples/nextjs)) |
 | **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
 | **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
 | **Analog** | Nitro v2 module setup |

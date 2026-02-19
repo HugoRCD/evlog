@@ -3,6 +3,13 @@ export default defineNuxtConfig({
 
   modules: ['motion-v/nuxt', 'nuxt-studio'],
 
+  fonts: {
+    families: [
+      { name: 'Geist', weights: [400, 600, 700], global: true },
+      { name: 'Geist Mono', weights: [400, 600], global: true },
+    ],
+  },
+
   css: ['~/assets/css/main.css'],
 
   site: {
@@ -31,6 +38,7 @@ export default defineNuxtConfig({
   mdc: {
     highlight: {
       noApiRoute: false,
+      langs: ['tsx'],
     },
   },
 

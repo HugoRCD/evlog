@@ -7,6 +7,9 @@
 .cache
 dist
 
+# Next.js
+.next
+
 # Node dependencies
 node_modules
 

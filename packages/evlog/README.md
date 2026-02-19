@@ -987,11 +987,10 @@ try {
 
 ## Framework Support
 
-evlog works with any framework powered by [Nitro](https://nitro.unjs.io/):
-
 | Framework | Integration |
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
+| **Next.js** | `createEvlog()` factory with `import { createEvlog } from 'evlog/next'` ([example](./examples/nextjs)) |
 | **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
 | **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
 | **Analog** | Nitro v2 module setup |
