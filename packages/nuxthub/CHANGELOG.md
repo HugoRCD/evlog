@@ -1,5 +1,14 @@
 # @evlog/nuxthub
 
+## 2.0.0
+
+### Patch Changes
+
+- [#95](https://github.com/HugoRCD/evlog/pull/95) [`f11e635`](https://github.com/HugoRCD/evlog/commit/f11e635372bf192b4bfd81e726e15a781393bdaa) Thanks [@HugoRCD](https://github.com/HugoRCD)! - add retry logic to nuxthub module
+
+- Updated dependencies [[`7d7f9ce`](https://github.com/HugoRCD/evlog/commit/7d7f9ce9d565f3757a6517521d83b42242249bbd)]:
+  - evlog@1.10.0
+
 ## 1.0.0
 
 ### Minor Changes

@@ -1,6 +1,6 @@
 {
   "name": "@evlog/nuxthub",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "description": "Self-hosted log retention for evlog using NuxtHub database storage",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -45,7 +45,7 @@
     "typescript": "^5.9.3"
   },
   "peerDependencies": {
-    "evlog": "^1.9.0",
+    "evlog": "^1.10.0",
     "@nuxthub/core": "^0.10.6",
     "drizzle-orm": ">=0.45.1"
   },
