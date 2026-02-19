@@ -122,6 +122,20 @@
         "tsx": "^4.20.6",
       },
     },
+    "examples/nextjs": {
+      "name": "evlog-nextjs-example",
+      "dependencies": {
+        "evlog": "workspace:*",
+        "next": "^16.1.6",
+        "react": "^19.2.4",
+        "react-dom": "^19.2.4",
+      },
+      "devDependencies": {
+        "@types/react": "^19.2.14",
+        "@types/react-dom": "^19.2.3",
+        "typescript": "^5.9.3",
+      },
+    },
     "examples/solidstart": {
       "name": "evlog-solidstart-example",
       "dependencies": {
@@ -1877,6 +1891,8 @@
     "evlog-hono-example": ["evlog-hono-example@workspace:examples/hono"],
 
     "evlog-next-playground": ["evlog-next-playground@workspace:apps/next-playground"],
+
+    "evlog-nextjs-example": ["evlog-nextjs-example@workspace:examples/nextjs"],
 
     "evlog-nitro-playground": ["evlog-nitro-playground@workspace:apps/nitro-playground"],
 

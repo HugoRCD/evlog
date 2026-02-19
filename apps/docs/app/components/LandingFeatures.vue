@@ -35,10 +35,12 @@ log.set({ cart: { items, total } })
   },
   {
     title: 'Built-in Adapters',
-    description: 'Zero-config adapters for Axiom, Posthog, OTLP (Grafana, Datadog, Honeycomb), or build your own.',
+    description: 'Zero-config adapters for Axiom, OTLP, PostHog, Sentry, Better Stack, or build your own.',
     code: `import { createAxiomDrain } from 'evlog/axiom'
 import { createOTLPDrain } from 'evlog/otlp'
-import { createPostHogDrain } from 'evlog/posthog'`,
+import { createPostHogDrain } from 'evlog/posthog'
+import { createSentryDrain } from 'evlog/sentry'
+import { createBetterStackDrain } from 'evlog/better-stack'`,
   },
   {
     title: 'Smart Sampling',
@@ -56,6 +58,15 @@ import { createPostHogDrain } from 'evlog/posthog'`,
 })`,
   },
   {
+    title: 'Next.js',
+    description: 'App Router support with AsyncLocalStorage. Wrap handlers, get full observability.',
+    code: `import { createEvlog } from 'evlog/next'
+
+export const { withEvlog, useLogger } = createEvlog({
+  service: 'my-app',
+})`,
+  },
+  {
     title: 'Client Transport',
     description: 'Send browser logs to your server. Automatic enrichment with server context.',
     code: `// Browser
@@ -69,6 +80,22 @@ log.info({ action: 'click' })
     code: `[INFO] POST /api/checkout (234ms)
   user: { id: 1, plan: "pro" }
   cart: { items: 3 }`,
+  },
+  {
+    title: 'Enrichers',
+    description: 'Auto-enrich events with user agent, geo, request size, and W3C trace context.',
+    code: `import { createUserAgentEnricher } from 'evlog/enrichers'
+import { createGeoEnricher } from 'evlog/enrichers'
+import { createTraceContextEnricher } from 'evlog/enrichers'`,
+  },
+  {
+    title: 'Hono & Workers',
+    description: 'Standalone API for Hono, Cloudflare Workers, Bun, or any TypeScript runtime.',
+    code: `import { initLogger, createRequestLogger } from 'evlog'
+
+const log = createRequestLogger({ method, path })
+log.set({ user: { id, plan } })
+log.emit()`,
   },
   {
     title: 'Agent-Ready',
