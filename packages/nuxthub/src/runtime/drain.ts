@@ -18,29 +18,28 @@ function parseDurationMs(event: WideEvent): number | null {
   return null
 }
 
+const INDEXED_FIELDS = new Set([
+  'timestamp',
+  'level',
+  'service',
+  'environment',
+  'method',
+  'path',
+  'status',
+  'durationMs',
+  'duration',
+  'requestId',
+  'source',
+  'error',
+])
+
 function extractRow(ctx: DrainContext): EventRow {
   const { event, request } = ctx
-
-  // Fields that go into indexed columns
-  const indexed = new Set([
-    'timestamp',
-    'level',
-    'service',
-    'environment',
-    'method',
-    'path',
-    'status',
-    'durationMs',
-    'duration',
-    'requestId',
-    'source',
-    'error',
-  ])
 
   // Collect remaining fields into data
   const data: Record<string, unknown> = {}
   for (const [key, value] of Object.entries(event)) {
-    if (!indexed.has(key) && value !== undefined) {
+    if (!INDEXED_FIELDS.has(key) && value !== undefined) {
       data[key] = value
     }
   }
@@ -77,6 +76,39 @@ function extractRow(ctx: DrainContext): EventRow {
   }
 }
 
+const MAX_ATTEMPTS = 3
+const INITIAL_DELAY_MS = 500
+
+const RETRYABLE_CODES = new Set([
+  'CONNECT_TIMEOUT',
+  'ETIMEDOUT',
+  'ECONNREFUSED',
+  'ECONNRESET',
+  'CONNECTION_ENDED',
+])
+
+function isRetryable(error: unknown): boolean {
+  if (error instanceof Error) {
+    const cause = (error as any).cause
+    if (cause && typeof cause.code === 'string') {
+      return RETRYABLE_CODES.has(cause.code)
+    }
+  }
+  return false
+}
+
+async function insertWithRetry(rows: EventRow[]): Promise<void> {
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      await db.insert(schema.evlogEvents).values(rows)
+      return
+    } catch (error) {
+      if (attempt === MAX_ATTEMPTS || !isRetryable(error)) throw error
+      await new Promise(r => setTimeout(r, INITIAL_DELAY_MS * 2 ** (attempt - 1)))
+    }
+  }
+}
+
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', async (ctx: DrainContext | DrainContext[]) => {
     try {
@@ -85,7 +117,7 @@ export default defineNitroPlugin((nitroApp) => {
 
       const rows = contexts.map(extractRow)
 
-      await db.insert(schema.evlogEvents).values(rows)
+      await insertWithRetry(rows)
     } catch (error) {
       console.error('[evlog/nuxthub] Failed to insert events:', error)
     }

@@ -38,3 +38,4 @@ apps/chat/.data
 .codex/environments/
 .claude/
 apps/nuxthub-playground/.data
+.next/
