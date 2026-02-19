@@ -1,0 +1,61 @@
+import type { EvlogMiddlewareConfig } from './types'
+import { shouldLog } from '../shared/routes'
+
+type NextRequest = {
+  nextUrl: { pathname: string }
+  headers: { get(name: string): string | null }
+}
+
+type NextResponse = {
+  headers: { set(name: string, value: string): void }
+}
+
+type NextResponseStatic = {
+  next(options?: { request?: { headers: Headers } }): NextResponse
+}
+
+/**
+ * Create an evlog middleware for Next.js.
+ * Sets `x-request-id` and `x-evlog-start` headers so `withEvlog()` can reuse them
+ * for timing consistency across the middleware -> handler chain.
+ *
+ * @example
+ * ```ts
+ * // middleware.ts
+ * import { evlogMiddleware } from 'evlog/next'
+ * export const middleware = evlogMiddleware()
+ * export const config = { matcher: ['/api/:path*'] }
+ * ```
+ */
+export function evlogMiddleware(config?: EvlogMiddlewareConfig) {
+  return async (request: NextRequest) => {
+    const path = request.nextUrl.pathname
+
+    // Check include/exclude patterns
+    if (!shouldLog(path, config?.include, config?.exclude)) {
+      const { NextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
+      return NextResponse.next()
+    }
+
+    // Generate or reuse request ID
+    const existingId = request.headers.get('x-request-id')
+    const requestId = existingId || crypto.randomUUID()
+
+    // Forward modified headers to the route handler
+    const requestHeaders = new Headers()
+    request.headers.get('x-request-id') // Ensure it's enumerable if needed
+
+    requestHeaders.set('x-request-id', requestId)
+    requestHeaders.set('x-evlog-start', String(Date.now()))
+
+    const { NextResponse } = await import('next/server') as { NextResponse: NextResponseStatic }
+    const response = NextResponse.next({
+      request: { headers: requestHeaders },
+    })
+
+    // Also set on response for downstream consumers
+    response.headers.set('x-request-id', requestId)
+
+    return response
+  }
+}

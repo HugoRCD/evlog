@@ -30,6 +30,8 @@ export default defineConfig({
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
     'browser': 'src/browser.ts',
+    'next/index': 'src/next/index.ts',
+    'next/client': 'src/next/client.ts',
   },
   format: 'esm',
   dts: true,
@@ -53,5 +55,8 @@ export default defineConfig({
     'ofetch',
     'h3',
     'ufo',
+    'next',
+    'next/server',
+    'react',
   ],
 })
