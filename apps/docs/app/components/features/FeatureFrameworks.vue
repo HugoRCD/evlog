@@ -171,12 +171,12 @@ const frameworks = [
       :in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.4, delay: 0.1 }"
       :in-view-options="{ once: true }"
-      class="mb-8 flex flex-wrap items-center justify-center gap-4 md:gap-6"
+      class="mb-8 grid grid-cols-5 items-center justify-center gap-2 md:gap-6 max-w-lg md:max-w-none mx-auto"
     >
       <button
         v-for="fw in frameworks"
         :key="fw.name"
-        class="group flex flex-col items-center gap-2.5 px-4 py-3 border outline-none transition-all duration-300"
+        class="group flex flex-col items-center gap-2.5 px-2 sm:px-4 py-3 border outline-none transition-all duration-300"
         :class="activeTab === fw.tab
           ? 'border-accent-blue/30 bg-accent-blue/5'
           : 'border-transparent hover:border-zinc-800'"
@@ -184,7 +184,7 @@ const frameworks = [
       >
         <UIcon
           :name="fw.icon"
-          class="size-10 transition-colors duration-300"
+          class="size-8 sm:size-10 transition-colors duration-300"
           :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-600 group-hover:text-zinc-400'"
         />
         <span

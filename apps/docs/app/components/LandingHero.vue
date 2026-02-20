@@ -73,17 +73,17 @@ onMounted(() => {
         <div class="flex flex-wrap justify-center items-center gap-4">
           <UButton
             to="/getting-started/installation"
-            size="xl"
-            class="bg-accent-blue hover:bg-blue-600 text-white font-medium px-8"
+            size="lg"
+            class="bg-accent-blue hover:bg-blue-600 text-white font-medium"
             trailing-icon="i-lucide-arrow-right"
-            label="Get Started"
+            label="Fix your logs"
           />
           <UButton
             to="https://github.com/hugorcd/evlog"
             target="_blank"
-            size="xl"
-            variant="outline"
-            class="text-zinc-300 border-zinc-800 hover:bg-zinc-900 hover:border-zinc-700 hover:text-white"
+            size="lg"
+            variant="ghost"
+            class="text-zinc-400 hover:text-white"
             label="GitHub"
             leading-icon="i-simple-icons-github"
           />

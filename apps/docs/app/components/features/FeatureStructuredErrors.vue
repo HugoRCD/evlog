@@ -62,7 +62,7 @@ const pills = [
             </div>
             <span class="ml-3 font-mono text-xs text-zinc-600">payment.post.ts</span>
           </div>
-          <div class="p-5 font-mono text-sm leading-relaxed">
+          <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <pre><code><span class="text-violet-400">throw</span> <span class="text-amber-400">createError</span>({
   <span class="text-sky-400">message</span>: <span class="text-emerald-400">'Payment failed'</span>,
   <span class="text-sky-400">status</span>: <span class="text-pink-400">402</span>,
@@ -89,7 +89,7 @@ const pills = [
             <span class="ml-3 font-mono text-xs text-zinc-600">output</span>
             <span class="ml-auto font-mono text-xs text-red-500">ERROR</span>
           </div>
-          <div class="p-5 font-mono text-sm leading-relaxed">
+          <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <div class="mb-3 flex items-baseline gap-3">
               <span class="font-medium text-red-500">ERROR</span>
               <span class="text-violet-400">POST</span>

@@ -10,20 +10,24 @@ let chaosInterval: ReturnType<typeof setInterval> | null = null
 let fieldInterval: ReturnType<typeof setInterval> | null = null
 
 const logTemplates = [
-  { msg: 'POST /api/webhooks/stripe 200 (23ms)', level: 'info' },
-  { msg: 'GET /api/health 200 (4ms)', level: 'debug' },
-  { msg: 'Processing webhook event', level: 'debug' },
-  { msg: 'POST /api/webhooks/stripe 200 (31ms)', level: 'info' },
-  { msg: 'Signature verification started', level: 'debug' },
-  { msg: 'Error: webhook signature mismatch', level: 'error' },
-  { msg: 'POST /api/webhooks/stripe 401', level: 'error' },
-  { msg: 'GET /api/health 200 (5ms)', level: 'debug' },
-  { msg: 'POST /api/webhooks/stripe 200 (28ms)', level: 'info' },
-  { msg: 'Error: webhook signature mismatch', level: 'error' },
-  { msg: 'POST /api/webhooks/stripe 401', level: 'error' },
-  { msg: 'Retry queue: 12 events pending', level: 'warn' },
-  { msg: 'GET /api/orders 200 (45ms)', level: 'info' },
-  { msg: 'Error: webhook signature mismatch', level: 'error' },
+  { msg: 'GET /api/users/me 200 (8ms)', level: 'info' },
+  { msg: 'Flag "new-pricing-engine" → enabled', level: 'debug' },
+  { msg: 'POST /api/cart 200 (31ms)', level: 'info' },
+  { msg: 'GET /api/products 200 (23ms)', level: 'info' },
+  { msg: 'POST /api/orders 500', level: 'error' },
+  { msg: 'TypeError: Cannot read properties of undefined', level: 'error' },
+  { msg: 'GET /api/health 200 (3ms)', level: 'debug' },
+  { msg: 'Cache miss: pricing_user_2kF9', level: 'debug' },
+  { msg: 'POST /api/orders 500', level: 'error' },
+  { msg: 'Slow query: orders (284ms)', level: 'warn' },
+  { msg: 'GET /api/users/me 200 (7ms)', level: 'info' },
+  { msg: 'TypeError: Cannot read properties of undefined', level: 'error' },
+  { msg: 'Deploy v2.3.1 rollout: 40% traffic', level: 'info' },
+  { msg: 'POST /api/orders 500', level: 'error' },
+  { msg: 'ECONNRESET on redis:6379', level: 'error' },
+  { msg: 'POST /api/cart 200 (28ms)', level: 'info' },
+  { msg: 'Hydration mismatch on /checkout', level: 'warn' },
+  { msg: 'TypeError: Cannot read properties of undefined', level: 'error' },
 ]
 
 const sourcesLeft = [
@@ -37,20 +41,19 @@ const sourcesRight = [
 ]
 
 const questions = [
-  { text: 'What failed?', answer: 'Webhook signature' },
-  { text: 'Why?', answer: 'Wrong secret key' },
-  { text: 'Which route?', answer: '/api/webhooks/stripe' },
-  { text: 'How to fix?', answer: 'Update STRIPE_SECRET' },
-  { text: 'How many affected?', answer: '12 events' },
+  { text: 'What failed?', answer: 'POST /api/orders' },
+  { text: 'Why?', answer: 'new-pricing-engine flag' },
+  { text: 'Which users?', answer: 'pro plans only' },
+  { text: 'How to fix?', answer: 'Disable flag or update code' },
 ]
 
 const wideEventFields = [
-  { key: 'path', value: '"/api/webhooks/stripe"', branch: '├', color: 'text-sky-400/80' },
-  { key: 'error', value: '"Webhook signature mismatch"', branch: '├', color: 'text-red-400/90' },
-  { key: 'why', value: '"STRIPE_WEBHOOK_SECRET uses test key in prod"', branch: '├', color: 'text-amber-400/80' },
-  { key: 'fix', value: '"Update STRIPE_WEBHOOK_SECRET env variable"', branch: '├', color: 'text-emerald-400/80' },
-  { key: 'affected', value: '{ events: 12, since: "14min ago" }', branch: '├', color: 'text-sky-400/80' },
-  { key: 'requestId', value: '"req_8f2k9dLp"', branch: '└', color: 'text-zinc-500' },
+  { key: 'path', value: '"/api/orders"', branch: '├', color: 'text-sky-400/80' },
+  { key: 'error', value: '"Cannot read properties of undefined (reading \'price\')"', branch: '├', color: 'text-red-400/90' },
+  { key: 'why', value: '"Flag \'new-pricing-engine\' returns pricing.amount instead of price"', branch: '├', color: 'text-amber-400/80' },
+  { key: 'fix', value: '"Disable flag or update OrderService to use pricing.amount"', branch: '├', color: 'text-emerald-400/80' },
+  { key: 'user', value: '{ id: "user_2kF9", plan: "pro" }', branch: '├', color: 'text-sky-400/80' },
+  { key: 'requestId', value: '"req_4kT8mPqZ"', branch: '└', color: 'text-zinc-500' },
 ]
 
 function ts() {
@@ -223,7 +226,7 @@ const levelColors: Record<string, string> = {
                     @click="resolve"
                   >
                     <span class="flex items-center gap-2.5">
-                      See the full picture
+                      Fix this with evlog
                       <UIcon name="i-lucide-arrow-right" class="size-3.5 group-hover:translate-x-0.5 transition-transform" />
                     </span>
                   </button>
@@ -260,11 +263,11 @@ const levelColors: Record<string, string> = {
                 <div class="flex items-center gap-3 pb-4 mb-5 border-b border-zinc-800/30">
                   <span class="px-1.5 py-0.5 text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/15 uppercase tracking-widest rounded-xs">error</span>
                   <span class="text-violet-400 font-medium">POST</span>
-                  <span class="text-amber-300/80">/api/webhooks/stripe</span>
+                  <span class="text-amber-300/80">/api/orders</span>
                   <span class="ml-auto flex items-center gap-2.5 text-zinc-500 text-xs">
-                    <span class="text-red-400 font-medium">401</span>
+                    <span class="text-red-400 font-medium">500</span>
                     <span class="text-zinc-800">|</span>
-                    <span class="text-zinc-600">12ms</span>
+                    <span class="text-zinc-600">23ms</span>
                   </span>
                 </div>
 

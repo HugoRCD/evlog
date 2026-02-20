@@ -233,7 +233,6 @@ function setupCanvas() {
 <template>
   <section class="py-24 md:py-32">
     <div class="grid gap-8 md:grid-cols-2">
-      <!-- Left: title + description + pills + features -->
       <div class="flex flex-col gap-8">
         <Motion
           :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
@@ -299,7 +298,6 @@ function setupCanvas() {
         </Motion>
       </div>
 
-      <!-- Right: unified panel (code + visual) -->
       <Motion
         :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
         :in-view="{ opacity: 1, y: 0 }"
@@ -307,7 +305,6 @@ function setupCanvas() {
         :in-view-options="{ once: true }"
       >
         <div class="overflow-hidden border border-zinc-800 bg-[#0c0c0e]">
-          <!-- Terminal header -->
           <div class="flex items-center gap-2 border-b border-zinc-800 px-4 py-3">
             <div class="flex gap-1.5">
               <div class="size-3 rounded-full bg-zinc-700" />
@@ -317,8 +314,7 @@ function setupCanvas() {
             <span class="ml-3 font-mono text-xs text-zinc-600">evlog-drain.ts</span>
           </div>
 
-          <!-- Code section -->
-          <div class="px-5 pt-5 pb-4 font-mono text-sm leading-relaxed">
+          <div class="px-5 pt-5 pb-4 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <pre><code><span class="text-violet-400">import</span> { createDrainPipeline } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/pipeline'</span>
 <span class="text-violet-400">import</span> { createAxiomDrain } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/axiom'</span>
 <span class="text-violet-400">import</span> { createSentryDrain } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/sentry'</span>
@@ -333,9 +329,8 @@ function setupCanvas() {
 })</code></pre>
           </div>
 
-          <!-- Fan-out visual: line flows from code into evlog then to adapters -->
-          <div ref="containerRef" class="relative flex flex-col items-center w-full border-t border-zinc-800/50 pt-10 pb-5 px-3">
-            <canvas ref="canvasRef" class="absolute top-0 left-0 pointer-events-none" />
+          <div ref="containerRef" class="relative flex flex-col items-center w-full border-t border-zinc-800/50 pt-6 sm:pt-10 pb-5 px-3">
+            <canvas ref="canvasRef" class="absolute top-0 left-0 pointer-events-none hidden sm:block" />
 
             <!-- evlog hub -->
             <div data-node="evlog" class="relative z-10 flex flex-col items-center border border-accent-blue/30 bg-[#0a0a0e] px-6 py-3">
@@ -349,10 +344,9 @@ function setupCanvas() {
               <span class="font-mono text-[7px] tracking-widest text-zinc-600 mt-1.5">BATCH · RETRY · FANOUT</span>
             </div>
 
-            <div class="h-16 md:h-20" />
+            <div class="h-8 sm:h-16 md:h-20" />
 
-            <!-- Adapter row -->
-            <div class="relative z-10 self-stretch grid grid-cols-5 gap-1">
+            <div class="relative z-10 self-stretch flex flex-wrap justify-center gap-1.5 sm:grid sm:grid-cols-5 sm:gap-1">
               <div
                 v-for="(adapter, idx) in adapters"
                 :key="adapter.name"

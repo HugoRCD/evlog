@@ -46,7 +46,7 @@ onMounted(() => {
             </div>
             <span class="ml-3 font-mono text-xs text-zinc-600">checkout.post.ts</span>
           </div>
-          <div class="p-5 font-mono text-sm leading-relaxed">
+          <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <pre><code><span class="text-violet-400">export default</span> <span class="text-amber-400">defineEventHandler</span>(<span class="text-violet-400">async</span> (event) => {
   <span class="text-violet-400">const</span> log = <span class="text-amber-400">useLogger</span>(event)
 
@@ -75,7 +75,7 @@ onMounted(() => {
             <span class="ml-3 font-mono text-xs text-zinc-600">output</span>
             <span class="ml-auto font-mono text-xs text-emerald-500">INFO</span>
           </div>
-          <div class="p-5 font-mono text-sm leading-relaxed">
+          <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <div class="mb-3 flex items-baseline gap-3">
               <span class="font-medium text-emerald-500">INFO</span>
               <span class="text-violet-400">POST</span>
