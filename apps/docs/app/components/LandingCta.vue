@@ -118,13 +118,13 @@ onMounted(() => {
       <div class="max-w-4xl mx-auto px-6 flex items-center justify-between">
         <div class="text-xs font-mono italic tracking-tight text-zinc-500">
           &copy; {{ new Date().getFullYear() }} - Made by
-          <a href="https://hrcd.fr/" target="_blank" class="hover:underline text-zinc-700">HugoRCD</a>
+          <a href="https://hrcd.fr/" target="_blank" rel="noopener noreferrer" class="hover:underline text-zinc-700">HugoRCD</a>
         </div>
         <div class="flex items-center gap-3">
-          <a href="https://x.com/hugorcd" target="_blank" aria-label="X" class="text-zinc-400 hover:text-zinc-700 transition-colors">
+          <a href="https://x.com/hugorcd" target="_blank" rel="noopener noreferrer" aria-label="X" class="text-zinc-400 hover:text-zinc-700 transition-colors">
             <UIcon name="i-simple-icons-x" class="size-4" />
           </a>
-          <a href="https://github.com/hugorcd/evlog" target="_blank" aria-label="GitHub" class="text-zinc-400 hover:text-zinc-700 transition-colors">
+          <a href="https://github.com/hugorcd/evlog" target="_blank" rel="noopener noreferrer" aria-label="GitHub" class="text-zinc-400 hover:text-zinc-700 transition-colors">
             <UIcon name="i-simple-icons-github" class="size-4" />
           </a>
         </div>

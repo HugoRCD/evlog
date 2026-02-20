@@ -18,7 +18,7 @@ export default defineNuxtConfig({
 
   site: {
     name: 'evlog',
-    url: 'https://evlog.dev',
+    url: 'https://www.evlog.dev',
   },
 
   studio: {

@@ -156,13 +156,17 @@ const frameworks = [
           <h2 class="section-title">
             Your stack. Covered<span class="text-primary">.</span>
           </h2>
-          <h2 aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse">
+          <div aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse">
             Your stack. Covered<span class="text-primary">.</span>
-          </h2>
+          </div>
         </div>
         <p class="mt-4 text-sm text-zinc-400 max-w-md mx-auto">
           One module for Nuxt. First-class Next.js support. Standalone API for everything else.
         </p>
+        <NuxtLink to="/getting-started/installation" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+          Installation guide
+          <UIcon name="i-lucide-arrow-right" class="size-3" />
+        </NuxtLink>
       </div>
     </Motion>
 

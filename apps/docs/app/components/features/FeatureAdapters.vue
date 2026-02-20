@@ -247,9 +247,9 @@ function setupCanvas() {
               <h2 class="section-title">
                 Send everywhere<span class="text-primary">.</span>
               </h2>
-              <h2 aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse">
+              <div aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse">
                 Send everywhere<span class="text-primary">.</span>
-              </h2>
+              </div>
             </div>
             <p class="max-w-md text-sm leading-relaxed text-zinc-400">
               Batched writes, automatic retries with backoff, and fan-out to multiple destinations. Your logs flow through a pipeline that never blocks your response.
@@ -264,6 +264,10 @@ function setupCanvas() {
                 {{ pill.label }}
               </span>
             </div>
+            <NuxtLink to="/adapters/overview" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+              Explore adapters
+              <UIcon name="i-lucide-arrow-right" class="size-3" />
+            </NuxtLink>
           </div>
         </Motion>
 

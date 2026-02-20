@@ -31,9 +31,9 @@ const pills = [
           <h2 class="section-title max-w-lg">
             Errors that explain why<span class="text-primary">.</span>
           </h2>
-          <h2 aria-hidden="true" class="absolute inset-0 section-title max-w-lg blur-xs animate-pulse">
+          <div aria-hidden="true" class="absolute inset-0 section-title max-w-lg blur-xs animate-pulse">
             Errors that explain why<span class="text-primary">.</span>
-          </h2>
+          </div>
         </div>
         <div class="flex flex-wrap gap-2">
           <span
@@ -45,6 +45,10 @@ const pills = [
             {{ pill.label }}
           </span>
         </div>
+        <NuxtLink to="/core-concepts/structured-errors" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+          Learn about structured errors
+          <UIcon name="i-lucide-arrow-right" class="size-3" />
+        </NuxtLink>
       </div>
     </Motion>
 

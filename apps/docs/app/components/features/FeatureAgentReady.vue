@@ -95,9 +95,9 @@ function startAnimation() {
           <h2 class="section-title max-w-xl">
             Built for agents<span class="text-primary">.</span>
           </h2>
-          <h2 aria-hidden="true" class="absolute inset-0 section-title max-w-xl blur-xs animate-pulse">
+          <div aria-hidden="true" class="absolute inset-0 section-title max-w-xl blur-xs animate-pulse">
             Built for agents<span class="text-primary">.</span>
-          </h2>
+          </div>
         </div>
         <p class="max-w-lg text-sm leading-relaxed text-zinc-400">
           Structured fields, machine-readable context, and actionable metadata — everything an AI agent needs to diagnose and resolve issues on its own.
@@ -112,6 +112,10 @@ function startAnimation() {
             {{ pill.label }}
           </span>
         </div>
+        <NuxtLink to="/getting-started/agent-skills" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+          Agent skills setup
+          <UIcon name="i-lucide-arrow-right" class="size-3" />
+        </NuxtLink>
       </div>
     </Motion>
 

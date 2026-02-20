@@ -48,9 +48,9 @@ onMounted(() => {
           <h1 class="section-title mb-5 leading-[1.1]">
             Stop grepping<br>through chaos<span class="text-accent-blue">.</span>
           </h1>
-          <h1 aria-hidden="true" class="absolute inset-0 section-title mb-5 leading-[1.1] blur-xs animate-pulse">
+          <div aria-hidden="true" class="absolute inset-0 section-title mb-5 leading-[1.1] blur-xs animate-pulse">
             Stop grepping<br>through chaos<span class="text-accent-blue">.</span>
-          </h1>
+          </div>
         </div>
       </Motion>
 
