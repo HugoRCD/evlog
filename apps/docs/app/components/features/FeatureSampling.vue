@@ -63,9 +63,15 @@ onBeforeUnmount(() => {
 function startAnimation() {
   if (animationStarted.value) return
   animationStarted.value = true
-  timers.push(setTimeout(() => { phase.value = 'head' }, 800))
-  timers.push(setTimeout(() => { phase.value = 'tail' }, 2200))
-  timers.push(setTimeout(() => { phase.value = 'done' }, 3400))
+  timers.push(setTimeout(() => {
+    phase.value = 'head' 
+  }, 800))
+  timers.push(setTimeout(() => {
+    phase.value = 'tail' 
+  }, 2200))
+  timers.push(setTimeout(() => {
+    phase.value = 'done' 
+  }, 3400))
 }
 
 function getLogState(log: LogEntry): 'normal' | 'kept' | 'dropped' | 'rescued' {
