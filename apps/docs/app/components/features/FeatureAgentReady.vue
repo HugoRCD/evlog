@@ -27,7 +27,7 @@ const pills = [
   { label: 'Actionable output', icon: 'i-lucide-sparkles' },
 ]
 
-let timers: ReturnType<typeof setTimeout>[] = []
+const timers: ReturnType<typeof setTimeout>[] = []
 let observer: IntersectionObserver | undefined
 
 onMounted(() => {
@@ -88,7 +88,9 @@ function startAnimation() {
       class="mb-10"
     >
       <div>
-        <p class="section-label">Agent Ready</p>
+        <p class="section-label">
+          Agent Ready
+        </p>
         <div class="relative mb-5">
           <h2 class="section-title max-w-xl">
             Built for agents<span class="text-primary">.</span>
@@ -233,7 +235,9 @@ function startAnimation() {
                 <span class="mt-px text-violet-500">→</span>
                 <div>
                   <span class="text-zinc-300">{{ step.label }}</span>
-                  <p class="text-zinc-500">{{ step.text }}</p>
+                  <p class="text-zinc-500">
+                    {{ step.text }}
+                  </p>
                 </div>
               </div>
             </div>

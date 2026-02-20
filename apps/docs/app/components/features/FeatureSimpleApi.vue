@@ -18,7 +18,9 @@ onMounted(() => {
       class="mb-10"
     >
       <div>
-        <p class="section-label">Simple API</p>
+        <p class="section-label">
+          Simple API
+        </p>
         <div class="relative">
           <h2 class="section-title max-w-2xl">
             Three lines of code.<br>Full observability<span class="text-primary">.</span>

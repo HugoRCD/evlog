@@ -173,8 +173,7 @@ function setupCanvas() {
 
     // Hub aura
     const g = ctx.createRadialGradient(
-      P.hubCenter.x, P.hubCenter.y, 0,
-      P.hubCenter.x, P.hubCenter.y, P.hubR,
+      P.hubCenter.x, P.hubCenter.y, 0, P.hubCenter.x, P.hubCenter.y, P.hubR,
     )
     g.addColorStop(0, 'rgba(40,83,255,0.06)')
     g.addColorStop(1, 'rgba(40,83,255,0)')
@@ -207,8 +206,8 @@ function setupCanvas() {
     const dpr = window.devicePixelRatio || 1
     w = rect.width
     h = rect.height
-    canvas.style.width = w + 'px'
-    canvas.style.height = h + 'px'
+    canvas.style.width = `${w }px`
+    canvas.style.height = `${h }px`
     canvas.width = w * dpr
     canvas.height = h * dpr
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
@@ -241,7 +240,9 @@ function setupCanvas() {
           :in-view-options="{ once: true }"
         >
           <div>
-            <p class="section-label">Drain Pipeline</p>
+            <p class="section-label">
+              Drain Pipeline
+            </p>
             <div class="relative mb-4">
               <h2 class="section-title">
                 Send everywhere<span class="text-primary">.</span>
@@ -276,22 +277,34 @@ function setupCanvas() {
             <div class="flex items-start gap-3">
               <UIcon name="i-lucide-zap" class="size-4 mt-0.5 shrink-0 text-accent-blue" />
               <div>
-                <p class="font-mono text-xs text-zinc-300">Non-blocking</p>
-                <p class="mt-1 text-xs leading-relaxed text-zinc-500">Pipeline runs in the background. Your response ships immediately.</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Non-blocking
+                </p>
+                <p class="mt-1 text-xs leading-relaxed text-zinc-500">
+                  Pipeline runs in the background. Your response ships immediately.
+                </p>
               </div>
             </div>
             <div class="flex items-start gap-3">
               <UIcon name="i-lucide-shield-check" class="size-4 mt-0.5 shrink-0 text-accent-blue" />
               <div>
-                <p class="font-mono text-xs text-zinc-300">Guaranteed delivery</p>
-                <p class="mt-1 text-xs leading-relaxed text-zinc-500">Exponential backoff with jitter ensures logs reach every destination.</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Guaranteed delivery
+                </p>
+                <p class="mt-1 text-xs leading-relaxed text-zinc-500">
+                  Exponential backoff with jitter ensures logs reach every destination.
+                </p>
               </div>
             </div>
             <div class="flex items-start gap-3">
               <UIcon name="i-lucide-plug" class="size-4 mt-0.5 shrink-0 text-accent-blue" />
               <div>
-                <p class="font-mono text-xs text-zinc-300">Bring your own drain</p>
-                <p class="mt-1 text-xs leading-relaxed text-zinc-500">Write a simple function to send logs anywhere.</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Bring your own drain
+                </p>
+                <p class="mt-1 text-xs leading-relaxed text-zinc-500">
+                  Write a simple function to send logs anywhere.
+                </p>
               </div>
             </div>
           </div>

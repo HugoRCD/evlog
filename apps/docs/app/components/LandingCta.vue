@@ -19,7 +19,9 @@ onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   updateShipByTime()
   setInterval(updateShipByTime, 1_000)
-  setInterval(() => { showColon.value = !showColon.value }, 1_000)
+  setInterval(() => {
+    showColon.value = !showColon.value 
+  }, 1_000)
 })
 </script>
 

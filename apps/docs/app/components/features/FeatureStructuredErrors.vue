@@ -24,7 +24,9 @@ const pills = [
       class="mb-10"
     >
       <div>
-        <p class="section-label">Structured Errors</p>
+        <p class="section-label">
+          Structured Errors
+        </p>
         <div class="relative mb-5">
           <h2 class="section-title max-w-lg">
             Errors that explain why<span class="text-primary">.</span>
