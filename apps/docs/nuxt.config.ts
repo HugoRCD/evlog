@@ -3,6 +3,10 @@ export default defineNuxtConfig({
 
   modules: ['motion-v/nuxt', 'nuxt-studio'],
 
+  colorMode: {
+    preference: 'dark',
+  },
+
   fonts: {
     families: [
       { name: 'Geist', weights: [400, 600, 700], global: true },

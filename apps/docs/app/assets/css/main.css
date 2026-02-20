@@ -5,48 +5,96 @@
   --font-sans: "Geist", sans-serif;
   --font-mono: "Geist Mono", monospace;
   --font-pixel: "Geist Pixel Line", monospace;
+  --font-pixel-square: "Geist Pixel Square", monospace;
+
+  /* Accent Colors */
+  --color-accent-blue: #2853FF;
+  --color-accent-glow: rgba(40, 83, 255, 0.4);
+  --color-dark-bg: #030303;
+  --color-dark-surface: #0a0a0c;
+  --color-dark-border: #1a1a20;
 }
 
 :root {
   --ui-radius: 0;
-  --ui-primary: #2853FF;
+  --ui-primary: var(--color-accent-blue);
 }
 
 .dark {
-  --ui-bg: #09090b;
+  --ui-bg: var(--color-dark-bg);
 }
 
 @layer base {
   :root {
-    @apply selection:bg-primary selection:text-highlighted;
+    @apply selection:bg-primary selection:text-white;
+  }
+
+  html, body {
+    @apply bg-dark-bg text-white;
   }
 }
 
 /* Section label with dot */
+.section-label {
+  @apply font-pixel text-[10px] uppercase tracking-widest text-zinc-500 mb-4 flex items-center;
+}
+
 .section-label::before {
   content: '';
   display: inline-block;
   width: 4px;
   height: 4px;
-  background-color: var(--color-primary);
-  margin-right: 0.1rem;
+  background-color: var(--ui-primary);
+  margin-right: 0.5rem;
+  box-shadow: 0 0 8px var(--ui-primary);
 }
 
 .section-title {
-  @apply font-pixel text-3xl md:text-4xl lg:text-5xl;
+  @apply font-pixel text-4xl md:text-5xl lg:text-6xl tracking-tight text-white;
+  text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 
-/* Subtle dot grid for hero */
-.dot-grid {
-  background-image: radial-gradient(circle at center, rgba(0, 0, 0, 0.04) 1px, transparent 1px);
-  background-size: 24px 24px;
+/* Abstract Tech Grid Background */
+.tech-grid {
+  background-image:
+    linear-gradient(to right, var(--color-dark-border) 1px, transparent 1px),
+    linear-gradient(to bottom, var(--color-dark-border) 1px, transparent 1px);
+  background-size: 64px 64px;
+  mask-image: radial-gradient(circle at center, black 40%, transparent 80%);
 }
 
-.dark .dot-grid {
-  background-image: radial-gradient(circle at center, rgba(255, 255, 255, 0.03) 1px, transparent 1px);
+.glow-border {
+  position: relative;
+}
+.glow-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(145deg, var(--color-accent-glow), transparent 40%);
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
 }
 
 /* Fade mask for scroll areas */
 .fade-bottom {
   mask-image: linear-gradient(to bottom, black 80%, transparent 100%);
+}
+
+.landing-code {
+  --ui-bg-muted: #0c0c0e;
+  --ui-border-muted: #27272a;
+  --ui-bg: #0c0c0e;
+}
+
+.landing-code pre[style] {
+  background-color: #0c0c0e !important;
+}
+
+.landing-code > div > div {
+  margin-top: 0;
+  margin-bottom: 0;
 }
