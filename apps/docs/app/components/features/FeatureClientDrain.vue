@@ -16,7 +16,7 @@ const pills = [
 
 <template>
   <section class="py-24 md:py-32">
-    <div class="grid gap-8 md:grid-cols-2">
+    <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <div class="flex flex-col gap-8">
         <Motion
           :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"

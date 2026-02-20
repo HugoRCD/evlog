@@ -119,7 +119,7 @@ function startAnimation() {
       </div>
     </Motion>
 
-    <div class="grid gap-6 lg:grid-cols-2">
+    <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <!-- Left: Structured error output -->
       <Motion
         :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
