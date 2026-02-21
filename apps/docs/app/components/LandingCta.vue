@@ -20,7 +20,7 @@ onMounted(() => {
   updateShipByTime()
   setInterval(updateShipByTime, 1_000)
   setInterval(() => {
-    showColon.value = !showColon.value 
+    showColon.value = !showColon.value
   }, 1_000)
 })
 </script>
@@ -70,7 +70,7 @@ onMounted(() => {
       >
         <div>
           <div class="relative mb-6">
-            <h2 class="section-title text-center text-shadow-lg">
+            <h2 class="section-title text-center text-shadow-lg text-shadow-black">
               Better logging<br>by
               <ClientOnly>
                 <span class="tabular-nums">{{ shipByTime }}</span>
