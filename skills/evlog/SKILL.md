@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, Nitro, Hono, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, TanStack Start, Nitro, Hono, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
 license: MIT
 metadata:
   author: HugoRCD
@@ -233,6 +233,46 @@ export default defineHandler(async (event) => {
   log.set({ action: 'checkout' })
   return { ok: true }
 })
+```
+
+### TanStack Start
+
+TanStack Start uses Nitro v3. Install evlog and add a `nitro.config.ts`:
+
+```typescript
+// nitro.config.ts
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  experimental: { asyncContext: true },
+  modules: [evlog({ env: { service: 'my-app' } })],
+})
+```
+
+Add the error handling middleware to `__root.tsx`:
+
+```typescript
+// src/routes/__root.tsx
+import { createMiddleware } from '@tanstack/react-start'
+import { evlogErrorHandler } from 'evlog/nitro/v3'
+
+export const Route = createRootRoute({
+  server: {
+    middleware: [createMiddleware().server(evlogErrorHandler)],
+  },
+})
+```
+
+Use `useRequest()` from `nitro/context` to access the logger:
+
+```typescript
+import { useRequest } from 'nitro/context'
+import type { RequestLogger } from 'evlog'
+
+const req = useRequest()
+const log = req.context.log as RequestLogger
+log.set({ user: { id: 'user_123' } })
 ```
 
 ### Nitro v2

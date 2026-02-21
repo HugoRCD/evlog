@@ -76,11 +76,12 @@ async function callDrainHook(
 
   let drainPromise: Promise<unknown> | undefined
   try {
-    drainPromise = hooks.callHook('evlog:drain', {
+    const result = hooks.callHook('evlog:drain', {
       event: emittedEvent,
       request: hookContext.request,
       headers: hookContext.headers,
-    }).catch((err) => {
+    })
+    drainPromise = result?.catch?.((err: unknown) => {
       console.error('[evlog] drain failed:', err)
     })
   } catch (err) {

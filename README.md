@@ -861,7 +861,7 @@ try {
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
-| **TanStack Start** | Nitro v2 module setup |
+| **TanStack Start** | Nitro v3 module setup ([example](./examples/tanstack-start)) |
 
 ## Agent Skills
 

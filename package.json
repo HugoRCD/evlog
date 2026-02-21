@@ -24,6 +24,7 @@
     "example:workers": "turbo run dev --filter=evlog-workers-example",
     "example:browser": "turbo run dev --filter=evlog-browser-example",
     "example:bun-script": "turbo run dev --filter=evlog-bun-script-example",
+    "example:tanstack-start": "turbo run dev --filter=evlog-tanstack-start-example",
     "build": "turbo run build",
     "build:package": "turbo run build --filter='./packages/*'",
     "build:docs": "turbo run build --filter=evlog-docs",
