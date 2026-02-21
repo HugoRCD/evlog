@@ -106,7 +106,7 @@ function startAnimation() {
           <span
             v-for="pill in pills"
             :key="pill.label"
-            class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400"
+            class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-300 hover:border-zinc-700/80 cursor-default"
           >
             <UIcon :name="pill.icon" class="size-3 text-violet-500" />
             {{ pill.label }}
@@ -222,10 +222,11 @@ function startAnimation() {
           </div>
           <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed">
             <div
-              class="mb-4 text-xs transition-colors duration-300"
+              class="mb-4 text-xs font-mono transition-colors duration-300 flex items-center gap-1.5"
               :class="isComplete ? 'text-zinc-600' : 'text-zinc-500'"
             >
-              {{ isComplete ? 'Analysis complete — 4 insights extracted' : 'Reading structured error context...' }}
+              {{ isComplete ? 'Analysis complete — 4 insights extracted' : 'Reading structured error context' }}
+              <span v-if="!isComplete" class="w-1.5 h-3 bg-violet-400/80 animate-pulse" />
             </div>
 
             <!-- All lines rendered upfront — no layout shift -->

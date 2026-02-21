@@ -258,7 +258,7 @@ function setupCanvas() {
               <span
                 v-for="pill in pills"
                 :key="pill.label"
-                class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400"
+                class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-300 hover:border-zinc-700/80 cursor-default"
               >
                 <UIcon :name="pill.icon" class="size-3 text-accent-blue" />
                 {{ pill.label }}
@@ -371,10 +371,10 @@ function setupCanvas() {
               >
                 <div
                   :data-adapter="idx"
-                  class="flex items-center gap-1.5 border border-zinc-800 bg-[#0a0a0e] px-2.5 py-1.5"
+                  class="group flex items-center gap-1.5 border border-zinc-800 bg-[#0a0a0e] px-2.5 py-1.5 transition-colors hover:border-zinc-700 hover:bg-zinc-900 cursor-default"
                 >
-                  <UIcon :name="adapter.icon" class="size-3 shrink-0 text-zinc-500" />
-                  <span class="font-mono text-[9px] text-zinc-400 whitespace-nowrap">{{ adapter.name }}</span>
+                  <UIcon :name="adapter.icon" class="size-3 shrink-0 text-zinc-500 transition-colors group-hover:text-zinc-300" />
+                  <span class="font-mono text-[9px] text-zinc-400 whitespace-nowrap transition-colors group-hover:text-zinc-200">{{ adapter.name }}</span>
                 </div>
               </div>
             </div>

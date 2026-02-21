@@ -43,7 +43,7 @@ const pills = [
               <span
                 v-for="pill in pills"
                 :key="pill.label"
-                class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400"
+                class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-300 hover:border-zinc-700/80 cursor-default"
               >
                 <UIcon :name="pill.icon" class="size-3 text-accent-blue" />
                 {{ pill.label }}
@@ -205,11 +205,11 @@ const pills = [
 <style scoped>
 .pulse-trail {
   position: absolute;
-  top: -1px;
-  height: 3px;
+  top: 0;
+  height: 1px;
   width: 30%;
-  background: linear-gradient(90deg, transparent, rgba(40, 83, 255, 0.6), transparent);
-  animation: pulse-flow 2.5s ease-in-out infinite;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.4), transparent);
+  animation: pulse-flow 3s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .pulse-trail-delayed {

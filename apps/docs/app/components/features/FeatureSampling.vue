@@ -117,7 +117,7 @@ function getLevelColor(level: string): string {
           <span
             v-for="pill in pills"
             :key="pill.label"
-            class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400"
+            class="inline-flex items-center gap-1.5 border border-zinc-800 bg-zinc-900/50 px-3 py-1 font-mono text-[11px] text-zinc-400 transition-colors hover:bg-zinc-800/80 hover:text-zinc-300 hover:border-zinc-700/80 cursor-default"
           >
             <UIcon :name="pill.icon" class="size-3 text-amber-500" />
             {{ pill.label }}

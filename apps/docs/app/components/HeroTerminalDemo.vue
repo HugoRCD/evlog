@@ -237,14 +237,17 @@ const levelColors: Record<string, string> = {
                 enter-active-class="transition-opacity duration-300"
                 enter-from-class="opacity-0"
                 enter-to-class="opacity-100"
+                leave-active-class="transition-opacity duration-200"
+                leave-from-class="opacity-100"
+                leave-to-class="opacity-0"
               >
                 <div
                   v-if="phase === 'resolving'"
-                  class="absolute inset-0 flex items-center justify-center bg-[#06060a]/60 backdrop-blur-xs z-20"
+                  class="absolute inset-0 flex items-center justify-center bg-[#06060a]/60 backdrop-blur-[2px] z-20"
                 >
-                  <div class="flex items-center gap-2.5 font-mono text-[11px] text-accent-blue/80">
-                    <span class="size-3.5 border-1.5 border-accent-blue/30 border-t-accent-blue rounded-full animate-spin" />
-                    <span>Aggregating into one wide event...</span>
+                  <div class="flex items-center gap-3 px-4 py-2 border border-zinc-800 bg-[#0c0c0e]/95 shadow-xl rounded-full font-mono text-[11px] text-zinc-300">
+                    <span class="size-3 border-[1.5px] border-zinc-700 border-t-zinc-400 rounded-full animate-spin" />
+                    <span>Aggregating context...</span>
                   </div>
                 </div>
               </Transition>
@@ -359,13 +362,13 @@ const levelColors: Record<string, string> = {
 }
 
 .pulse-inward-right {
-  background: linear-gradient(90deg, transparent 0%, rgba(40, 83, 255, 0.5) 50%, transparent 100%);
-  animation: slide-right 1.8s linear infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%);
+  animation: slide-right 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .pulse-inward-left {
-  background: linear-gradient(90deg, transparent 0%, rgba(40, 83, 255, 0.5) 50%, transparent 100%);
-  animation: slide-left 1.8s linear infinite;
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 255, 255, 0.4) 50%, transparent 100%);
+  animation: slide-left 2.5s cubic-bezier(0.4, 0, 0.2, 1) infinite;
 }
 
 .terminal-container {
