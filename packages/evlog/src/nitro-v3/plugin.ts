@@ -74,13 +74,20 @@ async function callDrainHook(
 ): Promise<void> {
   if (!emittedEvent) return
 
-  const drainPromise = hooks.callHook('evlog:drain', {
-    event: emittedEvent,
-    request: hookContext.request,
-    headers: hookContext.headers,
-  }).catch((err) => {
+  let drainPromise: Promise<unknown> | undefined
+  try {
+    drainPromise = hooks.callHook('evlog:drain', {
+      event: emittedEvent,
+      request: hookContext.request,
+      headers: hookContext.headers,
+    }).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    })
+  } catch (err) {
     console.error('[evlog] drain failed:', err)
-  })
+  }
+
+  if (!drainPromise) return
 
   // Use waitUntil if available (srvx native — Cloudflare Workers, Vercel Edge, etc.)
   // This keeps the runtime alive for background work without blocking the response
@@ -88,8 +95,9 @@ async function callDrainHook(
     event.req.waitUntil(drainPromise)
   } else {
     // Fallback: await drain to prevent lost logs in serverless environments
-    // (e.g. Vercel Fluid Compute). Runs inside the response hook so the HTTP
-    // response is already sent — no impact on client latency.
+    // (e.g. Vercel Fluid Compute). On the normal path this runs from the
+    // response hook (response already sent); on the error path it may run
+    // before the error response is finalized.
     await drainPromise
   }
 }

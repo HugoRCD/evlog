@@ -98,8 +98,9 @@ async function callEnrichAndDrain(
     waitUntilCtx.waitUntil(drainPromise)
   } else {
     // Fallback: await drain to prevent lost logs in serverless environments
-    // (e.g. Vercel Fluid Compute). Runs inside afterResponse so the HTTP
-    // response is already sent — no impact on client latency.
+    // (e.g. Vercel Fluid Compute). On the normal path this runs from
+    // afterResponse (response already sent); on the error path it may run
+    // before the error response is finalized.
     await drainPromise
   }
 }
