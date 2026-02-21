@@ -91,11 +91,16 @@ async function callEnrichAndDrain(
     console.error('[evlog] drain failed:', err)
   })
 
-  // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
-  // This ensures drains complete before the runtime terminates
+  // Use waitUntil if available (Cloudflare Workers, Vercel Edge, etc.)
+  // This keeps the runtime alive for background work without blocking the response
   const waitUntilCtx = event.context.cloudflare?.context ?? event.context
   if (typeof waitUntilCtx?.waitUntil === 'function') {
     waitUntilCtx.waitUntil(drainPromise)
+  } else {
+    // Fallback: await drain to prevent lost logs in serverless environments
+    // (e.g. Vercel Fluid Compute). Runs inside afterResponse so the HTTP
+    // response is already sent — no impact on client latency.
+    await drainPromise
   }
 }
 
