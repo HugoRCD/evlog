@@ -427,6 +427,68 @@ import { useLogger } from 'evlog/nitro/v3'
 import { createError } from 'evlog'
 ```
 
+### TanStack Start
+
+TanStack Start uses Nitro v3 under the hood. Install evlog and add a `nitro.config.ts`:
+
+```typescript
+// nitro.config.ts
+import { defineConfig } from 'nitro'
+import evlog from 'evlog/nitro/v3'
+
+export default defineConfig({
+  experimental: { asyncContext: true },
+  modules: [
+    evlog({ env: { service: 'my-app' } })
+  ],
+})
+```
+
+Add the error handling middleware to your root route so `throw createError()` returns structured JSON:
+
+```typescript
+// src/routes/__root.tsx
+import { createRootRoute } from '@tanstack/react-router'
+import { createMiddleware } from '@tanstack/react-start'
+import { evlogErrorHandler } from 'evlog/nitro/v3'
+
+export const Route = createRootRoute({
+  server: {
+    middleware: [createMiddleware().server(evlogErrorHandler)],
+  },
+})
+```
+
+Use `useRequest()` from `nitro/context` to access the logger in routes:
+
+```typescript
+import { createFileRoute } from '@tanstack/react-router'
+import { useRequest } from 'nitro/context'
+import { createError } from 'evlog'
+import type { RequestLogger } from 'evlog'
+
+export const Route = createFileRoute('/api/checkout')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const req = useRequest()
+        const log = req.context.log as RequestLogger
+        const body = await request.json()
+
+        log.set({ user: { id: body.userId } })
+
+        throw createError({
+          message: 'Payment failed',
+          status: 402,
+          why: 'Card declined by issuer',
+          fix: 'Try a different payment method',
+        })
+      },
+    },
+  },
+})
+```
+
 ### Nitro v2
 
 ```typescript

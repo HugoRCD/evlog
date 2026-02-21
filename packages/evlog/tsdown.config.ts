@@ -10,6 +10,7 @@ export default defineConfig({
     'nitro/v3/index': 'src/nitro-v3/index.ts',
     'nitro/v3/module': 'src/nitro-v3/module.ts',
     'nitro/v3/useLogger': 'src/nitro-v3/useLogger.ts',
+    'nitro/v3/middleware': 'src/nitro-v3/middleware.ts',
     'nitro/v3/plugin': 'src/nitro-v3/plugin.ts',
     'nitro/v3/errorHandler': 'src/nitro-v3/errorHandler.ts',
     'runtime/client/log': 'src/runtime/client/log.ts',

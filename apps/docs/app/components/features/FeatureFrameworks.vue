@@ -65,6 +65,44 @@ export const POST = withEvlog(async (req) => {
 \`\`\``,
   },
   {
+    label: 'TanStack Start',
+    code: `\`\`\`ts [src/routes/api/checkout.ts]
+import { createFileRoute } from '@tanstack/react-router'
+import { useRequest } from 'nitro/context'
+import { createError } from 'evlog'
+import type { RequestLogger } from 'evlog'
+
+export const Route = createFileRoute('/api/checkout')({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const req = useRequest()
+        const log = req.context.log as RequestLogger
+        const { cartId } = await request.json()
+
+        const cart = await db.findCart(cartId)
+        log.set({ cart: { items: cart.items.length, total: cart.total } })
+
+        const charge = await stripe.charge(cart.total)
+        log.set({ stripe: { chargeId: charge.id } })
+
+        if (!charge.success) {
+          throw createError({
+            status: 402,
+            message: 'Payment failed',
+            why: charge.decline_reason,
+            fix: 'Try a different payment method',
+          })
+        }
+
+        return Response.json({ orderId: charge.id })
+      },
+    },
+  },
+})
+\`\`\``,
+  },
+  {
     label: 'Hono',
     code: `\`\`\`ts [src/checkout.ts]
 import { createRequestLogger } from 'evlog'
@@ -133,9 +171,10 @@ log.emit()
 const frameworks = [
   { name: 'Nuxt', icon: 'i-simple-icons-nuxtdotjs', tab: 0 },
   { name: 'Next.js', icon: 'i-simple-icons-nextdotjs', tab: 1 },
-  { name: 'Hono', icon: 'i-simple-icons-hono', tab: 2 },
-  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 3 },
-  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 4 },
+  { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 2 },
+  { name: 'Hono', icon: 'i-simple-icons-hono', tab: 3 },
+  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 4 },
+  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 5 },
 ]
 </script>
 
@@ -161,7 +200,7 @@ const frameworks = [
           </div>
         </div>
         <p class="mt-4 text-sm text-zinc-400 max-w-md mx-auto">
-          One module for Nuxt. First-class Next.js support. Standalone API for everything else.
+          One module for Nuxt. First-class Next.js and TanStack Start support. Standalone API for everything else.
         </p>
         <NuxtLink to="/getting-started/installation" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
           Installation guide
@@ -175,12 +214,12 @@ const frameworks = [
       :in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.4, delay: 0.1 }"
       :in-view-options="{ once: true }"
-      class="mb-8 grid grid-cols-5 items-center justify-center gap-2 md:gap-6 max-w-lg md:max-w-none mx-auto"
+      class="mb-8 flex flex-wrap items-end justify-center gap-2 md:gap-3 mx-auto"
     >
       <button
         v-for="fw in frameworks"
         :key="fw.name"
-        class="group flex flex-col items-center gap-2.5 px-2 sm:px-4 py-3 border outline-none transition-all duration-300"
+        class="group flex flex-col items-center gap-2 px-4 py-3 border outline-none transition-all duration-300"
         :class="activeTab === fw.tab
           ? 'border-accent-blue/30 bg-accent-blue/5'
           : 'border-transparent hover:border-zinc-800'"
@@ -192,7 +231,7 @@ const frameworks = [
           :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-600 group-hover:text-zinc-400'"
         />
         <span
-          class="font-mono text-xs transition-colors duration-300"
+          class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
           :class="activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-600 group-hover:text-zinc-400'"
         >
           {{ fw.name }}
