@@ -43,11 +43,11 @@
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
     "automd": "^0.4.3",
-    "eslint": "^9.39.2",
-    "turbo": "^2.8.9",
+    "eslint": "^9.39.3",
+    "turbo": "^2.8.10",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
-    "vue-tsc": "^3.2.4"
+    "vue-tsc": "^3.2.5"
   },
   "workspaces": [
     "apps/*",
