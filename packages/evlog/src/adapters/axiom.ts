@@ -11,6 +11,8 @@ export interface AxiomConfig {
   token: string
   /** Organization ID (required for Personal Access Tokens) */
   orgId?: string
+  /** Edge URL for Axiom edge deployments. Takes priority over baseUrl. See https://axiom.co/docs/reference/edge-deployments */
+  edgeUrl?: string
   /** Base URL for Axiom API. Default: https://api.axiom.co */
   baseUrl?: string
   /** Request timeout in milliseconds. Default: 5000 */
@@ -21,6 +23,7 @@ const AXIOM_FIELDS: ConfigField<AxiomConfig>[] = [
   { key: 'dataset', env: ['NUXT_AXIOM_DATASET', 'AXIOM_DATASET'] },
   { key: 'token', env: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'] },
   { key: 'orgId', env: ['NUXT_AXIOM_ORG_ID', 'AXIOM_ORG_ID'] },
+  { key: 'edgeUrl', env: ['NUXT_AXIOM_EDGE_URL', 'AXIOM_EDGE_URL'] },
   { key: 'baseUrl', env: ['NUXT_AXIOM_URL', 'AXIOM_URL'] },
   { key: 'timeout' },
 ]
@@ -87,7 +90,7 @@ export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promis
  * ```
  */
 export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig): Promise<void> {
-  const baseUrl = config.baseUrl ?? 'https://api.axiom.co'
+  const baseUrl = config.edgeUrl ?? config.baseUrl ?? 'https://api.axiom.co'
   const url = `${baseUrl}/v1/datasets/${encodeURIComponent(config.dataset)}/ingest`
 
   const headers: Record<string, string> = {

@@ -50,6 +50,33 @@ describe('axiom adapter', () => {
       expect(url).toBe('https://custom.axiom.co/v1/datasets/my-dataset/ingest')
     })
 
+    it('uses edge URL when provided and takes priority over baseUrl', async () => {
+      const event = createTestEvent()
+
+      await sendToAxiom(event, {
+        dataset: 'my-dataset',
+        token: 'test-token',
+        edgeUrl: 'https://edge.axiom.co',
+        baseUrl: 'https://custom.axiom.co',
+      })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://edge.axiom.co/v1/datasets/my-dataset/ingest')
+    })
+
+    it('falls back to baseUrl when edgeUrl is not provided', async () => {
+      const event = createTestEvent()
+
+      await sendToAxiom(event, {
+        dataset: 'my-dataset',
+        token: 'test-token',
+        baseUrl: 'https://custom.axiom.co',
+      })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://custom.axiom.co/v1/datasets/my-dataset/ingest')
+    })
+
     it('URL encodes dataset name', async () => {
       const event = createTestEvent()
 
