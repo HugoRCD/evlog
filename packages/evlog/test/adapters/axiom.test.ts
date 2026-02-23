@@ -50,6 +50,32 @@ describe('axiom adapter', () => {
       expect(url).toBe('https://custom.axiom.co/v1/datasets/my-dataset/ingest')
     })
 
+    it('uses edgeUrl for edge ingest endpoint', async () => {
+      const event = createTestEvent()
+
+      await sendToAxiom(event, {
+        dataset: 'my-dataset',
+        token: 'test-token',
+        edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
+      })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my-dataset')
+    })
+
+    it('uses edgeUrl as-is when custom path is provided', async () => {
+      const event = createTestEvent()
+
+      await sendToAxiom(event, {
+        dataset: 'my-dataset',
+        token: 'test-token',
+        edgeUrl: 'http://localhost:3400/custom/ingest/',
+      })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('http://localhost:3400/custom/ingest')
+    })
+
     it('URL encodes dataset name', async () => {
       const event = createTestEvent()
 
@@ -60,6 +86,19 @@ describe('axiom adapter', () => {
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
       expect(url).toBe('https://api.axiom.co/v1/datasets/my%20dataset%2Ftest/ingest')
+    })
+
+    it('URL encodes dataset name for edge ingest endpoint', async () => {
+      const event = createTestEvent()
+
+      await sendToAxiom(event, {
+        dataset: 'my dataset/test',
+        token: 'test-token',
+        edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
+      })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my%20dataset%2Ftest')
     })
 
     it('sets correct Authorization header', async () => {

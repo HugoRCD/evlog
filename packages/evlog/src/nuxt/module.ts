@@ -11,6 +11,33 @@ import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig } from '../types'
 import { name, version } from '../../package.json'
 
+interface ModuleAxiomBaseConfig {
+  /** Axiom dataset name */
+  dataset: string
+  /** Axiom API token */
+  token: string
+  /** Organization ID (required for Personal Access Tokens) */
+  orgId?: string
+  /** Request timeout in milliseconds. Default: 5000 */
+  timeout?: number
+}
+
+interface ModuleAxiomEdgeConfig {
+  /** Edge URL for Axiom ingest/query endpoints. Uses /v1/ingest/{dataset}. */
+  edgeUrl: string
+  /** Mutually exclusive with edgeUrl. */
+  baseUrl?: never
+}
+
+interface ModuleAxiomEndpointConfig {
+  /** Base URL for Axiom API. Uses /v1/datasets/{dataset}/ingest. */
+  baseUrl?: string
+  /** Mutually exclusive with baseUrl. */
+  edgeUrl?: never
+}
+
+type ModuleAxiomConfig = ModuleAxiomBaseConfig & (ModuleAxiomEdgeConfig | ModuleAxiomEndpointConfig)
+
 export interface ModuleOptions {
   /**
    * Enable or disable all logging globally.
@@ -104,18 +131,7 @@ export interface ModuleOptions {
    * }
    * ```
    */
-  axiom?: {
-    /** Axiom dataset name */
-    dataset: string
-    /** Axiom API token */
-    token: string
-    /** Organization ID (required for Personal Access Tokens) */
-    orgId?: string
-    /** Base URL for Axiom API. Default: https://api.axiom.co */
-    baseUrl?: string
-    /** Request timeout in milliseconds. Default: 5000 */
-    timeout?: number
-  }
+  axiom?: ModuleAxiomConfig
 
   /**
    * OTLP adapter configuration.
