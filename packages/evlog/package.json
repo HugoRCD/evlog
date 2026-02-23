@@ -175,7 +175,7 @@
     "ofetch": "^1.5.1",
     "nitro": "^3.0.1-alpha.2",
     "next": ">=16.1.6",
-    "react": ">=18.0.0"
+    "react": ">=19.2.4"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
