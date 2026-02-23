@@ -4,23 +4,43 @@ import { resolveAdapterConfig } from './_config'
 import { defineDrain } from './_drain'
 import { httpPost } from './_http'
 
-export interface AxiomConfig {
+interface BaseAxiomConfig {
   /** Axiom dataset name */
   dataset: string
   /** Axiom API token */
   token: string
   /** Organization ID (required for Personal Access Tokens) */
   orgId?: string
-  /** Base URL for Axiom API. Default: https://api.axiom.co */
-  baseUrl?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
 }
 
-const AXIOM_FIELDS: ConfigField<AxiomConfig>[] = [
+interface EdgeAxiomConfig {
+  /** Edge URL for Axiom ingest/query endpoints. Uses /v1/ingest/{dataset}. */
+  edgeUrl: string
+  /** Mutually exclusive with edgeUrl. */
+  baseUrl?: never
+}
+
+interface EndpointAxiomConfig {
+  /** Base URL for Axiom API. Uses /v1/datasets/{dataset}/ingest. */
+  baseUrl?: string
+  /** Mutually exclusive with baseUrl. */
+  edgeUrl?: never
+}
+
+export type AxiomConfig = BaseAxiomConfig & (EdgeAxiomConfig | EndpointAxiomConfig)
+
+type ResolvedAxiomConfig = BaseAxiomConfig & {
+  edgeUrl?: string
+  baseUrl?: string
+}
+
+const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
   { key: 'dataset', env: ['NUXT_AXIOM_DATASET', 'AXIOM_DATASET'] },
   { key: 'token', env: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'] },
   { key: 'orgId', env: ['NUXT_AXIOM_ORG_ID', 'AXIOM_ORG_ID'] },
+  { key: 'edgeUrl', env: ['NUXT_AXIOM_EDGE_URL', 'AXIOM_EDGE_URL'] },
   { key: 'baseUrl', env: ['NUXT_AXIOM_URL', 'AXIOM_URL'] },
   { key: 'timeout' },
 ]
@@ -49,11 +69,21 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
   return defineDrain<AxiomConfig>({
     name: 'axiom',
     resolve: () => {
-      const config = resolveAdapterConfig<AxiomConfig>('axiom', AXIOM_FIELDS, overrides)
+      const config = resolveAdapterConfig<ResolvedAxiomConfig>(
+        'axiom',
+        AXIOM_FIELDS,
+        overrides as Partial<ResolvedAxiomConfig>,
+      )
       if (!config.dataset || !config.token) {
         console.error('[evlog/axiom] Missing dataset or token. Set NUXT_AXIOM_TOKEN/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
         return null
       }
+
+      if (config.edgeUrl && config.baseUrl) {
+        console.warn('[evlog/axiom] Both edgeUrl and baseUrl are set. edgeUrl takes precedence for ingest.')
+        delete config.baseUrl
+      }
+
       return config as AxiomConfig
     },
     send: sendBatchToAxiom,
@@ -87,8 +117,7 @@ export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promis
  * ```
  */
 export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig): Promise<void> {
-  const baseUrl = config.baseUrl ?? 'https://api.axiom.co'
-  const url = `${baseUrl}/v1/datasets/${encodeURIComponent(config.dataset)}/ingest`
+  const url = resolveIngestUrl(config)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
@@ -106,4 +135,28 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
     timeout: config.timeout ?? 5000,
     label: 'Axiom',
   })
+}
+
+function resolveIngestUrl(config: AxiomConfig): string {
+  const encodedDataset = encodeURIComponent(config.dataset)
+
+  if (!config.edgeUrl) {
+    const baseUrl = config.baseUrl ?? 'https://api.axiom.co'
+    return `${baseUrl}/v1/datasets/${encodedDataset}/ingest`
+  }
+
+  try {
+    const parsed = new URL(config.edgeUrl)
+
+    if (parsed.pathname === '' || parsed.pathname === '/') {
+      parsed.pathname = `/v1/ingest/${encodedDataset}`
+      return parsed.toString()
+    }
+
+    parsed.pathname = parsed.pathname.replace(/\/+$/, '')
+    return parsed.toString()
+  } catch {
+    const trimmed = config.edgeUrl.replace(/\/+$/, '')
+    return `${trimmed}/v1/ingest/${encodedDataset}`
+  }
 }
