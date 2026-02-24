@@ -22,9 +22,6 @@ export interface PostHogEventsConfig extends PostHogConfig {
   distinctId?: string
 }
 
-/** @deprecated Use `PostHogConfig` instead. */
-export type PostHogLogsConfig = PostHogConfig
-
 /** PostHog event structure for the batch API */
 export interface PostHogEvent {
   event: string
@@ -40,15 +37,26 @@ const POSTHOG_FIELDS: ConfigField<PostHogConfig>[] = [
 ]
 
 const POSTHOG_EVENTS_FIELDS: ConfigField<PostHogEventsConfig>[] = [
-  { key: 'apiKey', env: ['NUXT_POSTHOG_API_KEY', 'POSTHOG_API_KEY'] },
-  { key: 'host', env: ['NUXT_POSTHOG_HOST', 'POSTHOG_HOST'] },
+  ...POSTHOG_FIELDS,
   { key: 'eventName' },
   { key: 'distinctId' },
-  { key: 'timeout' },
 ]
 
+function resolveHost(config: PostHogConfig): string {
+  return (config.host ?? 'https://us.i.posthog.com').replace(/\/$/, '')
+}
+
+function toOTLPConfig(config: PostHogConfig): OTLPConfig {
+  const host = resolveHost(config)
+  return {
+    endpoint: `${host}/i`,
+    headers: { Authorization: `Bearer ${config.apiKey}` },
+    timeout: config.timeout,
+  }
+}
+
 /**
- * Convert a WideEvent to a PostHog event format.
+ * Convert a WideEvent to a PostHog custom event format.
  */
 export function toPostHogEvent(event: WideEvent, config: PostHogEventsConfig): PostHogEvent {
   const { timestamp, level, service, ...rest } = event
@@ -65,11 +73,12 @@ export function toPostHogEvent(event: WideEvent, config: PostHogEventsConfig): P
   }
 }
 
+// ---------------------------------------------------------------------------
+// PostHog Logs (OTLP) — default
+// ---------------------------------------------------------------------------
+
 /**
  * Create a drain function for sending logs to PostHog Logs via OTLP.
- *
- * This is the recommended approach — PostHog Logs uses the standard OTLP
- * log format and is significantly cheaper than custom events.
  *
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to createPostHogDrain()
@@ -100,30 +109,53 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
       }
       return config as PostHogConfig
     },
-    send: async (events, config) => {
-      const host = (config.host ?? 'https://us.i.posthog.com').replace(/\/$/, '')
-      const otlpConfig: OTLPConfig = {
-        endpoint: `${host}/i`,
-        headers: { Authorization: `Bearer ${config.apiKey}` },
-        timeout: config.timeout,
-      }
-      await sendBatchToOTLP(events, otlpConfig)
-    },
+    send: sendBatchToPostHog,
   })
 }
 
 /**
+ * Send a single event to PostHog Logs via OTLP.
+ *
+ * @example
+ * ```ts
+ * await sendToPostHog(event, {
+ *   apiKey: process.env.POSTHOG_API_KEY!,
+ * })
+ * ```
+ */
+export async function sendToPostHog(event: WideEvent, config: PostHogConfig): Promise<void> {
+  await sendBatchToPostHog([event], config)
+}
+
+/**
+ * Send a batch of events to PostHog Logs via OTLP.
+ *
+ * @example
+ * ```ts
+ * await sendBatchToPostHog(events, {
+ *   apiKey: process.env.POSTHOG_API_KEY!,
+ * })
+ * ```
+ */
+export async function sendBatchToPostHog(events: WideEvent[], config: PostHogConfig): Promise<void> {
+  if (events.length === 0) return
+  await sendBatchToOTLP(events, toOTLPConfig(config))
+}
+
+// ---------------------------------------------------------------------------
+// PostHog Events (custom events via /batch/)
+// ---------------------------------------------------------------------------
+
+/**
  * Create a drain function for sending logs to PostHog as custom events.
  *
- * Uses PostHog's `/batch/` API to send wide events as PostHog custom events.
- * Consider using `createPostHogDrain()` instead — it uses PostHog Logs (OTLP)
- * which is significantly cheaper.
+ * Uses PostHog's `/batch/` API. Consider using `createPostHogDrain()` instead
+ * which uses PostHog Logs (OTLP) and is significantly cheaper.
  *
  * @example
  * ```ts
  * nitroApp.hooks.hook('evlog:drain', createPostHogEventsDrain({
  *   eventName: 'server_request',
- *   distinctId: 'my-backend-service',
  * }))
  * ```
  */
@@ -143,32 +175,17 @@ export function createPostHogEventsDrain(overrides?: Partial<PostHogEventsConfig
 }
 
 /**
- * @deprecated Use `createPostHogDrain()` instead. `createPostHogDrain()` now
- * uses PostHog Logs (OTLP) by default, making this function redundant.
- */
-export const createPostHogLogsDrain = createPostHogDrain
-
-/**
  * Send a single event to PostHog as a custom event.
  *
  * @example
  * ```ts
- * await sendToPostHog(event, {
+ * await sendToPostHogEvents(event, {
  *   apiKey: process.env.POSTHOG_API_KEY!,
  * })
  * ```
  */
-export async function sendToPostHog(event: WideEvent, config: PostHogEventsConfig): Promise<void> {
+export async function sendToPostHogEvents(event: WideEvent, config: PostHogEventsConfig): Promise<void> {
   await sendBatchToPostHogEvents([event], config)
-}
-
-/**
- * Send a batch of events to PostHog as custom events.
- *
- * @deprecated Use `sendBatchToPostHogEvents()` instead.
- */
-export async function sendBatchToPostHog(events: WideEvent[], config: PostHogEventsConfig): Promise<void> {
-  return sendBatchToPostHogEvents(events, config)
 }
 
 /**
@@ -184,20 +201,13 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogEve
 export async function sendBatchToPostHogEvents(events: WideEvent[], config: PostHogEventsConfig): Promise<void> {
   if (events.length === 0) return
 
-  const host = (config.host ?? 'https://us.i.posthog.com').replace(/\/$/, '')
-  const url = `${host}/batch/`
-
+  const url = `${resolveHost(config)}/batch/`
   const batch = events.map(event => toPostHogEvent(event, config))
-
-  const payload = {
-    api_key: config.apiKey,
-    batch,
-  }
 
   await httpPost({
     url,
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(payload),
+    body: JSON.stringify({ api_key: config.apiKey, batch }),
     timeout: config.timeout ?? 5000,
     label: 'PostHog',
   })

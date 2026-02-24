@@ -147,7 +147,7 @@ export interface ModuleOptions {
   /**
    * PostHog adapter configuration.
    * When configured, use `createPostHogDrain()` from `evlog/posthog` to send logs
-   * via PostHog Logs (OTLP). For custom events, use `createPostHogEventsDrain()`.
+   * via PostHog Logs (OTLP).
    *
    * @example
    * ```ts
@@ -161,10 +161,6 @@ export interface ModuleOptions {
     apiKey: string
     /** PostHog host URL. Default: https://us.i.posthog.com */
     host?: string
-    /** PostHog event name (only used by `createPostHogEventsDrain()`). Default: evlog_wide_event */
-    eventName?: string
-    /** Override distinct_id (only used by `createPostHogEventsDrain()`). Defaults to event.service */
-    distinctId?: string
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
   }
