@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { createPostHogLogsDrain, sendBatchToPostHog, sendToPostHog, toPostHogEvent } from '../../src/adapters/posthog'
+import { createPostHogDrain, createPostHogEventsDrain, createPostHogLogsDrain, sendBatchToPostHog, sendBatchToPostHogEvents, sendToPostHog, toPostHogEvent } from '../../src/adapters/posthog'
 
 describe('posthog adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -207,7 +207,7 @@ describe('posthog adapter', () => {
     })
   })
 
-  describe('sendBatchToPostHog', () => {
+  describe('sendBatchToPostHogEvents', () => {
     it('sends multiple events in a single request', async () => {
       const events = [
         createTestEvent({ requestId: '1' }),
@@ -215,7 +215,7 @@ describe('posthog adapter', () => {
         createTestEvent({ requestId: '3' }),
       ]
 
-      await sendBatchToPostHog(events, {
+      await sendBatchToPostHogEvents(events, {
         apiKey: 'phc_test',
       })
 
@@ -226,7 +226,7 @@ describe('posthog adapter', () => {
     })
 
     it('does not send request for empty events array', async () => {
-      await sendBatchToPostHog([], {
+      await sendBatchToPostHogEvents([], {
         apiKey: 'phc_test',
       })
 
@@ -236,13 +236,25 @@ describe('posthog adapter', () => {
     it('includes api_key at top level of batch payload', async () => {
       const events = [createTestEvent()]
 
-      await sendBatchToPostHog(events, {
+      await sendBatchToPostHogEvents(events, {
         apiKey: 'phc_batch_key',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
       const body = JSON.parse(options.body as string)
       expect(body.api_key).toBe('phc_batch_key')
+    })
+  })
+
+  describe('sendBatchToPostHog (deprecated alias)', () => {
+    it('delegates to sendBatchToPostHogEvents', async () => {
+      const events = [createTestEvent()]
+
+      await sendBatchToPostHog(events, { apiKey: 'phc_test' })
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://us.i.posthog.com/batch/')
     })
   })
 
@@ -271,7 +283,7 @@ describe('posthog adapter', () => {
     })
   })
 
-  describe('createPostHogLogsDrain', () => {
+  describe('createPostHogDrain', () => {
     const createDrainContext = (overrides?: Partial<WideEvent>) => ({
       event: createTestEvent(overrides),
     })
@@ -284,7 +296,7 @@ describe('posthog adapter', () => {
     })
 
     it('sends to correct OTLP endpoint', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext())
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -293,7 +305,7 @@ describe('posthog adapter', () => {
     })
 
     it('sets Authorization header with Bearer token', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_my_key' })
+      const drain = createPostHogDrain({ apiKey: 'phc_my_key' })
       await drain(createDrainContext())
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -303,7 +315,7 @@ describe('posthog adapter', () => {
     })
 
     it('sends OTLP log record format in payload', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext({ action: 'checkout' }))
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -322,7 +334,7 @@ describe('posthog adapter', () => {
     })
 
     it('supports batch of events', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain([
         createDrainContext({ requestId: '1' }),
         createDrainContext({ requestId: '2' }),
@@ -336,14 +348,14 @@ describe('posthog adapter', () => {
     })
 
     it('handles single context (non-array)', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext())
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
     })
 
     it('skips empty array', async () => {
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain([])
 
       expect(fetchSpy).not.toHaveBeenCalled()
@@ -351,7 +363,7 @@ describe('posthog adapter', () => {
 
     it('resolves apiKey from env var NUXT_POSTHOG_API_KEY', async () => {
       process.env.NUXT_POSTHOG_API_KEY = 'phc_from_env'
-      const drain = createPostHogLogsDrain()
+      const drain = createPostHogDrain()
       await drain(createDrainContext())
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -362,7 +374,7 @@ describe('posthog adapter', () => {
 
     it('resolves apiKey from env var POSTHOG_API_KEY as fallback', async () => {
       process.env.POSTHOG_API_KEY = 'phc_fallback'
-      const drain = createPostHogLogsDrain()
+      const drain = createPostHogDrain()
       await drain(createDrainContext())
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -373,7 +385,7 @@ describe('posthog adapter', () => {
 
     it('overrides take priority over env vars', async () => {
       process.env.NUXT_POSTHOG_API_KEY = 'phc_from_env'
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_override' })
+      const drain = createPostHogDrain({ apiKey: 'phc_override' })
       await drain(createDrainContext())
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -384,7 +396,7 @@ describe('posthog adapter', () => {
 
     it('logs error when apiKey is missing', async () => {
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const drain = createPostHogLogsDrain()
+      const drain = createPostHogDrain()
       await drain(createDrainContext())
 
       expect(consoleSpy).toHaveBeenCalledWith(
@@ -394,7 +406,7 @@ describe('posthog adapter', () => {
     })
 
     it('uses custom host for EU region', async () => {
-      const drain = createPostHogLogsDrain({
+      const drain = createPostHogDrain({
         apiKey: 'phc_test',
         host: 'https://eu.i.posthog.com',
       })
@@ -405,7 +417,7 @@ describe('posthog adapter', () => {
     })
 
     it('uses custom host for self-hosted', async () => {
-      const drain = createPostHogLogsDrain({
+      const drain = createPostHogDrain({
         apiKey: 'phc_test',
         host: 'https://posthog.mycompany.com',
       })
@@ -416,7 +428,7 @@ describe('posthog adapter', () => {
     })
 
     it('handles host with trailing slash', async () => {
-      const drain = createPostHogLogsDrain({
+      const drain = createPostHogDrain({
         apiKey: 'phc_test',
         host: 'https://eu.i.posthog.com/',
       })
@@ -428,7 +440,7 @@ describe('posthog adapter', () => {
 
     it('resolves host from env var', async () => {
       process.env.NUXT_POSTHOG_HOST = 'https://eu.i.posthog.com'
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext())
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -437,7 +449,7 @@ describe('posthog adapter', () => {
 
     it('uses custom timeout', async () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test', timeout: 10000 })
+      const drain = createPostHogDrain({ apiKey: 'phc_test', timeout: 10000 })
       await drain(createDrainContext())
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
@@ -445,7 +457,7 @@ describe('posthog adapter', () => {
 
     it('uses default timeout of 5000ms', async () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext())
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
@@ -456,13 +468,76 @@ describe('posthog adapter', () => {
         new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' }),
       )
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test' })
       await drain(createDrainContext())
 
       expect(consoleSpy).toHaveBeenCalledWith(
         '[evlog/posthog] Failed to send events:',
         expect.any(Error),
       )
+    })
+  })
+
+  describe('createPostHogLogsDrain (deprecated alias)', () => {
+    it('is the same function as createPostHogDrain', () => {
+      expect(createPostHogLogsDrain).toBe(createPostHogDrain)
+    })
+
+    it('sends to OTLP endpoint', async () => {
+      const drain = createPostHogLogsDrain({ apiKey: 'phc_test' })
+      await drain({ event: createTestEvent() })
+
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://us.i.posthog.com/i/v1/logs')
+    })
+  })
+
+  describe('createPostHogEventsDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+    })
+
+    afterEach(() => {
+      delete process.env.NUXT_POSTHOG_API_KEY
+      delete process.env.POSTHOG_API_KEY
+    })
+
+    it('sends to batch endpoint', async () => {
+      const drain = createPostHogEventsDrain({ apiKey: 'phc_test' })
+      await drain(createDrainContext())
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(url).toBe('https://us.i.posthog.com/batch/')
+    })
+
+    it('supports custom eventName', async () => {
+      const drain = createPostHogEventsDrain({ apiKey: 'phc_test', eventName: 'custom_event' })
+      await drain(createDrainContext())
+
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const body = JSON.parse(options.body as string)
+      expect(body.batch[0].event).toBe('custom_event')
+    })
+
+    it('supports custom distinctId', async () => {
+      const drain = createPostHogEventsDrain({ apiKey: 'phc_test', distinctId: 'my-service' })
+      await drain(createDrainContext())
+
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const body = JSON.parse(options.body as string)
+      expect(body.batch[0].distinct_id).toBe('my-service')
+    })
+
+    it('logs error when apiKey is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createPostHogEventsDrain()
+      await drain(createDrainContext())
+
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/posthog] Missing apiKey'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })
