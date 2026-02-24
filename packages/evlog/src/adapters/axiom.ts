@@ -156,6 +156,7 @@ function resolveIngestUrl(config: AxiomConfig): string {
     parsed.pathname = parsed.pathname.replace(/\/+$/, '')
     return parsed.toString()
   } catch {
+    console.warn(`[evlog/axiom] edgeUrl "${config.edgeUrl}" is not a valid URL, falling back to string concatenation.`)
     const trimmed = config.edgeUrl.replace(/\/+$/, '')
     return `${trimmed}/v1/ingest/${encodedDataset}`
   }
