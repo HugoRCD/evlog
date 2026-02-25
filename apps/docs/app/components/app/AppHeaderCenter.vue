@@ -76,7 +76,7 @@ const landingItems = [
       {
         label: 'PostHog',
         icon: 'i-simple-icons-posthog',
-        description: 'Send events to PostHog',
+        description: 'Send logs to PostHog',
         to: '/adapters/posthog'
       },
       {

@@ -152,6 +152,12 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogCon
  * Uses PostHog's `/batch/` API. Consider using `createPostHogDrain()` instead
  * which uses PostHog Logs (OTLP) and is significantly cheaper.
  *
+ * Configuration priority (highest to lowest):
+ * 1. Overrides passed to createPostHogEventsDrain()
+ * 2. runtimeConfig.evlog.posthog
+ * 3. runtimeConfig.posthog
+ * 4. Environment variables: NUXT_POSTHOG_*, POSTHOG_*
+ *
  * @example
  * ```ts
  * nitroApp.hooks.hook('evlog:drain', createPostHogEventsDrain({
@@ -161,11 +167,11 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogCon
  */
 export function createPostHogEventsDrain(overrides?: Partial<PostHogEventsConfig>) {
   return defineDrain<PostHogEventsConfig>({
-    name: 'posthog',
+    name: 'posthog-events',
     resolve: () => {
       const config = resolveAdapterConfig<PostHogEventsConfig>('posthog', POSTHOG_EVENTS_FIELDS, overrides)
       if (!config.apiKey) {
-        console.error('[evlog/posthog] Missing apiKey. Set NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY env var or pass to createPostHogEventsDrain()')
+        console.error('[evlog/posthog-events] Missing apiKey. Set NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY env var or pass to createPostHogEventsDrain()')
         return null
       }
       return config as PostHogEventsConfig

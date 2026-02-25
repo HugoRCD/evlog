@@ -527,7 +527,7 @@ describe('posthog adapter', () => {
       await drain(createDrainContext())
 
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[evlog/posthog] Missing apiKey'),
+        expect.stringContaining('[evlog/posthog-events] Missing apiKey'),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
     })

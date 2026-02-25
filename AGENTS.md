@@ -222,7 +222,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 |---------|--------|-------------|
 | Axiom | `evlog/axiom` | Send logs to Axiom for querying and dashboards |
 | OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
-| PostHog | `evlog/posthog` | Send logs to PostHog as events for product analytics |
+| PostHog | `evlog/posthog` | Send logs to PostHog Logs via OTLP for structured logging and observability |
 | Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
 | Better Stack | `evlog/better-stack` | Send logs to Better Stack for log management and alerting |
 
