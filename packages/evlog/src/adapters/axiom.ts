@@ -16,7 +16,11 @@ interface BaseAxiomConfig {
 }
 
 interface EdgeAxiomConfig {
-  /** Edge URL for Axiom ingest/query endpoints. Uses /v1/ingest/{dataset}. */
+  /**
+   * Edge URL for Axiom ingest/query endpoints.
+   * If no path is provided, uses /v1/ingest/{dataset}.
+   * If a custom path is provided, it is used as-is (trailing slash trimmed).
+   */
   edgeUrl: string
   /** Mutually exclusive with edgeUrl. */
   baseUrl?: never
