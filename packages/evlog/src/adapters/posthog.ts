@@ -156,7 +156,7 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogCon
  * 1. Overrides passed to createPostHogEventsDrain()
  * 2. runtimeConfig.evlog.posthog
  * 3. runtimeConfig.posthog
- * 4. Environment variables: NUXT_POSTHOG_*, POSTHOG_*
+ * 4. Environment variables: NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY, NUXT_POSTHOG_HOST/POSTHOG_HOST
  *
  * @example
  * ```ts
