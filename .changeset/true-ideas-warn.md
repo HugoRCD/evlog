@@ -1,5 +1,0 @@
----
-"evlog": major
----
-
-bump version
