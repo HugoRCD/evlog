@@ -235,7 +235,7 @@
       "peerDependencies": {
         "@nuxthub/core": "^0.10.6",
         "drizzle-orm": ">=0.45.1",
-        "evlog": "^2.0.0",
+        "evlog": "^2.1.0",
       },
     },
   },
