@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { Nitro } from 'nitropack'
 import type { NitroModuleOptions } from '../nitro'
 
 export type { NitroModuleOptions }
@@ -9,7 +10,7 @@ const _dir = dirname(fileURLToPath(import.meta.url))
 export default function evlog(options?: NitroModuleOptions) {
   return {
     name: 'evlog',
-    setup(nitro: any) {
+    setup(nitro: Nitro) {
       // Push the plugin (no extension — Nitro's bundler resolves it)
       nitro.options.plugins = nitro.options.plugins || []
       nitro.options.plugins.push(resolve(_dir, 'plugin'))
@@ -18,6 +19,11 @@ export default function evlog(options?: NitroModuleOptions) {
       if (!nitro.options.errorHandler) {
         nitro.options.errorHandler = resolve(_dir, 'errorHandler')
       }
+
+      // explicitly tell nitro to bundle evlog's files to correctly resolve nitro dependencies
+      // in nitro v2 we can only disable externals globally
+
+      nitro.options.noExternals = true
 
       // Inject config into runtimeConfig — works in production where the
       // plugin is bundled through Nitro's builder and the virtual

@@ -1,5 +1,6 @@
 import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
+import type { Nitro } from 'nitro/types'
 import type { NitroModuleOptions } from '../nitro'
 
 export type { NitroModuleOptions }
@@ -9,10 +10,18 @@ const _dir = dirname(fileURLToPath(import.meta.url))
 export default function evlog(options?: NitroModuleOptions) {
   return {
     name: 'evlog',
-    setup(nitro: any) {
+    setup(nitro: Nitro) {
       // Push the plugin (no extension — Nitro's bundler resolves it)
       nitro.options.plugins = nitro.options.plugins || []
       nitro.options.plugins.push(resolve(_dir, 'plugin'))
+
+      // explicitly tell nitro to bundle evlog's files to correctly resolve nitro dependencies
+      if (!nitro.options.noExternals) {
+        nitro.options.noExternals = ['evlog']
+      } else if (Array.isArray(nitro.options.noExternals)) {
+        nitro.options.noExternals.push('evlog')
+      }
+      
 
       // Set error handler only if not already configured by user
       if (!nitro.options.errorHandler) {
