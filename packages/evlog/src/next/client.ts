@@ -30,6 +30,14 @@ export interface EvlogProviderProps {
    */
   enabled?: boolean
 
+  /**
+   * Enable or disable browser console output.
+   * When false, logs are suppressed in the browser DevTools console
+   * but still sent to the server via transport (if enabled).
+   * @default true
+   */
+  console?: boolean
+
   children: React.ReactNode
 }
 
@@ -52,15 +60,16 @@ export interface EvlogProviderProps {
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export function EvlogProvider({ service, pretty, transport, enabled, children }: EvlogProviderProps) {
+export function EvlogProvider({ service, pretty, transport, enabled, console: consoleOutput, children }: EvlogProviderProps) {
   useEffect(() => {
     initLog({
       enabled,
+      console: consoleOutput,
       pretty,
       service,
       transport,
     })
-  }, [enabled, pretty, service, transport])
+  }, [enabled, consoleOutput, pretty, service, transport])
 
   return children
 }

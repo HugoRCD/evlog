@@ -4,6 +4,7 @@ import { getConsoleMethod } from '../../utils'
 const isClient = typeof window !== 'undefined'
 
 let clientEnabled = true
+let clientConsole = true
 let clientPretty = true
 let clientService = 'client'
 let transportEnabled = false
@@ -25,8 +26,9 @@ const LEVEL_COLORS: Record<string, string> = {
   debug: 'color: #6b7280; font-weight: bold',
 }
 
-export function initLog(options: { enabled?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
+export function initLog(options: { enabled?: boolean, console?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
   clientEnabled = typeof options.enabled === 'boolean' ? options.enabled : true
+  clientConsole = typeof options.console === 'boolean' ? options.console : true
   clientPretty = typeof options.pretty === 'boolean' ? options.pretty : true
   clientService = options.service ?? 'client'
   transportEnabled = options.transport?.enabled ?? false
@@ -60,13 +62,14 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
     ...event,
   }
 
-  const method = getConsoleMethod(level)
-
-  if (clientPretty) {
-    const { level: lvl, service, ...rest } = formatted
-    console[method](`%c[${service}]%c ${lvl}`, LEVEL_COLORS[lvl] || '', 'color: inherit', rest)
-  } else {
-    console[method](JSON.stringify(formatted))
+  if (clientConsole) {
+    const method = getConsoleMethod(level)
+    if (clientPretty) {
+      const { level: lvl, service, ...rest } = formatted
+      console[method](`%c[${service}]%c ${lvl}`, LEVEL_COLORS[lvl] || '', 'color: inherit', rest)
+    } else {
+      console[method](JSON.stringify(formatted))
+    }
   }
 
   sendToServer(formatted)
@@ -75,7 +78,9 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!clientEnabled) return
   if (clientPretty) {
-    console[getConsoleMethod(level)](`%c[${tag}]%c ${message}`, LEVEL_COLORS[level] || '', 'color: inherit')
+    if (clientConsole) {
+      console[getConsoleMethod(level)](`%c[${tag}]%c ${message}`, LEVEL_COLORS[level] || '', 'color: inherit')
+    }
     sendToServer({
       timestamp: new Date().toISOString(),
       level,

@@ -56,6 +56,14 @@ export interface ModuleOptions {
   env?: Partial<EnvironmentContext>
 
   /**
+   * Enable or disable browser console output.
+   * When false, client-side logs are suppressed in the browser DevTools console
+   * but still sent to the server via transport (if enabled).
+   * @default true
+   */
+  console?: boolean
+
+  /**
    * Enable pretty printing.
    * @default true in development, false in production
    */
@@ -241,6 +249,7 @@ export default defineNuxtModule<ModuleOptions>({
     nuxt.options.runtimeConfig.evlog = options
     nuxt.options.runtimeConfig.public.evlog = {
       enabled: options.enabled ?? true,
+      console: options.console,
       pretty: options.pretty,
       transport: {
         enabled: transportEnabled,

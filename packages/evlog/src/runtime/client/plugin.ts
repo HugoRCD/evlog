@@ -4,6 +4,7 @@ import { defineNuxtPlugin, useRuntimeConfig } from '#app'
 
 interface EvlogPublicConfig {
   enabled?: boolean
+  console?: boolean
   pretty?: boolean
   transport?: TransportConfig
 }
@@ -14,6 +15,7 @@ export default defineNuxtPlugin(() => {
 
   initLog({
     enabled: evlogConfig?.enabled,
+    console: evlogConfig?.console,
     pretty: evlogConfig?.pretty ?? import.meta.dev,
     service: 'client',
     transport: evlogConfig?.transport,

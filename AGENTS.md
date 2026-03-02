@@ -169,6 +169,7 @@ export default defineNuxtConfig({
 | Option | Type | Default | Description |
 |--------|------|---------|-------------|
 | `enabled` | `boolean` | `true` | Globally enable/disable all logging. When `false`, all operations become no-ops |
+| `console` | `boolean` | `true` | Enable/disable browser console output. When `false`, client logs are suppressed in DevTools but still sent via transport |
 | `env.service` | `string` | `'app'` | Service name shown in logs |
 | `env.environment` | `string` | Auto-detected | Environment name |
 | `include` | `string[]` | `undefined` | Route patterns to log (glob). If not set, all routes are logged |
