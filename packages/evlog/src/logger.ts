@@ -253,29 +253,25 @@ const noopLogger: RequestLogger = {
 }
 
 /**
- * Create a request-scoped logger for building wide events.
+ * Create a scoped logger for building wide events.
+ * Use this for any context: workflows, jobs, scripts, queues, etc.
  *
  * @example
  * ```ts
- * const log = createRequestLogger({ method: 'POST', path: '/checkout' })
- * log.set({ user: { id: '123' } })
- * log.set({ cart: { items: 3 } })
+ * const log = createLogger({ jobId: job.id, queue: 'emails' })
+ * log.set({ batch: { size: 50, processed: 12 } })
  * log.emit()
  * ```
  */
-export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
+export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}): RequestLogger<T> {
   if (!globalEnabled) return noopLogger as RequestLogger<T>
 
   const startTime = Date.now()
-  let context: Record<string, unknown> = {
-    method: options.method,
-    path: options.path,
-    requestId: options.requestId,
-  }
+  let context: Record<string, unknown> = { ...initialContext }
   let hasError = false
   let hasWarn = false
 
-  function addRequestLog(level: 'info' | 'warn', message: string): void {
+  function addLog(level: 'info' | 'warn', message: string): void {
     const entry = {
       level,
       message,
@@ -319,7 +315,7 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
     },
 
     info(message: string, infoContext?: FieldContext<T>): void {
-      addRequestLog('info', message)
+      addLog('info', message)
       if (infoContext) {
         const { requestLogs: _, ...rest } = infoContext as Record<string, unknown>
         context = deepDefaults(rest, context) as Record<string, unknown>
@@ -328,7 +324,7 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
 
     warn(message: string, warnContext?: FieldContext<T>): void {
       hasWarn = true
-      addRequestLog('warn', message)
+      addLog('warn', message)
       if (warnContext) {
         const { requestLogs: _, ...rest } = warnContext as Record<string, unknown>
         context = deepDefaults(rest, context) as Record<string, unknown>
@@ -371,6 +367,26 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
       return { ...context }
     },
   }
+}
+
+/**
+ * Create a request-scoped logger for building wide events.
+ * Convenience wrapper around `createLogger` that pre-populates HTTP request fields.
+ *
+ * @example
+ * ```ts
+ * const log = createRequestLogger({ method: 'POST', path: '/checkout' })
+ * log.set({ user: { id: '123' } })
+ * log.set({ cart: { items: 3 } })
+ * log.emit()
+ * ```
+ */
+export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
+  const initial: Record<string, unknown> = {}
+  if (options.method !== undefined) initial.method = options.method
+  if (options.path !== undefined) initial.path = options.path
+  if (options.requestId !== undefined) initial.requestId = options.requestId
+  return createLogger<T>(initial)
 }
 
 /**

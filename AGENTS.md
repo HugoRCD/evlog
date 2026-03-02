@@ -68,20 +68,27 @@ export default defineEventHandler(async (event) => {
 
 ### Standalone TypeScript (scripts, workers, CLI)
 
-Use `initLogger()` once at startup, then `createRequestLogger()` for each logical operation.
+Use `initLogger()` once at startup, then `createLogger()` for each logical operation.
 
 ```typescript
 // scripts/sync-job.ts
-import { initLogger, createRequestLogger } from 'evlog'
+import { initLogger, createLogger } from 'evlog'
 
 initLogger({
-  env: { service: 'sync-worker', environment: 'production' },
+ env: { service: 'sync-worker', environment: 'production' },
 })
 
-const log = createRequestLogger({ jobId: job.id })
-log.set({ source: job.source, target: job.target })
+const log = createLogger({ jobId: job.id, source: job.source, target: job.target })
 log.set({ recordsSynced: 150 })
 log.emit() // Manual emit required
+```
+
+For HTTP request contexts specifically, use `createRequestLogger()` which pre-populates `method`, `path`, and `requestId`:
+
+```typescript
+import { createRequestLogger } from 'evlog'
+
+const log = createRequestLogger({ method: 'POST', path: '/api/checkout' })
 ```
 
 ### Simple Logging (anywhere)

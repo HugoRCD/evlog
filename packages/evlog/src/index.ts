@@ -1,5 +1,5 @@
 export { EvlogError, createError, createEvlogError } from './error'
-export { createRequestLogger, getEnvironment, initLogger, isEnabled, log, shouldKeep } from './logger'
+export { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log, shouldKeep } from './logger'
 export { useLogger } from './runtime/server/useLogger'
 export { parseError } from './runtime/utils/parseError'
 

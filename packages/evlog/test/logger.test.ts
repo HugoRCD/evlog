@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../src/logger'
+import { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../src/logger'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -475,6 +475,195 @@ describe('createRequestLogger', () => {
 
     expect(result).toBeNull()
     randomSpy.mockRestore()
+  })
+})
+
+describe('createLogger', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    initLogger({ pretty: false })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('creates logger with arbitrary initial context', () => {
+    const logger = createLogger({
+      jobId: 'job-123',
+      queue: 'emails',
+      workerId: 'w-1',
+    })
+
+    const context = logger.getContext()
+    expect(context.jobId).toBe('job-123')
+    expect(context.queue).toBe('emails')
+    expect(context.workerId).toBe('w-1')
+  })
+
+  it('creates logger with empty context by default', () => {
+    const logger = createLogger()
+
+    const context = logger.getContext()
+    expect(context).toEqual({})
+  })
+
+  it('accumulates context with set()', () => {
+    const logger = createLogger({ jobId: 'job-1' })
+
+    logger.set({ batch: { size: 50 } })
+    logger.set({ batch: { processed: 12 } })
+
+    const context = logger.getContext()
+    expect(context.jobId).toBe('job-1')
+    expect(context.batch).toEqual({ size: 50, processed: 12 })
+  })
+
+  it('emits wide event with accumulated context', () => {
+    const logger = createLogger({ jobId: 'job-1', queue: 'sync' })
+    logger.set({ recordsSynced: 150 })
+    logger.emit()
+
+    expect(infoSpy).toHaveBeenCalled()
+    const [[output]] = infoSpy.mock.calls
+    expect(output).toContain('"jobId":"job-1"')
+    expect(output).toContain('"queue":"sync"')
+    expect(output).toContain('"recordsSynced":150')
+    expect(output).toContain('"duration"')
+  })
+
+  it('records error and emits at error level', () => {
+    const errorSpy = vi.spyOn(console, 'error')
+    const logger = createLogger({ workflowId: 'wf-42' })
+
+    logger.error(new Error('Step failed'))
+    logger.emit()
+
+    expect(errorSpy).toHaveBeenCalled()
+    const output = errorSpy.mock.calls[0]?.[0]
+    expect(output).toContain('"level":"error"')
+    expect(output).toContain('"workflowId":"wf-42"')
+  })
+
+  it('captures info and warn messages in requestLogs', () => {
+    const logger = createLogger({ pipeline: 'etl' })
+
+    logger.info('Extracting data')
+    logger.warn('Slow downstream query')
+
+    const context = logger.getContext()
+    expect(context.requestLogs).toHaveLength(2)
+    expect(context.requestLogs[0].message).toBe('Extracting data')
+    expect(context.requestLogs[1].message).toBe('Slow downstream query')
+  })
+
+  it('returns WideEvent on emit', () => {
+    const logger = createLogger({ taskId: 'task-1' })
+    logger.set({ result: 'success' })
+
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('timestamp')
+    expect(result).toHaveProperty('level', 'info')
+    expect(result).toHaveProperty('taskId', 'task-1')
+    expect(result).toHaveProperty('result', 'success')
+  })
+
+  it('returns null when disabled', () => {
+    initLogger({ enabled: false, pretty: false })
+
+    const logger = createLogger({ jobId: 'job-1' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('returns null when sampled out', () => {
+    initLogger({ pretty: false, sampling: { rates: { info: 0 } } })
+
+    const logger = createLogger({ jobId: 'job-1' })
+    const result = logger.emit()
+
+    expect(result).toBeNull()
+  })
+
+  it('does not include undefined values from missing HTTP fields', () => {
+    const logger = createLogger({ jobId: 'job-1' })
+    logger.emit()
+
+    const [[output]] = infoSpy.mock.calls
+    expect(output).not.toContain('"method"')
+    expect(output).not.toContain('"path"')
+    expect(output).not.toContain('"requestId"')
+  })
+
+  it('works with typed fields', () => {
+    interface SyncFields {
+      source: string
+      target: string
+      recordsSynced: number
+    }
+
+    const logger = createLogger<SyncFields>({ source: 'db', target: 's3' })
+    logger.set({ recordsSynced: 100 })
+
+    const ctx = logger.getContext()
+    expect(ctx.source).toBe('db')
+    expect(ctx.target).toBe('s3')
+    expect(ctx.recordsSynced).toBe(100)
+  })
+
+  it('calls drain on emit', async () => {
+    const drain = vi.fn()
+    initLogger({ pretty: false, drain })
+
+    const logger = createLogger({ jobId: 'job-1' })
+    logger.set({ processed: 42 })
+    logger.emit()
+
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+
+    const [[ctx]] = drain.mock.calls
+    expect(ctx.event.jobId).toBe('job-1')
+    expect(ctx.event.processed).toBe(42)
+  })
+})
+
+describe('createRequestLogger wraps createLogger', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'info').mockImplementation(() => {})
+    initLogger({ pretty: false })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('populates method, path, requestId from options', () => {
+    const logger = createRequestLogger({
+      method: 'POST',
+      path: '/api/checkout',
+      requestId: 'req-abc',
+    })
+
+    const context = logger.getContext()
+    expect(context.method).toBe('POST')
+    expect(context.path).toBe('/api/checkout')
+    expect(context.requestId).toBe('req-abc')
+  })
+
+  it('omits undefined options from context', () => {
+    const logger = createRequestLogger({})
+
+    const context = logger.getContext()
+    expect(context).not.toHaveProperty('method')
+    expect(context).not.toHaveProperty('path')
+    expect(context).not.toHaveProperty('requestId')
   })
 })
 
