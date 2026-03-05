@@ -21,6 +21,7 @@
     "example:nextjs": "dotenv -- turbo run dev --filter=evlog-nextjs-example",
     "example:solidstart": "dotenv -- turbo run dev --filter=evlog-solidstart-example",
     "example:express": "dotenv -- turbo run dev --filter=evlog-express-example",
+    "example:elysia": "dotenv -- turbo run dev --filter=evlog-elysia-example",
     "example:hono": "dotenv -- turbo run dev --filter=evlog-hono-example",
     "example:workers": "dotenv -- turbo run dev --filter=evlog-workers-example",
     "example:browser": "dotenv -- turbo run dev --filter=evlog-browser-example",

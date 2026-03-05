@@ -22,6 +22,7 @@
     "tanstack-start",
     "express",
     "hono",
+    "elysia",
     "typescript"
   ],
   "license": "MIT",
@@ -95,6 +96,10 @@
     "./express": {
       "types": "./dist/express/index.d.mts",
       "import": "./dist/express/index.mjs"
+    },
+    "./elysia": {
+      "types": "./dist/elysia/index.d.mts",
+      "import": "./dist/elysia/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -151,6 +156,9 @@
       ],
       "express": [
         "./dist/express/index.d.mts"
+      ],
+      "elysia": [
+        "./dist/elysia/index.d.mts"
       ]
     }
   },
@@ -177,6 +185,7 @@
     "@types/supertest": "^7.2.0",
     "changelogen": "^0.6.2",
     "consola": "^3.4.2",
+    "elysia": "^1.4.27",
     "express": "^5.2.1",
     "h3": "^1.15.5",
     "happy-dom": "^20.7.2",
@@ -197,7 +206,8 @@
     "next": ">=16.1.6",
     "react": ">=19.2.4",
     "hono": "",
-    "express": ">=4.21.0"
+    "express": ">=4.21.0",
+    "elysia": ">=1.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -225,6 +235,9 @@
       "optional": true
     },
     "express": {
+      "optional": true
+    },
+    "elysia": {
       "optional": true
     }
   }

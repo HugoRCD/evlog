@@ -142,6 +142,7 @@ export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddlewar
 
 - **Hono** (~40 lines): `packages/evlog/src/hono/index.ts` — Web API Headers, `c.set('log', logger)`, wraps `next()` in try/catch
 - **Express** (~80 lines): `packages/evlog/src/express/index.ts` — Node.js headers, `req.log`, `res.on('finish')`, `AsyncLocalStorage` for `useLogger()`
+- **Elysia** (~70 lines): `packages/evlog/src/elysia/index.ts` — Web API Headers, `derive()` plugin, `onAfterHandle`/`onError`, `AsyncLocalStorage` for `useLogger()`
 
 ### Key Architecture Rules
 
@@ -163,7 +164,7 @@ export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddlewar
 
 **Express**: Standard `(req, res, next)` middleware, `res.on('finish')` for response end, `storage.run(logger, () => next())` for `useLogger()`. Type augmentation targets `express-serve-static-core` (NOT `express`). Error handler uses `ErrorRequestHandler` type.
 
-**Elysia**: Return `new Elysia({ name: 'evlog' })` plugin, use `.derive()` to attach `log` to context, `onAfterResponse` for emit.
+**Elysia**: Return `new Elysia({ name: 'evlog' })` plugin, use `.derive({ as: 'global' })` to create logger and attach `log` to context, `onAfterHandle` for success path, `onError` for error path. Use `storage.enterWith(logger)` in `derive` for `useLogger()` support. Note: `onAfterResponse` is fire-and-forget and may not complete before `app.handle()` returns in tests — use `onAfterHandle` instead.
 
 **Fastify**: Use `fastify-plugin` wrapper, `fastify.decorateRequest('log', null)`, `onRequest`/`onResponse` hooks.
 

@@ -34,6 +34,7 @@ jobs:
             tanstack-start
             hono
             express
+            elysia
             workers
             dx
           types: |

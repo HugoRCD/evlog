@@ -20,8 +20,9 @@ const frameworks = [
   { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 2 },
   { name: 'Hono', icon: 'i-simple-icons-hono', tab: 3 },
   { name: 'Express', icon: 'i-simple-icons-express', tab: 4 },
-  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 5 },
-  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 6 },
+  { name: 'Elysia', icon: 'i-custom-elysia', tab: 5 },
+  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 6 },
+  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 7 },
 ]
 </script>
 
@@ -109,9 +110,12 @@ const frameworks = [
         <slot name="express" />
       </div>
       <div v-show="activeTab === 5" class="landing-code">
-        <slot name="cloudflare" />
+        <slot name="elysia" />
       </div>
       <div v-show="activeTab === 6" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 7" class="landing-code">
         <slot name="bun" />
       </div>
     </Motion>

@@ -577,6 +577,50 @@ app.use(evlog({
 }))
 ```
 
+### Elysia
+
+```typescript
+import { Elysia } from 'elysia'
+import { initLogger } from 'evlog'
+import { evlog, useLogger } from 'evlog/elysia'
+
+initLogger({ env: { service: 'my-api' } })
+
+const app = new Elysia()
+  .use(evlog())
+  .get('/api/users', ({ log }) => {
+    log.set({ users: { count: 42 } })
+    return { users: [] }
+  })
+  .listen(3000)
+```
+
+Use `useLogger()` to access the logger from anywhere in the call stack:
+
+```typescript
+import { useLogger } from 'evlog/elysia'
+
+function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+The plugin supports the full evlog pipeline — `drain`, `enrich`, and `keep` callbacks:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+app.use(evlog({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+}))
+```
+
 ### Nitro v2
 
 ```typescript

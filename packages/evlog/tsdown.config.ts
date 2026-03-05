@@ -35,6 +35,7 @@ export default defineConfig({
     'next/client': 'src/next/client.ts',
     'hono/index': 'src/hono/index.ts',
     'express/index': 'src/express/index.ts',
+    'elysia/index': 'src/elysia/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -63,6 +64,7 @@ export default defineConfig({
     'hono',
     'hono/factory',
     'express',
+    'elysia',
   ],
   inlineOnly: ['ufo']
 })

@@ -31,6 +31,7 @@ Here are the available types and scopes:
 - tanstack-start (TanStack Start integration)
 - hono (Hono middleware)
 - express (Express middleware)
+- elysia (Elysia plugin)
 - workers (Cloudflare Workers adapter)
 - dx (developer experience improvements)
 -->
