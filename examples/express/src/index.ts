@@ -1,6 +1,6 @@
 import express from 'express'
 import { createError, initLogger, parseError } from 'evlog'
-import { evlog } from 'evlog/express'
+import { evlog, useLogger } from 'evlog/express'
 import { createPostHogDrain } from 'evlog/posthog'
 import { testUI } from './ui'
 
@@ -8,6 +8,21 @@ initLogger({
   env: { service: 'express-example' },
   pretty: true,
 })
+
+function findUserWithOrders(userId: string) {
+  const log = useLogger()
+
+  log.set({ user: { id: userId } })
+  const user = { id: userId, name: 'Alice', plan: 'pro', email: 'alice@example.com' }
+
+  const [local, domain] = user.email.split('@')
+  log.set({ user: { name: user.name, plan: user.plan, email: `${local[0]}***@${domain}` } })
+
+  const orders = [{ id: 'order_1', total: 4999 }, { id: 'order_2', total: 1299 }]
+  log.set({ orders: { count: orders.length, totalRevenue: orders.reduce((sum, o) => sum + o.total, 0) } })
+
+  return { user, orders }
+}
 
 const app = express()
 
@@ -27,18 +42,8 @@ app.get('/health', (req, res) => {
 })
 
 app.get('/users/:id', (req, res) => {
-  const userId = req.params.id
-
-  req.log.set({ user: { id: userId } })
-  const user = { id: userId, name: 'Alice', plan: 'pro', email: 'alice@example.com' }
-
-  const [local, domain] = user.email.split('@')
-  req.log.set({ user: { name: user.name, plan: user.plan, email: `${local[0]}***@${domain}` } })
-
-  const orders = [{ id: 'order_1', total: 4999 }, { id: 'order_2', total: 1299 }]
-  req.log.set({ orders: { count: orders.length, totalRevenue: orders.reduce((sum, o) => sum + o.total, 0) } })
-
-  res.json({ user, orders })
+  const result = findUserWithOrders(req.params.id)
+  res.json(result)
 })
 
 app.get('/checkout', () => {

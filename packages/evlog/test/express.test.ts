@@ -2,7 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import { initLogger } from '../src/logger'
-import { evlog } from '../src/express/index'
+import { evlog, useLogger } from '../src/express/index'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
@@ -341,6 +341,76 @@ describe('evlog/express', () => {
 
       expect(drain).not.toHaveBeenCalled()
       expect(enrich).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('useLogger()', () => {
+    it('returns the request-scoped logger from anywhere in the call stack', async () => {
+      const app = express()
+      app.use(evlog())
+
+      let loggerFromService: unknown
+      function serviceFunction() {
+        loggerFromService = useLogger()
+        useLogger().set({ fromService: true })
+      }
+
+      app.get('/api/test', (_req, res) => {
+        serviceFunction()
+        res.json({ ok: true })
+      })
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/test')
+
+      expect(loggerFromService).toBeDefined()
+      expect(typeof (loggerFromService as Record<string, unknown>).set).toBe('function')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"fromService":true'),
+      )
+      expect(lastCall).toBeDefined()
+    })
+
+    it('returns the same logger as req.log', async () => {
+      const app = express()
+      app.use(evlog())
+
+      let isSame = false
+      app.get('/api/test', (req, res) => {
+        isSame = useLogger() === req.log
+        res.json({ ok: true })
+      })
+
+      await request(app).get('/api/test')
+      expect(isSame).toBe(true)
+    })
+
+    it('throws when called outside middleware context', () => {
+      expect(() => useLogger()).toThrow('[evlog] useLogger()')
+    })
+
+    it('works across async boundaries', async () => {
+      const app = express()
+      app.use(evlog())
+
+      async function asyncService() {
+        await new Promise(resolve => setTimeout(resolve, 5))
+        useLogger().set({ asyncWork: 'done' })
+      }
+
+      app.get('/api/test', async (_req, res) => {
+        await asyncService()
+        res.json({ ok: true })
+      })
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/test')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"asyncWork":"done"'),
+      )
+      expect(lastCall).toBeDefined()
     })
   })
 })

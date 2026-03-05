@@ -1,7 +1,10 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Request, Response, NextFunction, RequestHandler } from 'express'
 import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
 import { createMiddlewareLogger } from '../shared/middleware'
 import { extractSafeNodeHeaders } from '../shared/headers'
+
+const storage = new AsyncLocalStorage<RequestLogger>()
 
 export interface EvlogExpressOptions {
   /** Route patterns to include in logging (glob). If not set, all routes are logged */
@@ -31,6 +34,31 @@ declare module 'express' {
   interface Request {
     log: RequestLogger
   }
+}
+
+/**
+ * Get the request-scoped logger from anywhere in the call stack.
+ * Must be called inside a request handled by the `evlog()` middleware.
+ *
+ * @example
+ * ```ts
+ * import { useLogger } from 'evlog/express'
+ *
+ * function findUser(id: string) {
+ *   const log = useLogger()
+ *   log.set({ user: { id } })
+ * }
+ * ```
+ */
+export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
+  const logger = storage.getStore()
+  if (!logger) {
+    throw new Error(
+      '[evlog] useLogger() was called outside of an evlog middleware context. '
+      + 'Make sure app.use(evlog()) is registered before your routes.',
+    )
+  }
+  return logger as RequestLogger<T>
 }
 
 /**
@@ -72,6 +100,6 @@ export function evlog(options: EvlogExpressOptions = {}): RequestHandler {
       finish({ status: res.statusCode }).catch(() => {})
     })
 
-    next()
+    storage.run(logger, () => next())
   }
 }

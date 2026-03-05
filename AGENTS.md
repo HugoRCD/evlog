@@ -538,7 +538,7 @@ app.use(evlog({
 ```typescript
 import express from 'express'
 import { initLogger } from 'evlog'
-import { evlog } from 'evlog/express'
+import { evlog, useLogger } from 'evlog/express'
 
 initLogger({ env: { service: 'my-api' } })
 
@@ -549,6 +549,17 @@ app.get('/api/users', (req, res) => {
   req.log.set({ users: { count: 42 } })
   res.json({ users: [] })
 })
+```
+
+Use `useLogger()` to access the logger from anywhere in the call stack without passing `req`:
+
+```typescript
+import { useLogger } from 'evlog/express'
+
+function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
 ```
 
 The middleware supports the full evlog pipeline — `drain`, `enrich`, and `keep` callbacks:
