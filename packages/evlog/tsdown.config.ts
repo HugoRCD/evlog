@@ -33,6 +33,7 @@ export default defineConfig({
     'browser': 'src/browser.ts',
     'next/index': 'src/next/index.ts',
     'next/client': 'src/next/client.ts',
+    'hono/index': 'src/hono/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -58,6 +59,8 @@ export default defineConfig({
     'next',
     'next/server',
     'react',
+    'hono',
+    'hono/factory',
   ],
   inlineOnly: ['ufo']
 })

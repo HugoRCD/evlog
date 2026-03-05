@@ -85,6 +85,10 @@
     "./next/client": {
       "types": "./dist/next/client.d.mts",
       "import": "./dist/next/client.mjs"
+    },
+    "./hono": {
+      "types": "./dist/hono/index.d.mts",
+      "import": "./dist/hono/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -135,6 +139,9 @@
       ],
       "next/client": [
         "./dist/next/client.d.mts"
+      ],
+      "hono": [
+        "./dist/hono/index.d.mts"
       ]
     }
   },
@@ -175,7 +182,8 @@
     "ofetch": "^1.5.1",
     "nitro": "^3.0.1-alpha.2",
     "next": ">=16.1.6",
-    "react": ">=19.2.4"
+    "react": ">=19.2.4",
+    "hono": ""
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -197,6 +205,9 @@
       "optional": true
     },
     "react": {
+      "optional": true
+    },
+    "hono": {
       "optional": true
     }
   }

@@ -148,6 +148,8 @@ try {
 
 ## Framework Integration
 
+> **Creating a new framework integration?** Follow the skill at `.agents/skills/create-framework-integration/SKILL.md`. It covers all touchpoints: source code, build config, package exports, tests, example app, and all documentation updates.
+
 ### Nuxt
 
 ```typescript
@@ -497,6 +499,40 @@ export const Route = createFileRoute('/api/checkout')({
 })
 ```
 
+### Hono
+
+```typescript
+import { Hono } from 'hono'
+import { initLogger } from 'evlog'
+import { evlog, type EvlogVariables } from 'evlog/hono'
+
+initLogger({ env: { service: 'my-api' } })
+
+const app = new Hono<EvlogVariables>()
+app.use(evlog())
+
+app.get('/api/users', (c) => {
+  const log = c.get('log')
+  log.set({ users: { count: 42 } })
+  return c.json({ users: [] })
+})
+```
+
+The middleware supports the full evlog pipeline — `drain`, `enrich`, and `keep` callbacks — ensuring feature parity with Nuxt and Next.js:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+app.use(evlog({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+}))
+```
+
 ### Nitro v2
 
 ```typescript
@@ -664,6 +700,9 @@ This repository includes agent skills for AI-assisted code review and evlog adop
 | Skill | Description |
 |-------|-------------|
 | `skills/evlog` | Review code for logging patterns, suggest evlog adoption, guide wide event design |
+| `.agents/skills/create-adapter` | Create a new drain adapter (Axiom, OTLP, Sentry, etc.) |
+| `.agents/skills/create-enricher` | Create a new event enricher (User Agent, Geo, etc.) |
+| `.agents/skills/create-framework-integration` | Create a new framework integration (Hono, Elysia, Fastify, etc.) |
 
 ### Skill Structure
 
