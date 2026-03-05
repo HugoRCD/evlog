@@ -20,6 +20,8 @@
     "nitro",
     "nextjs",
     "tanstack-start",
+    "express",
+    "hono",
     "typescript"
   ],
   "license": "MIT",
@@ -89,6 +91,10 @@
     "./hono": {
       "types": "./dist/hono/index.d.mts",
       "import": "./dist/hono/index.mjs"
+    },
+    "./express": {
+      "types": "./dist/express/index.d.mts",
+      "import": "./dist/express/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -142,6 +148,9 @@
       ],
       "hono": [
         "./dist/hono/index.d.mts"
+      ],
+      "express": [
+        "./dist/express/index.d.mts"
       ]
     }
   },
@@ -161,19 +170,23 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
-    "ufo": "^1.6.3",
     "@nuxt/devtools": "^3.2.2",
     "@nuxt/schema": "^4.3.1",
     "@nuxt/test-utils": "^4.0.0",
+    "@types/express": "^5.0.6",
+    "@types/supertest": "^7.2.0",
     "changelogen": "^0.6.2",
     "consola": "^3.4.2",
+    "express": "^5.2.1",
     "h3": "^1.15.5",
     "happy-dom": "^20.7.2",
     "nitro": "^3.0.1-alpha.2",
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.1",
+    "supertest": "^7.2.2",
     "tsdown": "^0.20.3",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "ufo": "^1.6.3"
   },
   "peerDependencies": {
     "@nuxt/kit": "^4.3.1",
@@ -183,7 +196,8 @@
     "nitro": "^3.0.1-alpha.2",
     "next": ">=16.1.6",
     "react": ">=19.2.4",
-    "hono": ""
+    "hono": "",
+    "express": ">=4.21.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -208,6 +222,9 @@
       "optional": true
     },
     "hono": {
+      "optional": true
+    },
+    "express": {
       "optional": true
     }
   }

@@ -1,6 +1,6 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
-import { createError, initLogger, parseError } from 'evlog'
+import { createError, initLogger, parseError, type EnrichContext } from 'evlog'
 import { evlog, type EvlogVariables } from 'evlog/hono'
 import { createPostHogDrain } from 'evlog/posthog'
 import type { ContentfulStatusCode } from 'hono/utils/http-status'
@@ -17,7 +17,7 @@ app.get('/', c => c.html(testUI()))
 
 app.use(evlog({
   drain: createPostHogDrain(),
-  enrich: (ctx) => {
+  enrich: (ctx: EnrichContext) => {
     ctx.event.runtime = 'node'
     ctx.event.pid = process.pid
   },
