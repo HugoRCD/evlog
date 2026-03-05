@@ -1,4 +1,4 @@
-import express from 'express'
+import express, { type ErrorRequestHandler } from 'express'
 import { createError, initLogger, parseError, type EnrichContext } from 'evlog'
 import { evlog, useLogger } from 'evlog/express'
 import { createPostHogDrain } from 'evlog/posthog'
@@ -56,7 +56,7 @@ app.get('/checkout', () => {
   })
 })
 
-app.use((err: Error, req: express.Request, res: express.Response, _next: express.NextFunction) => {
+const errorHandler: ErrorRequestHandler = (err, req, res, _next) => {
   req.log.error(err)
   const parsed = parseError(err)
 
@@ -66,7 +66,9 @@ app.use((err: Error, req: express.Request, res: express.Response, _next: express
     fix: parsed.fix,
     link: parsed.link,
   })
-})
+}
+
+app.use(errorHandler)
 
 app.listen(3000, () => {
   console.log('Express server started on http://localhost:3000')

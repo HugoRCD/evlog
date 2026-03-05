@@ -30,7 +30,7 @@ export interface EvlogExpressOptions {
   keep?: (ctx: TailSamplingContext) => void | Promise<void>
 }
 
-declare module 'express' {
+declare module 'express-serve-static-core' {
   interface Request {
     log: RequestLogger
   }
