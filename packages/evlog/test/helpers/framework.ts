@@ -51,8 +51,8 @@ export function assertEnrichBeforeDrain(
   expect(enrichFn).toHaveBeenCalled()
   expect(drainFn).toHaveBeenCalled()
 
-  const enrichOrder = enrichFn.mock.invocationCallOrder[0]
-  const drainOrder = drainFn.mock.invocationCallOrder[0]
+  const [enrichOrder] = enrichFn.mock.invocationCallOrder
+  const [drainOrder] = drainFn.mock.invocationCallOrder
   expect(enrichOrder).toBeLessThan(drainOrder)
 }
 

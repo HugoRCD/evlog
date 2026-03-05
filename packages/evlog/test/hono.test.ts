@@ -240,7 +240,7 @@ describe('evlog/hono', () => {
       await app.request('/api/test')
 
       assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', level: 'info', status: 200 })
-      const ctx = drain.mock.calls[0][0]
+      const [[ctx]] = drain.mock.calls
       expect(ctx.headers).toBeDefined()
     })
 
@@ -272,7 +272,7 @@ describe('evlog/hono', () => {
       })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const ctx = enrich.mock.calls[0][0]
+      const [[ctx]] = enrich.mock.calls
       expect(ctx.response!.status).toBe(200)
       expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
       expect(ctx.headers!['x-custom']).toBe('value')

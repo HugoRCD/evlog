@@ -238,7 +238,7 @@ describe('createMiddlewareLogger', () => {
       await finish({ status: 200 })
 
       expect(drain).toHaveBeenCalledOnce()
-      const ctx = drain.mock.calls[0][0]
+      const [[ctx]] = drain.mock.calls
       expect(ctx.event.path).toBe('/api/checkout')
       expect(ctx.event.cart.total).toBe(99)
       expect(ctx.request).toEqual({ method: 'POST', path: '/api/checkout', requestId: 'req-d1' })
@@ -281,13 +281,15 @@ describe('createMiddlewareLogger', () => {
       await finish({ status: 201 })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const ctx = enrich.mock.calls[0][0]
+      const [[ctx]] = enrich.mock.calls
       expect(ctx.response.status).toBe(201)
       expect(ctx.headers['x-custom']).toBe('value')
     })
 
     it('drain error does not throw', async () => {
-      const drain = vi.fn(() => { throw new Error('drain exploded') })
+      const drain = vi.fn(() => {
+        throw new Error('drain exploded')
+      })
 
       const { finish } = createMiddlewareLogger({
         method: 'GET',
@@ -300,7 +302,9 @@ describe('createMiddlewareLogger', () => {
 
     it('enrich error does not prevent drain', async () => {
       const drain = vi.fn()
-      const enrich = vi.fn(() => { throw new Error('enrich exploded') })
+      const enrich = vi.fn(() => {
+        throw new Error('enrich exploded')
+      })
 
       const { finish } = createMiddlewareLogger({
         method: 'GET',
@@ -346,14 +350,18 @@ describe('createMiddlewareLogger', () => {
       await finish({ error })
 
       expect(drain).toHaveBeenCalledOnce()
-      const ctx = drain.mock.calls[0][0]
+      const [[ctx]] = drain.mock.calls
       expect(ctx.event.status).toBe(422)
       expect(ctx.event.level).toBe('error')
     })
 
     it('works with keep + drain + enrich together', async () => {
-      const keep = vi.fn((ctx) => { ctx.shouldKeep = true })
-      const enrich = vi.fn((ctx) => { ctx.event.region = 'eu' })
+      const keep = vi.fn((ctx) => {
+        ctx.shouldKeep = true
+      })
+      const enrich = vi.fn((ctx) => {
+        ctx.event.region = 'eu'
+      })
       const drain = vi.fn()
 
       const { logger, finish } = createMiddlewareLogger({
