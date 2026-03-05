@@ -21,6 +21,11 @@ const steps: Step[] = [
   { field: 'links', label: 'Documentation', text: 'stripe.com/docs/declines/codes' },
 ]
 
+const props = defineProps<{
+  link?: string
+  linkLabel?: string
+}>()
+
 const pills = [
   { label: 'Structured context', icon: 'i-lucide-braces' },
   { label: 'Machine-parseable', icon: 'i-lucide-cpu' },
@@ -88,19 +93,19 @@ function startAnimation() {
       class="mb-10"
     >
       <div>
-        <p class="section-label">
-          Agent Ready
+        <p v-if="$slots.headline" class="section-label">
+          <slot name="headline" mdc-unwrap="p" />
         </p>
         <div class="relative mb-5">
           <h2 class="section-title max-w-xl">
-            Built for agents<span class="text-primary">.</span>
+            <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-xl blur-xs animate-pulse">
-            Built for agents<span class="text-primary">.</span>
+          <div aria-hidden="true" class="absolute inset-0 section-title max-w-xl blur-xs animate-pulse pointer-events-none">
+            <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>
-        <p class="max-w-lg text-sm leading-relaxed text-zinc-400">
-          Structured fields, machine-readable context, and actionable metadata — everything an AI agent needs to diagnose and resolve issues on its own.
+        <p v-if="$slots.description" class="max-w-lg text-sm leading-relaxed text-zinc-400">
+          <slot name="description" mdc-unwrap="p" />
         </p>
         <div class="mt-5 flex flex-wrap gap-2">
           <span
@@ -112,8 +117,8 @@ function startAnimation() {
             {{ pill.label }}
           </span>
         </div>
-        <NuxtLink to="/getting-started/agent-skills" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
-          Agent skills setup
+        <NuxtLink v-if="props.link" :to="props.link" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+          {{ props.linkLabel || 'Learn more' }}
           <UIcon name="i-lucide-arrow-right" class="size-3" />
         </NuxtLink>
       </div>

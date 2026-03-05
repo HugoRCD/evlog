@@ -46,10 +46,10 @@ onMounted(() => {
       >
         <div class="relative">
           <h1 class="section-title mb-5 leading-[1.1]">
-            Stop grepping<br>through chaos<span class="text-accent-blue">.</span>
+            <slot name="title" mdc-unwrap="p" /><span class="text-accent-blue">.</span>
           </h1>
-          <div aria-hidden="true" class="absolute inset-0 section-title mb-5 leading-[1.1] blur-xs animate-pulse">
-            Stop grepping<br>through chaos<span class="text-accent-blue">.</span>
+          <div aria-hidden="true" class="absolute inset-0 section-title mb-5 leading-[1.1] blur-xs animate-pulse pointer-events-none">
+            <slot name="title" mdc-unwrap="p" /><span class="text-accent-blue">.</span>
           </div>
         </div>
       </Motion>
@@ -60,8 +60,7 @@ onMounted(() => {
         :transition="{ duration: 0.5, delay: 0.16 }"
       >
         <p class="mb-8 max-w-xl text-base/7 text-zinc-400 font-sans">
-          Wide events and structured errors for TypeScript. One log per request,
-          full context, errors that explain why and how to fix.
+          <slot name="description" mdc-unwrap="p" />
         </p>
       </Motion>
 

@@ -8,9 +8,13 @@ useHead({
   titleTemplate: '',
 })
 
+const { data: page } = await useAsyncData('landing', () => {
+  return queryCollection('docs').path('/landing').first()
+})
+
 useSeoMeta({
-  title: 'evlog - Stop grepping through chaos',
-  description: 'Wide events and structured errors for TypeScript. One log per request, full context, errors that explain why and how to fix.',
+  title: page.value?.title || 'evlog - Stop grepping through chaos',
+  description: page.value?.description || 'Wide events and structured errors for TypeScript. One log per request, full context, errors that explain why and how to fix.',
   ogImage: '/og.png',
   ogImageWidth: 1200,
   ogImageHeight: 630,
@@ -21,8 +25,6 @@ useSeoMeta({
 
 <template>
   <div>
-    <LandingHero />
-    <LandingFeatures />
-    <LandingCta />
+    <ContentRenderer v-if="page" :value="page" />
   </div>
 </template>

@@ -8,6 +8,11 @@ const outputRef = ref<HTMLElement>()
 let cycleInterval: ReturnType<typeof setInterval> | undefined
 let observer: IntersectionObserver | undefined
 
+const props = defineProps<{
+  link?: string
+  linkLabel?: string
+}>()
+
 const pills = [
   { label: 'Wide events', icon: 'i-lucide-layers' },
   { label: 'Root cause', icon: 'i-lucide-search' },
@@ -56,19 +61,19 @@ function setOutput(type: 'success' | 'error') {
       class="mb-10"
     >
       <div>
-        <p class="section-label">
-          Simple API
+        <p v-if="$slots.headline" class="section-label">
+          <slot name="headline" mdc-unwrap="p" />
         </p>
         <div class="relative mb-5">
           <h2 class="section-title max-w-2xl">
-            Set context.<br>Get answers<span class="text-primary">.</span>
+            <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-2xl blur-xs animate-pulse">
-            Set context.<br>Get answers<span class="text-primary">.</span>
+          <div aria-hidden="true" class="absolute inset-0 section-title max-w-2xl blur-xs animate-pulse pointer-events-none">
+            <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>
-        <p class="max-w-lg text-sm leading-relaxed text-zinc-400">
-          Accumulate context with log.set, throw structured errors with why and fix. One wide event captures everything — success or failure.
+        <p v-if="$slots.description" class="max-w-lg text-sm leading-relaxed text-zinc-400">
+          <slot name="description" mdc-unwrap="p" />
         </p>
         <div class="mt-5 flex flex-wrap gap-2">
           <span
@@ -80,8 +85,8 @@ function setOutput(type: 'success' | 'error') {
             {{ pill.label }}
           </span>
         </div>
-        <NuxtLink to="/getting-started/quick-start" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
-          Quick start guide
+        <NuxtLink v-if="props.link" :to="props.link" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+          {{ props.linkLabel || 'Learn more' }}
           <UIcon name="i-lucide-arrow-right" class="size-3" />
         </NuxtLink>
       </div>

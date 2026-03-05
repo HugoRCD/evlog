@@ -82,8 +82,7 @@ onMounted(() => {
             </h2>
           </div>
           <p class="text-base leading-relaxed text-zinc-200 mb-10">
-            Wide events, structured errors, dead simple setup.<br class="hidden sm:block">
-            Set up evlog in 10 minutes. Your future self will thank you.
+            <slot name="description" mdc-unwrap="p" />
           </p>
 
           <div class="flex flex-wrap items-center justify-center gap-4">

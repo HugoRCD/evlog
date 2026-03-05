@@ -7,6 +7,11 @@ onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 })
 
+const props = defineProps<{
+  link?: string
+  linkLabel?: string
+}>()
+
 const pills = [
   { label: 'Auto-batch', icon: 'i-lucide-layers' },
   { label: 'sendBeacon', icon: 'i-lucide-send' },
@@ -25,19 +30,19 @@ const pills = [
           :in-view-options="{ once: true }"
         >
           <div>
-            <p class="section-label">
-              Client Logs
+            <p v-if="$slots.headline" class="section-label">
+              <slot name="headline" mdc-unwrap="p" />
             </p>
             <div class="relative mb-4">
               <h2 class="section-title">
-                See the full picture<span class="text-primary">.</span>
+                <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
               </h2>
-              <div aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse">
-                See the full picture<span class="text-primary">.</span>
+              <div aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse pointer-events-none">
+                <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
               </div>
             </div>
-            <p class="max-w-md text-sm leading-relaxed text-zinc-400">
-              Capture browser events and drain them to your server. Automatic batching, retries, and page-aware flushing — same pipeline, client to server.
+            <p v-if="$slots.description" class="max-w-md text-sm leading-relaxed text-zinc-400">
+              <slot name="description" mdc-unwrap="p" />
             </p>
             <div class="mt-5 flex flex-wrap gap-2">
               <span
@@ -49,8 +54,8 @@ const pills = [
                 {{ pill.label }}
               </span>
             </div>
-            <NuxtLink to="/core-concepts/client-logging" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
-              Client logging guide
+            <NuxtLink v-if="props.link" :to="props.link" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-zinc-500 hover:text-accent-blue transition-colors">
+              {{ props.linkLabel || 'Learn more' }}
               <UIcon name="i-lucide-arrow-right" class="size-3" />
             </NuxtLink>
           </div>
