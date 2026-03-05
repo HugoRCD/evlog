@@ -28,6 +28,12 @@ jobs:
             nuxthub
             deps
             repo
+            hono
+            express
+            elysia
+            fastify
+            nestjs
+            dx
           types: |
             breaking
             feat
