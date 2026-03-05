@@ -28,11 +28,13 @@ jobs:
             nuxthub
             deps
             repo
+            nuxt
+            nitro
+            next
+            tanstack-start
             hono
             express
-            elysia
-            fastify
-            nestjs
+            workers
             dx
           types: |
             breaking

@@ -31,8 +31,10 @@ feat({framework}): add {Framework} middleware integration
 | 10 | `examples/{framework}/` | Create example app with test UI |
 | 11 | `package.json` (root) | Add `example:{framework}` script |
 | 12 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
+| 13 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
+| 14 | `.github/pull_request_template.md` | Add `{framework}` scope |
 
-**Important**: Do NOT consider the task complete until all 12 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 14 touchpoints have been addressed.
 
 ## Naming Conventions
 
@@ -423,6 +425,24 @@ Create `.changeset/{framework}-integration.md`:
 ---
 
 Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
+```
+
+## Step 13 & 14: PR Scopes
+
+Add the framework name as a valid scope in **both** files so PR title validation passes:
+
+**`.github/workflows/semantic-pull-request.yml`** — add `{framework}` to the `scopes` list:
+
+```yaml
+scopes: |
+  # ... existing scopes
+  {framework}
+```
+
+**`.github/pull_request_template.md`** — add `{framework}` to the Scopes section:
+
+```markdown
+- {framework} ({Framework} integration)
 ```
 
 ## Verification
