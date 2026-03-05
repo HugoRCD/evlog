@@ -92,12 +92,24 @@ const frameworks = [
       :in-view-options="{ once: true }"
       class="mx-auto max-w-3xl"
     >
-      <div v-show="activeTab === 0" class="landing-code"><slot name="nuxt" /></div>
-      <div v-show="activeTab === 1" class="landing-code"><slot name="nextjs" /></div>
-      <div v-show="activeTab === 2" class="landing-code"><slot name="tanstack-start" /></div>
-      <div v-show="activeTab === 3" class="landing-code"><slot name="hono" /></div>
-      <div v-show="activeTab === 4" class="landing-code"><slot name="cloudflare" /></div>
-      <div v-show="activeTab === 5" class="landing-code"><slot name="bun" /></div>
+      <div v-show="activeTab === 0" class="landing-code">
+        <slot name="nuxt" />
+      </div>
+      <div v-show="activeTab === 1" class="landing-code">
+        <slot name="nextjs" />
+      </div>
+      <div v-show="activeTab === 2" class="landing-code">
+        <slot name="tanstack-start" />
+      </div>
+      <div v-show="activeTab === 3" class="landing-code">
+        <slot name="hono" />
+      </div>
+      <div v-show="activeTab === 4" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 5" class="landing-code">
+        <slot name="bun" />
+      </div>
     </Motion>
   </section>
 </template>
