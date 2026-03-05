@@ -12,3 +12,16 @@ export function extractSafeHeaders(headers: Headers): Record<string, string> {
   })
   return filterSafeHeaders(raw)
 }
+
+/**
+ * Extract headers from Node.js `IncomingHttpHeaders` and filter out sensitive ones.
+ * Works with Express, Fastify, and any Node.js HTTP server using `req.headers`.
+ */
+export function extractSafeNodeHeaders(headers: Record<string, string | string[] | undefined>): Record<string, string> {
+  const raw: Record<string, string> = {}
+  for (const [key, value] of Object.entries(headers)) {
+    if (value === undefined) continue
+    raw[key] = Array.isArray(value) ? value.join(', ') : value
+  }
+  return filterSafeHeaders(raw)
+}

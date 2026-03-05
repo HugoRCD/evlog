@@ -533,6 +533,39 @@ app.use(evlog({
 }))
 ```
 
+### Express
+
+```typescript
+import express from 'express'
+import { initLogger } from 'evlog'
+import { evlog } from 'evlog/express'
+
+initLogger({ env: { service: 'my-api' } })
+
+const app = express()
+app.use(evlog())
+
+app.get('/api/users', (req, res) => {
+  req.log.set({ users: { count: 42 } })
+  res.json({ users: [] })
+})
+```
+
+The middleware supports the full evlog pipeline — `drain`, `enrich`, and `keep` callbacks:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+app.use(evlog({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+}))
+```
+
 ### Nitro v2
 
 ```typescript
