@@ -20,6 +20,8 @@
     "nitro",
     "nextjs",
     "tanstack-start",
+    "express",
+    "hono",
     "typescript"
   ],
   "license": "MIT",
