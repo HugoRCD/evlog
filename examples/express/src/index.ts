@@ -1,5 +1,5 @@
 import express from 'express'
-import { createError, initLogger, parseError } from 'evlog'
+import { createError, initLogger, parseError, type EnrichContext } from 'evlog'
 import { evlog, useLogger } from 'evlog/express'
 import { createPostHogDrain } from 'evlog/posthog'
 import { testUI } from './ui'
@@ -30,7 +30,7 @@ app.get('/', (_req, res) => res.type('html').send(testUI()))
 
 app.use(evlog({
   drain: createPostHogDrain(),
-  enrich: (ctx) => {
+  enrich: (ctx: EnrichContext) => {
     ctx.event.runtime = 'node'
     ctx.event.pid = process.pid
   },
