@@ -1,5 +1,16 @@
 {
   "$schema": "https://turborepo.dev/schema.v2.json",
+  "globalDependencies": [".env"],
+  "globalEnv": [
+    "AI_GATEWAY_API_KEY",
+    "AXIOM_TOKEN",
+    "AXIOM_DATASET",
+    "OTLP_ENDPOINT",
+    "POSTHOG_API_KEY",
+    "POSTHOG_HOST",
+    "SENTRY_DSN",
+    "BETTER_STACK_SOURCE_TOKEN"
+  ],
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
