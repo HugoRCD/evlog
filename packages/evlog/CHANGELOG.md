@@ -1,5 +1,11 @@
 # evlog
 
+## 2.3.0
+
+### Minor Changes
+
+- [#135](https://github.com/HugoRCD/evlog/pull/135) [`e3e53a2`](https://github.com/HugoRCD/evlog/commit/e3e53a2dac958e0ede9dffb70623f90ff800c0bc) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add Elysia plugin integration (`evlog/elysia`) with automatic wide-event logging, drain, enrich, and tail sampling support
+
 ## 2.2.0
 
 ### Minor Changes
