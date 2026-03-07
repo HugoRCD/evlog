@@ -1,6 +1,17 @@
 export default defineNuxtConfig({
   extends: ['docus'],
 
+  routeRules: {
+    '/examples/nextjs': { redirect: { to: '/frameworks/nextjs', statusCode: 301 } },
+    '/examples/sveltekit': { redirect: { to: '/frameworks/sveltekit', statusCode: 301 } },
+    '/examples/tanstack-start': { redirect: { to: '/frameworks/tanstack-start', statusCode: 301 } },
+    '/examples/nestjs': { redirect: { to: '/frameworks/nestjs', statusCode: 301 } },
+    '/examples/express': { redirect: { to: '/frameworks/express', statusCode: 301 } },
+    '/examples/hono': { redirect: { to: '/frameworks/hono', statusCode: 301 } },
+    '/examples/fastify': { redirect: { to: '/frameworks/fastify', statusCode: 301 } },
+    '/examples/elysia': { redirect: { to: '/frameworks/elysia', statusCode: 301 } },
+  },
+
   modules: ['motion-v/nuxt', 'nuxt-studio'],
 
   colorMode: {
