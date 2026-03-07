@@ -1,60 +1,17 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
-import { createMiddlewareLogger } from '../shared/middleware'
+import type { RequestLogger } from '../types'
+import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'
+import { createLoggerStorage } from '../shared/storage'
 import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } from '../nitro'
 import { EvlogError } from '../error'
 
-const storage = new AsyncLocalStorage<RequestLogger>()
+const { storage, useLogger } = createLoggerStorage(
+  'handle context. Make sure evlog() handle is added to your hooks.server.ts.',
+)
 
-export interface EvlogSvelteKitOptions {
-  /** Route patterns to include in logging (glob). If not set, all routes are logged */
-  include?: string[]
-  /** Route patterns to exclude from logging. Exclusions take precedence over inclusions */
-  exclude?: string[]
-  /** Route-specific service configuration */
-  routes?: Record<string, RouteConfig>
-  /**
-   * Drain callback called with every emitted event.
-   * Use with drain adapters (Axiom, OTLP, Sentry, etc.) or custom endpoints.
-   */
-  drain?: (ctx: DrainContext) => void | Promise<void>
-  /**
-   * Enrich callback called after emit, before drain.
-   * Use to add derived context (geo, deployment info, user agent, etc.).
-   */
-  enrich?: (ctx: EnrichContext) => void | Promise<void>
-  /**
-   * Custom tail sampling callback.
-   * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
-   */
-  keep?: (ctx: TailSamplingContext) => void | Promise<void>
-}
+export interface EvlogSvelteKitOptions extends BaseEvlogOptions {}
 
-/**
- * Get the request-scoped logger from anywhere in the call stack.
- * Must be called inside a request handled by the `evlog()` handle hook.
- *
- * @example
- * ```ts
- * import { useLogger } from 'evlog/sveltekit'
- *
- * function findUser(id: string) {
- *   const log = useLogger()
- *   log.set({ user: { id } })
- * }
- * ```
- */
-export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
-  const logger = storage.getStore()
-  if (!logger) {
-    throw new Error(
-      '[evlog] useLogger() was called outside of an evlog handle context. '
-      + 'Make sure evlog() handle is added to your hooks.server.ts.',
-    )
-  }
-  return logger as RequestLogger<T>
-}
+export { useLogger }
 
 /**
  * SvelteKit `Handle` function signature — avoids a hard dependency on `@sveltejs/kit`.

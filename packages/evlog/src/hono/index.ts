@@ -1,31 +1,9 @@
 import type { MiddlewareHandler } from 'hono'
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
-import { createMiddlewareLogger } from '../shared/middleware'
+import type { RequestLogger } from '../types'
+import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'
 
-export interface EvlogHonoOptions {
-  /** Route patterns to include in logging (glob). If not set, all routes are logged */
-  include?: string[]
-  /** Route patterns to exclude from logging. Exclusions take precedence over inclusions */
-  exclude?: string[]
-  /** Route-specific service configuration */
-  routes?: Record<string, RouteConfig>
-  /**
-   * Drain callback called with every emitted event.
-   * Use with drain adapters (Axiom, OTLP, Sentry, etc.) or custom endpoints.
-   */
-  drain?: (ctx: DrainContext) => void | Promise<void>
-  /**
-   * Enrich callback called after emit, before drain.
-   * Use to add derived context (geo, deployment info, user agent, etc.).
-   */
-  enrich?: (ctx: EnrichContext) => void | Promise<void>
-  /**
-   * Custom tail sampling callback.
-   * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
-   */
-  keep?: (ctx: TailSamplingContext) => void | Promise<void>
-}
+export interface EvlogHonoOptions extends BaseEvlogOptions {}
 
 /**
  * Hono variables type for typed `c.get('log')` access.

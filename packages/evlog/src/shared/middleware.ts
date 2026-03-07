@@ -5,21 +5,44 @@ import { shouldLog, getServiceForPath } from './routes'
 
 /**
  * Base options shared by all framework integrations.
- * Each framework adapter spreads its user-facing options into this.
+ *
+ * Every framework-specific options interface (e.g. `EvlogExpressOptions`)
+ * extends this type. If a framework needs extra fields it can add them
+ * on top; otherwise the base is used as-is.
  */
-export interface MiddlewareLoggerOptions {
+export interface BaseEvlogOptions {
+  /** Route patterns to include in logging (glob). If not set, all routes are logged */
+  include?: string[]
+  /** Route patterns to exclude from logging. Exclusions take precedence over inclusions */
+  exclude?: string[]
+  /** Route-specific service configuration */
+  routes?: Record<string, RouteConfig>
+  /**
+   * Drain callback called with every emitted event.
+   * Use with drain adapters (Axiom, OTLP, Sentry, etc.) or custom endpoints.
+   */
+  drain?: (ctx: DrainContext) => void | Promise<void>
+  /**
+   * Enrich callback called after emit, before drain.
+   * Use to add derived context (geo, deployment info, user agent, etc.).
+   */
+  enrich?: (ctx: EnrichContext) => void | Promise<void>
+  /**
+   * Custom tail sampling callback.
+   * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
+   */
+  keep?: (ctx: TailSamplingContext) => void | Promise<void>
+}
+
+/**
+ * Internal options consumed by `createMiddlewareLogger`.
+ * Extends `BaseEvlogOptions` with the request-specific fields
+ * that framework adapters must provide.
+ */
+export interface MiddlewareLoggerOptions extends BaseEvlogOptions {
   method: string
   path: string
   requestId?: string
-  include?: string[]
-  exclude?: string[]
-  routes?: Record<string, RouteConfig>
-  /** Tail sampling callback — set `ctx.shouldKeep = true` to force-keep */
-  keep?: (ctx: TailSamplingContext) => void | Promise<void>
-  /** Drain callback — send events to external services */
-  drain?: (ctx: DrainContext) => void | Promise<void>
-  /** Enrich callback — add derived context after emit, before drain */
-  enrich?: (ctx: EnrichContext) => void | Promise<void>
   /** Pre-filtered safe request headers (used for enrich/drain context) */
   headers?: Record<string, string>
 }

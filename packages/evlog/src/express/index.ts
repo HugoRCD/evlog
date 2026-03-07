@@ -1,64 +1,21 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
 import type { Request, Response, NextFunction, RequestHandler } from 'express'
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
-import { createMiddlewareLogger } from '../shared/middleware'
+import type { RequestLogger } from '../types'
+import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeNodeHeaders } from '../shared/headers'
+import { createLoggerStorage } from '../shared/storage'
 
-const storage = new AsyncLocalStorage<RequestLogger>()
+const { storage, useLogger } = createLoggerStorage(
+  'middleware context. Make sure app.use(evlog()) is registered before your routes.',
+)
 
-export interface EvlogExpressOptions {
-  /** Route patterns to include in logging (glob). If not set, all routes are logged */
-  include?: string[]
-  /** Route patterns to exclude from logging. Exclusions take precedence over inclusions */
-  exclude?: string[]
-  /** Route-specific service configuration */
-  routes?: Record<string, RouteConfig>
-  /**
-   * Drain callback called with every emitted event.
-   * Use with drain adapters (Axiom, OTLP, Sentry, etc.) or custom endpoints.
-   */
-  drain?: (ctx: DrainContext) => void | Promise<void>
-  /**
-   * Enrich callback called after emit, before drain.
-   * Use to add derived context (geo, deployment info, user agent, etc.).
-   */
-  enrich?: (ctx: EnrichContext) => void | Promise<void>
-  /**
-   * Custom tail sampling callback.
-   * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
-   */
-  keep?: (ctx: TailSamplingContext) => void | Promise<void>
-}
+export interface EvlogExpressOptions extends BaseEvlogOptions {}
+
+export { useLogger }
 
 declare module 'express-serve-static-core' {
   interface Request {
     log: RequestLogger
   }
-}
-
-/**
- * Get the request-scoped logger from anywhere in the call stack.
- * Must be called inside a request handled by the `evlog()` middleware.
- *
- * @example
- * ```ts
- * import { useLogger } from 'evlog/express'
- *
- * function findUser(id: string) {
- *   const log = useLogger()
- *   log.set({ user: { id } })
- * }
- * ```
- */
-export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
-  const logger = storage.getStore()
-  if (!logger) {
-    throw new Error(
-      '[evlog] useLogger() was called outside of an evlog middleware context. '
-      + 'Make sure app.use(evlog()) is registered before your routes.',
-    )
-  }
-  return logger as RequestLogger<T>
 }
 
 /**
