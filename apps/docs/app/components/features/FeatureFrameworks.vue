@@ -22,8 +22,9 @@ const frameworks = [
   { name: 'Express', icon: 'i-simple-icons-express', tab: 4 },
   { name: 'Elysia', icon: 'i-custom-elysia', tab: 5 },
   { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 6 },
-  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 7 },
-  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 8 },
+  { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 7 },
+  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 8 },
+  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 9 },
 ]
 </script>
 
@@ -117,9 +118,12 @@ const frameworks = [
         <slot name="fastify" />
       </div>
       <div v-show="activeTab === 7" class="landing-code">
-        <slot name="cloudflare" />
+        <slot name="nestjs" />
       </div>
       <div v-show="activeTab === 8" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 9" class="landing-code">
         <slot name="bun" />
       </div>
     </Motion>

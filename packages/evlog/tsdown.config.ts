@@ -37,6 +37,7 @@ export default defineConfig({
     'express/index': 'src/express/index.ts',
     'elysia/index': 'src/elysia/index.ts',
     'fastify/index': 'src/fastify/index.ts',
+    'nestjs/index': 'src/nestjs/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -67,6 +68,8 @@ export default defineConfig({
     'express',
     'elysia',
     'fastify',
+    '@nestjs/common',
+    '@nestjs/core',
   ],
   inlineOnly: ['ufo']
 })

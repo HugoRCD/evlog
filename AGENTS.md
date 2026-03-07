@@ -682,6 +682,50 @@ await app.register(evlog, {
 - Lifecycle: `onRequest` creates the logger → `onResponse` emits with status → `onError` captures errors and prevents double emit
 - `useLogger()` uses `AsyncLocalStorage` propagated via `storage.run(logger, () => done())` in `onRequest`
 
+### NestJS
+
+```typescript
+import express from 'express'
+import { initLogger } from 'evlog'
+import { evlog, useLogger } from 'evlog/nestjs'
+
+initLogger({ env: { service: 'my-api' } })
+
+const app = express()
+app.use(evlog())
+
+app.get('/api/users', (req, res) => {
+  req.log.set({ users: { count: 42 } })
+  res.json({ users: [] })
+})
+```
+
+NestJS uses Express by default, so the middleware works via `app.use()` in your bootstrap. Use `useLogger()` to access the logger from anywhere in the call stack without passing `req`:
+
+```typescript
+import { useLogger } from 'evlog/nestjs'
+
+function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+The middleware supports the full evlog pipeline — `drain`, `enrich`, and `keep` callbacks:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+app.use(evlog({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+}))
+```
+
 ### Nitro v2
 
 ```typescript

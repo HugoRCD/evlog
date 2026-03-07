@@ -33,6 +33,7 @@ Here are the available types and scopes:
 - express (Express middleware)
 - elysia (Elysia plugin)
 - fastify (Fastify plugin)
+- nestjs (NestJS middleware)
 - workers (Cloudflare Workers adapter)
 - dx (developer experience improvements)
 -->

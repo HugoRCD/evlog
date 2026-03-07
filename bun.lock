@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -146,6 +145,16 @@
         "hono": "^4.11.9",
       },
     },
+    "examples/nestjs": {
+      "name": "evlog-nestjs-example",
+      "dependencies": {
+        "evlog": "workspace:*",
+        "express": "^5.2.1",
+      },
+      "devDependencies": {
+        "@types/express": "^5.0.6",
+      },
+    },
     "examples/nextjs": {
       "name": "evlog-nextjs-example",
       "dependencies": {
@@ -234,6 +243,7 @@
         "ufo": "^1.6.3",
       },
       "peerDependencies": {
+        "@nestjs/common": ">=9.0.0",
         "@nuxt/kit": "^4.3.1",
         "elysia": ">=1.0.0",
         "express": ">=4.21.0",
@@ -247,6 +257,7 @@
         "react": ">=19.2.4",
       },
       "optionalPeers": [
+        "@nestjs/common",
         "@nuxt/kit",
         "elysia",
         "express",
@@ -2143,6 +2154,8 @@
     "evlog-fastify-example": ["evlog-fastify-example@workspace:examples/fastify"],
 
     "evlog-hono-example": ["evlog-hono-example@workspace:examples/hono"],
+
+    "evlog-nestjs-example": ["evlog-nestjs-example@workspace:examples/nestjs"],
 
     "evlog-next-playground": ["evlog-next-playground@workspace:apps/next-playground"],
 

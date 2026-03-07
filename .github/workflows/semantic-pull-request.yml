@@ -36,6 +36,7 @@ jobs:
             express
             elysia
             fastify
+            nestjs
             workers
             dx
           types: |
