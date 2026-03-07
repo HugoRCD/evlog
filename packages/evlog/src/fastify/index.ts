@@ -106,9 +106,9 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
     const state = requestState.get(request)
     if (!state || emitted.has(request)) return
     emitted.add(request)
-    const logger = storage.getStore()
+    const logger = (request as any).log
     const err = error instanceof Error ? error : new Error(String(error))
-    if (logger) logger.error(err)
+    if (logger && typeof logger.error === 'function') logger.error(err)
     await state.finish({ error: err })
   })
 

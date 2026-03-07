@@ -6,6 +6,11 @@ import { extractSafeHeaders } from '../shared/headers'
 
 const storage = new AsyncLocalStorage<RequestLogger>()
 
+// Tracks loggers that are currently active (within a live request).
+// storage.enterWith() persists in the async context even after the request ends,
+// so we use this set to distinguish an in-flight logger from a stale one.
+const activeLoggers = new WeakSet<RequestLogger>()
+
 export interface EvlogElysiaOptions {
   /** Route patterns to include in logging (glob). If not set, all routes are logged */
   include?: string[]
@@ -46,7 +51,7 @@ export interface EvlogElysiaOptions {
  */
 export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
   const logger = storage.getStore()
-  if (!logger) {
+  if (!logger || !activeLoggers.has(logger)) {
     throw new Error(
       '[evlog] useLogger() was called outside of an evlog plugin context. '
       + 'Make sure app.use(evlog()) is registered before your routes.',
@@ -81,6 +86,7 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
 interface RequestState {
   finish: (opts?: { status?: number; error?: Error }) => Promise<unknown>
   skipped: boolean
+  logger: RequestLogger
 }
 
 export function evlog(options: EvlogElysiaOptions = {}) {
@@ -99,8 +105,9 @@ export function evlog(options: EvlogElysiaOptions = {}) {
         ...options,
       })
 
+      if (!skipped) activeLoggers.add(logger)
       storage.enterWith(logger)
-      requestState.set(request, { finish, skipped })
+      requestState.set(request, { finish, skipped, logger })
 
       return { log: logger }
     })
@@ -109,16 +116,17 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
       await state.finish({ status: set.status as number || 200 })
+      activeLoggers.delete(state.logger)
       storage.enterWith(undefined as unknown as RequestLogger)
     })
     .onError({ as: 'global' }, async ({ request, error }) => {
       const state = requestState.get(request)
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
-      const logger = storage.getStore()
       const err = error instanceof Error ? error : new Error(String(error))
-      if (logger) logger.error(err)
+      state.logger.error(err)
       await state.finish({ error: err })
+      activeLoggers.delete(state.logger)
       storage.enterWith(undefined as unknown as RequestLogger)
     })
 }
