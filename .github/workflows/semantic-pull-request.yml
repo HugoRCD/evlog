@@ -37,6 +37,7 @@ jobs:
             elysia
             fastify
             nestjs
+            sveltekit
             workers
             dx
           types: |

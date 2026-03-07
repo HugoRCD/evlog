@@ -24,6 +24,7 @@
     "hono",
     "elysia",
     "nestjs",
+    "sveltekit",
     "typescript"
   ],
   "license": "MIT",
@@ -109,6 +110,10 @@
     "./nestjs": {
       "types": "./dist/nestjs/index.d.mts",
       "import": "./dist/nestjs/index.mjs"
+    },
+    "./sveltekit": {
+      "types": "./dist/sveltekit/index.d.mts",
+      "import": "./dist/sveltekit/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -174,6 +179,9 @@
       ],
       "nestjs": [
         "./dist/nestjs/index.d.mts"
+      ],
+      "sveltekit": [
+        "./dist/sveltekit/index.d.mts"
       ]
     }
   },
@@ -226,7 +234,8 @@
     "express": ">=4.21.0",
     "elysia": ">=1.0.0",
     "fastify": ">=4.0.0",
-    "@nestjs/common": ">=9.0.0"
+    "@nestjs/common": ">=9.0.0",
+    "@sveltejs/kit": ">=2.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -263,6 +272,9 @@
       "optional": true
     },
     "@nestjs/common": {
+      "optional": true
+    },
+    "@sveltejs/kit": {
       "optional": true
     }
   }

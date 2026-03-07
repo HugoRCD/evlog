@@ -38,6 +38,7 @@ export default defineConfig({
     'elysia/index': 'src/elysia/index.ts',
     'fastify/index': 'src/fastify/index.ts',
     'nestjs/index': 'src/nestjs/index.ts',
+    'sveltekit/index': 'src/sveltekit/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -70,6 +71,7 @@ export default defineConfig({
     'fastify',
     '@nestjs/common',
     '@nestjs/core',
+    '@sveltejs/kit',
   ],
   inlineOnly: ['ufo']
 })

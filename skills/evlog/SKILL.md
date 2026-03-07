@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, TanStack Start, Nitro, Hono, Express, Fastify, Elysia, NestJS, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, TanStack Start, Nitro, Hono, Express, Fastify, Elysia, NestJS, SvelteKit, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
 license: MIT
 metadata:
   author: HugoRCD
@@ -507,6 +507,54 @@ EvlogModule.forRootAsync({
   useFactory: (config) => ({
     drain: createAxiomDrain({ token: config.get('AXIOM_TOKEN') }),
   }),
+})
+```
+
+### SvelteKit
+
+```typescript
+// src/hooks.server.ts
+import { initLogger } from 'evlog'
+import { createEvlogHooks } from 'evlog/sveltekit'
+
+initLogger({ env: { service: 'my-app' } })
+
+export const { handle, handleError } = createEvlogHooks()
+```
+
+Access the logger via `event.locals.log` in route handlers or `useLogger()` from anywhere in the call stack:
+
+```typescript
+// src/routes/api/users/[id]/+server.ts
+import { json } from '@sveltejs/kit'
+
+export const GET = ({ locals, params }) => {
+  locals.log.set({ user: { id: params.id } })
+  return json({ id: params.id })
+}
+```
+
+```typescript
+import { useLogger } from 'evlog/sveltekit'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+export const { handle, handleError } = createEvlogHooks({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
 })
 ```
 

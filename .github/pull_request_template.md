@@ -34,6 +34,7 @@ Here are the available types and scopes:
 - elysia (Elysia plugin)
 - fastify (Fastify plugin)
 - nestjs (NestJS middleware)
+- sveltekit (SvelteKit integration)
 - workers (Cloudflare Workers adapter)
 - dx (developer experience improvements)
 -->

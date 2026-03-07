@@ -1072,6 +1072,7 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([example](./examples/nestjs)) |
+| **SvelteKit** | `export const { handle, handleError } = createEvlogHooks()` with `import { createEvlogHooks } from 'evlog/sveltekit'` ([example](./examples/sveltekit)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
