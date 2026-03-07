@@ -184,9 +184,6 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "echo 'Typecheck handled by build'"
   },
-  "dependencies": {
-    "fastify-plugin": "^5.0.1"
-  },
   "devDependencies": {
     "@nuxt/devtools": "^3.2.2",
     "@nuxt/schema": "^4.3.1",

@@ -25,13 +25,13 @@ describe('evlog/fastify', () => {
     vi.restoreAllMocks()
   })
 
-  it('creates a logger accessible via request.evlog', async () => {
+  it('creates a logger accessible via request.log', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
 
     let hasLogger = false
     app.get('/api/test', async (request) => {
-      hasLogger = request.evlog !== null && typeof request.evlog.set === 'function'
+      hasLogger = request.log !== null && typeof request.log.set === 'function'
       return { ok: true }
     })
 
@@ -64,7 +64,7 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
     app.get('/api/users', async (request) => {
-      request.evlog.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+      request.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return { users: [] }
     })
 
@@ -85,7 +85,7 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
     app.get('/api/fail', async (request) => {
-      request.evlog.error(new Error('Something broke'))
+      request.log.error(new Error('Something broke'))
       const error = new Error('Something broke') as Error & { statusCode?: number }
       error.statusCode = 500
       throw error
@@ -107,21 +107,21 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { include: ['/api/**'] })
 
-    let evlogValue: unknown = 'untouched'
+    let isEvlogLogger = false
     app.get('/health', async (request) => {
-      evlogValue = request.evlog
+      isEvlogLogger = typeof request.log.set === 'function'
       return { ok: true }
     })
 
     await app.inject({ method: 'GET', url: '/health' })
-    expect(evlogValue).toBeNull()
+    expect(isEvlogLogger).toBe(false)
   })
 
   it('logs routes matching include patterns', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { include: ['/api/**'] })
     app.get('/api/data', async (request) => {
-      request.evlog.set({ data: true })
+      request.log.set({ data: true })
       return { ok: true }
     })
 
@@ -173,14 +173,14 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { exclude: ['/_internal/**'] })
 
-    let evlogValue: unknown = 'untouched'
+    let isEvlogLogger = false
     app.get('/_internal/probe', async (request) => {
-      evlogValue = request.evlog
+      isEvlogLogger = typeof request.log.set === 'function'
       return { ok: true }
     })
 
     await app.inject({ method: 'GET', url: '/_internal/probe' })
-    expect(evlogValue).toBeNull()
+    expect(isEvlogLogger).toBe(false)
   })
 
   it('applies route-based service override', async () => {
@@ -206,7 +206,7 @@ describe('evlog/fastify', () => {
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
       app.get('/api/test', async (request) => {
-        request.evlog.set({ user: { id: 'u-1' } })
+        request.log.set({ user: { id: 'u-1' } })
         return { ok: true }
       })
 
@@ -286,7 +286,7 @@ describe('evlog/fastify', () => {
       const app = Fastify({ logger: false })
       await app.register(evlog, { keep, drain })
       app.get('/api/test', async (request) => {
-        request.evlog.set({ important: true })
+        request.log.set({ important: true })
         return { ok: true }
       })
 
@@ -369,13 +369,13 @@ describe('evlog/fastify', () => {
       expect(lastCall).toBeDefined()
     })
 
-    it('returns the same logger as request.evlog', async () => {
+    it('returns the same logger as request.log', async () => {
       const app = Fastify({ logger: false })
       await app.register(evlog)
 
       let isSame = false
       app.get('/api/test', async (request) => {
-        isSame = useLogger() === request.evlog
+        isSame = useLogger() === request.log
         return { ok: true }
       })
 

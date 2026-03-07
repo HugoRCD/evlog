@@ -1,5 +1,4 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import fp from 'fastify-plugin'
 import type { FastifyPluginCallback } from 'fastify'
 import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
 import { createMiddlewareLogger } from '../shared/middleware'
@@ -33,7 +32,9 @@ export interface EvlogFastifyOptions {
 
 declare module 'fastify' {
   interface FastifyRequest {
-    evlog: RequestLogger
+    // Overrides Fastify's built-in pino logger on the request with evlog's RequestLogger.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    log: any
   }
 }
 
@@ -70,8 +71,6 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
   const emitted = new WeakSet<object>()
   const requestState = new WeakMap<object, RequestState>()
 
-  fastify.decorateRequest('evlog', null)
-
   fastify.addHook('onRequest', (request, _reply, done) => {
     const headers = extractSafeNodeHeaders(request.headers)
     const path = new URL(request.url, 'http://localhost').pathname
@@ -89,7 +88,8 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
       return
     }
 
-    request.evlog = logger
+    // Shadow Fastify's built-in pino logger with evlog's request-scoped logger
+    ;(request as any).log = logger
     requestState.set(request, { finish })
 
     storage.run(logger, () => done())
@@ -115,6 +115,11 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
   done()
 }
 
+// Break Fastify plugin encapsulation without a runtime dependency on fastify-plugin.
+// This is the same mechanism fastify-plugin uses internally.
+;(evlogPlugin as any)[Symbol.for('skip-override')] = true
+;(evlogPlugin as any)[Symbol.for('fastify.display-name')] = 'evlog'
+
 /**
  * Create an evlog plugin for Fastify.
  *
@@ -136,4 +141,4 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
  * })
  * ```
  */
-export const evlog = fp(evlogPlugin, { name: 'evlog' })
+export const evlog = evlogPlugin

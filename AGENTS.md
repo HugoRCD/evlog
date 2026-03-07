@@ -634,7 +634,7 @@ const app = Fastify()
 await app.register(evlog)
 
 app.get('/api/users', async (request) => {
-  request.evlog.set({ users: { count: 42 } })
+  request.log.set({ users: { count: 42 } })
   return { users: [] }
 })
 ```
@@ -666,7 +666,7 @@ await app.register(evlog, {
 ```
 
 **Key Fastify specifics:**
-- `request.evlog` is the evlog wide-event logger (`fastify-plugin` breaks encapsulation so it applies to all routes)
+- `request.log` is the evlog wide-event logger (shadows Fastify's built-in pino logger on the request; plugin encapsulation is broken via `Symbol.for('skip-override')`, no extra dependency)
 - Fastify's built-in pino logger stays available via `fastify.log` — evlog complements it for wide events
 - Lifecycle: `onRequest` creates the logger → `onResponse` emits with status → `onError` captures errors and prevents double emit
 - `useLogger()` uses `AsyncLocalStorage` propagated via `storage.run(logger, () => done())` in `onRequest`
