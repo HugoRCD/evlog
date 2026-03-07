@@ -238,7 +238,7 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "2.3.0",
+      "version": "2.4.0",
       "devDependencies": {
         "@nestjs/common": "^10.0.0",
         "@nuxt/devtools": "^3.2.2",
