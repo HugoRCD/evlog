@@ -27,14 +27,15 @@ feat({framework}): add {Framework} middleware integration
 | 6 | `apps/docs/content/6.examples/{N}.{framework}.md` | Create dedicated example page |
 | 7 | `apps/docs/content/0.landing.md` | Add framework code snippet |
 | 8 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
-| 9 | `AGENTS.md` | Add framework to integration section |
-| 10 | `examples/{framework}/` | Create example app with test UI |
-| 11 | `package.json` (root) | Add `example:{framework}` script |
-| 12 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
-| 13 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
-| 14 | `.github/pull_request_template.md` | Add `{framework}` scope |
+| 9 | `skills/evlog/SKILL.md` | Add framework setup section + update frontmatter description |
+| 10 | `packages/evlog/README.md` | Add framework section + add row to Framework Support table |
+| 11 | `examples/{framework}/` | Create example app with test UI |
+| 12 | `package.json` (root) | Add `example:{framework}` script |
+| 13 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
+| 14 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
+| 15 | `.github/pull_request_template.md` | Add `{framework}` scope |
 
-**Important**: Do NOT consider the task complete until all 14 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 15 touchpoints have been addressed.
 
 ## Naming Conventions
 
@@ -334,15 +335,32 @@ Update `apps/docs/app/components/features/FeatureFrameworks.vue`:
 
 Icons use Simple Icons format: `i-simple-icons-{name}` (e.g., `i-simple-icons-express`, `i-simple-icons-hono`).
 
-## Step 9: Update AGENTS.md
+## Step 9: Update `skills/evlog/SKILL.md`
 
-In the root `AGENTS.md` file:
+In `skills/evlog/SKILL.md` (the public skill distributed to users):
 
-1. Add the framework to the **"Framework Integration"** section
-2. Add import path and basic setup example (showing both `req.log` and `useLogger()`)
-3. Show drain/enrich/keep usage
+1. Add `### {Framework}` in the **"Framework Setup"** section, after the last existing framework entry and before "Cloudflare Workers"
+2. Include:
+   - Import + `initLogger` + middleware/plugin setup
+   - Logger access in route handlers (`req.log`, `c.get('log')`, or `{ log }` destructuring)
+   - `useLogger()` snippet with a short service function example
+   - Full pipeline example showing `drain`, `enrich`, and `keep` options
+3. Update the `description:` line in the YAML frontmatter to mention the new framework name
 
-## Step 10: Example App
+## Step 10: Update `packages/evlog/README.md`
+
+In the root `packages/evlog/README.md`:
+
+1. Add a `## {Framework}` section after the Elysia section (before `## Browser`), with a minimal setup snippet and a link to the example app
+2. Add a row to the **"Framework Support"** table:
+
+```markdown
+| **{Framework}** | `{registration pattern}` with `import { evlog } from 'evlog/{framework}'` ([example](./examples/{framework})) |
+```
+
+Keep the snippet short — just init, register/use middleware, and one route handler showing logger access. No need to repeat drain/enrich/keep here.
+
+## Step 11: Example App
 
 Create `examples/{framework}/` with a runnable app that demonstrates all evlog features.
 
@@ -406,7 +424,7 @@ Reference: `examples/hono/src/ui.ts` for the canonical pattern. Copy and adapt f
 }
 ```
 
-## Step 11: Root Package Script
+## Step 12: Root Package Script
 
 Add a root-level script in the monorepo `package.json`:
 
@@ -416,7 +434,7 @@ Add a root-level script in the monorepo `package.json`:
 
 The `dotenv --` prefix loads the root `.env` file (containing `POSTHOG_API_KEY` and other adapter keys) into the process before turbo starts. Turborepo does not load `.env` files — `dotenv-cli` handles this at the root level so individual examples need no env configuration.
 
-## Step 12: Changeset
+## Step 13: Changeset
 
 Create `.changeset/{framework}-integration.md`:
 
@@ -428,7 +446,7 @@ Create `.changeset/{framework}-integration.md`:
 Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
 ```
 
-## Step 13 & 14: PR Scopes
+## Step 14 & 15: PR Scopes
 
 Add the framework name as a valid scope in **both** files so PR title validation passes:
 
