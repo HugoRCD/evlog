@@ -343,6 +343,10 @@ describe('evlog/elysia', () => {
   })
 
   describe('useLogger()', () => {
+    it('throws outside middleware context', () => {
+      expect(() => useLogger()).toThrow('[evlog] useLogger()')
+    })
+
     it('returns same logger as context log', async () => {
       let same = false
 
@@ -356,10 +360,6 @@ describe('evlog/elysia', () => {
 
       await request(app, '/api/test')
       expect(same).toBe(true)
-    })
-
-    it('throws outside middleware context', () => {
-      expect(() => useLogger()).toThrow('[evlog] useLogger()')
     })
 
     it('works across async boundaries', async () => {
