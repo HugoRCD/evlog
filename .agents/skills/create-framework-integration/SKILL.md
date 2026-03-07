@@ -23,19 +23,20 @@ feat({framework}): add {Framework} middleware integration
 | 2 | `packages/evlog/tsdown.config.ts` | Add build entry + external |
 | 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` + peer dep + keyword |
 | 4 | `packages/evlog/test/{framework}.test.ts` | Create tests |
-| 5 | `apps/docs/content/1.getting-started/2.installation.md` | Add framework section |
-| 6 | `apps/docs/content/6.examples/{N}.{framework}.md` | Create dedicated example page |
-| 7 | `apps/docs/content/0.landing.md` | Add framework code snippet |
-| 8 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
-| 9 | `skills/evlog/SKILL.md` | Add framework setup section + update frontmatter description |
-| 10 | `packages/evlog/README.md` | Add framework section + add row to Framework Support table |
-| 11 | `examples/{framework}/` | Create example app with test UI |
-| 12 | `package.json` (root) | Add `example:{framework}` script |
-| 13 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
-| 14 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
-| 15 | `.github/pull_request_template.md` | Add `{framework}` scope |
+| 5 | `apps/docs/content/2.frameworks/{NN}.{framework}.md` | Create framework docs page |
+| 6 | `apps/docs/content/2.frameworks/00.overview.md` | Add card + table row |
+| 7 | `apps/docs/content/1.getting-started/2.installation.md` | Add card in "Choose Your Framework" |
+| 8 | `apps/docs/content/0.landing.md` | Add framework code snippet |
+| 9 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
+| 10 | `skills/evlog/SKILL.md` | Add framework setup section + update frontmatter description |
+| 11 | `packages/evlog/README.md` | Add framework section + add row to Framework Support table |
+| 12 | `examples/{framework}/` | Create example app with test UI |
+| 13 | `package.json` (root) | Add `example:{framework}` script |
+| 14 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
+| 15 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
+| 16 | `.github/pull_request_template.md` | Add `{framework}` scope |
 
-**Important**: Do NOT consider the task complete until all 15 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 16 touchpoints have been addressed.
 
 ## Naming Conventions
 
@@ -262,30 +263,18 @@ Required test categories:
 
 Use the framework's test utilities when available (e.g., Hono's `app.request()`, Express's `supertest`, Fastify's `inject()`).
 
-## Step 5: Installation Docs
+## Step 5: Framework Docs Page
 
-Add a section in `apps/docs/content/1.getting-started/2.installation.md` for the framework.
+Create `apps/docs/content/2.frameworks/{NN}.{framework}.md` with a comprehensive, self-contained guide.
 
-Follow the pattern of existing framework sections (Nuxt, Next.js, Nitro, Hono, Express). Include:
-
-1. **One-liner description** mentioning `req.log` / `c.get('log')` and `useLogger()` access
-2. **Install command** — `npm install evlog {framework}`
-3. **Setup code** — minimal working example with imports and configuration
-4. **Usage in routes** — how to access the logger in route handlers
-5. **Full pipeline example** — show drain + enrich + keep configuration
-6. **Error handling** — how structured errors work with the framework
-7. **Callout** linking to the dedicated example page
-
-## Step 6: Example Docs Page
-
-Create `apps/docs/content/6.examples/{N}.{framework}.md` with a comprehensive guide.
+Use zero-padded numbering (`{NN}`) to maintain correct sidebar ordering. Check existing files to determine the next number.
 
 **Frontmatter**:
 
 ```yaml
 ---
 title: {Framework}
-description: Using evlog with {Framework} — automatic wide events, structured errors, drain adapters, enrichers, and tail sampling.
+description: Using evlog with {Framework} — automatic wide events, structured errors, drain adapters, enrichers, and tail sampling in {Framework} applications.
 navigation:
   title: {Framework}
   icon: i-simple-icons-{framework}
@@ -298,19 +287,33 @@ links:
 ---
 ```
 
-**Sections** (follow the Express/Hono example pages):
+**Sections** (follow the Express/Hono/Elysia pages as reference):
 
-1. **Setup** — install + register middleware
-2. **Wide Events** — `req.log.set()` / `c.get('log').set()` usage
+1. **Quick Start** — install + register middleware (copy-paste minimum setup)
+2. **Wide Events** — progressive `log.set()` usage
 3. **useLogger()** — accessing logger from services without passing req
-4. **Error Handling** — `createError()` + framework error handler
-5. **Drain & Enrichers** — middleware options
-6. **Tail Sampling** — `keep` callback
-7. **Route Filtering** — `include` / `exclude` / `routes`
-8. **Run Locally** — clone + `bun run example:{framework}`
-9. **Card group** linking to GitHub source
+4. **Error Handling** — `createError()` + `parseError()` + framework error handler
+5. **Drain & Enrichers** — middleware options with inline example
+6. **Pipeline (Batching & Retry)** — `createDrainPipeline` example
+7. **Tail Sampling** — `keep` callback
+8. **Route Filtering** — `include` / `exclude` / `routes`
+9. **Client-Side Logging** — browser drain (only if framework has a client-side story)
+10. **Run Locally** — clone + `bun run example:{framework}`
+11. **Card group** linking to GitHub source
 
-## Step 7: Landing Page
+## Step 6: Overview & Installation Cards
+
+**In `apps/docs/content/2.frameworks/00.overview.md`**:
+
+1. Add a row to the **Overview table** with framework name, import, type, logger access, and status
+2. Add a `:::card` in the appropriate section (Full-Stack or Server Frameworks) with `color: neutral`
+
+**In `apps/docs/content/1.getting-started/2.installation.md`**:
+
+1. Add a `:::card` in the "Choose Your Framework" `::card-group` with `color: neutral`
+2. Place it in the correct order relative to existing frameworks (Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, CF Workers)
+
+## Step 7: Landing Page (unchanged)
 
 Add a code snippet in `apps/docs/content/0.landing.md` for the framework.
 
@@ -446,7 +449,7 @@ Create `.changeset/{framework}-integration.md`:
 Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
 ```
 
-## Step 14 & 15: PR Scopes
+## Step 15 & 16: PR Scopes
 
 Add the framework name as a valid scope in **both** files so PR title validation passes:
 
