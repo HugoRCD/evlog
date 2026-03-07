@@ -1064,15 +1064,16 @@ try {
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
 | **Next.js** | `createEvlog()` factory with `import { createEvlog } from 'evlog/next'` ([example](./examples/nextjs)) |
+| **SvelteKit** | `export const { handle, handleError } = createEvlogHooks()` with `import { createEvlogHooks } from 'evlog/sveltekit'` ([example](./examples/sveltekit)) |
 | **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
 | **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
 | **TanStack Start** | Nitro v3 module setup ([example](./examples/tanstack-start)) |
-| **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([example](./examples/hono)) |
+| **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([example](./examples/nestjs)) |
 | **Express** | `app.use(evlog())` with `import { evlog } from 'evlog/express'` ([example](./examples/express)) |
+| **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([example](./examples/hono)) |
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
-| **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([example](./examples/nestjs)) |
-| **SvelteKit** | `export const { handle, handleError } = createEvlogHooks()` with `import { createEvlogHooks } from 'evlog/sveltekit'` ([example](./examples/sveltekit)) |
+| **Cloudflare Workers** | Manual setup with `import { initLogger, createRequestLogger } from 'evlog'` ([example](./examples/workers)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |

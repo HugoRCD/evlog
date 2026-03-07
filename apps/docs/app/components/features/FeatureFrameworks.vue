@@ -18,17 +18,18 @@ const frameworkRows = [
   [
     { name: 'Nuxt', icon: 'i-simple-icons-nuxtdotjs', tab: 0 },
     { name: 'Next.js', icon: 'i-simple-icons-nextdotjs', tab: 1 },
-    { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 2 },
-    { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 8 },
-    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 7 },
+    { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 2 },
+    { name: 'Nitro', icon: 'i-custom-nitro', tab: 3 },
+    { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 4 },
+    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 5 },
   ],
   [
-    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 3 },
-    { name: 'Express', icon: 'i-simple-icons-express', tab: 4 },
-    { name: 'Elysia', icon: 'i-custom-elysia', tab: 5 },
-    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 6 },
-    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 9 },
-    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 10 },
+    { name: 'Express', icon: 'i-simple-icons-express', tab: 6 },
+    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 7 },
+    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 8 },
+    { name: 'Elysia', icon: 'i-custom-elysia', tab: 9 },
+    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 10 },
+    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 11 },
   ],
 ]
 </script>
@@ -114,30 +115,33 @@ const frameworkRows = [
         <slot name="nextjs" />
       </div>
       <div v-show="activeTab === 2" class="landing-code">
-        <slot name="tanstack-start" />
-      </div>
-      <div v-show="activeTab === 3" class="landing-code">
-        <slot name="hono" />
-      </div>
-      <div v-show="activeTab === 4" class="landing-code">
-        <slot name="express" />
-      </div>
-      <div v-show="activeTab === 5" class="landing-code">
-        <slot name="elysia" />
-      </div>
-      <div v-show="activeTab === 6" class="landing-code">
-        <slot name="fastify" />
-      </div>
-      <div v-show="activeTab === 7" class="landing-code">
-        <slot name="nestjs" />
-      </div>
-      <div v-show="activeTab === 8" class="landing-code">
         <slot name="sveltekit" />
       </div>
+      <div v-show="activeTab === 3" class="landing-code">
+        <slot name="nitro" />
+      </div>
+      <div v-show="activeTab === 4" class="landing-code">
+        <slot name="tanstack-start" />
+      </div>
+      <div v-show="activeTab === 5" class="landing-code">
+        <slot name="nestjs" />
+      </div>
+      <div v-show="activeTab === 6" class="landing-code">
+        <slot name="express" />
+      </div>
+      <div v-show="activeTab === 7" class="landing-code">
+        <slot name="hono" />
+      </div>
+      <div v-show="activeTab === 8" class="landing-code">
+        <slot name="fastify" />
+      </div>
       <div v-show="activeTab === 9" class="landing-code">
-        <slot name="cloudflare" />
+        <slot name="elysia" />
       </div>
       <div v-show="activeTab === 10" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 11" class="landing-code">
         <slot name="bun" />
       </div>
     </Motion>

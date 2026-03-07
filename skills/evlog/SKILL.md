@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, TanStack Start, Nitro, Hono, Express, Fastify, Elysia, NestJS, SvelteKit, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
 license: MIT
 metadata:
   author: HugoRCD
@@ -211,6 +211,54 @@ export async function POST(request: NextRequest) {
 }
 ```
 
+### SvelteKit
+
+```typescript
+// src/hooks.server.ts
+import { initLogger } from 'evlog'
+import { createEvlogHooks } from 'evlog/sveltekit'
+
+initLogger({ env: { service: 'my-app' } })
+
+export const { handle, handleError } = createEvlogHooks()
+```
+
+Access the logger via `event.locals.log` in route handlers or `useLogger()` from anywhere in the call stack:
+
+```typescript
+// src/routes/api/users/[id]/+server.ts
+import { json } from '@sveltejs/kit'
+
+export const GET = ({ locals, params }) => {
+  locals.log.set({ user: { id: params.id } })
+  return json({ id: params.id })
+}
+```
+
+```typescript
+import { useLogger } from 'evlog/sveltekit'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+export const { handle, handleError } = createEvlogHooks({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+})
+```
+
 ### Nitro v3
 
 ```typescript
@@ -289,40 +337,55 @@ export default defineNitroConfig({
 
 Import `useLogger` from `evlog/nitro` in routes.
 
-### Hono
+### NestJS
 
 ```typescript
-import { Hono } from 'hono'
-import { initLogger } from 'evlog'
-import { evlog, type EvlogVariables } from 'evlog/hono'
+// src/app.module.ts
+import { Module } from '@nestjs/common'
+import { EvlogModule } from 'evlog/nestjs'
 
-initLogger({ env: { service: 'my-api' } })
-
-const app = new Hono<EvlogVariables>()
-app.use(evlog())
-
-app.get('/api/users', (c) => {
-  const log = c.get('log')
-  log.set({ users: { count: 42 } })
-  return c.json({ users: [] })
+@Module({
+  imports: [EvlogModule.forRoot()],
 })
+export class AppModule {}
 ```
 
-Access the logger via `c.get('log')` in handlers. No `useLogger()` — use `c.get('log')` and pass it down explicitly, or use Express/Fastify/Elysia if you need `useLogger()` across async boundaries.
+`EvlogModule.forRoot()` registers a global middleware. Use `useLogger()` to access the request-scoped logger from any controller or service:
+
+```typescript
+import { useLogger } from 'evlog/nestjs'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
 
 Full pipeline with drain, enrich, and tail sampling:
 
 ```typescript
 import { createAxiomDrain } from 'evlog/axiom'
 
-app.use(evlog({
+EvlogModule.forRoot({
   include: ['/api/**'],
   drain: createAxiomDrain(),
   enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
   keep: (ctx) => {
     if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
   },
-}))
+})
+```
+
+For async configuration with NestJS DI, use `forRootAsync()`:
+
+```typescript
+EvlogModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config) => ({
+    drain: createAxiomDrain({ token: config.get('AXIOM_TOKEN') }),
+  }),
+})
 ```
 
 ### Express
@@ -353,6 +416,42 @@ async function findUsers() {
   log.set({ db: { query: 'SELECT * FROM users' } })
 }
 ```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+app.use(evlog({
+  include: ['/api/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+}))
+```
+
+### Hono
+
+```typescript
+import { Hono } from 'hono'
+import { initLogger } from 'evlog'
+import { evlog, type EvlogVariables } from 'evlog/hono'
+
+initLogger({ env: { service: 'my-api' } })
+
+const app = new Hono<EvlogVariables>()
+app.use(evlog())
+
+app.get('/api/users', (c) => {
+  const log = c.get('log')
+  log.set({ users: { count: 42 } })
+  return c.json({ users: [] })
+})
+```
+
+Access the logger via `c.get('log')` in handlers. No `useLogger()` — use `c.get('log')` and pass it down explicitly, or use Express/Fastify/Elysia if you need `useLogger()` across async boundaries.
 
 Full pipeline with drain, enrich, and tail sampling:
 
@@ -457,105 +556,6 @@ app.use(evlog({
     if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
   },
 }))
-```
-
-### NestJS
-
-```typescript
-// src/app.module.ts
-import { Module } from '@nestjs/common'
-import { EvlogModule } from 'evlog/nestjs'
-
-@Module({
-  imports: [EvlogModule.forRoot()],
-})
-export class AppModule {}
-```
-
-`EvlogModule.forRoot()` registers a global middleware. Use `useLogger()` to access the request-scoped logger from any controller or service:
-
-```typescript
-import { useLogger } from 'evlog/nestjs'
-
-async function findUsers() {
-  const log = useLogger()
-  log.set({ db: { query: 'SELECT * FROM users' } })
-}
-```
-
-Full pipeline with drain, enrich, and tail sampling:
-
-```typescript
-import { createAxiomDrain } from 'evlog/axiom'
-
-EvlogModule.forRoot({
-  include: ['/api/**'],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
-  },
-})
-```
-
-For async configuration with NestJS DI, use `forRootAsync()`:
-
-```typescript
-EvlogModule.forRootAsync({
-  imports: [ConfigModule],
-  inject: [ConfigService],
-  useFactory: (config) => ({
-    drain: createAxiomDrain({ token: config.get('AXIOM_TOKEN') }),
-  }),
-})
-```
-
-### SvelteKit
-
-```typescript
-// src/hooks.server.ts
-import { initLogger } from 'evlog'
-import { createEvlogHooks } from 'evlog/sveltekit'
-
-initLogger({ env: { service: 'my-app' } })
-
-export const { handle, handleError } = createEvlogHooks()
-```
-
-Access the logger via `event.locals.log` in route handlers or `useLogger()` from anywhere in the call stack:
-
-```typescript
-// src/routes/api/users/[id]/+server.ts
-import { json } from '@sveltejs/kit'
-
-export const GET = ({ locals, params }) => {
-  locals.log.set({ user: { id: params.id } })
-  return json({ id: params.id })
-}
-```
-
-```typescript
-import { useLogger } from 'evlog/sveltekit'
-
-async function findUsers() {
-  const log = useLogger()
-  log.set({ db: { query: 'SELECT * FROM users' } })
-}
-```
-
-Full pipeline with drain, enrich, and tail sampling:
-
-```typescript
-import { createAxiomDrain } from 'evlog/axiom'
-
-export const { handle, handleError } = createEvlogHooks({
-  include: ['/api/**'],
-  drain: createAxiomDrain(),
-  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
-  keep: (ctx) => {
-    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
-  },
-})
 ```
 
 ### Cloudflare Workers
