@@ -56,7 +56,9 @@ All integrations share the same core utilities. **Never reimplement logic that e
 | `createMiddlewareLogger` | `../shared/middleware` | Full lifecycle: logger creation, route filtering, tail sampling, emit, enrich, drain |
 | `extractSafeHeaders` | `../shared/headers` | Convert Web API `Headers` → filtered `Record<string, string>` (Hono, Elysia, etc.) |
 | `extractSafeNodeHeaders` | `../shared/headers` | Convert Node.js `IncomingHttpHeaders` → filtered `Record<string, string>` (Express, Fastify, NestJS) |
-| `MiddlewareLoggerOptions` | `../shared/middleware` | Base options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `headers` |
+| `BaseEvlogOptions` | `../shared/middleware` | Base user-facing options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes` |
+| `MiddlewareLoggerOptions` | `../shared/middleware` | Internal options type extending `BaseEvlogOptions` with `method`, `path`, `requestId`, `headers` |
+| `createLoggerStorage` | `../shared/storage` | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()` |
 
 ### Test Helpers
 
@@ -77,42 +79,24 @@ The integration file should be **minimal** — typically 50-80 lines of framewor
 ### Template Structure
 
 ```typescript
-import { AsyncLocalStorage } from 'node:async_hooks'
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext } from '../types'
-import { createMiddlewareLogger } from '../shared/middleware'
+import type { RequestLogger } from '../types'
+import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'       // for Web API Headers (Hono, Elysia)
 // OR
 import { extractSafeNodeHeaders } from '../shared/headers'    // for Node.js headers (Express, Fastify)
+import { createLoggerStorage } from '../shared/storage'
 
-const storage = new AsyncLocalStorage<RequestLogger>()
+const { storage, useLogger } = createLoggerStorage(
+  'middleware context. Make sure the evlog middleware is registered before your routes.',
+)
 
-export interface Evlog{Framework}Options {
-  include?: string[]
-  exclude?: string[]
-  routes?: Record<string, RouteConfig>
-  drain?: (ctx: DrainContext) => void | Promise<void>
-  enrich?: (ctx: EnrichContext) => void | Promise<void>
-  keep?: (ctx: TailSamplingContext) => void | Promise<void>
-}
+export interface Evlog{Framework}Options extends BaseEvlogOptions {}
+
+export { useLogger }
 
 // Type augmentation for typed logger access (framework-specific)
 // For Express: declare module 'express-serve-static-core' { interface Request { log: RequestLogger } }
 // For Hono: export type EvlogVariables = { Variables: { log: RequestLogger } }
-
-/**
- * Get the request-scoped logger from anywhere in the call stack.
- * Uses AsyncLocalStorage — works across async boundaries.
- */
-export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
-  const logger = storage.getStore()
-  if (!logger) {
-    throw new Error(
-      '[evlog] useLogger() was called outside of an evlog middleware context. '
-      + 'Make sure the evlog middleware is registered before your routes.',
-    )
-  }
-  return logger as RequestLogger<T>
-}
 
 export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddleware {
   return async (frameworkContext, next) => {
