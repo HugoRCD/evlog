@@ -14,18 +14,22 @@ onMounted(() => {
 
 const activeTab = ref(0)
 
-const frameworks = [
-  { name: 'Nuxt', icon: 'i-simple-icons-nuxtdotjs', tab: 0 },
-  { name: 'Next.js', icon: 'i-simple-icons-nextdotjs', tab: 1 },
-  { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 2 },
-  { name: 'Hono', icon: 'i-simple-icons-hono', tab: 3 },
-  { name: 'Express', icon: 'i-simple-icons-express', tab: 4 },
-  { name: 'Elysia', icon: 'i-custom-elysia', tab: 5 },
-  { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 6 },
-  { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 7 },
-  { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 8 },
-  { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 9 },
-  { name: 'Bun', icon: 'i-simple-icons-bun', tab: 10 },
+const frameworkRows = [
+  [
+    { name: 'Nuxt', icon: 'i-simple-icons-nuxtdotjs', tab: 0 },
+    { name: 'Next.js', icon: 'i-simple-icons-nextdotjs', tab: 1 },
+    { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 2 },
+    { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 8 },
+    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 7 },
+  ],
+  [
+    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 3 },
+    { name: 'Express', icon: 'i-simple-icons-express', tab: 4 },
+    { name: 'Elysia', icon: 'i-custom-elysia', tab: 5 },
+    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 6 },
+    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 9 },
+    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 10 },
+  ],
 ]
 </script>
 
@@ -65,29 +69,35 @@ const frameworks = [
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.4, delay: 0.1 }"
       :in-view-options="{ once: true }"
-      class="mb-8 flex flex-wrap items-end justify-center gap-2 md:gap-3 mx-auto"
+      class="mb-8 flex flex-col items-center gap-1 mx-auto"
     >
-      <button
-        v-for="fw in frameworks"
-        :key="fw.name"
-        class="group flex flex-col items-center gap-2 px-4 py-3 border outline-none transition-all duration-300"
-        :class="activeTab === fw.tab
-          ? 'border-accent-blue/30 bg-accent-blue/5'
-          : 'border-transparent hover:border-zinc-800'"
-        @click="activeTab = fw.tab"
+      <div
+        v-for="(row, rowIndex) in frameworkRows"
+        :key="rowIndex"
+        class="flex flex-wrap items-end justify-center gap-2 md:gap-3"
       >
-        <UIcon
-          :name="fw.icon"
-          class="size-8 sm:size-10 transition-colors duration-300"
-          :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-600 group-hover:text-zinc-400'"
-        />
-        <span
-          class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
-          :class="activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-600 group-hover:text-zinc-400'"
+        <button
+          v-for="fw in row"
+          :key="fw.name"
+          class="group flex flex-col items-center gap-2 px-4 py-3 border outline-none transition-all duration-300"
+          :class="activeTab === fw.tab
+            ? 'border-accent-blue/30 bg-accent-blue/5'
+            : 'border-transparent hover:border-zinc-800'"
+          @click="activeTab = fw.tab"
         >
-          {{ fw.name }}
-        </span>
-      </button>
+          <UIcon
+            :name="fw.icon"
+            class="size-8 sm:size-10 transition-colors duration-300"
+            :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'"
+          />
+          <span
+            class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
+            :class="activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'"
+          >
+            {{ fw.name }}
+          </span>
+        </button>
+      </div>
     </Motion>
 
     <Motion
