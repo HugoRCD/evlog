@@ -1,5 +1,11 @@
 # evlog
 
+## 2.4.1
+
+### Patch Changes
+
+- [`8ade245`](https://github.com/HugoRCD/evlog/commit/8ade2455ecc8f8da37e71fe19b7302dfb1563d69) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Restore useLogger() JSDoc for IntelliSense and remove unused RequestLogger import from Fastify adapter
+
 ## 2.4.0
 
 ### Minor Changes
