@@ -35,6 +35,7 @@ jobs:
             hono
             express
             elysia
+            fastify
             workers
             dx
           types: |

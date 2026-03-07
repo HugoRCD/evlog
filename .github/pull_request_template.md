@@ -32,6 +32,7 @@ Here are the available types and scopes:
 - hono (Hono middleware)
 - express (Express middleware)
 - elysia (Elysia plugin)
+- fastify (Fastify plugin)
 - workers (Cloudflare Workers adapter)
 - dx (developer experience improvements)
 -->
