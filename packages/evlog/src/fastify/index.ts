@@ -33,7 +33,6 @@ export interface EvlogFastifyOptions {
 declare module 'fastify' {
   interface FastifyRequest {
     // Overrides Fastify's built-in pino logger on the request with evlog's RequestLogger.
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     log: any
   }
 }
@@ -89,7 +88,8 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
     }
 
     // Shadow Fastify's built-in pino logger with evlog's request-scoped logger
-    ;(request as any).log = logger
+    const req = request as any
+    req.log = logger
     requestState.set(request, { finish })
 
     storage.run(logger, () => done())
@@ -117,8 +117,9 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
 
 // Break Fastify plugin encapsulation without a runtime dependency on fastify-plugin.
 // This is the same mechanism fastify-plugin uses internally.
-;(evlogPlugin as any)[Symbol.for('skip-override')] = true
-;(evlogPlugin as any)[Symbol.for('fastify.display-name')] = 'evlog'
+const plugin = evlogPlugin as any
+plugin[Symbol.for('skip-override')] = true
+plugin[Symbol.for('fastify.display-name')] = 'evlog'
 
 /**
  * Create an evlog plugin for Fastify.

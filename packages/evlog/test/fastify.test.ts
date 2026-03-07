@@ -30,7 +30,7 @@ describe('evlog/fastify', () => {
     await app.register(evlog)
 
     let hasLogger = false
-    app.get('/api/test', async (request) => {
+    app.get('/api/test', (request) => {
       hasLogger = request.log !== null && typeof request.log.set === 'function'
       return { ok: true }
     })
@@ -42,7 +42,7 @@ describe('evlog/fastify', () => {
   it('emits event with correct method, path, and status', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
-    app.get('/api/users', async () => ({ users: [] }))
+    app.get('/api/users', () => ({ users: [] }))
 
     const consoleSpy = vi.mocked(console.info)
     await app.inject({ method: 'GET', url: '/api/users' })
@@ -63,7 +63,7 @@ describe('evlog/fastify', () => {
   it('accumulates context set by route handler', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
-    app.get('/api/users', async (request) => {
+    app.get('/api/users', (request) => {
       request.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return { users: [] }
     })
@@ -84,7 +84,7 @@ describe('evlog/fastify', () => {
   it('logs error status when handler throws', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
-    app.get('/api/fail', async (request) => {
+    app.get('/api/fail', (request) => {
       request.log.error(new Error('Something broke'))
       const error = new Error('Something broke') as Error & { statusCode?: number }
       error.statusCode = 500
@@ -108,7 +108,7 @@ describe('evlog/fastify', () => {
     await app.register(evlog, { include: ['/api/**'] })
 
     let isEvlogLogger = false
-    app.get('/health', async (request) => {
+    app.get('/health', (request) => {
       isEvlogLogger = typeof request.log.set === 'function'
       return { ok: true }
     })
@@ -120,7 +120,7 @@ describe('evlog/fastify', () => {
   it('logs routes matching include patterns', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { include: ['/api/**'] })
-    app.get('/api/data', async (request) => {
+    app.get('/api/data', (request) => {
       request.log.set({ data: true })
       return { ok: true }
     })
@@ -137,7 +137,7 @@ describe('evlog/fastify', () => {
   it('uses x-request-id header when present', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
-    app.get('/api/test', async () => ({ ok: true }))
+    app.get('/api/test', () => ({ ok: true }))
 
     const consoleSpy = vi.mocked(console.info)
     await app.inject({
@@ -158,7 +158,7 @@ describe('evlog/fastify', () => {
   it('handles POST requests with correct method', async () => {
     const app = Fastify({ logger: false })
     await app.register(evlog)
-    app.post('/api/checkout', async () => ({ ok: true }))
+    app.post('/api/checkout', () => ({ ok: true }))
 
     const consoleSpy = vi.mocked(console.info)
     await app.inject({ method: 'POST', url: '/api/checkout' })
@@ -174,7 +174,7 @@ describe('evlog/fastify', () => {
     await app.register(evlog, { exclude: ['/_internal/**'] })
 
     let isEvlogLogger = false
-    app.get('/_internal/probe', async (request) => {
+    app.get('/_internal/probe', (request) => {
       isEvlogLogger = typeof request.log.set === 'function'
       return { ok: true }
     })
@@ -188,7 +188,7 @@ describe('evlog/fastify', () => {
     await app.register(evlog, {
       routes: { '/api/auth/**': { service: 'auth-service' } },
     })
-    app.get('/api/auth/login', async () => ({ ok: true }))
+    app.get('/api/auth/login', () => ({ ok: true }))
 
     const consoleSpy = vi.mocked(console.info)
     await app.inject({ method: 'GET', url: '/api/auth/login' })
@@ -205,7 +205,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
-      app.get('/api/test', async (request) => {
+      app.get('/api/test', (request) => {
         request.log.set({ user: { id: 'u-1' } })
         return { ok: true }
       })
@@ -225,7 +225,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { enrich, drain })
-      app.get('/api/test', async () => ({ ok: true }))
+      app.get('/api/test', () => ({ ok: true }))
 
       await app.inject({ method: 'GET', url: '/api/test' })
 
@@ -238,7 +238,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { enrich })
-      app.get('/api/test', async () => ({ ok: true }))
+      app.get('/api/test', () => ({ ok: true }))
 
       await app.inject({
         method: 'GET',
@@ -261,7 +261,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
-      app.get('/api/test', async () => ({ ok: true }))
+      app.get('/api/test', () => ({ ok: true }))
 
       await app.inject({
         method: 'GET',
@@ -285,7 +285,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { keep, drain })
-      app.get('/api/test', async (request) => {
+      app.get('/api/test', (request) => {
         request.log.set({ important: true })
         return { ok: true }
       })
@@ -304,7 +304,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
-      app.get('/api/test', async () => ({ ok: true }))
+      app.get('/api/test', () => ({ ok: true }))
 
       const res = await app.inject({ method: 'GET', url: '/api/test' })
       expect(res.statusCode).toBe(200)
@@ -319,7 +319,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { enrich, drain })
-      app.get('/api/test', async () => ({ ok: true }))
+      app.get('/api/test', () => ({ ok: true }))
 
       const res = await app.inject({ method: 'GET', url: '/api/test' })
       expect(res.statusCode).toBe(200)
@@ -332,7 +332,7 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { include: ['/api/**'], drain, enrich })
-      app.get('/health', async () => ({ ok: true }))
+      app.get('/health', () => ({ ok: true }))
 
       await app.inject({ method: 'GET', url: '/health' })
 
@@ -352,7 +352,7 @@ describe('evlog/fastify', () => {
         useLogger().set({ fromService: true })
       }
 
-      app.get('/api/test', async (_request) => {
+      app.get('/api/test', (_request) => {
         serviceFunction()
         return { ok: true }
       })
@@ -374,7 +374,7 @@ describe('evlog/fastify', () => {
       await app.register(evlog)
 
       let isSame = false
-      app.get('/api/test', async (request) => {
+      app.get('/api/test', (request) => {
         isSame = useLogger() === request.log
         return { ok: true }
       })
