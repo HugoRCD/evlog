@@ -14,6 +14,22 @@ import type { RequestLogger } from '../types'
 export function createLoggerStorage(contextHint: string) {
   const storage = new AsyncLocalStorage<RequestLogger>()
 
+  /**
+   * Access the request-scoped logger created by the evlog middleware.
+   *
+   * Must be called inside a request that is handled by the evlog middleware.
+   * Throws if called outside of a request context.
+   *
+   * @example
+   * ```ts
+   * import { useLogger } from 'evlog/express' // or /fastify, /nestjs, /sveltekit, /elysia
+   *
+   * function myService() {
+   *   const log = useLogger()
+   *   log.set({ users: { count: 42 } })
+   * }
+   * ```
+   */
   function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
     const logger = storage.getStore()
     if (!logger) {

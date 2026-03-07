@@ -1,5 +1,4 @@
 import type { FastifyPluginCallback } from 'fastify'
-import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeNodeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
