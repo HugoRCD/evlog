@@ -72,7 +72,7 @@ type SvelteKitHandleServerError = (input: {
   event: { request: Request; url: URL; locals: Record<string, any> }
   status: number
   message: string
-}) => MaybePromise<void | App.Error>
+}) => MaybePromise<void | AppError>
 
 type MaybePromise<T> = T | Promise<T>
 
@@ -140,13 +140,11 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
         const ctx = logger.getContext()
         const errorData = ctx.error as { name?: string; status?: number; message?: string; data?: unknown } | undefined
         if (response.status >= 500 && errorData?.name === 'EvlogError' && errorData.status) {
-          await finish({ status: errorData.status })
-          return new Response(JSON.stringify({
-            message: errorData.message,
-            status: errorData.status,
-            ...(errorData.data as Record<string, unknown>),
-          }), {
-            status: errorData.status,
+          const { status } = errorData
+          await finish({ status })
+          const body = serializeEvlogErrorResponse(errorData as EvlogError, event.url.pathname)
+          return new Response(JSON.stringify(body), {
+            status,
             headers: { 'content-type': 'application/json' },
           })
         }

@@ -195,8 +195,8 @@ describe('evlog/sveltekit', () => {
     const body = await response.json()
     expect(body.message).toBe('Payment failed')
     expect(body.status).toBe(402)
-    expect(body.why).toBe('Card declined')
-    expect(body.fix).toBe('Try another card')
+    expect(body.data.why).toBe('Card declined')
+    expect(body.data.fix).toBe('Try another card')
   })
 
   it('skips routes not matching include patterns', async () => {
