@@ -36,6 +36,7 @@ export default defineConfig({
     'hono/index': 'src/hono/index.ts',
     'express/index': 'src/express/index.ts',
     'elysia/index': 'src/elysia/index.ts',
+    'fastify/index': 'src/fastify/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -65,6 +66,7 @@ export default defineConfig({
     'hono/factory',
     'express',
     'elysia',
+    'fastify',
   ],
   inlineOnly: ['ufo']
 })

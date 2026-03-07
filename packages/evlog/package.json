@@ -100,6 +100,10 @@
     "./elysia": {
       "types": "./dist/elysia/index.d.mts",
       "import": "./dist/elysia/index.mjs"
+    },
+    "./fastify": {
+      "types": "./dist/fastify/index.d.mts",
+      "import": "./dist/fastify/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -159,6 +163,9 @@
       ],
       "elysia": [
         "./dist/elysia/index.d.mts"
+      ],
+      "fastify": [
+        "./dist/fastify/index.d.mts"
       ]
     }
   },
@@ -177,6 +184,9 @@
     "test:coverage": "vitest run --coverage",
     "typecheck": "echo 'Typecheck handled by build'"
   },
+  "dependencies": {
+    "fastify-plugin": "^5.0.1"
+  },
   "devDependencies": {
     "@nuxt/devtools": "^3.2.2",
     "@nuxt/schema": "^4.3.1",
@@ -187,6 +197,7 @@
     "consola": "^3.4.2",
     "elysia": "^1.4.27",
     "express": "^5.2.1",
+    "fastify": "^5.2.1",
     "h3": "^1.15.5",
     "happy-dom": "^20.7.2",
     "nitro": "^3.0.1-alpha.2",
@@ -207,7 +218,8 @@
     "react": ">=19.2.4",
     "hono": "",
     "express": ">=4.21.0",
-    "elysia": ">=1.0.0"
+    "elysia": ">=1.0.0",
+    "fastify": ">=4.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -238,6 +250,9 @@
       "optional": true
     },
     "elysia": {
+      "optional": true
+    },
+    "fastify": {
       "optional": true
     }
   }
