@@ -125,7 +125,7 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
     })
 
     if (skipped) {
-      return resolve(event)
+      return await resolve(event)
     }
 
     event.locals.log = logger

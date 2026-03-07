@@ -19,7 +19,7 @@ function createMockEvent(method = 'GET', path = '/api/test', headers: Record<str
 }
 
 function createMockResolve(status = 200) {
-  return vi.fn(async () => new Response(JSON.stringify({ ok: true }), { status }))
+  return vi.fn(() => new Response(JSON.stringify({ ok: true }), { status }))
 }
 
 describe('evlog/sveltekit', () => {
@@ -76,7 +76,7 @@ describe('evlog/sveltekit', () => {
   it('accumulates context set by route handler', async () => {
     const handle = evlog()
     const event = createMockEvent('GET', '/api/users')
-    const resolve = vi.fn(async (ev: any) => {
+    const resolve = vi.fn((ev: any) => {
       ev.locals.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return new Response(JSON.stringify({ users: [] }), { status: 200 })
     })
@@ -97,7 +97,7 @@ describe('evlog/sveltekit', () => {
   it('logs error status when handler throws', async () => {
     const handle = evlog()
     const event = createMockEvent('GET', '/api/fail')
-    const resolve = vi.fn(async () => {
+    const resolve = vi.fn(() => {
       throw new Error('Something broke')
     })
 
@@ -116,7 +116,7 @@ describe('evlog/sveltekit', () => {
   it('returns structured JSON response for thrown EvlogError', async () => {
     const handle = evlog()
     const event = createMockEvent('GET', '/api/checkout')
-    const resolve = vi.fn(async () => {
+    const resolve = vi.fn(() => {
       throw new EvlogError({
         message: 'Payment failed',
         status: 402,
@@ -142,14 +142,14 @@ describe('evlog/sveltekit', () => {
     const { drain } = createPipelineSpies()
     const handle = evlog({ drain })
     const event = createMockEvent('GET', '/api/checkout')
-    const resolve = vi.fn(async () => {
+    const resolve = vi.fn(() => {
       throw new EvlogError({ message: 'Payment failed', status: 402 })
     })
 
     await handle({ event, resolve })
 
     expect(drain).toHaveBeenCalledOnce()
-    const drainCtx = drain.mock.calls[0][0]
+    const [[drainCtx]] = drain.mock.calls
     expect(drainCtx.event.level).toBe('error')
     expect(drainCtx.event.status).toBe(402)
   })
@@ -157,7 +157,7 @@ describe('evlog/sveltekit', () => {
   it('re-throws non-EvlogError errors', async () => {
     const handle = evlog()
     const event = createMockEvent('GET', '/api/fail')
-    const resolve = vi.fn(async () => {
+    const resolve = vi.fn(() => {
       throw new Error('Unexpected crash')
     })
 
@@ -180,7 +180,7 @@ describe('evlog/sveltekit', () => {
     })
 
     // Simulate SvelteKit's resolve: calls handleError, then returns 500
-    const resolve = vi.fn(async () => {
+    const resolve = vi.fn(() => {
       // SvelteKit calls handleError before returning the response
       handleError({ error: evlogError, event, status: 500, message: 'Internal Error' })
       return new Response('Internal Error', { status: 500 })
@@ -286,7 +286,7 @@ describe('evlog/sveltekit', () => {
 
       const handle = evlog({ drain })
       const event = createMockEvent('GET', '/api/test')
-      const resolve = vi.fn(async (ev: any) => {
+      const resolve = vi.fn((ev: any) => {
         ev.locals.log.set({ user: { id: 'u-1' } })
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
@@ -358,7 +358,7 @@ describe('evlog/sveltekit', () => {
 
       const handle = evlog({ keep, drain })
       const event = createMockEvent('GET', '/api/test')
-      const resolve = vi.fn(async (ev: any) => {
+      const resolve = vi.fn((ev: any) => {
         ev.locals.log.set({ important: true })
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
@@ -419,7 +419,7 @@ describe('evlog/sveltekit', () => {
       const handle = evlog()
 
       let loggerFromService: unknown
-      const resolve = vi.fn(async () => {
+      const resolve = vi.fn(() => {
         loggerFromService = useLogger()
         useLogger().set({ fromService: true })
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
@@ -443,7 +443,7 @@ describe('evlog/sveltekit', () => {
 
       let isSame = false
       const event = createMockEvent('GET', '/api/test')
-      const resolve = vi.fn(async () => {
+      const resolve = vi.fn(() => {
         isSame = useLogger() === event.locals.log
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
@@ -487,7 +487,7 @@ describe('evlog/sveltekit', () => {
       const event = createMockEvent('GET', '/api/fail')
 
       // First set up the logger via the handle hook
-      const resolve = vi.fn(async () => {
+      const resolve = vi.fn(() => {
         throw new Error('Something broke')
       })
       await handle({ event, resolve }).catch(() => {})
@@ -503,7 +503,18 @@ describe('evlog/sveltekit', () => {
     it('returns structured response for EvlogError', () => {
       const handleError = evlogHandleError()
       const event = createMockEvent('GET', '/api/checkout')
-      event.locals.log = { set() {}, error() {}, info() {}, warn() {}, emit() { return null }, getContext() { return {} } }
+      event.locals.log = {
+        set() {},
+        error() {},
+        info() {},
+        warn() {},
+        emit() {
+          return null
+        },
+        getContext() {
+          return {}
+        },
+      }
 
       const error = new EvlogError({
         message: 'Payment failed',
@@ -526,7 +537,18 @@ describe('evlog/sveltekit', () => {
     it('returns generic response for non-EvlogError', () => {
       const handleError = evlogHandleError()
       const event = createMockEvent('GET', '/api/fail')
-      event.locals.log = { set() {}, error() {}, info() {}, warn() {}, emit() { return null }, getContext() { return {} } }
+      event.locals.log = {
+        set() {},
+        error() {},
+        info() {},
+        warn() {},
+        emit() {
+          return null
+        },
+        getContext() {
+          return {}
+        },
+      }
 
       const result = handleError({
         error: new Error('Something broke'),
@@ -580,7 +602,18 @@ describe('evlog/sveltekit', () => {
     it('handleError returns structured EvlogError response', () => {
       const { handleError } = createEvlogHooks()
       const event = createMockEvent('GET', '/api/checkout')
-      event.locals.log = { set() {}, error() {}, info() {}, warn() {}, emit() { return null }, getContext() { return {} } }
+      event.locals.log = {
+        set() {},
+        error() {},
+        info() {},
+        warn() {},
+        emit() {
+          return null
+        },
+        getContext() {
+          return {}
+        },
+      }
 
       const error = new EvlogError({
         message: 'Payment failed',
