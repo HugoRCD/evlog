@@ -109,6 +109,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
       await state.finish({ status: set.status as number || 200 })
+      storage.enterWith(undefined as unknown as RequestLogger)
     })
     .onError({ as: 'global' }, async ({ request, error }) => {
       const state = requestState.get(request)
@@ -118,5 +119,6 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       const err = error instanceof Error ? error : new Error(String(error))
       if (logger) logger.error(err)
       await state.finish({ error: err })
+      storage.enterWith(undefined as unknown as RequestLogger)
     })
 }
