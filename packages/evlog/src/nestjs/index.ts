@@ -42,7 +42,13 @@ export interface EvlogModuleAsyncOptions {
 
 declare module 'http' {
   interface IncomingMessage {
-    log: RequestLogger
+    log?: RequestLogger
+  }
+}
+
+declare module 'express-serve-static-core' {
+  interface Request {
+    log?: RequestLogger
   }
 }
 
@@ -75,8 +81,9 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
   return logger as RequestLogger<T>
 }
 
-function createEvlogMiddleware(options: EvlogNestJSOptions) {
+function createEvlogMiddleware(getOptions: () => EvlogNestJSOptions) {
   return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+    const options = getOptions()
     const headers = extractSafeNodeHeaders(req.headers)
     const url = new URL(req.url || '/', 'http://localhost')
 
@@ -184,7 +191,7 @@ export class EvlogModule implements NestModule {
 
   configure(consumer: MiddlewareConsumer): void {
     consumer
-      .apply(createEvlogMiddleware(EvlogModule.options))
+      .apply(createEvlogMiddleware(() => EvlogModule.options))
       .forRoutes('*')
   }
 
