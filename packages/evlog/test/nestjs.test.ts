@@ -2,7 +2,8 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import { initLogger } from '../src/logger'
-import { evlog, useLogger } from '../src/nestjs/index'
+import { EvlogModule, useLogger } from '../src/nestjs/index'
+import type { EvlogNestJSOptions } from '../src/nestjs/index'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
@@ -10,8 +11,26 @@ import {
   createPipelineSpies,
 } from './helpers/framework'
 
-// NestJS uses Express under the hood by default.
-// We test the evlog/nestjs middleware with Express to validate it works correctly.
+/**
+ * Extract the middleware function from EvlogModule.configure() for testing.
+ * This lets us test the actual middleware pipeline through the NestJS module API
+ * without needing the full NestJS runtime.
+ */
+function getMiddleware(options: EvlogNestJSOptions = {}): any {
+  let middleware: any
+  const consumer = {
+    apply: (mw: any) => {
+      middleware = mw
+      return { forRoutes: () => {} }
+    },
+  }
+
+  EvlogModule.forRoot(options)
+  const module = new EvlogModule()
+  module.configure(consumer as any)
+  return middleware
+}
+
 describe('evlog/nestjs', () => {
   beforeEach(() => {
     initLogger({
@@ -28,173 +47,217 @@ describe('evlog/nestjs', () => {
     vi.restoreAllMocks()
   })
 
-  it('creates a logger accessible via req.log', async () => {
-    const app = express()
-    app.use(evlog())
-
-    let hasLogger = false
-    app.get('/api/test', (req, res) => {
-      hasLogger = req.log !== undefined && typeof req.log.set === 'function'
-      res.json({ ok: true })
+  describe('EvlogModule', () => {
+    it('forRoot() returns a valid DynamicModule', () => {
+      const result = EvlogModule.forRoot({ exclude: ['/health'] })
+      expect(result).toHaveProperty('module', EvlogModule)
+      expect(result).toHaveProperty('global', true)
     })
 
-    await request(app).get('/api/test')
-    expect(hasLogger).toBe(true)
-  })
-
-  it('emits event with correct method, path, and status', async () => {
-    const app = express()
-    app.use(evlog())
-    app.get('/api/users', (_req, res) => res.json({ users: [] }))
-
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).get('/api/users')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.method).toBe('GET')
-    expect(event.path).toBe('/api/users')
-    expect(event.status).toBe(200)
-    expect(event.level).toBe('info')
-    expect(event.duration).toBeDefined()
-  })
-
-  it('accumulates context set by route handler', async () => {
-    const app = express()
-    app.use(evlog())
-    app.get('/api/users', (req, res) => {
-      req.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
-      res.json({ users: [] })
+    it('forRootAsync() returns a valid DynamicModule with providers', () => {
+      const result = EvlogModule.forRootAsync({
+        useFactory: () => ({ exclude: ['/health'] }),
+      })
+      expect(result).toHaveProperty('module', EvlogModule)
+      expect(result).toHaveProperty('global', true)
+      expect(result.providers).toBeDefined()
+      expect(result.providers!.length).toBe(1)
     })
 
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).get('/api/users')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"user"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.user.id).toBe('u-1')
-    expect(event.db.queries).toBe(3)
-  })
-
-  it('logs error status when handler sends error response', async () => {
-    const app = express()
-    app.use(evlog())
-    app.get('/api/fail', (req, res) => {
-      req.log.error(new Error('Something broke'))
-      res.status(500).json({ error: 'fail' })
+    it('forRootAsync() includes imports when provided', () => {
+      const fakeModule = class ConfigModule {}
+      const result = EvlogModule.forRootAsync({
+        imports: [fakeModule],
+        useFactory: () => ({}),
+        inject: ['CONFIG'],
+      })
+      expect(result.imports).toContain(fakeModule)
     })
 
-    const errorSpy = vi.mocked(console.error)
-    await request(app).get('/api/fail')
+    it('configure() applies middleware via consumer', () => {
+      const forRoutes = vi.fn()
+      const apply = vi.fn(() => ({ forRoutes }))
+      const consumer = { apply } as any
 
-    const lastCall = errorSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"level":"error"'),
-    )
-    expect(lastCall).toBeDefined()
+      EvlogModule.forRoot()
+      const module = new EvlogModule()
+      module.configure(consumer)
 
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.level).toBe('error')
-    expect(event.status).toBe(500)
+      expect(apply).toHaveBeenCalledOnce()
+      expect(apply.mock.calls[0][0]).toBeTypeOf('function')
+      expect(forRoutes).toHaveBeenCalledWith('*')
+    })
   })
 
-  it('skips routes not matching include patterns', async () => {
-    const app = express()
-    app.use(evlog({ include: ['/api/**'] }))
+  describe('middleware behavior', () => {
+    it('creates a logger accessible via req.log', async () => {
+      const app = express()
+      app.use(getMiddleware())
 
-    let logValue: unknown = 'untouched'
-    app.get('/health', (req, res) => {
-      logValue = req.log
-      res.json({ ok: true })
+      let hasLogger = false
+      app.get('/api/test', (req, res) => {
+        hasLogger = req.log !== undefined && typeof req.log.set === 'function'
+        res.json({ ok: true })
+      })
+
+      await request(app).get('/api/test')
+      expect(hasLogger).toBe(true)
     })
 
-    await request(app).get('/health')
-    expect(logValue).toBeUndefined()
-  })
+    it('emits event with correct method, path, and status', async () => {
+      const app = express()
+      app.use(getMiddleware())
+      app.get('/api/users', (_req, res) => res.json({ users: [] }))
 
-  it('logs routes matching include patterns', async () => {
-    const app = express()
-    app.use(evlog({ include: ['/api/**'] }))
-    app.get('/api/data', (req, res) => {
-      req.log.set({ data: true })
-      res.json({ ok: true })
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/users')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
+      )
+      expect(lastCall).toBeDefined()
+
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.method).toBe('GET')
+      expect(event.path).toBe('/api/users')
+      expect(event.status).toBe(200)
+      expect(event.level).toBe('info')
+      expect(event.duration).toBeDefined()
     })
 
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).get('/api/data')
+    it('accumulates context set by route handler', async () => {
+      const app = express()
+      app.use(getMiddleware())
+      app.get('/api/users', (req, res) => {
+        req.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+        res.json({ users: [] })
+      })
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/users')
 
-  it('uses x-request-id header when present', async () => {
-    const app = express()
-    app.use(evlog())
-    app.get('/api/test', (_req, res) => res.json({ ok: true }))
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"user"'),
+      )
+      expect(lastCall).toBeDefined()
 
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('custom-req-id'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.requestId).toBe('custom-req-id')
-  })
-
-  it('handles POST requests with correct method', async () => {
-    const app = express()
-    app.use(evlog())
-    app.post('/api/checkout', (_req, res) => res.json({ ok: true }))
-
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).post('/api/checkout')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
-
-  it('excludes routes matching exclude patterns', async () => {
-    const app = express()
-    app.use(evlog({ exclude: ['/_internal/**'] }))
-
-    let logValue: unknown = 'untouched'
-    app.get('/_internal/probe', (req, res) => {
-      logValue = req.log
-      res.json({ ok: true })
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.user.id).toBe('u-1')
+      expect(event.db.queries).toBe(3)
     })
 
-    await request(app).get('/_internal/probe')
-    expect(logValue).toBeUndefined()
-  })
+    it('logs error status when handler sends error response', async () => {
+      const app = express()
+      app.use(getMiddleware())
+      app.get('/api/fail', (req, res) => {
+        req.log.error(new Error('Something broke'))
+        res.status(500).json({ error: 'fail' })
+      })
 
-  it('applies route-based service override', async () => {
-    const app = express()
-    app.use(evlog({
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-    }))
-    app.get('/api/auth/login', (_req, res) => res.json({ ok: true }))
+      const errorSpy = vi.mocked(console.error)
+      await request(app).get('/api/fail')
 
-    const consoleSpy = vi.mocked(console.info)
-    await request(app).get('/api/auth/login')
+      const lastCall = errorSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"level":"error"'),
+      )
+      expect(lastCall).toBeDefined()
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
-    )
-    expect(lastCall).toBeDefined()
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.level).toBe('error')
+      expect(event.status).toBe(500)
+    })
+
+    it('skips routes not matching include patterns', async () => {
+      const app = express()
+      app.use(getMiddleware({ include: ['/api/**'] }))
+
+      let logValue: unknown = 'untouched'
+      app.get('/health', (req, res) => {
+        logValue = req.log
+        res.json({ ok: true })
+      })
+
+      await request(app).get('/health')
+      expect(logValue).toBeUndefined()
+    })
+
+    it('logs routes matching include patterns', async () => {
+      const app = express()
+      app.use(getMiddleware({ include: ['/api/**'] }))
+      app.get('/api/data', (req, res) => {
+        req.log.set({ data: true })
+        res.json({ ok: true })
+      })
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/data')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
+      )
+      expect(lastCall).toBeDefined()
+    })
+
+    it('uses x-request-id header when present', async () => {
+      const app = express()
+      app.use(getMiddleware())
+      app.get('/api/test', (_req, res) => res.json({ ok: true }))
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('custom-req-id'),
+      )
+      expect(lastCall).toBeDefined()
+
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.requestId).toBe('custom-req-id')
+    })
+
+    it('handles POST requests with correct method', async () => {
+      const app = express()
+      app.use(getMiddleware())
+      app.post('/api/checkout', (_req, res) => res.json({ ok: true }))
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).post('/api/checkout')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
+      )
+      expect(lastCall).toBeDefined()
+    })
+
+    it('excludes routes matching exclude patterns', async () => {
+      const app = express()
+      app.use(getMiddleware({ exclude: ['/_internal/**'] }))
+
+      let logValue: unknown = 'untouched'
+      app.get('/_internal/probe', (req, res) => {
+        logValue = req.log
+        res.json({ ok: true })
+      })
+
+      await request(app).get('/_internal/probe')
+      expect(logValue).toBeUndefined()
+    })
+
+    it('applies route-based service override', async () => {
+      const app = express()
+      app.use(getMiddleware({
+        routes: { '/api/auth/**': { service: 'auth-service' } },
+      }))
+      app.get('/api/auth/login', (_req, res) => res.json({ ok: true }))
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/auth/login')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
+      )
+      expect(lastCall).toBeDefined()
+    })
   })
 
   describe('drain / enrich / keep', () => {
@@ -202,7 +265,7 @@ describe('evlog/nestjs', () => {
       const { drain } = createPipelineSpies()
 
       const app = express()
-      app.use(evlog({ drain }))
+      app.use(getMiddleware({ drain }))
       app.get('/api/test', (req, res) => {
         req.log.set({ user: { id: 'u-1' } })
         res.json({ ok: true })
@@ -222,7 +285,7 @@ describe('evlog/nestjs', () => {
       })
 
       const app = express()
-      app.use(evlog({ enrich, drain }))
+      app.use(getMiddleware({ enrich, drain }))
       app.get('/api/test', (_req, res) => res.json({ ok: true }))
 
       await request(app).get('/api/test')
@@ -235,7 +298,7 @@ describe('evlog/nestjs', () => {
       const { enrich } = createPipelineSpies()
 
       const app = express()
-      app.use(evlog({ enrich }))
+      app.use(getMiddleware({ enrich }))
       app.get('/api/test', (_req, res) => res.json({ ok: true }))
 
       await request(app)
@@ -254,7 +317,7 @@ describe('evlog/nestjs', () => {
       const { drain } = createPipelineSpies()
 
       const app = express()
-      app.use(evlog({ drain }))
+      app.use(getMiddleware({ drain }))
       app.get('/api/test', (_req, res) => res.json({ ok: true }))
 
       await request(app)
@@ -274,7 +337,7 @@ describe('evlog/nestjs', () => {
       })
 
       const app = express()
-      app.use(evlog({ keep, drain }))
+      app.use(getMiddleware({ keep, drain }))
       app.get('/api/test', (req, res) => {
         req.log.set({ important: true })
         res.json({ ok: true })
@@ -293,7 +356,7 @@ describe('evlog/nestjs', () => {
       })
 
       const app = express()
-      app.use(evlog({ drain }))
+      app.use(getMiddleware({ drain }))
       app.get('/api/test', (_req, res) => res.json({ ok: true }))
 
       const res = await request(app).get('/api/test')
@@ -308,7 +371,7 @@ describe('evlog/nestjs', () => {
       })
 
       const app = express()
-      app.use(evlog({ enrich, drain }))
+      app.use(getMiddleware({ enrich, drain }))
       app.get('/api/test', (_req, res) => res.json({ ok: true }))
 
       const res = await request(app).get('/api/test')
@@ -321,7 +384,7 @@ describe('evlog/nestjs', () => {
       const { drain, enrich } = createPipelineSpies()
 
       const app = express()
-      app.use(evlog({ include: ['/api/**'], drain, enrich }))
+      app.use(getMiddleware({ include: ['/api/**'], drain, enrich }))
       app.get('/health', (_req, res) => res.json({ ok: true }))
 
       await request(app).get('/health')
@@ -334,7 +397,7 @@ describe('evlog/nestjs', () => {
   describe('useLogger()', () => {
     it('returns the request-scoped logger from anywhere in the call stack', async () => {
       const app = express()
-      app.use(evlog())
+      app.use(getMiddleware())
 
       let loggerFromService: unknown
       function serviceFunction() {
@@ -361,7 +424,7 @@ describe('evlog/nestjs', () => {
 
     it('returns the same logger as req.log', async () => {
       const app = express()
-      app.use(evlog())
+      app.use(getMiddleware())
 
       let isSame = false
       app.get('/api/test', (req, res) => {
@@ -379,7 +442,7 @@ describe('evlog/nestjs', () => {
 
     it('works across async boundaries', async () => {
       const app = express()
-      app.use(evlog())
+      app.use(getMiddleware())
 
       async function asyncService() {
         await new Promise(resolve => setTimeout(resolve, 5))

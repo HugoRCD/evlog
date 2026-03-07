@@ -462,22 +462,17 @@ app.use(evlog({
 ### NestJS
 
 ```typescript
-import express from 'express'
-import { initLogger } from 'evlog'
-import { evlog, useLogger } from 'evlog/nestjs'
+// src/app.module.ts
+import { Module } from '@nestjs/common'
+import { EvlogModule } from 'evlog/nestjs'
 
-initLogger({ env: { service: 'my-api' } })
-
-const app = express()
-app.use(evlog())
-
-app.get('/api/users', (req, res) => {
-  req.log.set({ users: { count: 42 } })
-  res.json({ users: [] })
+@Module({
+  imports: [EvlogModule.forRoot()],
 })
+export class AppModule {}
 ```
 
-NestJS uses Express by default, so the middleware works via `app.use()` in your bootstrap. Use `useLogger()` to access the logger from anywhere in the call stack without passing `req`:
+`EvlogModule.forRoot()` registers a global middleware. Use `useLogger()` to access the request-scoped logger from any controller or service:
 
 ```typescript
 import { useLogger } from 'evlog/nestjs'
@@ -493,14 +488,26 @@ Full pipeline with drain, enrich, and tail sampling:
 ```typescript
 import { createAxiomDrain } from 'evlog/axiom'
 
-app.use(evlog({
+EvlogModule.forRoot({
   include: ['/api/**'],
   drain: createAxiomDrain(),
   enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
   keep: (ctx) => {
     if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
   },
-}))
+})
+```
+
+For async configuration with NestJS DI, use `forRootAsync()`:
+
+```typescript
+EvlogModule.forRootAsync({
+  imports: [ConfigModule],
+  inject: [ConfigService],
+  useFactory: (config) => ({
+    drain: createAxiomDrain({ token: config.get('AXIOM_TOKEN') }),
+  }),
+})
 ```
 
 ### Cloudflare Workers

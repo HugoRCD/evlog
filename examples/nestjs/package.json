@@ -3,12 +3,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts"
+    "dev": "bun --watch src/main.ts",
+    "start": "bun src/main.ts"
   },
   "dependencies": {
     "evlog": "workspace:*",
-    "express": "^5.2.1"
+    "@nestjs/common": "^10.0.0",
+    "@nestjs/core": "^10.0.0",
+    "@nestjs/platform-express": "^10.0.0",
+    "reflect-metadata": "^0.2.0",
+    "rxjs": "^7.8.0"
   },
   "devDependencies": {
     "@types/express": "^5.0.6"

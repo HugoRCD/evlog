@@ -1,6 +1,6 @@
 # evlog — NestJS Example
 
-Demonstrates evlog's NestJS middleware with wide events, structured errors, and PostHog drain.
+Demonstrates evlog's NestJS module with `EvlogModule.forRoot()`, wide events, structured errors, exception filters, and PostHog drain.
 
 ## Run
 
