@@ -3,7 +3,7 @@ import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'
 
-export interface EvlogHonoOptions extends BaseEvlogOptions {}
+export type EvlogHonoOptions = BaseEvlogOptions
 
 /**
  * Hono variables type for typed `c.get('log')` access.

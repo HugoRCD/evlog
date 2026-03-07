@@ -9,7 +9,7 @@ const { storage, useLogger } = createLoggerStorage(
   'handle context. Make sure evlog() handle is added to your hooks.server.ts.',
 )
 
-export interface EvlogSvelteKitOptions extends BaseEvlogOptions {}
+export type EvlogSvelteKitOptions = BaseEvlogOptions
 
 export { useLogger }
 

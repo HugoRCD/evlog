@@ -9,7 +9,7 @@ const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure EvlogModule.forRoot() is imported in your AppModule.',
 )
 
-export interface EvlogNestJSOptions extends BaseEvlogOptions {}
+export type EvlogNestJSOptions = BaseEvlogOptions
 
 export { useLogger }
 

@@ -8,7 +8,7 @@ const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure app.use(evlog()) is registered before your routes.',
 )
 
-export interface EvlogExpressOptions extends BaseEvlogOptions {}
+export type EvlogExpressOptions = BaseEvlogOptions
 
 export { useLogger }
 

@@ -8,7 +8,7 @@ const { storage, useLogger } = createLoggerStorage(
   'plugin context. Make sure app.register(evlog) is called before your routes.',
 )
 
-export interface EvlogFastifyOptions extends BaseEvlogOptions {}
+export type EvlogFastifyOptions = BaseEvlogOptions
 
 export { useLogger }
 

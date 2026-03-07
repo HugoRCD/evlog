@@ -12,7 +12,7 @@ const storage = new AsyncLocalStorage<RequestLogger>()
 // an in-flight logger from a stale one.
 const activeLoggers = new WeakSet<RequestLogger>()
 
-export interface EvlogElysiaOptions extends BaseEvlogOptions {}
+export type EvlogElysiaOptions = BaseEvlogOptions
 
 /**
  * Get the request-scoped logger from anywhere in the call stack.
