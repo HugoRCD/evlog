@@ -25,8 +25,8 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 | 2 | `packages/evlog/tsdown.config.ts` | Add build entry |
 | 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` entries |
 | 4 | `packages/evlog/test/adapters/{name}.test.ts` | Create tests |
-| 5 | `apps/docs/content/3.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
-| 6 | `apps/docs/content/3.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
+| 5 | `apps/docs/content/4.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
+| 6 | `apps/docs/content/4.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
 | 7 | `skills/evlog/SKILL.md` | Add adapter row in the Drain Adapters table |
 | 8 | Renumber `custom.md` | Ensure `custom.md` stays last after the new adapter |
 
@@ -111,13 +111,15 @@ Required test categories:
 
 ## Step 5: Adapter Documentation Page
 
-Create `apps/docs/content/3.adapters/{n}.{name}.md` where `{n}` is the next number before `custom.md` (custom should always be last).
+Create `apps/docs/content/4.adapters/{n}.{name}.md` where `{n}` is the next number before `custom.md` (custom should always be last).
 
-Use the existing Axiom adapter page (`apps/docs/content/3.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
+Use the existing Axiom adapter page (`apps/docs/content/4.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
+
+**Important: multi-framework examples.** The Quick Start section must include a `::code-group` with tabs for all supported frameworks (Nuxt/Nitro, Hono, Express, Fastify, Elysia, NestJS, Standalone). Do not only show Nitro examples. See any existing adapter page for the pattern.
 
 ## Step 6: Update Adapters Overview Page
 
-Edit `apps/docs/content/3.adapters/1.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
+Edit `apps/docs/content/4.adapters/1.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
 
 1. **Frontmatter `links` array** -- add a link entry with icon and path
 2. **`::card-group` section** -- add a card block before the Custom card

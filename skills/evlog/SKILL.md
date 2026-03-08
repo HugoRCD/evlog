@@ -629,11 +629,13 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 
 | Adapter | Import | Env Vars |
 |---------|--------|----------|
-| Axiom | `evlog/axiom` | `NUXT_AXIOM_TOKEN`, `NUXT_AXIOM_DATASET` |
-| OTLP | `evlog/otlp` | `NUXT_OTLP_ENDPOINT` |
-| PostHog | `evlog/posthog` | `NUXT_POSTHOG_API_KEY`, `NUXT_POSTHOG_HOST` |
-| Sentry | `evlog/sentry` | `NUXT_SENTRY_DSN` |
-| Better Stack | `evlog/better-stack` | `NUXT_BETTER_STACK_SOURCE_TOKEN` |
+| Axiom | `evlog/axiom` | `AXIOM_TOKEN`, `AXIOM_DATASET` |
+| OTLP | `evlog/otlp` | `OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) |
+| PostHog | `evlog/posthog` | `POSTHOG_API_KEY`, `POSTHOG_HOST` |
+| Sentry | `evlog/sentry` | `SENTRY_DSN` |
+| Better Stack | `evlog/better-stack` | `BETTER_STACK_SOURCE_TOKEN` |
+
+In Nuxt/Nitro, use the `NUXT_` prefix (e.g., `NUXT_AXIOM_TOKEN`) so values are available via `useRuntimeConfig()`. All adapters also read unprefixed variables as fallback.
 
 Setup pattern per framework:
 
@@ -644,7 +646,19 @@ export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
 })
 
-// Next.js: in lib/evlog.ts, pass drain to createEvlog()
+// Hono / Express / Elysia: pass drain in middleware options
+import { createAxiomDrain } from 'evlog/axiom'
+app.use(evlog({ drain: createAxiomDrain() }))
+
+// Fastify: pass drain in plugin options
+import { createAxiomDrain } from 'evlog/axiom'
+await app.register(evlog, { drain: createAxiomDrain() })
+
+// NestJS: pass drain in module options
+import { createAxiomDrain } from 'evlog/axiom'
+EvlogModule.forRoot({ drain: createAxiomDrain() })
+
+// Next.js: pass drain to createEvlog()
 import { createAxiomDrain } from 'evlog/axiom'
 import { createDrainPipeline } from 'evlog/pipeline'
 const pipeline = createDrainPipeline<DrainContext>({ batch: { size: 50 } })
@@ -652,7 +666,7 @@ const drain = pipeline(createAxiomDrain())
 // then: createEvlog({ ..., drain })
 
 // Standalone: pass drain to initLogger()
-initLogger({ env: { service: 'my-app' }, drain })
+initLogger({ env: { service: 'my-app' }, drain: createAxiomDrain() })
 ```
 
 See [references/drain-pipeline.md](references/drain-pipeline.md) for batching, retry, and buffer overflow config.
