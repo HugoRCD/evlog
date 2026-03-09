@@ -330,6 +330,64 @@ describe('otlp adapter', () => {
       expect(payload.resourceLogs[0].scopeLogs[0].logRecords).toHaveLength(3)
     })
 
+    it('groups events by service into separate resourceLogs', async () => {
+      const events = [
+        createTestEvent({ service: 'auth', environment: 'production', requestId: '1' }),
+        createTestEvent({ service: 'payments', environment: 'production', requestId: '2' }),
+        createTestEvent({ service: 'auth', environment: 'production', requestId: '3' }),
+      ]
+
+      await sendBatchToOTLP(events, {
+        endpoint: 'http://localhost:4318',
+      })
+
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const payload = JSON.parse(options.body as string)
+
+      // Should create 2 resourceLogs: one for auth, one for payments
+      expect(payload.resourceLogs).toHaveLength(2)
+
+      const authAttrs = payload.resourceLogs[0].resource.attributes
+      const paymentsAttrs = payload.resourceLogs[1].resource.attributes
+
+      const authService = authAttrs.find((a: { key: string }) => a.key === 'service.name')
+      expect(authService?.value).toEqual({ stringValue: 'auth' })
+
+      const paymentsService = paymentsAttrs.find((a: { key: string }) => a.key === 'service.name')
+      expect(paymentsService?.value).toEqual({ stringValue: 'payments' })
+
+      expect(payload.resourceLogs[0].scopeLogs[0].logRecords).toHaveLength(2)
+      expect(payload.resourceLogs[1].scopeLogs[0].logRecords).toHaveLength(1)
+    })
+
+    it('groups events by environment into separate resourceLogs', async () => {
+      const events = [
+        createTestEvent({ service: 'api', environment: 'production', requestId: '1' }),
+        createTestEvent({ service: 'api', environment: 'staging', requestId: '2' }),
+      ]
+
+      await sendBatchToOTLP(events, {
+        endpoint: 'http://localhost:4318',
+      })
+
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const payload = JSON.parse(options.body as string)
+
+      expect(payload.resourceLogs).toHaveLength(2)
+
+      const prodAttrs = payload.resourceLogs[0].resource.attributes
+      const stagingAttrs = payload.resourceLogs[1].resource.attributes
+
+      const prodEnv = prodAttrs.find((a: { key: string }) => a.key === 'deployment.environment')
+      expect(prodEnv?.value).toEqual({ stringValue: 'production' })
+
+      const stagingEnv = stagingAttrs.find((a: { key: string }) => a.key === 'deployment.environment')
+      expect(stagingEnv?.value).toEqual({ stringValue: 'staging' })
+
+      expect(payload.resourceLogs[0].scopeLogs[0].logRecords).toHaveLength(1)
+      expect(payload.resourceLogs[1].scopeLogs[0].logRecords).toHaveLength(1)
+    })
+
     it('does not send request for empty events array', async () => {
       await sendBatchToOTLP([], {
         endpoint: 'http://localhost:4318',
