@@ -289,25 +289,28 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
 
   const url = `${config.endpoint.replace(/\/$/, '')}/v1/logs`
 
-  // Group events by service for proper resource attribution
-  // For simplicity, we use the first event's resource attributes
-  const [firstEvent] = events
-  const resourceAttributes = buildResourceAttributes(firstEvent, config)
-
-  const logRecords = events.map(toOTLPLogRecord)
+  // Group events by (service, environment) so each gets correct OTLP resource attributes
+  const grouped = new Map<string, WideEvent[]>()
+  for (const event of events) {
+    const key = `${event.service}::${event.environment}`
+    const group = grouped.get(key)
+    if (group) {
+      group.push(event)
+    } else {
+      grouped.set(key, [event])
+    }
+  }
 
   const payload: ExportLogsServiceRequest = {
-    resourceLogs: [
-      {
-        resource: { attributes: resourceAttributes },
-        scopeLogs: [
-          {
-            scope: { name: 'evlog', version: '1.0.0' },
-            logRecords,
-          },
-        ],
-      },
-    ],
+    resourceLogs: Array.from(grouped.values()).map((groupEvents) => ({
+      resource: { attributes: buildResourceAttributes(groupEvents[0]!, config) },
+      scopeLogs: [
+        {
+          scope: { name: 'evlog', version: '1.0.0' },
+          logRecords: groupEvents.map(toOTLPLogRecord),
+        },
+      ],
+    })),
   }
 
   const headers: Record<string, string> = {
