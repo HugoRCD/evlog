@@ -201,7 +201,7 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
-    "@nuxt/devtools": "^3.2.2",
+    "@nuxt/devtools": "^3.2.3",
     "@nuxt/schema": "^4.3.1",
     "@nuxt/test-utils": "^4.0.0",
     "@types/express": "^5.0.6",
@@ -210,32 +210,32 @@
     "consola": "^3.4.2",
     "elysia": "^1.4.27",
     "express": "^5.2.1",
-    "@nestjs/common": "^10.0.0",
-    "fastify": "^5.2.1",
-    "h3": "^1.15.5",
-    "happy-dom": "^20.7.2",
+    "@nestjs/common": "^10.4.22",
+    "fastify": "^5.8.2",
+    "h3": "^1.15.6",
+    "happy-dom": "^20.8.3",
     "nitro": "^3.0.1-alpha.2",
     "nitropack": "^2.13.1",
     "nuxt": "^4.3.1",
     "supertest": "^7.2.2",
-    "tsdown": "^0.20.3",
+    "tsdown": "^0.21.1",
     "typescript": "^5.9.3",
     "ufo": "^1.6.3"
   },
   "peerDependencies": {
     "@nuxt/kit": "^4.3.1",
-    "h3": "^1.15.5",
+    "h3": "^1.15.6",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1",
     "nitro": "^3.0.1-alpha.2",
     "next": ">=16.1.6",
     "react": ">=19.2.4",
     "hono": "",
-    "express": ">=4.21.0",
-    "elysia": ">=1.0.0",
-    "fastify": ">=4.0.0",
-    "@nestjs/common": ">=9.0.0",
-    "@sveltejs/kit": ">=2.0.0"
+    "express": ">=4.22.1",
+    "elysia": ">=1.4.27",
+    "fastify": ">=4.29.1",
+    "@nestjs/common": ">=9.4.3",
+    "@sveltejs/kit": ">=2.53.4"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {

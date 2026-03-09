@@ -43,14 +43,14 @@
     "release": "turbo run build --filter='./packages/*' && changeset publish"
   },
   "devDependencies": {
-    "@changesets/changelog-github": "^0.5.2",
-    "@changesets/cli": "^2.29.8",
+    "@changesets/changelog-github": "^0.6.0",
+    "@changesets/cli": "^2.30.0",
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9.39.3",
-    "turbo": "^2.8.12",
+    "eslint": "^9.39.4",
+    "turbo": "^2.8.15",
     "typescript": "^5.9.3",
     "vitest": "^4.0.18",
     "vue-tsc": "^3.2.5"
