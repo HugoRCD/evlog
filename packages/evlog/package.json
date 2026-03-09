@@ -33,87 +33,108 @@
   "exports": {
     ".": {
       "types": "./dist/index.d.mts",
-      "import": "./dist/index.mjs"
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
     },
     "./nuxt": {
       "types": "./dist/nuxt/module.d.mts",
-      "import": "./dist/nuxt/module.mjs"
+      "import": "./dist/nuxt/module.mjs",
+      "default": "./dist/nuxt/module.mjs"
     },
     "./nitro": {
       "types": "./dist/nitro/module.d.mts",
-      "import": "./dist/nitro/module.mjs"
+      "import": "./dist/nitro/module.mjs",
+      "default": "./dist/nitro/module.mjs"
     },
     "./nitro/v3": {
       "types": "./dist/nitro/v3/index.d.mts",
-      "import": "./dist/nitro/v3/index.mjs"
+      "import": "./dist/nitro/v3/index.mjs",
+      "default": "./dist/nitro/v3/index.mjs"
     },
     "./workers": {
       "types": "./dist/workers.d.mts",
-      "import": "./dist/workers.mjs"
+      "import": "./dist/workers.mjs",
+      "default": "./dist/workers.mjs"
     },
     "./axiom": {
       "types": "./dist/adapters/axiom.d.mts",
-      "import": "./dist/adapters/axiom.mjs"
+      "import": "./dist/adapters/axiom.mjs",
+      "default": "./dist/adapters/axiom.mjs"
     },
     "./otlp": {
       "types": "./dist/adapters/otlp.d.mts",
-      "import": "./dist/adapters/otlp.mjs"
+      "import": "./dist/adapters/otlp.mjs",
+      "default": "./dist/adapters/otlp.mjs"
     },
     "./posthog": {
       "types": "./dist/adapters/posthog.d.mts",
-      "import": "./dist/adapters/posthog.mjs"
+      "import": "./dist/adapters/posthog.mjs",
+      "default": "./dist/adapters/posthog.mjs"
     },
     "./sentry": {
       "types": "./dist/adapters/sentry.d.mts",
-      "import": "./dist/adapters/sentry.mjs"
+      "import": "./dist/adapters/sentry.mjs",
+      "default": "./dist/adapters/sentry.mjs"
     },
     "./better-stack": {
       "types": "./dist/adapters/better-stack.d.mts",
-      "import": "./dist/adapters/better-stack.mjs"
+      "import": "./dist/adapters/better-stack.mjs",
+      "default": "./dist/adapters/better-stack.mjs"
     },
     "./enrichers": {
       "types": "./dist/enrichers.d.mts",
-      "import": "./dist/enrichers.mjs"
+      "import": "./dist/enrichers.mjs",
+      "default": "./dist/enrichers.mjs"
     },
     "./pipeline": {
       "types": "./dist/pipeline.d.mts",
-      "import": "./dist/pipeline.mjs"
+      "import": "./dist/pipeline.mjs",
+      "default": "./dist/pipeline.mjs"
     },
     "./browser": {
       "types": "./dist/browser.d.mts",
-      "import": "./dist/browser.mjs"
+      "import": "./dist/browser.mjs",
+      "default": "./dist/browser.mjs"
     },
     "./next": {
       "types": "./dist/next/index.d.mts",
-      "import": "./dist/next/index.mjs"
+      "import": "./dist/next/index.mjs",
+      "default": "./dist/next/index.mjs"
     },
     "./next/client": {
       "types": "./dist/next/client.d.mts",
-      "import": "./dist/next/client.mjs"
+      "import": "./dist/next/client.mjs",
+      "default": "./dist/next/client.mjs"
     },
     "./hono": {
       "types": "./dist/hono/index.d.mts",
-      "import": "./dist/hono/index.mjs"
+      "import": "./dist/hono/index.mjs",
+      "default": "./dist/hono/index.mjs"
     },
     "./express": {
       "types": "./dist/express/index.d.mts",
-      "import": "./dist/express/index.mjs"
+      "import": "./dist/express/index.mjs",
+      "default": "./dist/express/index.mjs"
     },
     "./elysia": {
       "types": "./dist/elysia/index.d.mts",
-      "import": "./dist/elysia/index.mjs"
+      "import": "./dist/elysia/index.mjs",
+      "default": "./dist/elysia/index.mjs"
     },
     "./fastify": {
       "types": "./dist/fastify/index.d.mts",
-      "import": "./dist/fastify/index.mjs"
+      "import": "./dist/fastify/index.mjs",
+      "default": "./dist/fastify/index.mjs"
     },
     "./nestjs": {
       "types": "./dist/nestjs/index.d.mts",
-      "import": "./dist/nestjs/index.mjs"
+      "import": "./dist/nestjs/index.mjs",
+      "default": "./dist/nestjs/index.mjs"
     },
     "./sveltekit": {
       "types": "./dist/sveltekit/index.d.mts",
-      "import": "./dist/sveltekit/index.mjs"
+      "import": "./dist/sveltekit/index.mjs",
+      "default": "./dist/sveltekit/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
