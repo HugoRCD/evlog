@@ -1,5 +1,11 @@
 # evlog
 
+## 2.5.0
+
+### Minor Changes
+
+- [`d7b06fa`](https://github.com/HugoRCD/evlog/commit/d7b06faba5704aa97fe1b9a46628be974a1b8a37) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add default condition to subpath exports for CJS compatibility and fix OTLP batch grouping by resource identity
+
 ## 2.4.1
 
 ### Patch Changes
