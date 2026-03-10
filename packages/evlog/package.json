@@ -210,7 +210,7 @@
     "consola": "^3.4.2",
     "elysia": "^1.4.27",
     "express": "^5.2.1",
-    "@nestjs/common": "^10.4.22",
+    "@nestjs/common": "^11.1.16",
     "fastify": "^5.8.2",
     "h3": "^1.15.6",
     "happy-dom": "^20.8.3",
@@ -234,7 +234,7 @@
     "express": ">=4.22.1",
     "elysia": ">=1.4.27",
     "fastify": ">=4.29.1",
-    "@nestjs/common": ">=9.4.3",
+    "@nestjs/common": ">=11.1.16",
     "@sveltejs/kit": ">=2.53.4"
   },
   "peerDependenciesMeta": {
