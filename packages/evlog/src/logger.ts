@@ -1,5 +1,31 @@
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
-import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isDev, matchesPattern } from './utils'
+import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isClient, isDev, matchesPattern } from './utils'
+
+// %c CSS equivalents of ANSI `colors` for browser DevTools
+const cssColors = {
+  dim: 'color: #6b7280',
+  red: 'color: #ef4444; font-weight: bold',
+  green: 'color: #22c55e',
+  yellow: 'color: #f59e0b; font-weight: bold',
+  cyan: 'color: #06b6d4',
+  gray: 'color: #6b7280',
+  reset: 'color: inherit; font-weight: normal',
+} as const
+
+function getCssLevelColor(level: string): string {
+  switch (level) {
+    case 'error':
+      return cssColors.red
+    case 'warn':
+      return cssColors.yellow
+    case 'info':
+      return cssColors.cyan
+    case 'debug':
+      return cssColors.gray
+    default:
+      return cssColors.reset
+  }
+}
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
@@ -141,6 +167,20 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
     if (!shouldSample(level)) {
       return
     }
+
+    if (isClient()) {
+      const levelColor = getCssLevelColor(level)
+      const timestamp = new Date().toISOString().slice(11, 23)
+      console.log(
+        `%c${timestamp}%c %c[${tag}]%c ${message}`,
+        cssColors.dim,
+        cssColors.reset,
+        levelColor,
+        cssColors.reset,
+      )
+      return
+    }
+
     const color = getLevelColor(level)
     const timestamp = new Date().toISOString().slice(11, 23)
     console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
@@ -172,6 +212,11 @@ function formatValue(value: unknown): string {
 }
 
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
+  if (isClient()) {
+    prettyPrintWideEventBrowser(event)
+    return
+  }
+
   const { timestamp, level, service, environment, version, ...rest } = event
   const levelColor = getLevelColor(level as string)
   const ts = (timestamp as string).slice(11, 23)
@@ -206,6 +251,55 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     const prefix = isLast ? '└─' : '├─'
     const formatted = formatValue(value)
     console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${key}:${colors.reset} ${formatted}`)
+  })
+}
+
+function prettyPrintWideEventBrowser(event: Record<string, unknown>): void {
+  const { timestamp, level, service, environment, version, ...rest } = event
+  const levelColor = getCssLevelColor(level as string)
+  const ts = (timestamp as string).slice(11, 23)
+
+  const parts: string[] = []
+  const styles: string[] = []
+
+  parts.push(`%c${ts}%c %c${(level as string).toUpperCase()}%c %c[${service}]%c`)
+  styles.push(cssColors.dim, cssColors.reset, levelColor, cssColors.reset, cssColors.cyan, cssColors.reset)
+
+  if (rest.method && rest.path) {
+    parts.push(` ${rest.method} ${rest.path}`)
+    delete rest.method
+    delete rest.path
+  }
+
+  if (rest.status) {
+    const statusColor = (rest.status as number) >= 400 ? cssColors.red : cssColors.green
+    parts.push(` %c${rest.status}%c`)
+    styles.push(statusColor, cssColors.reset)
+    delete rest.status
+  }
+
+  if (rest.duration) {
+    parts.push(` %cin ${rest.duration}%c`)
+    styles.push(cssColors.dim, cssColors.reset)
+    delete rest.duration
+  }
+
+  console.log(parts.join(''), ...styles)
+
+  const entries = Object.entries(rest).filter(([_, v]) => v !== undefined)
+  const lastIndex = entries.length - 1
+
+  entries.forEach(([key, value], index) => {
+    const isLast = index === lastIndex
+    const prefix = isLast ? '└─' : '├─'
+    const formatted = formatValue(value)
+    console.log(
+      `  %c${prefix}%c %c${key}:%c ${formatted}`,
+      cssColors.dim,
+      cssColors.reset,
+      cssColors.cyan,
+      cssColors.reset,
+    )
   })
 }
 
