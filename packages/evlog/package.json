@@ -223,7 +223,7 @@
   },
   "devDependencies": {
     "@nuxt/devtools": "^3.2.3",
-    "@nuxt/schema": "^4.3.1",
+    "@nuxt/schema": "^4.4.2",
     "@nuxt/test-utils": "^4.0.0",
     "@types/express": "^5.0.6",
     "@types/supertest": "^7.2.0",
@@ -237,14 +237,14 @@
     "happy-dom": "^20.8.3",
     "nitro": "^3.0.1-alpha.2",
     "nitropack": "^2.13.1",
-    "nuxt": "^4.3.1",
+    "nuxt": "^4.4.2",
     "supertest": "^7.2.2",
     "tsdown": "^0.21.1",
     "typescript": "^5.9.3",
     "ufo": "^1.6.3"
   },
   "peerDependencies": {
-    "@nuxt/kit": "^4.3.1",
+    "@nuxt/kit": "^4.4.2",
     "h3": "^1.15.6",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1",
