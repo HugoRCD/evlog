@@ -135,6 +135,11 @@
       "types": "./dist/sveltekit/index.d.mts",
       "import": "./dist/sveltekit/index.mjs",
       "default": "./dist/sveltekit/index.mjs"
+    },
+    "./shared": {
+      "types": "./dist/shared.d.mts",
+      "import": "./dist/shared.mjs",
+      "default": "./dist/shared.mjs"
     }
   },
   "main": "./dist/index.mjs",
