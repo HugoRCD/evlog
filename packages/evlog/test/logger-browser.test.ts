@@ -93,4 +93,30 @@ describe('browser pretty printing', () => {
     expect(headerFormat).toContain('in ')
     expect(styles.some((s: string) => s.includes('#6b7280'))).toBe(true)
   })
+
+  it('escapes % in dynamic values to prevent format string injection', () => {
+    log.info('test', '100% complete %c injected %s')
+
+    expect(logSpy).toHaveBeenCalledTimes(1)
+    const [format, ...styles] = logSpy.mock.calls[0]!
+
+    expect(format).toContain('100%% complete %%c injected %%s')
+    expect(format).not.toContain('\x1B')
+    expect(styles).toHaveLength(4)
+  })
+
+  it('escapes % in wide event field values', () => {
+    const logger = createRequestLogger({ method: 'GET', path: '/api/100%25-done' })
+    logger.set({ note: '50% off' })
+    logger.emit()
+
+    const headerCall = logSpy.mock.calls[0]!
+    const [headerFormat] = headerCall
+    expect(headerFormat).toContain('/api/100%%25-done')
+
+    const treeCalls = logSpy.mock.calls.slice(1)
+    const noteCall = treeCalls.find(([fmt]: string[]) => fmt.includes('note'))
+    expect(noteCall).toBeDefined()
+    expect(noteCall![0]).toContain('50%% off')
+  })
 })

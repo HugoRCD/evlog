@@ -1,5 +1,5 @@
 import type { Log, LogLevel, TransportConfig } from '../../types'
-import { getConsoleMethod } from '../../utils'
+import { cssColors, escapeFormatString, getConsoleMethod, getCssLevelColor } from '../../utils'
 
 const isClient = typeof window !== 'undefined'
 
@@ -19,12 +19,6 @@ export function clearIdentity(): void {
   identityContext = {}
 }
 
-const LEVEL_COLORS: Record<string, string> = {
-  error: 'color: #ef4444; font-weight: bold',
-  warn: 'color: #f59e0b; font-weight: bold',
-  info: 'color: #06b6d4; font-weight: bold',
-  debug: 'color: #6b7280; font-weight: bold',
-}
 
 export function initLog(options: { enabled?: boolean, console?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
   clientEnabled = typeof options.enabled === 'boolean' ? options.enabled : true
@@ -66,7 +60,7 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
     const method = getConsoleMethod(level)
     if (clientPretty) {
       const { level: lvl, service, ...rest } = formatted
-      console[method](`%c[${service}]%c ${lvl}`, LEVEL_COLORS[lvl] || '', 'color: inherit', rest)
+      console[method](`%c[${escapeFormatString(String(service))}]%c ${lvl}`, getCssLevelColor(lvl), cssColors.reset, rest)
     } else {
       console[method](JSON.stringify(formatted))
     }
@@ -79,7 +73,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!clientEnabled) return
   if (clientPretty) {
     if (clientConsole) {
-      console[getConsoleMethod(level)](`%c[${tag}]%c ${message}`, LEVEL_COLORS[level] || '', 'color: inherit')
+      console[getConsoleMethod(level)](`%c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`, getCssLevelColor(level), cssColors.reset)
     }
     sendToServer({
       timestamp: new Date().toISOString(),

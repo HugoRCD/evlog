@@ -77,6 +77,40 @@ export function getLevelColor(level: string): string {
   }
 }
 
+export const cssColors = {
+  dim: 'color: #6b7280',
+  red: 'color: #ef4444; font-weight: bold',
+  green: 'color: #22c55e',
+  yellow: 'color: #f59e0b; font-weight: bold',
+  cyan: 'color: #06b6d4; font-weight: bold',
+  gray: 'color: #6b7280; font-weight: bold',
+  reset: 'color: inherit; font-weight: normal',
+} as const
+
+export function getCssLevelColor(level: string): string {
+  switch (level) {
+    case 'error':
+      return cssColors.red
+    case 'warn':
+      return cssColors.yellow
+    case 'info':
+      return cssColors.cyan
+    case 'debug':
+      return cssColors.gray
+    default:
+      return cssColors.reset
+  }
+}
+
+/**
+ * Escape `%` in strings interpolated into `console.log` format strings
+ * to prevent `%c`, `%s`, `%d` etc. in user data from being interpreted
+ * as formatting directives.
+ */
+export function escapeFormatString(str: string): string {
+  return str.replace(/%/g, '%%')
+}
+
 /** Headers that should never be passed to hooks for security */
 export const SENSITIVE_HEADERS = [
   'authorization',

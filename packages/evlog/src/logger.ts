@@ -1,31 +1,5 @@
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
-import { colors, detectEnvironment, formatDuration, getConsoleMethod, getLevelColor, isClient, isDev, matchesPattern } from './utils'
-
-// %c CSS equivalents of ANSI `colors` for browser DevTools
-const cssColors = {
-  dim: 'color: #6b7280',
-  red: 'color: #ef4444; font-weight: bold',
-  green: 'color: #22c55e',
-  yellow: 'color: #f59e0b; font-weight: bold',
-  cyan: 'color: #06b6d4',
-  gray: 'color: #6b7280',
-  reset: 'color: inherit; font-weight: normal',
-} as const
-
-function getCssLevelColor(level: string): string {
-  switch (level) {
-    case 'error':
-      return cssColors.red
-    case 'warn':
-      return cssColors.yellow
-    case 'info':
-      return cssColors.cyan
-    case 'debug':
-      return cssColors.gray
-    default:
-      return cssColors.reset
-  }
-}
+import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
@@ -172,7 +146,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
       const levelColor = getCssLevelColor(level)
       const timestamp = new Date().toISOString().slice(11, 23)
       console.log(
-        `%c${timestamp}%c %c[${tag}]%c ${message}`,
+        `%c${timestamp}%c %c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`,
         cssColors.dim,
         cssColors.reset,
         levelColor,
@@ -262,11 +236,11 @@ function prettyPrintWideEventBrowser(event: Record<string, unknown>): void {
   const parts: string[] = []
   const styles: string[] = []
 
-  parts.push(`%c${ts}%c %c${(level as string).toUpperCase()}%c %c[${service}]%c`)
+  parts.push(`%c${ts}%c %c${(level as string).toUpperCase()}%c %c[${escapeFormatString(String(service))}]%c`)
   styles.push(cssColors.dim, cssColors.reset, levelColor, cssColors.reset, cssColors.cyan, cssColors.reset)
 
   if (rest.method && rest.path) {
-    parts.push(` ${rest.method} ${rest.path}`)
+    parts.push(` ${escapeFormatString(String(rest.method))} ${escapeFormatString(String(rest.path))}`)
     delete rest.method
     delete rest.path
   }
@@ -279,7 +253,7 @@ function prettyPrintWideEventBrowser(event: Record<string, unknown>): void {
   }
 
   if (rest.duration) {
-    parts.push(` %cin ${rest.duration}%c`)
+    parts.push(` %c${escapeFormatString(`in ${rest.duration}`)}%c`)
     styles.push(cssColors.dim, cssColors.reset)
     delete rest.duration
   }
@@ -292,9 +266,9 @@ function prettyPrintWideEventBrowser(event: Record<string, unknown>): void {
   entries.forEach(([key, value], index) => {
     const isLast = index === lastIndex
     const prefix = isLast ? '└─' : '├─'
-    const formatted = formatValue(value)
+    const formatted = escapeFormatString(formatValue(value))
     console.log(
-      `  %c${prefix}%c %c${key}:%c ${formatted}`,
+      `  %c${prefix}%c %c${escapeFormatString(key)}:%c ${formatted}`,
       cssColors.dim,
       cssColors.reset,
       cssColors.cyan,
