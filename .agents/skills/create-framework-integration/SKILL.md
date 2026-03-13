@@ -49,7 +49,7 @@ Use these placeholders consistently:
 
 ## Shared Utilities
 
-All integrations share the same core utilities. **Never reimplement logic that exists in shared/**.
+All integrations share the same core utilities. **Never reimplement logic that exists in shared/**. These are also publicly available as `evlog/toolkit` for community-built integrations (see [Custom Integration docs](https://evlog.dev/frameworks/custom-integration)).
 
 | Utility | Location | Purpose |
 |---------|----------|---------|

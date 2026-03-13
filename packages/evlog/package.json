@@ -135,6 +135,11 @@
       "types": "./dist/sveltekit/index.d.mts",
       "import": "./dist/sveltekit/index.mjs",
       "default": "./dist/sveltekit/index.mjs"
+    },
+    "./toolkit": {
+      "types": "./dist/toolkit.d.mts",
+      "import": "./dist/toolkit.mjs",
+      "default": "./dist/toolkit.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -203,6 +208,9 @@
       ],
       "sveltekit": [
         "./dist/sveltekit/index.d.mts"
+      ],
+      "toolkit": [
+        "./dist/toolkit.d.mts"
       ]
     }
   },
@@ -223,7 +231,7 @@
   },
   "devDependencies": {
     "@nuxt/devtools": "^3.2.3",
-    "@nuxt/schema": "^4.3.1",
+    "@nuxt/schema": "^4.4.2",
     "@nuxt/test-utils": "^4.0.0",
     "@types/express": "^5.0.6",
     "@types/supertest": "^7.2.0",
@@ -235,20 +243,20 @@
     "fastify": "^5.8.2",
     "h3": "^1.15.6",
     "happy-dom": "^20.8.3",
-    "nitro": "^3.0.1-alpha.2",
+    "nitro": "^3.0.260311-beta",
     "nitropack": "^2.13.1",
-    "nuxt": "^4.3.1",
+    "nuxt": "^4.4.2",
     "supertest": "^7.2.2",
     "tsdown": "^0.21.1",
     "typescript": "^5.9.3",
     "ufo": "^1.6.3"
   },
   "peerDependencies": {
-    "@nuxt/kit": "^4.3.1",
+    "@nuxt/kit": "^4.4.2",
     "h3": "^1.15.6",
     "nitropack": "^2.13.1",
     "ofetch": "^1.5.1",
-    "nitro": "^3.0.1-alpha.2",
+    "nitro": "^3.0.260311-beta",
     "next": ">=16.1.6",
     "react": ">=19.2.4",
     "hono": "",

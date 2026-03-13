@@ -25,7 +25,11 @@ export default function evlog(options?: NitroModuleOptions) {
 
       // Set error handler only if not already configured by user
       if (!nitro.options.errorHandler) {
-        nitro.options.errorHandler = resolve(_dir, 'errorHandler')
+        nitro.options.errorHandler = [resolve(_dir, 'errorHandler')]
+      } else if (Array.isArray(nitro.options.errorHandler)) {
+        nitro.options.errorHandler.unshift(resolve(_dir, 'errorHandler'))
+      } else if (typeof nitro.options.errorHandler === 'string') {
+        nitro.options.errorHandler = [resolve(_dir, 'errorHandler'), nitro.options.errorHandler]
       }
 
       // Inject config into runtimeConfig — works in production where the

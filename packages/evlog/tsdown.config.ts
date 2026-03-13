@@ -39,6 +39,7 @@ export default defineConfig({
     'fastify/index': 'src/fastify/index.ts',
     'nestjs/index': 'src/nestjs/index.ts',
     'sveltekit/index': 'src/sveltekit/index.ts',
+    'toolkit': 'src/shared/index.ts',
   },
   format: 'esm',
   dts: true,

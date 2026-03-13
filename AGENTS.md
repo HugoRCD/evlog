@@ -51,6 +51,7 @@ evlog/
 │       ├── src/
 │       │   ├── nuxt/        # Nuxt module
 │       │   ├── nitro/       # Nitro plugin
+│       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
 │       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
@@ -768,6 +769,10 @@ This file retains framework sections as development context (useful for understa
 ### Hono does not export `useLogger()`
 
 `evlog/hono` only exposes `evlog` and `EvlogVariables`. Logger access is via `c.get('log')` in handlers. Do **not** import or document `useLogger` for Hono — it doesn't exist. The other frameworks (Express, Fastify, Elysia) do export `useLogger()`.
+
+### `evlog/toolkit` is the public entrypoint for `src/shared/`
+
+The `src/shared/` directory is exposed as `evlog/toolkit` (not `evlog/shared`). The directory stays named `shared/` internally, but the public entrypoint is `toolkit`. All framework integrations import from `../shared/*` internally. `extractErrorStatus` lives in `shared/errors.ts` (re-exported from `nitro.ts` for backward compatibility). The toolkit API is marked `@beta`.
 
 ### README.md is a symlink
 

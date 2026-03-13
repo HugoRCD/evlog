@@ -1074,13 +1074,14 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **Cloudflare Workers** | Manual setup with `import { initLogger, createRequestLogger } from 'evlog'` ([example](./examples/workers)) |
+| **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/frameworks/custom-integration)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
 
 ## Agent Skills
 
-evlog provides [Agent Skills](https://github.com/boristane/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
+evlog provides [Agent Skills](https://www.evlog.dev/getting-started/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
 
 ### Installation
 
