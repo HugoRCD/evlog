@@ -6,7 +6,9 @@
  * @beta This function is part of the evlog toolkit API for building custom framework integrations.
  */
 export function extractErrorStatus(error: unknown): number {
-  return (error as { status?: number }).status
-    ?? (error as { statusCode?: number }).statusCode
-    ?? 500
+  if (error === null || typeof error !== 'object') return 500
+  const raw = (error as { status?: unknown }).status
+    ?? (error as { statusCode?: unknown }).statusCode
+  const status = Number(raw)
+  return Number.isFinite(status) ? status : 500
 }
