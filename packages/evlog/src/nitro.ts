@@ -1,4 +1,5 @@
 import type { EnvironmentContext, RouteConfig, SamplingConfig } from './types'
+import { extractErrorStatus } from './shared/errors'
 
 export { shouldLog, getServiceForPath } from './shared/routes'
 
@@ -65,14 +66,7 @@ export function resolveEvlogError(error: Error): Error | null {
   return null
 }
 
-/**
- * Extract HTTP status from an error, checking both `status` and `statusCode`.
- */
-export function extractErrorStatus(error: unknown): number {
-  return (error as { status?: number }).status
-    ?? (error as { statusCode?: number }).statusCode
-    ?? 500
-}
+export { extractErrorStatus } from './shared/errors'
 
 /**
  * Build a standard evlog error JSON response body.

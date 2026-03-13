@@ -136,10 +136,10 @@
       "import": "./dist/sveltekit/index.mjs",
       "default": "./dist/sveltekit/index.mjs"
     },
-    "./shared": {
-      "types": "./dist/shared.d.mts",
-      "import": "./dist/shared.mjs",
-      "default": "./dist/shared.mjs"
+    "./toolkit": {
+      "types": "./dist/toolkit.d.mts",
+      "import": "./dist/toolkit.mjs",
+      "default": "./dist/toolkit.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -208,6 +208,9 @@
       ],
       "sveltekit": [
         "./dist/sveltekit/index.d.mts"
+      ],
+      "toolkit": [
+        "./dist/toolkit.d.mts"
       ]
     }
   },

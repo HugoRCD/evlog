@@ -1,6 +1,6 @@
 import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
 import { createRequestLogger, isEnabled, shouldKeep } from '../logger'
-import { extractErrorStatus } from '../nitro'
+import { extractErrorStatus } from './errors'
 import { shouldLog, getServiceForPath } from './routes'
 
 /**
@@ -9,6 +9,8 @@ import { shouldLog, getServiceForPath } from './routes'
  * Every framework-specific options interface (e.g. `EvlogExpressOptions`)
  * extends this type. If a framework needs extra fields it can add them
  * on top; otherwise the base is used as-is.
+ *
+ * @beta Part of `evlog/toolkit` — the public API for building custom integrations.
  */
 export interface BaseEvlogOptions {
   /** Route patterns to include in logging (glob). If not set, all routes are logged */
@@ -117,6 +119,8 @@ async function runEnrichAndDrain(
  * 3. Check `skipped` — if true, skip to next middleware
  * 4. Store `logger` in framework-specific context (e.g., `c.set('log', logger)`)
  * 5. Call `finish({ status })` or `finish({ error })` at response end
+ *
+ * @beta Part of `evlog/toolkit` — the public API for building custom integrations.
  */
 export function createMiddlewareLogger(options: MiddlewareLoggerOptions): MiddlewareLoggerResult {
   if (!isEnabled()) return noopResult

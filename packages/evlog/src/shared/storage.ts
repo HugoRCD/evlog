@@ -10,6 +10,8 @@ import type { RequestLogger } from '../types'
  * @param contextHint - Human-readable hint appended to the error message when
  *   `useLogger()` is called outside of a request (e.g.
  *   `"middleware context. Make sure app.use(evlog()) is registered before your routes."`).
+ *
+ * @beta Part of `evlog/toolkit` — the public API for building custom integrations.
  */
 export function createLoggerStorage(contextHint: string) {
   const storage = new AsyncLocalStorage<RequestLogger>()
