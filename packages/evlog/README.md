@@ -1081,7 +1081,7 @@ try {
 
 ## Agent Skills
 
-evlog provides [Agent Skills](https://github.com/boristane/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
+evlog provides [Agent Skills](https://www.evlog.dev/getting-started/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
 
 ### Installation
 
