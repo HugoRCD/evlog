@@ -40,7 +40,7 @@ export function evlog(options: EvlogExpressOptions = {}): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
     const { logger, finish, skipped } = createMiddlewareLogger({
       method: req.method,
-      path: req.path,
+      path: new URL(req.originalUrl || req.url || '/', 'http://localhost').pathname,
       requestId: req.get('x-request-id') || crypto.randomUUID(),
       headers: extractSafeNodeHeaders(req.headers),
       ...options,
