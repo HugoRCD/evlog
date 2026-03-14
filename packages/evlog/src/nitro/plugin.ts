@@ -126,6 +126,7 @@ export default defineNitroPlugin(async (nitroApp) => {
     enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
+    silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
   })
 
@@ -152,7 +153,7 @@ export default defineNitroPlugin(async (nitroApp) => {
       method: e.method,
       path: e.path,
       requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
-    })
+    }, { _deferDrain: true })
 
     // Apply route-based service configuration if a matching route is found
     const routeService = getServiceForPath(e.path, evlogConfig?.routes)

@@ -1,5 +1,5 @@
 import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, isEnabled, shouldKeep } from '../logger'
+import { createRequestLogger, getGlobalDrain, isEnabled, shouldKeep } from '../logger'
 import { extractErrorStatus } from './errors'
 import { shouldLog, getServiceForPath } from './routes'
 
@@ -92,14 +92,15 @@ async function runEnrichAndDrain(
     }
   }
 
-  if (options.drain) {
+  const drain = options.drain ?? getGlobalDrain()
+  if (drain) {
     const drainCtx: DrainContext = {
       event: emittedEvent,
       request: requestInfo,
       headers: options.headers,
     }
     try {
-      await options.drain(drainCtx)
+      await drain(drainCtx)
     } catch (err) {
       console.error('[evlog] drain failed:', err)
     }
@@ -137,7 +138,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     method,
     path,
     requestId: resolvedRequestId,
-  })
+  }, { _deferDrain: true })
 
   const routeService = getServiceForPath(path, routes)
   if (routeService) {
@@ -180,7 +181,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     const forceKeep = tailCtx.shouldKeep || shouldKeep(tailCtx)
     const emittedEvent = logger.emit({ _forceKeep: forceKeep })
 
-    if (emittedEvent && (options.enrich || options.drain)) {
+    if (emittedEvent && (options.enrich || options.drain || getGlobalDrain())) {
       await runEnrichAndDrain(emittedEvent, options, requestInfo, resolvedStatus)
     }
 

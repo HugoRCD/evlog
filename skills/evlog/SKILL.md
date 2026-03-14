@@ -605,6 +605,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | `env.service` / `service` | `string` | `'app'` | Service name in logs |
 | `enabled` | `boolean` | `true` | Global toggle (no-ops when false) |
 | `pretty` | `boolean` | `true` in dev | Pretty tree format vs JSON |
+| `silent` | `boolean` | `false` | Suppress console output. Events still go to drains |
 | `include` | `string[]` | All routes | Route glob patterns to log |
 | `exclude` | `string[]` | None | Route patterns to exclude (takes precedence) |
 | `routes` | `Record<string, { service }>` | -- | Route-specific service names |

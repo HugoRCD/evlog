@@ -263,6 +263,14 @@ export interface LoggerConfig {
    */
   stringify?: boolean
   /**
+   * Suppress built-in console output.
+   * When true, events are still built, sampled, and passed to drains,
+   * but nothing is written to console. Use when drains own the output
+   * channel (e.g., stdout-based platforms like GCP Cloud Run, AWS Lambda).
+   * @default false
+   */
+  silent?: boolean
+  /**
    * Drain callback called with every emitted event (fire-and-forget).
    * Use this to send logs to external services outside of Nitro.
    * Compatible with drain adapters (`createAxiomDrain()`) and pipeline-wrapped drains.

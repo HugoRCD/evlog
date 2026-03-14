@@ -29,6 +29,7 @@ let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
 let globalEnabled = true
+let globalSilent = false
 
 /**
  * Initialize the logger with configuration.
@@ -50,6 +51,11 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
+  globalSilent = config.silent ?? false
+
+  if (globalSilent && !globalDrain) {
+    console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
+  }
 }
 
 /**
@@ -57,6 +63,15 @@ export function initLogger(config: LoggerConfig = {}): void {
  */
 export function isEnabled(): boolean {
   return globalEnabled
+}
+
+/**
+ * @internal Get the globally configured drain callback.
+ * Used by framework middleware to fall back to the global drain
+ * when no middleware-level drain is provided.
+ */
+export function getGlobalDrain(): ((ctx: DrainContext) => void | Promise<void>) | undefined {
+  return globalDrain
 }
 
 /**
@@ -103,7 +118,7 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false): WideEvent | null {
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false, deferDrain = false): WideEvent | null {
   if (!globalEnabled) return null
 
   if (!skipSamplingCheck && !shouldSample(level)) {
@@ -117,15 +132,17 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
     ...event,
   }
 
-  if (globalPretty) {
-    prettyPrintWideEvent(formatted)
-  } else if (globalStringify) {
-    console[getConsoleMethod(level)](JSON.stringify(formatted))
-  } else {
-    console[getConsoleMethod(level)](formatted)
+  if (!globalSilent) {
+    if (globalPretty) {
+      prettyPrintWideEvent(formatted)
+    } else if (globalStringify) {
+      console[getConsoleMethod(level)](JSON.stringify(formatted))
+    } else {
+      console[getConsoleMethod(level)](formatted)
+    }
   }
 
-  if (globalDrain) {
+  if (globalDrain && !deferDrain) {
     Promise.resolve(globalDrain({ event: formatted })).catch((err) => {
       console.error('[evlog] drain failed:', err)
     })
@@ -137,7 +154,7 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamp
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!globalEnabled) return
 
-  if (globalPretty) {
+  if (globalPretty && !globalSilent) {
     if (!shouldSample(level)) {
       return
     }
@@ -152,12 +169,12 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
         levelColor,
         cssColors.reset,
       )
-      return
+    } else {
+      const color = getLevelColor(level)
+      const timestamp = new Date().toISOString().slice(11, 23)
+      console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
     }
 
-    const color = getLevelColor(level)
-    const timestamp = new Date().toISOString().slice(11, 23)
-    console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
     return
   }
   emitWideEvent(level, { tag, message })
@@ -331,9 +348,21 @@ const noopLogger: RequestLogger = {
  * log.emit()
  * ```
  */
-export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}): RequestLogger<T> {
+/**
+ * @internal Options for createLogger that are not part of the public API.
+ */
+interface CreateLoggerInternalOptions {
+  /**
+   * When true, the global drain is skipped on emit.
+   * Used by framework middleware that runs its own enrich+drain pipeline.
+   */
+  _deferDrain?: boolean
+}
+
+export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}, internalOptions?: CreateLoggerInternalOptions): RequestLogger<T> {
   if (!globalEnabled) return noopLogger as RequestLogger<T>
 
+  const deferDrain = internalOptions?._deferDrain ?? false
   const startTime = Date.now()
   let context: Record<string, unknown> = { ...initialContext }
   let hasError = false
@@ -428,7 +457,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         ...context,
         ...restOverrides,
         duration,
-      }, true)
+      }, true, deferDrain)
     },
 
     getContext(): FieldContext<T> & Record<string, unknown> {
@@ -449,12 +478,12 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
  * log.emit()
  * ```
  */
-export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}): RequestLogger<T> {
+export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}, internalOptions?: CreateLoggerInternalOptions): RequestLogger<T> {
   const initial: Record<string, unknown> = {}
   if (options.method !== undefined) initial.method = options.method
   if (options.path !== undefined) initial.path = options.path
   if (options.requestId !== undefined) initial.requestId = options.requestId
-  return createLogger<T>(initial)
+  return createLogger<T>(initial, internalOptions)
 }
 
 /**

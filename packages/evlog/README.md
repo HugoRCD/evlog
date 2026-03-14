@@ -865,6 +865,7 @@ initLogger({
     region?: string      // Deployment region
   },
   pretty?: boolean       // Pretty print (default: true in dev)
+  silent?: boolean       // Suppress console output (default: false). Events still go to drains.
   stringify?: boolean    // JSON.stringify output (default: true, false for Workers)
   include?: string[]     // Route patterns to log (glob), e.g. ['/api/**']
   sampling?: {

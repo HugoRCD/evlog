@@ -142,6 +142,7 @@ export default definePlugin((nitroApp) => {
     enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
+    silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
   })
 
@@ -172,7 +173,7 @@ export default definePlugin((nitroApp) => {
       method: event.req.method,
       path: pathname,
       requestId: requestIdOverride || ctx.requestId as string | undefined || crypto.randomUUID(),
-    })
+    }, { _deferDrain: true })
 
     // Apply route-based service configuration if a matching route is found
     const routeService = getServiceForPath(pathname, evlogConfig?.routes)

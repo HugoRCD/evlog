@@ -188,6 +188,7 @@ export default defineNuxtConfig({
 | `env.environment` | `string` | Auto-detected | Environment name |
 | `include` | `string[]` | `undefined` | Route patterns to log (glob). If not set, all routes are logged |
 | `pretty` | `boolean` | `true` in dev | Pretty print logs with tree formatting |
+| `silent` | `boolean` | `false` | Suppress console output. Events are still built, sampled, and drained. Use for stdout-based platforms (GCP Cloud Run, AWS Lambda) |
 | `sampling.rates` | `object` | `undefined` | Head sampling rates per log level (0-100%). Error defaults to 100% |
 | `sampling.keep` | `array` | `undefined` | Tail sampling conditions to force-keep logs (see below) |
 | `transport.enabled` | `boolean` | `false` | Enable sending client logs to the server |

@@ -318,6 +318,59 @@ describe('createMiddlewareLogger', () => {
       expect(drain).toHaveBeenCalledOnce()
     })
 
+    it('falls back to global drain when no middleware drain is set', async () => {
+      const globalDrain = vi.fn()
+      initLogger({ pretty: false, drain: globalDrain })
+
+      const { logger, finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        requestId: 'req-global',
+      })
+
+      logger.set({ action: 'global-drain-test' })
+      await finish({ status: 200 })
+
+      expect(globalDrain).toHaveBeenCalledOnce()
+      const [[ctx]] = globalDrain.mock.calls
+      expect(ctx.event.action).toBe('global-drain-test')
+      expect(ctx.request).toEqual({ method: 'GET', path: '/api/test', requestId: 'req-global' })
+    })
+
+    it('middleware drain takes precedence over global drain', async () => {
+      const globalDrain = vi.fn()
+      const middlewareDrain = vi.fn()
+      initLogger({ pretty: false, drain: globalDrain })
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        drain: middlewareDrain,
+      })
+
+      await finish({ status: 200 })
+
+      expect(middlewareDrain).toHaveBeenCalledOnce()
+      expect(globalDrain).not.toHaveBeenCalled()
+    })
+
+    it('does not double-drain when both global and middleware drain are set', async () => {
+      const globalDrain = vi.fn()
+      const middlewareDrain = vi.fn()
+      initLogger({ pretty: false, drain: globalDrain })
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        drain: middlewareDrain,
+      })
+
+      await finish({ status: 200 })
+
+      expect(middlewareDrain).toHaveBeenCalledOnce()
+      expect(globalDrain).not.toHaveBeenCalled()
+    })
+
     it('does not call drain/enrich when route is skipped', async () => {
       const drain = vi.fn()
       const enrich = vi.fn()

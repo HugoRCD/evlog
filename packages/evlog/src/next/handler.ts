@@ -1,5 +1,5 @@
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, initLogger, isEnabled } from '../logger'
+import { createRequestLogger, getGlobalDrain, initLogger, isEnabled } from '../logger'
 import { filterSafeHeaders } from '../utils'
 import { shouldLog, getServiceForPath } from '../shared/routes'
 import { EvlogError } from '../error'
@@ -56,7 +56,8 @@ async function callEnrichAndDrain(
 ): Promise<void> {
   if (!emittedEvent) return
 
-  const { enrich, drain } = state.options
+  const { enrich } = state.options
+  const drain = state.options.drain ?? getGlobalDrain()
 
   const run = async () => {
     if (enrich) {
@@ -154,7 +155,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
         return await handler(...args) as Awaited<TReturn>
       }
 
-      const logger = createRequestLogger({ method, path, requestId })
+      const logger = createRequestLogger({ method, path, requestId }, { _deferDrain: true })
 
       // Apply route-based service configuration
       const routeService = getServiceForPath(path, state.options.routes)

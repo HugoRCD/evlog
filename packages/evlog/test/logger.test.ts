@@ -1325,3 +1325,117 @@ describe('enabled option', () => {
     expect(result).toHaveProperty('level', 'info')
   })
 })
+
+describe('silent option', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+  let logSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+    initLogger({ pretty: false })
+  })
+
+  it('suppresses console output for wide events', () => {
+    initLogger({ silent: true, pretty: false })
+
+    log.info({ action: 'test' })
+
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('suppresses console output for tagged logs (non-pretty)', () => {
+    initLogger({ silent: true, pretty: false })
+
+    log.info('auth', 'User logged in')
+
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('suppresses console output for tagged logs (pretty)', () => {
+    initLogger({ silent: true, pretty: true })
+
+    log.info('auth', 'User logged in')
+
+    expect(logSpy).not.toHaveBeenCalled()
+  })
+
+  it('suppresses console output for request logger emit', () => {
+    initLogger({ silent: true, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ user: { id: '123' } })
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+
+  it('still returns WideEvent from emit', () => {
+    initLogger({ silent: true, pretty: false })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.set({ action: 'checkout' })
+    const result = logger.emit()
+
+    expect(result).not.toBeNull()
+    expect(result).toHaveProperty('level', 'info')
+    expect(result).toHaveProperty('action', 'checkout')
+  })
+
+  it('still calls drain when silent', async () => {
+    const drain = vi.fn()
+    initLogger({ silent: true, pretty: false, drain })
+
+    log.info({ action: 'test' })
+
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+    const [[ctx]] = drain.mock.calls
+    expect(ctx.event.action).toBe('test')
+  })
+
+  it('still calls drain for request logger when silent', async () => {
+    const drain = vi.fn()
+    initLogger({ silent: true, pretty: false, drain })
+
+    const logger = createRequestLogger({ method: 'POST', path: '/checkout' })
+    logger.set({ cart: { items: 3 } })
+    logger.emit()
+
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+    const [[ctx]] = drain.mock.calls
+    expect(ctx.event.path).toBe('/checkout')
+  })
+
+  it('still applies sampling when silent', () => {
+    const drain = vi.fn()
+    initLogger({
+      silent: true,
+      pretty: false,
+      drain,
+      sampling: { rates: { info: 0 } },
+    })
+
+    log.info({ action: 'sampled-out' })
+    expect(drain).not.toHaveBeenCalled()
+  })
+
+  it('tagged logs in silent+pretty mode go through drain as structured events', async () => {
+    const drain = vi.fn()
+    initLogger({ silent: true, pretty: true, drain })
+
+    log.info('auth', 'User logged in')
+
+    expect(logSpy).not.toHaveBeenCalled()
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+    const [[ctx]] = drain.mock.calls
+    expect(ctx.event.tag).toBe('auth')
+    expect(ctx.event.message).toBe('User logged in')
+  })
+})

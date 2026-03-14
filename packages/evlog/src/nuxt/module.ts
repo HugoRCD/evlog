@@ -70,6 +70,15 @@ export interface ModuleOptions {
   pretty?: boolean
 
   /**
+   * Suppress built-in console output.
+   * When true, events are still built, sampled, and passed to drains,
+   * but nothing is written to console. Use when drains own the output
+   * channel (e.g., stdout-based platforms like GCP Cloud Run, AWS Lambda).
+   * @default false
+   */
+  silent?: boolean
+
+  /**
    * Route patterns to include in logging.
    * Supports glob patterns like '/api/**'.
    * If not set, all routes are logged.
