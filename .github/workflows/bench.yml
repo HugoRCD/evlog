@@ -1,6 +1,13 @@
 name: bench
 
 on:
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/evlog/src/**'
+      - 'packages/evlog/bench/**'
+      - 'packages/evlog/tsdown.config.ts'
   pull_request:
     branches:
       - main
@@ -11,14 +18,15 @@ on:
       - 'packages/evlog/vitest.config.ts'
 
 jobs:
-  benchmark:
+  # On push to main: update baseline files in the repo
+  update-baseline:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
-      pull-requests: write
+      contents: write
 
     steps:
-      - name: Checkout PR branch
-        uses: actions/checkout@v6
+      - uses: actions/checkout@v6
 
       - uses: oven-sh/setup-bun@v2
         with:
@@ -30,67 +38,73 @@ jobs:
       - name: Build evlog package
         run: bunx turbo run build --filter=evlog
 
-      - name: Measure bundle size (PR)
-        working-directory: packages/evlog
-        run: bun bench/size.ts --json > /tmp/size-current.json
-
-      - name: Run benchmarks (PR)
+      - name: Run benchmarks
         working-directory: packages/evlog
         run: bun run bench
 
-      - name: Save PR results
-        run: cp packages/evlog/bench/results.json /tmp/bench-current.json
+      - name: Measure bundle size
+        working-directory: packages/evlog
+        run: bun bench/size.ts --json > bench/baseline/size.json
 
-      - name: Checkout base branch
-        uses: actions/checkout@v6
+      - name: Update baseline
+        working-directory: packages/evlog
+        run: cp bench/results.json bench/baseline/bench.json
+
+      - name: Commit baseline
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add packages/evlog/bench/baseline/
+          if git diff --cached --quiet; then
+            echo "No baseline changes to commit"
+          else
+            git commit -m "chore(bench): update baseline [skip ci]"
+            git push
+          fi
+
+  # On PR: compare against committed baseline
+  compare:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
         with:
-          ref: ${{ github.event.pull_request.base.sha }}
-          clean: false
+          fetch-depth: 2
 
-      - name: Install dependencies (base)
-        run: bun install
-
-      - name: Build evlog package (base)
-        run: bunx turbo run build --filter=evlog
-
-      - name: Measure bundle size (base)
-        working-directory: packages/evlog
-        run: |
-          if [ -f bench/size.ts ]; then
-            bun bench/size.ts --json > /tmp/size-baseline.json
-          else
-            echo '{"entries":[],"total":{"raw":0,"gzip":0}}' > /tmp/size-baseline.json
-          fi
-
-      - name: Run benchmarks (base)
-        working-directory: packages/evlog
-        run: |
-          if grep -q '"bench"' package.json 2>/dev/null; then
-            bun run bench
-            cp bench/results.json /tmp/bench-baseline.json
-          else
-            echo '{"files":[]}' > /tmp/bench-baseline.json
-          fi
-
-      - name: Checkout PR branch (for compare script)
-        uses: actions/checkout@v6
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
 
       - name: Install dependencies
         run: bun install
+
+      - name: Build evlog package
+        run: bunx turbo run build --filter=evlog
+
+      - name: Measure bundle size
+        working-directory: packages/evlog
+        run: bun bench/size.ts --json > /tmp/size-current.json
+
+      - name: Run benchmarks
+        working-directory: packages/evlog
+        run: bun run bench
+
+      - name: Get baseline from main
+        run: |
+          git show origin/main:packages/evlog/bench/baseline/bench.json > /tmp/bench-baseline.json 2>/dev/null || echo '{"files":[]}' > /tmp/bench-baseline.json
+          git show origin/main:packages/evlog/bench/baseline/size.json > /tmp/size-baseline.json 2>/dev/null || echo '{"entries":[],"total":{"raw":0,"gzip":0}}' > /tmp/size-baseline.json
 
       - name: Compare results
         id: compare
         working-directory: packages/evlog
         run: |
           set +e
-          ARGS=""
-          if [ -f /tmp/bench-baseline.json ] && [ -f /tmp/bench-current.json ]; then
-            ARGS="$ARGS --bench /tmp/bench-baseline.json /tmp/bench-current.json"
-          fi
-          if [ -f /tmp/size-baseline.json ] && [ -f /tmp/size-current.json ]; then
-            ARGS="$ARGS --size /tmp/size-baseline.json /tmp/size-current.json"
-          fi
-          REPORT=$(bun bench/compare.ts $ARGS)
+          REPORT=$(bun bench/compare.ts \
+            --bench /tmp/bench-baseline.json bench/results.json \
+            --size /tmp/size-baseline.json /tmp/size-current.json)
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
