@@ -28,7 +28,7 @@ jobs:
         run: bun install
 
       - name: Build evlog package
-        run: turbo run build --filter=evlog
+        run: bunx turbo run build --filter=evlog
 
       - name: Measure bundle size (PR)
         working-directory: packages/evlog
@@ -51,7 +51,7 @@ jobs:
         run: bun install
 
       - name: Build evlog package (base)
-        run: turbo run build --filter=evlog
+        run: bunx turbo run build --filter=evlog
 
       - name: Measure bundle size (base)
         working-directory: packages/evlog
