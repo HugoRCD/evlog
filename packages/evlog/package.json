@@ -234,6 +234,8 @@
     "lint:fix": "eslint . --fix",
     "bench": "vitest bench",
     "bench:json": "vitest bench --reporter=json",
+    "size": "bun bench/size.ts",
+    "size:json": "bun bench/size.ts --json",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
