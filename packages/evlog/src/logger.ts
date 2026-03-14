@@ -5,18 +5,17 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
 }
 
-function deepDefaults(base: Record<string, unknown>, defaults: Record<string, unknown>): Record<string, unknown> {
-  const result = { ...base }
-  for (const key in defaults) {
-    const baseVal = result[key]
-    const defaultVal = defaults[key]
-    if (baseVal === undefined || baseVal === null) {
-      result[key] = defaultVal
-    } else if (isPlainObject(baseVal) && isPlainObject(defaultVal)) {
-      result[key] = deepDefaults(baseVal, defaultVal)
+function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key in source) {
+    const sourceVal = source[key]
+    if (sourceVal === undefined || sourceVal === null) continue
+    const targetVal = target[key]
+    if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
+      mergeInto(targetVal, sourceVal)
+    } else {
+      target[key] = sourceVal
     }
   }
-  return result
 }
 
 let globalEnv: EnvironmentContext = {
@@ -118,18 +117,30 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, skipSamplingCheck = false, deferDrain = false): WideEvent | null {
+function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDrain = false, ownsEvent = false): WideEvent | null {
   if (!globalEnabled) return null
 
-  if (!skipSamplingCheck && !shouldSample(level)) {
+  if (!ownsEvent && !shouldSample(level)) {
     return null
   }
 
-  const formatted: WideEvent = {
-    timestamp: new Date().toISOString(),
-    level,
-    ...globalEnv,
-    ...event,
+  let formatted: WideEvent
+  if (ownsEvent) {
+    event.timestamp = new Date().toISOString()
+    event.level = level
+    if (event.service === undefined) event.service = globalEnv.service
+    if (event.environment === undefined) event.environment = globalEnv.environment
+    if (globalEnv.version !== undefined && event.version === undefined) event.version = globalEnv.version
+    if (globalEnv.commitHash !== undefined && event.commitHash === undefined) event.commitHash = globalEnv.commitHash
+    if (globalEnv.region !== undefined && event.region === undefined) event.region = globalEnv.region
+    formatted = event as WideEvent
+  } else {
+    formatted = {
+      timestamp: new Date().toISOString(),
+      level,
+      ...globalEnv,
+      ...event,
+    }
   }
 
   if (!globalSilent) {
@@ -364,58 +375,58 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
 
   const deferDrain = internalOptions?._deferDrain ?? false
   const startTime = Date.now()
-  let context: Record<string, unknown> = { ...initialContext }
+  const context: Record<string, unknown> = { ...initialContext }
   let hasError = false
   let hasWarn = false
 
   function addLog(level: 'info' | 'warn', message: string): void {
-    const entry = {
+    if (!Array.isArray(context.requestLogs)) {
+      context.requestLogs = []
+    }
+    (context.requestLogs as unknown[]).push({
       level,
       message,
       timestamp: new Date().toISOString(),
-    }
-
-    const requestLogs = Array.isArray(context.requestLogs)
-      ? [...context.requestLogs, entry]
-      : [entry]
-
-    context = {
-      ...context,
-      requestLogs,
-    }
+    })
   }
 
   return {
     set(data: FieldContext<T>): void {
-      context = deepDefaults(data as Record<string, unknown>, context) as Record<string, unknown>
+      mergeInto(context, data as Record<string, unknown>)
     },
 
     error(error: Error | string, errorContext?: FieldContext<T>): void {
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
-      const errorData = {
-        ...(errorContext as Record<string, unknown>),
-        error: {
-          name: err.name,
-          message: err.message,
-          stack: err.stack,
-          ...('status' in err && { status: (err as Record<string, unknown>).status }),
-          ...('statusText' in err && { statusText: (err as Record<string, unknown>).statusText }),
-          ...('statusCode' in err && { statusCode: (err as Record<string, unknown>).statusCode }),
-          ...('statusMessage' in err && { statusMessage: (err as Record<string, unknown>).statusMessage }),
-          ...('data' in err && { data: (err as Record<string, unknown>).data }),
-          ...('cause' in err && { cause: (err as unknown as Record<string, unknown>).cause }),
-        },
+      if (errorContext) {
+        mergeInto(context, errorContext as Record<string, unknown>)
       }
-      context = deepDefaults(errorData, context) as Record<string, unknown>
+
+      const errorObj: Record<string, unknown> = {
+        name: err.name,
+        message: err.message,
+        stack: err.stack,
+      }
+      if ('status' in err) errorObj.status = (err as Record<string, unknown>).status
+      if ('statusText' in err) errorObj.statusText = (err as Record<string, unknown>).statusText
+      if ('statusCode' in err) errorObj.statusCode = (err as Record<string, unknown>).statusCode
+      if ('statusMessage' in err) errorObj.statusMessage = (err as Record<string, unknown>).statusMessage
+      if ('data' in err) errorObj.data = (err as Record<string, unknown>).data
+      if ('cause' in err) errorObj.cause = (err as unknown as Record<string, unknown>).cause
+
+      if (isPlainObject(context.error)) {
+        mergeInto(context.error as Record<string, unknown>, errorObj)
+      } else {
+        context.error = errorObj
+      }
     },
 
     info(message: string, infoContext?: FieldContext<T>): void {
       addLog('info', message)
       if (infoContext) {
         const { requestLogs: _, ...rest } = infoContext as Record<string, unknown>
-        context = deepDefaults(rest, context) as Record<string, unknown>
+        mergeInto(context, rest)
       }
     },
 
@@ -424,40 +435,36 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       addLog('warn', message)
       if (warnContext) {
         const { requestLogs: _, ...rest } = warnContext as Record<string, unknown>
-        context = deepDefaults(rest, context) as Record<string, unknown>
+        mergeInto(context, rest)
       }
     },
 
     emit(overrides?: FieldContext<T> & { _forceKeep?: boolean }): WideEvent | null {
       const durationMs = Date.now() - startTime
-      const duration = formatDuration(durationMs)
       const level: LogLevel = hasError ? 'error' : hasWarn ? 'warn' : 'info'
 
-      // Extract _forceKeep from overrides (set by evlog:emit:keep hook)
-      const { _forceKeep, ...restOverrides } = (overrides ?? {}) as Record<string, unknown> & { _forceKeep?: boolean }
+      const overridesObj = (overrides ?? {}) as Record<string, unknown> & { _forceKeep?: boolean }
 
-      // Build tail sampling context
       const tailCtx: TailSamplingContext = {
-        status: (context.status ?? restOverrides.status) as number | undefined,
+        status: (context.status ?? overridesObj.status) as number | undefined,
         duration: durationMs,
         path: context.path as string | undefined,
         method: context.method as string | undefined,
-        context: { ...context, ...restOverrides },
+        context,
       }
 
-      // Tail sampling: force keep if hook or built-in conditions match
-      const forceKeep = _forceKeep || shouldKeep(tailCtx)
+      const forceKeep = overridesObj._forceKeep || shouldKeep(tailCtx)
 
-      // Apply head sampling only if not force-kept
       if (!forceKeep && !shouldSample(level)) {
         return null
       }
 
-      return emitWideEvent(level, {
-        ...context,
-        ...restOverrides,
-        duration,
-      }, true, deferDrain)
+      for (const key in overridesObj) {
+        if (key !== '_forceKeep') context[key] = overridesObj[key]
+      }
+      context.duration = formatDuration(durationMs)
+
+      return emitWideEvent(level, context, deferDrain, true)
     },
 
     getContext(): FieldContext<T> & Record<string, unknown> {

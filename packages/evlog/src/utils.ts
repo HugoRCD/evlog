@@ -133,18 +133,23 @@ export function filterSafeHeaders(headers: Record<string, string>): Record<strin
   return safeHeaders
 }
 
+const patternCache = new Map<string, RegExp>()
+
 /**
  * Match a path against a glob pattern.
  * Supports * (any chars except /) and ** (any chars including /).
  */
 export function matchesPattern(path: string, pattern: string): boolean {
-  const regexPattern = pattern
-    .replace(/[.+^${}()|[\]\\]/g, '\\$&') // Escape special regex chars except * and ?
-    .replace(/\*\*/g, '{{GLOBSTAR}}') // Temp placeholder for **
-    .replace(/\*/g, '[^/]*') // * matches anything except /
-    .replace(/{{GLOBSTAR}}/g, '.*') // ** matches anything including /
-    .replace(/\?/g, '[^/]') // ? matches single char except /
-
-  const regex = new RegExp(`^${regexPattern}$`)
+  let regex = patternCache.get(pattern)
+  if (!regex) {
+    const regexPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*/g, '{{GLOBSTAR}}')
+      .replace(/\*/g, '[^/]*')
+      .replace(/{{GLOBSTAR}}/g, '.*')
+      .replace(/\?/g, '[^/]')
+    regex = new RegExp(`^${regexPattern}$`)
+    patternCache.set(pattern, regex)
+  }
   return regex.test(path)
 }
