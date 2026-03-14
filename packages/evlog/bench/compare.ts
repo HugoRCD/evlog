@@ -100,7 +100,36 @@ function getSizeIndicator(delta: number): string {
 
 // --- Bench comparison ---
 
+function hasBaselineData(report: BenchReport): boolean {
+  return report.files.some(f => f.groups.some(g => g.benchmarks.length > 0))
+}
+
+function renderFirstRunBenchmarks(current: BenchReport): string {
+  const lines: string[] = []
+  lines.push('### Performance (first run — no baseline to compare)')
+  lines.push('')
+  lines.push('| Benchmark | ops/sec | Mean | p99 |')
+  lines.push('|-----------|--------:|-----:|----:|')
+
+  for (const file of current.files) {
+    for (const group of file.groups) {
+      for (const bench of group.benchmarks) {
+        const shortName = `${group.fullName} > ${bench.name}`.replace(/^bench\/[^>]+> /, '')
+        lines.push(
+          `| ${shortName} | ${formatHz(bench.hz)} | ${bench.mean.toFixed(4)}ms | ${bench.p99.toFixed(4)}ms |`,
+        )
+      }
+    }
+  }
+
+  return lines.join('\n')
+}
+
 function compareBenchmarks(baseline: BenchReport, current: BenchReport): { markdown: string, hasRegression: boolean } {
+  if (!hasBaselineData(baseline)) {
+    return { markdown: renderFirstRunBenchmarks(current), hasRegression: false }
+  }
+
   const baseMap = new Map<string, BenchmarkEntry>()
   for (const file of baseline.files) {
     for (const group of file.groups) {
@@ -189,11 +218,36 @@ function compareBenchmarks(baseline: BenchReport, current: BenchReport): { markd
 
 // --- Size comparison ---
 
+function hasBaselineSizeData(report: SizeReport): boolean {
+  return report.entries.length > 0
+}
+
+function renderFirstRunSizes(current: SizeReport): string {
+  const lines: string[] = []
+  lines.push('### Bundle size (first run — no baseline to compare)')
+  lines.push('')
+  lines.push('| Entry | Raw | Gzip |')
+  lines.push('|-------|----:|-----:|')
+
+  for (const entry of current.entries) {
+    lines.push(`| ${entry.entry} | ${formatBytes(entry.raw)} | ${formatBytes(entry.gzip)} |`)
+  }
+
+  lines.push(`| **Total** | **${formatBytes(current.total.raw)}** | **${formatBytes(current.total.gzip)}** |`)
+
+  return lines.join('\n')
+}
+
 function compareSizes(baseline: SizeReport, current: SizeReport): string {
+  if (!hasBaselineSizeData(baseline)) {
+    return renderFirstRunSizes(current)
+  }
+
   const baseMap = new Map(baseline.entries.map(e => [e.entry, e]))
 
   const rows: Array<{
     entry: string
+    isNew: boolean
     baseGzip: number
     currGzip: number
     baseRaw: number
@@ -204,22 +258,27 @@ function compareSizes(baseline: SizeReport, current: SizeReport): string {
 
   for (const curr of current.entries) {
     const base = baseMap.get(curr.entry)
+    const isNew = !base
     const baseGzip = base?.gzip ?? 0
     const baseRaw = base?.raw ?? 0
-    const delta = baseGzip > 0 ? ((curr.gzip - baseGzip) / baseGzip) * 100 : (curr.gzip > 0 ? 100 : 0)
+    const delta = baseGzip > 0 ? ((curr.gzip - baseGzip) / baseGzip) * 100 : 0
 
     rows.push({
       entry: curr.entry,
+      isNew,
       baseGzip,
       currGzip: curr.gzip,
       baseRaw,
       currRaw: curr.raw,
       delta,
-      indicator: getSizeIndicator(delta),
+      indicator: isNew ? '🆕' : getSizeIndicator(delta),
     })
   }
 
-  rows.sort((a, b) => b.delta - a.delta)
+  rows.sort((a, b) => {
+    if (a.isNew !== b.isNew) return a.isNew ? -1 : 1
+    return b.delta - a.delta
+  })
 
   const totalBase = baseline.total
   const totalCurr = current.total
@@ -230,14 +289,17 @@ function compareSizes(baseline: SizeReport, current: SizeReport): string {
   const lines: string[] = []
   lines.push('### Bundle size')
   lines.push('')
-  lines.push(`> Threshold: **${SIZE_THRESHOLD}%** · 🔴 larger · 🟡 warning · 🟢 smaller · ⚪ unchanged`)
+  lines.push(`> Threshold: **${SIZE_THRESHOLD}%** · 🔴 larger · 🟡 warning · 🟢 smaller · ⚪ unchanged · 🆕 new`)
   lines.push('')
   lines.push('| Status | Entry | Base (gzip) | Current (gzip) | Change | Raw delta |')
   lines.push('|--------|-------|------------:|---------------:|-------:|----------:|')
 
   for (const row of rows) {
+    const baseCol = row.isNew ? '—' : formatBytes(row.baseGzip)
+    const changeCol = row.isNew ? 'new' : formatDelta(row.delta)
+    const rawDeltaCol = row.isNew ? `+${formatBytes(row.currRaw)}` : formatBytesDelta(row.baseRaw, row.currRaw)
     lines.push(
-      `| ${row.indicator} | ${row.entry} | ${formatBytes(row.baseGzip)} | ${formatBytes(row.currGzip)} | ${formatDelta(row.delta)} | ${formatBytesDelta(row.baseRaw, row.currRaw)} |`,
+      `| ${row.indicator} | ${row.entry} | ${baseCol} | ${formatBytes(row.currGzip)} | ${changeCol} | ${rawDeltaCol} |`,
     )
   }
 
