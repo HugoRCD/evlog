@@ -257,8 +257,7 @@ function parseArgs(): { benchBase?: string, benchCurr?: string, sizeBase?: strin
       result.benchBase = args[i + 1]
       result.benchCurr = args[i + 2]
       i += 2
-    }
-    else if (args[i] === '--size' && args[i + 1] && args[i + 2]) {
+    } else if (args[i] === '--size' && args[i + 1] && args[i + 2]) {
       result.sizeBase = args[i + 1]
       result.sizeCurr = args[i + 2]
       i += 2
