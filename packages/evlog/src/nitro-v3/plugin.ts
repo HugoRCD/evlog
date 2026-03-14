@@ -144,6 +144,7 @@ export default definePlugin((nitroApp) => {
     pretty: evlogConfig?.pretty,
     silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
+    _suppressDrainWarning: true,
   })
 
   if (!isEnabled()) return

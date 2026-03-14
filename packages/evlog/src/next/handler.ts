@@ -30,8 +30,10 @@ export function configureHandler(options: NextEvlogOptions): void {
       ...options.env,
     },
     pretty: options.pretty,
+    silent: options.silent,
     sampling: options.sampling,
     stringify: options.stringify,
+    _suppressDrainWarning: true,
   })
 }
 

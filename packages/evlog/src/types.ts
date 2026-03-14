@@ -302,6 +302,8 @@ export interface LoggerConfig {
    * ```
    */
   drain?: (ctx: DrainContext) => void | Promise<void>
+  /** @internal Suppress the "silent without drain" warning (used by hook-based frameworks like Nitro/Nuxt) */
+  _suppressDrainWarning?: boolean
 }
 
 /**

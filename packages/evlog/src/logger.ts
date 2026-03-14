@@ -53,7 +53,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalDrain = config.drain
   globalSilent = config.silent ?? false
 
-  if (globalSilent && !globalDrain) {
+  if (globalSilent && !globalDrain && !config._suppressDrainWarning) {
     console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
   }
 }
@@ -338,17 +338,6 @@ const noopLogger: RequestLogger = {
 }
 
 /**
- * Create a scoped logger for building wide events.
- * Use this for any context: workflows, jobs, scripts, queues, etc.
- *
- * @example
- * ```ts
- * const log = createLogger({ jobId: job.id, queue: 'emails' })
- * log.set({ batch: { size: 50, processed: 12 } })
- * log.emit()
- * ```
- */
-/**
  * @internal Options for createLogger that are not part of the public API.
  */
 interface CreateLoggerInternalOptions {
@@ -359,6 +348,17 @@ interface CreateLoggerInternalOptions {
   _deferDrain?: boolean
 }
 
+/**
+ * Create a scoped logger for building wide events.
+ * Use this for any context: workflows, jobs, scripts, queues, etc.
+ *
+ * @example
+ * ```ts
+ * const log = createLogger({ jobId: job.id, queue: 'emails' })
+ * log.set({ batch: { size: 50, processed: 12 } })
+ * log.emit()
+ * ```
+ */
 export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}, internalOptions?: CreateLoggerInternalOptions): RequestLogger<T> {
   if (!globalEnabled) return noopLogger as RequestLogger<T>
 
