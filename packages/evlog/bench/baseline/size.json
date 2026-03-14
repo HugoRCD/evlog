@@ -7,8 +7,8 @@
     },
     {
       "entry": "logger",
-      "raw": 12701,
-      "gzip": 3834
+      "raw": 11877,
+      "gzip": 3785
     },
     {
       "entry": "framework/next",
@@ -47,8 +47,8 @@
     },
     {
       "entry": "utils",
-      "raw": 3438,
-      "gzip": 1445
+      "raw": 3362,
+      "gzip": 1440
     },
     {
       "entry": "pipeline",
@@ -122,7 +122,7 @@
     }
   ],
   "total": {
-    "raw": 104457,
-    "gzip": 38788
+    "raw": 103557,
+    "gzip": 38734
   }
 }
