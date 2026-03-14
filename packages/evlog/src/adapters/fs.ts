@@ -1,5 +1,5 @@
 import { appendFile, mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
-import { join } from 'node:path'
+import { join, sep } from 'node:path'
 import type { WideEvent } from '../types'
 import { defineDrain } from './_drain'
 
@@ -17,9 +17,10 @@ export interface FsConfig {
 const gitignoreWritten = new Set<string>()
 
 async function ensureGitignore(dir: string): Promise<void> {
-  const segments = dir.split('/')
+  const normalized = dir.replace(/[\\/]/g, sep)
+  const segments = normalized.split(sep)
   const evlogIndex = segments.findIndex(s => s === '.evlog')
-  const targetDir = evlogIndex !== -1 ? segments.slice(0, evlogIndex + 1).join('/') : dir
+  const targetDir = evlogIndex !== -1 ? segments.slice(0, evlogIndex + 1).join(sep) : dir
 
   if (gitignoreWritten.has(targetDir)) return
 
@@ -62,9 +63,19 @@ async function resolveFilePath(dir: string, maxSizePerFile?: number): Promise<st
   return join(dir, `${date}.999.jsonl`)
 }
 
+function parseLogFilename(filename: string): { date: string; index: number } {
+  const match = filename.match(/^(\d{4}-\d{2}-\d{2})(?:\.(\d+))?\.jsonl$/)
+  if (!match) return { date: '', index: 0 }
+  return { date: match[1], index: match[2] ? Number.parseInt(match[2], 10) : 0 }
+}
+
 async function cleanupOldFiles(dir: string, maxFiles: number): Promise<void> {
   const files = await readdir(dir)
-  const jsonlFiles = files.filter(f => f.endsWith('.jsonl')).sort()
+  const jsonlFiles = files.filter(f => f.endsWith('.jsonl')).sort((a, b) => {
+    const pa = parseLogFilename(a)
+    const pb = parseLogFilename(b)
+    return pa.date.localeCompare(pb.date) || pa.index - pb.index
+  })
 
   if (jsonlFiles.length <= maxFiles) return
 

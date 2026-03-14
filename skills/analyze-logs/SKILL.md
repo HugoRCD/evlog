@@ -21,7 +21,13 @@ Read and analyze structured wide-event logs from the local `.evlog/logs/` direct
 
 ## Finding the logs
 
-Logs are written by evlog's file system drain as NDJSON files (one JSON object per line), organized by date.
+Logs are written by evlog's file system drain as `.jsonl` files, organized by date.
+
+**Format detection**: The drain supports two modes:
+- **NDJSON** (default, `pretty: false`): One compact JSON object per line. Parse line-by-line.
+- **Pretty** (`pretty: true`): Multi-line indented JSON per event. Parse by reading the entire file and splitting on top-level objects (e.g. `JSON.parse('[' + content.replace(/\}\n\{/g, '},{') + ']')`) or use a streaming JSON parser.
+
+Always check the first few bytes of the file to detect the format: if the second character is a newline or `"`, it's NDJSON; if it's a space or newline followed by spaces, it's pretty-printed.
 
 **Search order** — check these locations relative to the project root:
 
