@@ -1,4 +1,5 @@
-import type { IncomingMessage, ServerResponse } from 'node:http'
+import type { ServerResponse } from 'node:http'
+import type { Request } from 'express'
 import type { DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
@@ -35,10 +36,10 @@ declare module 'express-serve-static-core' {
 }
 
 function createEvlogMiddleware(getOptions: () => EvlogNestJSOptions) {
-  return (req: IncomingMessage, res: ServerResponse, next: () => void) => {
+  return (req: Request, res: ServerResponse, next: () => void) => {
     const options = getOptions()
     const headers = extractSafeNodeHeaders(req.headers)
-    const url = new URL(req.url || '/', 'http://localhost')
+    const url = new URL(req.originalUrl || req.url || '/', 'http://localhost')
 
     const { logger, finish, skipped } = createMiddlewareLogger({
       method: req.method || 'GET',
