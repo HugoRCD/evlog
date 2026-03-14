@@ -55,14 +55,22 @@ jobs:
 
       - name: Measure bundle size (base)
         working-directory: packages/evlog
-        run: bun bench/size.ts --json > /tmp/size-baseline.json
+        run: |
+          if [ -f bench/size.ts ]; then
+            bun bench/size.ts --json > /tmp/size-baseline.json
+          else
+            echo '{"entries":[],"total":{"raw":0,"gzip":0}}' > /tmp/size-baseline.json
+          fi
 
       - name: Run benchmarks (base)
         working-directory: packages/evlog
-        run: bun run bench
-
-      - name: Save base results
-        run: cp packages/evlog/bench/results.json /tmp/bench-baseline.json
+        run: |
+          if grep -q '"bench"' package.json 2>/dev/null; then
+            bun run bench
+            cp bench/results.json /tmp/bench-baseline.json
+          else
+            echo '{"files":[]}' > /tmp/bench-baseline.json
+          fi
 
       - name: Checkout PR branch (for compare script)
         uses: actions/checkout@v6
@@ -75,9 +83,14 @@ jobs:
         working-directory: packages/evlog
         run: |
           set +e
-          REPORT=$(bun bench/compare.ts \
-            --bench /tmp/bench-baseline.json /tmp/bench-current.json \
-            --size /tmp/size-baseline.json /tmp/size-current.json)
+          ARGS=""
+          if [ -f /tmp/bench-baseline.json ] && [ -f /tmp/bench-current.json ]; then
+            ARGS="$ARGS --bench /tmp/bench-baseline.json /tmp/bench-current.json"
+          fi
+          if [ -f /tmp/size-baseline.json ] && [ -f /tmp/size-current.json ]; then
+            ARGS="$ARGS --size /tmp/size-baseline.json /tmp/size-current.json"
+          fi
+          REPORT=$(bun bench/compare.ts $ARGS)
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
           EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
