@@ -111,24 +111,30 @@ jobs:
         with:
           bun-version: "1.3.10"
 
-      - name: Install dependencies
-        run: bun install
+      # --- A/B comparison: run baseline (main) and current (PR) on the same runner ---
 
-      - name: Build evlog package
-        run: bunx turbo run build --filter=evlog
-
-      - name: Measure bundle size
-        working-directory: packages/evlog
-        run: bun bench/scripts/size.ts --json > /tmp/size-current.json
-
-      - name: Run benchmarks
-        working-directory: packages/evlog
-        run: bun run bench
-
-      - name: Get baseline from main
+      - name: Benchmark main branch (baseline)
         run: |
-          git show origin/main:packages/evlog/bench/baseline/bench.json > /tmp/bench-baseline.json 2>/dev/null || echo '{"files":[]}' > /tmp/bench-baseline.json
-          git show origin/main:packages/evlog/bench/baseline/size.json > /tmp/size-baseline.json 2>/dev/null || echo '{"entries":[],"total":{"raw":0,"gzip":0}}' > /tmp/size-baseline.json
+          git checkout origin/main -- .
+          bun install
+          bunx turbo run build --filter=evlog
+          cd packages/evlog
+          bunx vitest bench bench/core/
+          cp bench/results.json /tmp/bench-baseline.json
+          bun bench/scripts/size.ts --json > /tmp/size-baseline.json
+
+      - name: Restore PR branch
+        run: |
+          git checkout -- .
+          git clean -fd
+
+      - name: Benchmark PR branch (current)
+        run: |
+          bun install
+          bunx turbo run build --filter=evlog
+          cd packages/evlog
+          bunx vitest bench bench/core/
+          bun bench/scripts/size.ts --json > /tmp/size-current.json
 
       - name: Compare results
         id: compare
