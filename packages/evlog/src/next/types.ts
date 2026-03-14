@@ -35,6 +35,13 @@ export interface NextEvlogOptions extends BaseEvlogOptions {
    * @default true
    */
   stringify?: boolean
+
+  /**
+   * Suppress built-in console output.
+   * Events are still built, sampled, and passed to drains.
+   * @default false
+   */
+  silent?: boolean
 }
 
 export interface EvlogMiddlewareConfig {
