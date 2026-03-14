@@ -1,0 +1,128 @@
+{
+  "entries": [
+    {
+      "entry": "framework/nitro",
+      "raw": 17856,
+      "gzip": 7012
+    },
+    {
+      "entry": "logger",
+      "raw": 12169,
+      "gzip": 3729
+    },
+    {
+      "entry": "framework/next",
+      "raw": 9145,
+      "gzip": 3090
+    },
+    {
+      "entry": "adapter/sentry",
+      "raw": 6148,
+      "gzip": 2382
+    },
+    {
+      "entry": "adapter/otlp",
+      "raw": 5850,
+      "gzip": 2140
+    },
+    {
+      "entry": "enrichers",
+      "raw": 6293,
+      "gzip": 1963
+    },
+    {
+      "entry": "framework/sveltekit",
+      "raw": 4960,
+      "gzip": 1579
+    },
+    {
+      "entry": "adapter/posthog",
+      "raw": 4895,
+      "gzip": 1520
+    },
+    {
+      "entry": "adapter/fs",
+      "raw": 3458,
+      "gzip": 1450
+    },
+    {
+      "entry": "pipeline",
+      "raw": 4265,
+      "gzip": 1385
+    },
+    {
+      "entry": "utils",
+      "raw": 3278,
+      "gzip": 1373
+    },
+    {
+      "entry": "adapter/axiom",
+      "raw": 3315,
+      "gzip": 1333
+    },
+    {
+      "entry": "browser",
+      "raw": 2996,
+      "gzip": 1242
+    },
+    {
+      "entry": "error",
+      "raw": 3130,
+      "gzip": 1240
+    },
+    {
+      "entry": "framework/nestjs",
+      "raw": 2872,
+      "gzip": 1237
+    },
+    {
+      "entry": "adapter/better-stack",
+      "raw": 2682,
+      "gzip": 1102
+    },
+    {
+      "entry": "framework/elysia",
+      "raw": 2569,
+      "gzip": 1090
+    },
+    {
+      "entry": "framework/fastify",
+      "raw": 2344,
+      "gzip": 1010
+    },
+    {
+      "entry": "workers",
+      "raw": 2126,
+      "gzip": 960
+    },
+    {
+      "entry": "framework/express",
+      "raw": 1322,
+      "gzip": 702
+    },
+    {
+      "entry": "framework/hono",
+      "raw": 1098,
+      "gzip": 593
+    },
+    {
+      "entry": "toolkit",
+      "raw": 486,
+      "gzip": 243
+    },
+    {
+      "entry": "core (index)",
+      "raw": 497,
+      "gzip": 205
+    },
+    {
+      "entry": "types",
+      "raw": 11,
+      "gzip": 31
+    }
+  ],
+  "total": {
+    "raw": 103765,
+    "gzip": 38611
+  }
+}
