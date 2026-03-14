@@ -1,5 +1,19 @@
 # evlog
 
+## 2.7.0
+
+### Minor Changes
+
+- [#175](https://github.com/HugoRCD/evlog/pull/175) [`aa18840`](https://github.com/HugoRCD/evlog/commit/aa18840459b4adced2747f70ebe0fed394348195) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add file system drain adapter (`evlog/fs`) to write wide events as NDJSON files to the local file system with date-based rotation, size-based rotation, automatic cleanup, and `.gitignore` generation
+
+- [#174](https://github.com/HugoRCD/evlog/pull/174) [`a77a69a`](https://github.com/HugoRCD/evlog/commit/a77a69a11caf350e190d0e9eae743c904a86cf4c) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `silent` option to suppress console output while still passing events to drains, fix drain pipeline to prevent double-draining in framework integrations, and add central configuration reference page to docs
+
+### Patch Changes
+
+- [#178](https://github.com/HugoRCD/evlog/pull/178) [`2b26ed2`](https://github.com/HugoRCD/evlog/commit/2b26ed2682cd98b21a5a64a44e6f3337018bae3c) Thanks [@ruisaraiva19](https://github.com/ruisaraiva19)! - Use request `originalUrl` for correct path extraction in NestJS and Express integrations (`evlog/nestjs`, `evlog/express`)
+
+- [#172](https://github.com/HugoRCD/evlog/pull/172) [`d87d1e0`](https://github.com/HugoRCD/evlog/commit/d87d1e03ae47b913338f6d73bd7ed874316e749b) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Remove `@sveltejs/kit` optional peer dependency that caused `ERESOLVE` failures in non-SvelteKit projects (e.g. Nuxt 4) due to transitive `vite@^8.0.0` requirement
+
 ## 2.6.0
 
 ### Minor Changes
