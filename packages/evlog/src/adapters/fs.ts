@@ -26,8 +26,7 @@ async function ensureGitignore(dir: string): Promise<void> {
   const gitignorePath = join(targetDir, '.gitignore')
   try {
     await stat(gitignorePath)
-  }
-  catch {
+  } catch {
     await writeFile(gitignorePath, '*\n', 'utf-8')
   }
   gitignoreWritten.add(targetDir)
