@@ -11,10 +11,92 @@ on:
       - 'packages/evlog/bench/scripts/**'
       - '!packages/evlog/bench/baseline/**'
       - 'packages/evlog/tsdown.config.ts'
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/evlog/src/**'
+      - 'packages/evlog/tsdown.config.ts'
   workflow_dispatch:
 
 jobs:
+  bundle-size:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build evlog package
+        run: bunx turbo run build --filter=evlog
+
+      - name: Measure current bundle size
+        working-directory: packages/evlog
+        run: bun bench/scripts/size.ts --json > /tmp/size-current.json
+
+      - name: Get baseline from main
+        run: |
+          git show origin/main:packages/evlog/bench/baseline/size.json > /tmp/size-baseline.json 2>/dev/null || echo '{"entries":[],"total":{"raw":0,"gzip":0}}' > /tmp/size-baseline.json
+
+      - name: Compare sizes
+        id: compare
+        working-directory: packages/evlog
+        run: |
+          set +e
+          REPORT=$(bun bench/scripts/compare.ts \
+            --size /tmp/size-baseline.json /tmp/size-current.json)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "report<<$EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT" >> "$GITHUB_OUTPUT"
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.compare.outputs.report }}`;
+            const marker = '<!-- evlog-size -->';
+            const fullBody = `${marker}\n${body}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }
+
   update-baseline:
+    if: github.event_name == 'push'
     runs-on: ubuntu-latest
     permissions:
       contents: write
