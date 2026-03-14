@@ -238,7 +238,7 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "2.5.0",
+      "version": "2.6.0",
       "devDependencies": {
         "@nestjs/common": "^11.1.16",
         "@nuxt/devtools": "^3.2.3",
@@ -264,7 +264,6 @@
       "peerDependencies": {
         "@nestjs/common": ">=11.1.16",
         "@nuxt/kit": "^4.4.2",
-        "@sveltejs/kit": ">=2.53.4",
         "elysia": ">=1.4.27",
         "express": ">=5.2.1",
         "fastify": ">=5.8.2",
@@ -279,7 +278,6 @@
       "optionalPeers": [
         "@nestjs/common",
         "@nuxt/kit",
-        "@sveltejs/kit",
         "elysia",
         "express",
         "fastify",
