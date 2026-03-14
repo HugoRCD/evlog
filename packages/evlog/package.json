@@ -263,8 +263,7 @@
     "express": ">=5.2.1",
     "elysia": ">=1.4.27",
     "fastify": ">=5.8.2",
-    "@nestjs/common": ">=11.1.16",
-    "@sveltejs/kit": ">=2.53.4"
+    "@nestjs/common": ">=11.1.16"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -301,9 +300,6 @@
       "optional": true
     },
     "@nestjs/common": {
-      "optional": true
-    },
-    "@sveltejs/kit": {
       "optional": true
     }
   }
