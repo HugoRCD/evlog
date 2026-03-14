@@ -28,7 +28,7 @@ feat({framework}): add {Framework} middleware integration
 | 7 | `apps/docs/content/1.getting-started/2.installation.md` | Add card in "Choose Your Framework" |
 | 8 | `apps/docs/content/0.landing.md` | Add framework code snippet |
 | 9 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
-| 10 | `skills/evlog/SKILL.md` | Add framework setup section + update frontmatter description |
+| 10 | `skills/review-logging-patterns/SKILL.md` | Add framework setup section + update frontmatter description |
 | 11 | `packages/evlog/README.md` | Add framework section + add row to Framework Support table |
 | 12 | `examples/{framework}/` | Create example app with test UI |
 | 13 | `package.json` (root) | Add `example:{framework}` script |
@@ -322,9 +322,9 @@ Update `apps/docs/app/components/features/FeatureFrameworks.vue`:
 
 Icons use Simple Icons format: `i-simple-icons-{name}` (e.g., `i-simple-icons-express`, `i-simple-icons-hono`).
 
-## Step 9: Update `skills/evlog/SKILL.md`
+## Step 9: Update `skills/review-logging-patterns/SKILL.md`
 
-In `skills/evlog/SKILL.md` (the public skill distributed to users):
+In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to users):
 
 1. Add `### {Framework}` in the **"Framework Setup"** section, after the last existing framework entry and before "Cloudflare Workers"
 2. Include:

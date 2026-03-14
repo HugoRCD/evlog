@@ -763,7 +763,7 @@ Rules established through past work — maintain these actively.
 
 ### User-facing framework docs live in the skill, not here
 
-`skills/evlog/SKILL.md` is the source of truth for user-facing documentation (framework setup, adapters, enrichers). **When a new framework/adapter/enricher is added, update `skills/evlog/SKILL.md` first** — not this file.
+`skills/review-logging-patterns/SKILL.md` is the source of truth for user-facing documentation (framework setup, adapters, enrichers). **When a new framework/adapter/enricher is added, update `skills/review-logging-patterns/SKILL.md` first** — not this file.
 
 This file retains framework sections as development context (useful for understanding the codebase), but the internal skills (`.agents/skills/`) mandate updating the public skill, not this file.
 
@@ -923,7 +923,8 @@ This repository includes agent skills for AI-assisted code review and evlog adop
 
 | Skill | Description |
 |-------|-------------|
-| `skills/evlog` | Review code for logging patterns, suggest evlog adoption, guide wide event design |
+| `skills/review-logging-patterns` | Review code for logging patterns, suggest evlog adoption, guide wide event design |
+| `skills/analyze-logs` | Analyze application logs from `.evlog/logs/` to debug errors, investigate performance, and understand behavior |
 | `.agents/skills/create-adapter` | Create a new drain adapter (Axiom, OTLP, Sentry, etc.) |
 | `.agents/skills/create-enricher` | Create a new event enricher (User Agent, Geo, etc.) |
 | `.agents/skills/create-framework-integration` | Create a new framework integration (Hono, Elysia, Fastify, etc.) |
@@ -932,13 +933,15 @@ This repository includes agent skills for AI-assisted code review and evlog adop
 
 ```
 skills/
-└── evlog/
-    ├── SKILL.md              # Main skill instructions
-    └── references/
-        ├── wide-events.md    # Wide events patterns
-        ├── structured-errors.md # Error handling guide
-        ├── code-review.md    # Review checklist
-        └── drain-pipeline.md # Drain pipeline patterns
+├── review-logging-patterns/
+│   ├── SKILL.md              # Main skill instructions
+│   └── references/
+│       ├── wide-events.md    # Wide events patterns
+│       ├── structured-errors.md # Error handling guide
+│       ├── code-review.md    # Review checklist
+│       └── drain-pipeline.md # Drain pipeline patterns
+└── analyze-logs/
+    └── SKILL.md              # Log analysis from .evlog/logs/
 ```
 
 ### Using Skills

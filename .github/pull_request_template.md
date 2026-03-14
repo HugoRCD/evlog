@@ -36,6 +36,7 @@ Here are the available types and scopes:
 - nestjs (NestJS middleware)
 - sveltekit (SvelteKit integration)
 - workers (Cloudflare Workers adapter)
+- fs (File System adapter)
 - dx (developer experience improvements)
 -->
 

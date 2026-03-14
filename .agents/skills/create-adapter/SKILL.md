@@ -27,7 +27,7 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 | 4 | `packages/evlog/test/adapters/{name}.test.ts` | Create tests |
 | 5 | `apps/docs/content/4.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
 | 6 | `apps/docs/content/4.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
-| 7 | `skills/evlog/SKILL.md` | Add adapter row in the Drain Adapters table |
+| 7 | `skills/review-logging-patterns/SKILL.md` | Add adapter row in the Drain Adapters table |
 | 8 | Renumber `custom.md` | Ensure `custom.md` stays last after the new adapter |
 
 **Important**: Do NOT consider the task complete until all 8 touchpoints have been addressed.
@@ -125,9 +125,9 @@ Edit `apps/docs/content/4.adapters/1.overview.md` to add the new adapter in **th
 2. **`::card-group` section** -- add a card block before the Custom card
 3. **Zero-Config Setup `.env` example** -- add the adapter's env vars
 
-## Step 7: Update `skills/evlog/SKILL.md`
+## Step 7: Update `skills/review-logging-patterns/SKILL.md`
 
-In `skills/evlog/SKILL.md` (the public skill distributed to users), find the **Drain Adapters** table and add a new row:
+In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to users), find the **Drain Adapters** table and add a new row:
 
 ```markdown
 | {Name} | `evlog/{name}` | `{NAME}_TOKEN`, `{NAME}_DATASET` (or equivalent) |

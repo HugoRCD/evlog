@@ -25,7 +25,7 @@ The exact wording may vary depending on the enricher (e.g., `feat: add user agen
 | 2 | `packages/evlog/test/enrichers.test.ts` | Add tests |
 | 3 | `apps/docs/content/4.enrichers/2.built-in.md` | Add enricher to built-in docs |
 | 4 | `apps/docs/content/4.enrichers/1.overview.md` | Add enricher to overview cards |
-| 5 | `skills/evlog/SKILL.md` | Add enricher to the Built-in line in the Enrichers section |
+| 5 | `skills/review-logging-patterns/SKILL.md` | Add enricher to the Built-in line in the Enrichers section |
 | 6 | `README.md` + `packages/evlog/README.md` | Add enricher to README enrichers section |
 
 **Important**: Do NOT consider the task complete until all 6 touchpoints have been addressed.
@@ -124,9 +124,9 @@ Edit `apps/docs/content/4.enrichers/1.overview.md` to add a card for the new enr
   :::
 ```
 
-## Step 5: Update `skills/evlog/SKILL.md`
+## Step 5: Update `skills/review-logging-patterns/SKILL.md`
 
-In `skills/evlog/SKILL.md` (the public skill distributed to users), find the **Enrichers** section and add the new enricher to the `Built-in:` line:
+In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to users), find the **Enrichers** section and add the new enricher to the `Built-in:` line:
 
 ```markdown
 Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, ..., `create{Name}Enricher()` — all from `evlog/enrichers`.

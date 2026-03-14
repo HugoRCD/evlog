@@ -29,7 +29,7 @@ const props = defineProps<{
 const pills = [
   { label: 'Structured context', icon: 'i-lucide-braces' },
   { label: 'Machine-parseable', icon: 'i-lucide-cpu' },
-  { label: 'Actionable output', icon: 'i-lucide-sparkles' },
+  { label: 'Local NDJSON files', icon: 'i-lucide-hard-drive' },
 ]
 
 const timers: ReturnType<typeof setTimeout>[] = []

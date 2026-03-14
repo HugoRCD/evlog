@@ -81,6 +81,11 @@
       "import": "./dist/adapters/better-stack.mjs",
       "default": "./dist/adapters/better-stack.mjs"
     },
+    "./fs": {
+      "types": "./dist/adapters/fs.d.mts",
+      "import": "./dist/adapters/fs.mjs",
+      "default": "./dist/adapters/fs.mjs"
+    },
     "./enrichers": {
       "types": "./dist/enrichers.d.mts",
       "import": "./dist/enrichers.mjs",
@@ -175,6 +180,9 @@
       ],
       "better-stack": [
         "./dist/adapters/better-stack.d.mts"
+      ],
+      "fs": [
+        "./dist/adapters/fs.d.mts"
       ],
       "enrichers": [
         "./dist/enrichers.d.mts"

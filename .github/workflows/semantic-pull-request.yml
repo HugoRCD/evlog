@@ -39,6 +39,7 @@ jobs:
             nestjs
             sveltekit
             workers
+            fs
             dx
           types: |
             breaking

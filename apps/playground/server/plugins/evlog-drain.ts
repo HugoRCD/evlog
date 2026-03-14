@@ -2,6 +2,7 @@
 // import { createPostHogDrain } from 'evlog/posthog'
 // import { createSentryDrain } from 'evlog/sentry'
 // import { createBetterStackDrain } from 'evlog/better-stack'
+import { createFsDrain } from 'evlog/fs'
 
 export default defineNitroPlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', (ctx) => {
@@ -24,5 +25,8 @@ export default defineNitroPlugin((nitroApp) => {
 
     // const betterStackDrain = createBetterStackDrain()
     // betterStackDrain(ctx)
+
+    const fsDrain = createFsDrain()
+    fsDrain(ctx)
   })
 })
