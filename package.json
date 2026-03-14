@@ -35,6 +35,7 @@
     "build:docs": "turbo run build --filter=evlog-docs",
     "lint": "turbo run lint",
     "lint:fix": "turbo run lint:fix",
+    "bench": "turbo run bench --filter='./packages/*'",
     "test": "turbo run test",
     "typecheck": "turbo run typecheck",
     "automd": "automd --config .github/automd.json",

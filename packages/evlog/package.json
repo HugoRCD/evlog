@@ -232,6 +232,8 @@
     "dev:prepare": "tsdown",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
+    "bench": "vitest bench",
+    "bench:json": "vitest bench --reporter=json",
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",

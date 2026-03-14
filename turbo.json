@@ -42,6 +42,10 @@
     "lint:fix": {
       "cache": false
     },
+    "bench": {
+      "dependsOn": ["^build"],
+      "cache": false
+    },
     "test": {
       "dependsOn": ["^build"]
     },

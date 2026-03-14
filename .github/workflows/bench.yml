@@ -1,0 +1,107 @@
+name: bench
+
+on:
+  pull_request:
+    branches:
+      - main
+    paths:
+      - 'packages/evlog/src/**'
+      - 'packages/evlog/bench/**'
+      - 'packages/evlog/vitest.config.ts'
+
+jobs:
+  benchmark:
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+
+    steps:
+      - name: Checkout PR branch
+        uses: actions/checkout@v6
+
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: "1.3.10"
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Build package
+        run: bun run build:package
+
+      - name: Run benchmarks (PR)
+        working-directory: packages/evlog
+        run: bun run bench
+
+      - name: Save PR results
+        run: cp packages/evlog/bench/results.json /tmp/bench-current.json
+
+      - name: Checkout base branch
+        uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event.pull_request.base.sha }}
+          clean: false
+
+      - name: Install dependencies (base)
+        run: bun install
+
+      - name: Build package (base)
+        run: bun run build:package
+
+      - name: Run benchmarks (base)
+        working-directory: packages/evlog
+        run: bun run bench
+
+      - name: Save base results
+        run: cp packages/evlog/bench/results.json /tmp/bench-baseline.json
+
+      - name: Checkout PR branch again (for compare script)
+        uses: actions/checkout@v6
+
+      - name: Install dependencies
+        run: bun install
+
+      - name: Compare results
+        id: compare
+        working-directory: packages/evlog
+        run: |
+          set +e
+          REPORT=$(bun bench/compare.ts /tmp/bench-baseline.json /tmp/bench-current.json)
+          EXIT_CODE=$?
+          echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
+          EOF=$(dd if=/dev/urandom bs=15 count=1 status=none | base64)
+          echo "report<<$EOF" >> "$GITHUB_OUTPUT"
+          echo "$REPORT" >> "$GITHUB_OUTPUT"
+          echo "$EOF" >> "$GITHUB_OUTPUT"
+
+      - name: Post PR comment
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const body = `${{ steps.compare.outputs.report }}`;
+            const marker = '<!-- evlog-bench -->';
+            const fullBody = `${marker}\n${body}`;
+
+            const { data: comments } = await github.rest.issues.listComments({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: context.issue.number,
+            });
+
+            const existing = comments.find(c => c.body?.includes(marker));
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                comment_id: existing.id,
+                body: fullBody,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: fullBody,
+              });
+            }

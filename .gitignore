@@ -23,6 +23,9 @@ logs
 .idea
 .pnpm-store*
 
+# Benchmarks
+bench/results.json
+
 # Turbo
 .turbo
 

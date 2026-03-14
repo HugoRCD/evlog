@@ -10,5 +10,9 @@ export default defineConfig({
       include: ['src/**/*.ts'],
       exclude: ['src/nuxt/**', 'src/nitro/**', 'src/runtime/**'],
     },
+    benchmark: {
+      include: ['bench/**/*.bench.ts'],
+      outputJson: 'bench/results.json',
+    },
   },
 })
