@@ -287,9 +287,9 @@ let hasRegression = false
 if (parsed.benchBase && parsed.benchCurr) {
   const baseline = await loadJSON<BenchReport>(parsed.benchBase)
   const current = await loadJSON<BenchReport>(parsed.benchCurr)
-  const result = compareBenchmarks(baseline, current)
-  sections.push(result.markdown)
-  hasRegression = result.hasRegression
+  const { markdown, hasRegression: regression } = compareBenchmarks(baseline, current)
+  sections.push(markdown)
+  hasRegression = regression
 }
 
 if (parsed.sizeBase && parsed.sizeCurr) {
