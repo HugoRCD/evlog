@@ -5,6 +5,12 @@ function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
 }
 
+const _tsDate = new Date()
+function isoNow(): string {
+  _tsDate.setTime(Date.now())
+  return _tsDate.toISOString()
+}
+
 function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
   for (const key in source) {
     const sourceVal = source[key]
@@ -126,7 +132,7 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDra
 
   let formatted: WideEvent
   if (ownsEvent) {
-    event.timestamp = new Date().toISOString()
+    event.timestamp = isoNow()
     event.level = level
     if (event.service === undefined) event.service = globalEnv.service
     if (event.environment === undefined) event.environment = globalEnv.environment
@@ -136,7 +142,7 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDra
     formatted = event as WideEvent
   } else {
     formatted = {
-      timestamp: new Date().toISOString(),
+      timestamp: isoNow(),
       level,
       ...globalEnv,
       ...event,
@@ -172,7 +178,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
 
     if (isClient()) {
       const levelColor = getCssLevelColor(level)
-      const timestamp = new Date().toISOString().slice(11, 23)
+      const timestamp = isoNow().slice(11, 23)
       console.log(
         `%c${timestamp}%c %c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`,
         cssColors.dim,
@@ -182,7 +188,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
       )
     } else {
       const color = getLevelColor(level)
-      const timestamp = new Date().toISOString().slice(11, 23)
+      const timestamp = isoNow().slice(11, 23)
       console.log(`${colors.dim}${timestamp}${colors.reset} ${color}[${tag}]${colors.reset} ${message}`)
     }
 
@@ -356,7 +362,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     (context.requestLogs as unknown[]).push({
       level,
       message,
-      timestamp: new Date().toISOString(),
+      timestamp: isoNow(),
     })
   }
 
@@ -411,24 +417,29 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       const durationMs = Date.now() - startTime
       const level: LogLevel = hasError ? 'error' : hasWarn ? 'warn' : 'info'
 
-      const overridesObj = (overrides ?? {}) as Record<string, unknown> & { _forceKeep?: boolean }
-
-      const tailCtx: TailSamplingContext = {
-        status: (context.status ?? overridesObj.status) as number | undefined,
-        duration: durationMs,
-        path: context.path as string | undefined,
-        method: context.method as string | undefined,
-        context,
+      let forceKeep = false
+      if (overrides?._forceKeep) {
+        forceKeep = true
+      } else if (globalSampling.keep?.length) {
+        const status = (overrides as Record<string, unknown> | undefined)?.status ?? context.status
+        forceKeep = shouldKeep({
+          status: status as number | undefined,
+          duration: durationMs,
+          path: context.path as string | undefined,
+          method: context.method as string | undefined,
+          context,
+        })
       }
-
-      const forceKeep = overridesObj._forceKeep || shouldKeep(tailCtx)
 
       if (!forceKeep && !shouldSample(level)) {
         return null
       }
 
-      for (const key in overridesObj) {
-        if (key !== '_forceKeep') context[key] = overridesObj[key]
+      if (overrides) {
+        const obj = overrides as Record<string, unknown>
+        for (const key in obj) {
+          if (key !== '_forceKeep') context[key] = obj[key]
+        }
       }
       context.duration = formatDuration(durationMs)
 
