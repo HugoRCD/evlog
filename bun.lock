@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -93,7 +94,6 @@
       "name": "evlog-playground",
       "dependencies": {
         "@nuxt/ui": "^4.5.1",
-        "ai": "^6.0.116",
         "evlog": "workspace:*",
         "nuxt": "^4.4.2",
         "tailwindcss": "^4.2.1",
