@@ -11,12 +11,15 @@ export interface BetterStackConfig {
   endpoint?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
 }
 
 const BETTER_STACK_FIELDS: ConfigField<BetterStackConfig>[] = [
   { key: 'sourceToken', env: ['NUXT_BETTER_STACK_SOURCE_TOKEN', 'BETTER_STACK_SOURCE_TOKEN'] },
   { key: 'endpoint', env: ['NUXT_BETTER_STACK_ENDPOINT', 'BETTER_STACK_ENDPOINT'] },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 /**
@@ -98,6 +101,7 @@ export async function sendBatchToBetterStack(events: WideEvent[], config: Better
     },
     body: JSON.stringify(events.map(toBetterStackEvent)),
     timeout: config.timeout ?? 5000,
+    retries: config.retries,
     label: 'Better Stack',
   })
 }

@@ -299,7 +299,7 @@ describe('otlp adapter', () => {
     })
 
     it('throws error on non-OK response', async () => {
-      fetchSpy.mockResolvedValueOnce(
+      fetchSpy.mockResolvedValue(
         new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' }),
       )
 

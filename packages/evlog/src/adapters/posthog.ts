@@ -13,6 +13,8 @@ export interface PostHogConfig {
   host?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
 }
 
 export interface PostHogEventsConfig extends PostHogConfig {
@@ -34,6 +36,7 @@ const POSTHOG_FIELDS: ConfigField<PostHogConfig>[] = [
   { key: 'apiKey', env: ['NUXT_POSTHOG_API_KEY', 'POSTHOG_API_KEY'] },
   { key: 'host', env: ['NUXT_POSTHOG_HOST', 'POSTHOG_HOST'] },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 const POSTHOG_EVENTS_FIELDS: ConfigField<PostHogEventsConfig>[] = [
@@ -52,6 +55,7 @@ function toOTLPConfig(config: PostHogConfig): OTLPConfig {
     endpoint: `${host}/i`,
     headers: { Authorization: `Bearer ${config.apiKey}` },
     timeout: config.timeout,
+    retries: config.retries,
   }
 }
 
@@ -215,6 +219,7 @@ export async function sendBatchToPostHogEvents(events: WideEvent[], config: Post
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ api_key: config.apiKey, batch }),
     timeout: config.timeout ?? 5000,
+    retries: config.retries,
     label: 'PostHog',
   })
 }
