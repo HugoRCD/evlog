@@ -2,8 +2,11 @@ import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
 import { evlog, type EvlogVariables } from 'evlog/hono'
 import { chargeUser } from './utils/billing'
+import { testUI } from './ui'
 
 const app = new Hono<EvlogVariables>()
+
+app.get('/', c => c.html(testUI()))
 
 app.use(evlog())
 
@@ -26,17 +29,18 @@ app.get('/users/:id', (c) => {
   return c.json(user)
 })
 
-app.get('/checkout', () => {
+app.get('/checkout', (c) => {
   const result = chargeUser('user_123', 4999)
-  if (!result.success) {
-    throw createError({
-      message: 'Payment failed',
-      status: 402,
-      why: 'Card declined by issuer',
-      fix: 'Try a different card or payment method',
-    })
-  }
-  return new Response(JSON.stringify(result))
+  return c.json(result)
+})
+
+app.get('/error', () => {
+  throw createError({
+    message: 'Payment failed',
+    status: 402,
+    why: 'Card declined by issuer',
+    fix: 'Try a different card or payment method',
+  })
 })
 
 app.onError((error, c) => {

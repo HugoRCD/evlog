@@ -8,10 +8,6 @@ export default defineConfig({
       autoImports: true,
       strip: ['debug'],
       sourceLocation: true,
-      client: {
-        service: 'vite-example-client',
-        pretty: true,
-      },
     }),
   ],
 })
