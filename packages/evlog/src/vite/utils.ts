@@ -22,11 +22,12 @@ export function shouldTransform(id: string): boolean {
 
 export function walk(
   node: any,
-  enter: (node: any, parent: any) => void,
+  enter: (node: any, parent: any, grandparent: any) => void,
   parent?: any,
+  grandparent?: any,
 ): void {
   if (!node || typeof node !== 'object' || typeof node.type !== 'string') return
-  enter(node, parent)
+  enter(node, parent, grandparent)
 
   for (const key of Object.keys(node)) {
     if (key === 'type' || key === 'start' || key === 'end' || key === 'loc' || key === 'range') continue
@@ -34,11 +35,11 @@ export function walk(
     if (Array.isArray(value)) {
       for (const child of value) {
         if (child && typeof child === 'object' && typeof child.type === 'string') {
-          walk(child, enter, node)
+          walk(child, enter, node, parent)
         }
       }
     } else if (value && typeof value === 'object' && typeof value.type === 'string') {
-      walk(value, enter, node)
+      walk(value, enter, node, parent)
     }
   }
 }
@@ -54,10 +55,19 @@ export function isLogMemberCall(node: any, levels?: string[]): boolean {
   )
 }
 
-export function getLineNumber(code: string, pos: number): number {
-  let line = 1
-  for (let i = 0; i < pos; i++) {
-    if (code[i] === '\n') line++
+export function buildLineIndex(code: string): (pos: number) => number {
+  const offsets = [0]
+  for (let i = 0; i < code.length; i++) {
+    if (code[i] === '\n') offsets.push(i + 1)
   }
-  return line
+  return (pos: number) => {
+    let lo = 0
+    let hi = offsets.length
+    while (lo < hi) {
+      const mid = (lo + hi) >>> 1
+      if (offsets[mid] <= pos) lo = mid + 1
+      else hi = mid
+    }
+    return lo
+  }
 }

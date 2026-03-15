@@ -596,7 +596,7 @@ export default defineConfig({
       service: 'my-app',
       autoImports: true,           // auto-import log, createEvlogError, parseError
       strip: ['debug'],            // remove log.debug() in production
-      sourceLocation: true,        // inject file:line in dev
+      sourceLocation: true,        // inject file:line in dev + prod
       client: {                    // client-side logging
         transport: { endpoint: '/api/logs' },
       },

@@ -153,4 +153,21 @@ describe('vite strip plugin', () => {
     expect(result.code).toContain('foo(void 0)')
     expect(result.code).not.toContain('log.debug')
   })
+
+  it('replaces log.debug() in braceless if body with empty statement', () => {
+    const code = `if (cond) log.debug('x')\nconst y = 1`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('if (cond) ;')
+    expect(result.code).toContain('const y = 1')
+    expect(result.code).not.toContain('log.debug')
+  })
+
+  it('replaces log.debug() in braceless while body with empty statement', () => {
+    const code = `while (running) log.debug('tick')`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('while (running) ;')
+    expect(result.code).not.toContain('log.debug')
+  })
 })

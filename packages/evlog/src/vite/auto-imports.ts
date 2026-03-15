@@ -38,7 +38,6 @@ export function createAutoImportsPlugin(options: AutoImportsOptions = {}): Plugi
       handler(code, id) {
         if (!shouldTransform(id)) return
         if (!symbols.some(s => code.includes(s))) return
-        if (/from\s*['"]#imports['"]/.test(code)) return
 
         let ast: any
         try {

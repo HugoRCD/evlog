@@ -1,7 +1,7 @@
 import { relative } from 'node:path'
 import type { Plugin } from 'vite'
 import MagicString from 'magic-string'
-import { TRANSFORM_FILTER, getLineNumber, isLogMemberCall, shouldTransform, walk } from './utils'
+import { TRANSFORM_FILTER, buildLineIndex, isLogMemberCall, shouldTransform, walk } from './utils'
 
 export function createSourceLocationPlugin(enabled?: boolean): Plugin {
   let active = false
@@ -31,6 +31,7 @@ export function createSourceLocationPlugin(enabled?: boolean): Plugin {
 
         const [cleanId] = id.split('?')
         const relativePath = relative(root, cleanId).replaceAll('\\', '/')
+        const lineOf = buildLineIndex(code)
         const s = new MagicString(code)
         let modified = false
 
@@ -46,7 +47,7 @@ export function createSourceLocationPlugin(enabled?: boolean): Plugin {
             )
             if (hasSource) return
 
-            const line = getLineNumber(code, node.start)
+            const line = lineOf(node.start)
             const source = `${relativePath}:${line}`
 
             const content = code.slice(obj.start + 1, obj.end - 1).trim()

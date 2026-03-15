@@ -32,11 +32,20 @@ export function createStripPlugin(levels: LogLevel[]): Plugin {
         const s = new MagicString(code)
         let modified = false
 
-        walk(ast, (node: any, parent: any) => {
+        walk(ast, (node: any, parent: any, grandparent: any) => {
           if (!isLogMemberCall(node, levels)) return
 
           if (parent?.type === 'ExpressionStatement') {
-            s.remove(parent.start, parent.end)
+            const isDirectChild = grandparent?.body === parent
+              || grandparent?.consequent === parent
+              || grandparent?.alternate === parent
+            const isBraceless = isDirectChild && parent.type !== 'BlockStatement'
+
+            if (isBraceless) {
+              s.overwrite(parent.start, parent.end, ';')
+            } else {
+              s.remove(parent.start, parent.end)
+            }
           } else {
             s.overwrite(node.start, node.end, 'void 0')
           }

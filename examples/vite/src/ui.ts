@@ -7,8 +7,8 @@ interface Route {
 const routes: Route[] = [
   { method: 'GET', path: '/health', description: 'Health check — log.debug() stripped in prod, log.info() with __source' },
   { method: 'GET', path: '/users/42', description: 'User lookup — wide event with context accumulation' },
-  { method: 'GET', path: '/checkout', description: 'Checkout — calls auto-imported chargeUser() utility' },
-  { method: 'GET', path: '/error', description: 'Throws createError() with status/why/fix (auto-imported)' },
+  { method: 'GET', path: '/checkout', description: 'Checkout — calls chargeUser() utility' },
+  { method: 'GET', path: '/error', description: 'Throws createError() with status/why/fix' },
 ]
 
 export function testUI(): string {
@@ -192,7 +192,6 @@ export function testUI(): string {
 
     <div class="features">
       No <code>initLogger()</code> — auto-init via <code>define</code><br>
-      No <code>import { log }</code> — auto-imports enabled<br>
       <code>log.debug()</code> stripped in production builds<br>
       <code>__source: 'file:line'</code> injected into log calls
     </div>
@@ -212,8 +211,12 @@ export function testUI(): string {
   </div>
 
   <script>
+    function esc(s) {
+      return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    }
+
     function syntaxHighlight(json) {
-      return JSON.stringify(json, null, 2)
+      return esc(JSON.stringify(json, null, 2))
         .replace(/("(\\\\u[a-fA-F0-9]{4}|\\\\[^u]|[^\\\\"])*")(\\s*:)?/g, (match, str, _, colon) => {
           if (colon) return '<span class="key">' + str + '</span>' + colon
           return '<span class="string">' + str + '</span>'
