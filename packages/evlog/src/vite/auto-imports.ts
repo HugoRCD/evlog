@@ -1,9 +1,9 @@
-import { writeFileSync } from 'node:fs'
+import { existsSync, writeFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 import type { Plugin } from 'vite'
 import MagicString from 'magic-string'
 import type { AutoImportsOptions } from './types'
-import { shouldTransform, walk } from './utils'
+import { TRANSFORM_FILTER, shouldTransform, walk } from './utils'
 
 const DEFAULT_IMPORTS = ['log', 'createEvlogError', 'parseError']
 const LOG_METHODS = ['info', 'error', 'warn', 'debug']
@@ -24,35 +24,43 @@ export function createAutoImportsPlugin(options: AutoImportsOptions = {}): Plugi
 
     configResolved(config) {
       if (options.dts === false) return
-      const dtsPath = resolve(config.root, typeof options.dts === 'string' ? options.dts : 'auto-imports.d.ts')
-      writeFileSync(dtsPath, generateDts(symbols))
-    },
-
-    transform(code, id) {
-      if (!shouldTransform(id)) return
-      if (!symbols.some(s => code.includes(s))) return
-      if (/from\s*['"]evlog['"]/.test(code) || /from\s*['"]#imports['"]/.test(code)) return
-
-      let ast: any
-      try {
-        ast = this.parse(code)
-      } catch {
+      if (typeof options.dts === 'string') {
+        writeFileSync(resolve(config.root, options.dts), generateDts(symbols))
         return
       }
+      const srcDir = resolve(config.root, 'src')
+      const dir = existsSync(srcDir) ? srcDir : config.root
+      writeFileSync(resolve(dir, 'auto-imports.d.ts'), generateDts(symbols))
+    },
 
-      const declared = collectTopLevelDeclarations(ast)
-      const needed = detectUsedSymbols(ast, symbols, declared)
+    transform: {
+      filter: TRANSFORM_FILTER,
+      handler(code, id) {
+        if (!shouldTransform(id)) return
+        if (!symbols.some(s => code.includes(s))) return
+        if (/from\s*['"]evlog['"]/.test(code) || /from\s*['"]#imports['"]/.test(code)) return
 
-      if (needed.size === 0) return
+        let ast: any
+        try {
+          ast = (this as any).parse(code)
+        } catch {
+          return
+        }
 
-      const grouped = groupBySource(needed)
-      const s = new MagicString(code)
+        const declared = collectTopLevelDeclarations(ast)
+        const needed = detectUsedSymbols(ast, symbols, declared)
 
-      for (const [source, names] of grouped) {
-        s.prepend(`import { ${names.join(', ')} } from '${source}'\n`)
-      }
+        if (needed.size === 0) return
 
-      return { code: s.toString(), map: s.generateMap({ hires: true }) }
+        const grouped = groupBySource(needed)
+        const s = new MagicString(code)
+
+        for (const [source, names] of grouped) {
+          s.prepend(`import { ${names.join(', ')} } from '${source}'\n`)
+        }
+
+        return { code: s.toString(), map: s.generateMap({ hires: true }) }
+      },
     },
   }
 }
@@ -141,6 +149,9 @@ function generateDts(symbols: string[]): string {
         break
       case 'clearIdentity':
         lines.push('  const clearIdentity: () => void')
+        break
+      default:
+        lines.push(`  const ${sym}: typeof import('evlog').${sym}`)
         break
     }
   }

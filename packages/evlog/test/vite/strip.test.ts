@@ -1,8 +1,8 @@
+import { parse } from 'acorn'
 import { describe, expect, it } from 'vitest'
 import { createStripPlugin } from '../../src/vite/strip'
 
 function createTransformContext() {
-  const { parse } = require('acorn') as typeof import('acorn')
   return {
     parse(code: string) {
       return parse(code, { ecmaVersion: 'latest', sourceType: 'module' })
@@ -12,11 +12,12 @@ function createTransformContext() {
 
 function stripTransform(code: string, levels: string[], id = 'src/app.ts') {
   const plugin = createStripPlugin(levels as any)
-  const configResolved = (plugin as any).configResolved
+  const { configResolved } = (plugin as any)
   if (configResolved) configResolved({ command: 'build' })
   const ctx = createTransformContext()
-  const transform = (plugin as any).transform
-  return transform.call(ctx, code, id)
+  const t = (plugin as any).transform
+  const handler = typeof t === 'function' ? t : t.handler
+  return handler.call(ctx, code, id)
 }
 
 describe('vite strip plugin', () => {
@@ -102,11 +103,54 @@ describe('vite strip plugin', () => {
 
   it('does not strip in dev mode', () => {
     const plugin = createStripPlugin(['debug'] as any)
-    const configResolved = (plugin as any).configResolved
+    const { configResolved } = (plugin as any)
     configResolved({ command: 'serve' })
     const ctx = createTransformContext()
     const code = `log.debug('test', 'msg')\nconst x = 1`
-    const result = (plugin as any).transform.call(ctx, code, 'src/app.ts')
+    const { handler } = (plugin as any).transform
+    const result = handler.call(ctx, code, 'src/app.ts')
     expect(result).toBeUndefined()
+  })
+
+  it('replaces log.debug() in ternary with void 0', () => {
+    const code = `const x = cond ? log.debug('a') : 'fallback'`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('void 0')
+    expect(result.code).not.toContain('log.debug')
+    expect(result.code).toContain('\'fallback\'')
+  })
+
+  it('replaces log.debug() in comma expression with void 0', () => {
+    const code = `const x = (log.debug('a'), 42)`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('void 0')
+    expect(result.code).toContain('42')
+    expect(result.code).not.toContain('log.debug')
+  })
+
+  it('replaces log.debug() in return statement with void 0', () => {
+    const code = `function foo() { return log.debug('x') }`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('return void 0')
+    expect(result.code).not.toContain('log.debug')
+  })
+
+  it('replaces log.debug() in arrow function body with void 0', () => {
+    const code = `const fn = () => log.debug('x')`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('void 0')
+    expect(result.code).not.toContain('log.debug')
+  })
+
+  it('replaces log.debug() as function argument with void 0', () => {
+    const code = `foo(log.debug('x'))`
+    const result = stripTransform(code, ['debug'])
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('foo(void 0)')
+    expect(result.code).not.toContain('log.debug')
   })
 })

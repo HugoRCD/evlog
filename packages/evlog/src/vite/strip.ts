@@ -1,7 +1,7 @@
+import MagicString from 'magic-string'
 import type { Plugin } from 'vite'
 import type { LogLevel } from '../types'
-import MagicString from 'magic-string'
-import { isLogMemberCall, shouldTransform, walk } from './utils'
+import { TRANSFORM_FILTER, isLogMemberCall, shouldTransform, walk } from './utils'
 
 export function createStripPlugin(levels: LogLevel[]): Plugin {
   if (levels.length === 0) return { name: 'evlog:strip' }
@@ -15,35 +15,38 @@ export function createStripPlugin(levels: LogLevel[]): Plugin {
       isBuild = config.command === 'build'
     },
 
-    transform(code, id) {
-      if (!isBuild) return
-      if (!shouldTransform(id)) return
-      if (!levels.some(l => code.includes(`log.${l}`))) return
+    transform: {
+      filter: { ...TRANSFORM_FILTER, code: 'log.' },
+      handler(code, id) {
+        if (!isBuild) return
+        if (!shouldTransform(id)) return
+        if (!levels.some(l => code.includes(`log.${l}`))) return
 
-      let ast: any
-      try {
-        ast = this.parse(code)
-      } catch {
-        return
-      }
-
-      const s = new MagicString(code)
-      let modified = false
-
-      walk(ast, (node: any, parent: any) => {
-        if (!isLogMemberCall(node, levels)) return
-
-        if (parent?.type === 'ExpressionStatement') {
-          s.remove(parent.start, parent.end)
-        } else {
-          s.overwrite(node.start, node.end, 'void 0')
+        let ast: any
+        try {
+          ast = (this as any).parse(code)
+        } catch {
+          return
         }
-        modified = true
-      })
 
-      if (!modified) return
+        const s = new MagicString(code)
+        let modified = false
 
-      return { code: s.toString(), map: s.generateMap({ hires: true }) }
+        walk(ast, (node: any, parent: any) => {
+          if (!isLogMemberCall(node, levels)) return
+
+          if (parent?.type === 'ExpressionStatement') {
+            s.remove(parent.start, parent.end)
+          } else {
+            s.overwrite(node.start, node.end, 'void 0')
+          }
+          modified = true
+        })
+
+        if (!modified) return
+
+        return { code: s.toString(), map: s.generateMap({ hires: true }) }
+      },
     },
   }
 }

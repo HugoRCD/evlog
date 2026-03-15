@@ -77,7 +77,6 @@ export default defineConfig({
     '@nestjs/core',
     '@sveltejs/kit',
     'vite',
-    'magic-string',
   ],
-  inlineOnly: ['ufo']
+  inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })

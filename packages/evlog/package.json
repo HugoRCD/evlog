@@ -282,7 +282,7 @@
     "tsdown": "^0.21.1",
     "magic-string": "^0.30.17",
     "typescript": "^5.9.3",
-    "vite": "^6.3.5",
+    "vite": "^8.0.0",
     "ufo": "^1.6.3",
     "winston": "^3.19.0"
   },
@@ -299,7 +299,7 @@
     "elysia": ">=1.4.27",
     "fastify": ">=5.8.2",
     "@nestjs/common": ">=11.1.16",
-    "vite": "^5.0.0 || ^6.0.0"
+    "vite": "^7.0.0 || ^8.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {

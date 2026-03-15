@@ -35,10 +35,10 @@ export interface EvlogViteOptions {
   stringify?: boolean
   /** Opt-in auto-imports for log, createEvlogError, parseError */
   autoImports?: boolean | AutoImportsOptions
-  /** Log levels to strip from production builds */
+  /** Log levels to strip from production builds. Set to [] to disable. @default ['debug'] */
   strip?: LogLevel[]
-  /** Inject source file:line into log calls @default false */
-  sourceLocation?: boolean
+  /** Inject source file:line into log calls. When 'dev', active only during development. @default false */
+  sourceLocation?: boolean | 'dev'
   /** Client-side logging configuration */
   client?: ClientOptions
 }

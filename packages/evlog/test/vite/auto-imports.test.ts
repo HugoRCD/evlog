@@ -1,8 +1,8 @@
+import { parse } from 'acorn'
 import { describe, expect, it } from 'vitest'
 import { createAutoImportsPlugin } from '../../src/vite/auto-imports'
 
 function createTransformContext() {
-  const { parse } = require('acorn') as typeof import('acorn')
   return {
     parse(code: string) {
       return parse(code, { ecmaVersion: 'latest', sourceType: 'module' })
@@ -13,8 +13,9 @@ function createTransformContext() {
 function autoImportTransform(code: string, id = 'src/app.ts', options = {}) {
   const plugin = createAutoImportsPlugin(options)
   const ctx = createTransformContext()
-  const { transform } = (plugin as any)
-  return transform.call(ctx, code, id)
+  const t = (plugin as any).transform
+  const handler = typeof t === 'function' ? t : t.handler
+  return handler.call(ctx, code, id)
 }
 
 describe('vite auto-imports plugin', () => {
@@ -103,5 +104,30 @@ describe('vite auto-imports plugin', () => {
     const result = autoImportTransform(code)
     expect(result).toBeTruthy()
     expect(result.map).toBeTruthy()
+  })
+
+  it('adds import for setIdentity from evlog/client', () => {
+    const code = `setIdentity({ userId: '123' })`
+    const result = autoImportTransform(code, 'src/app.ts', {
+      imports: ['setIdentity'],
+    })
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('import { setIdentity } from \'evlog/client\'')
+  })
+
+  it('adds import for clearIdentity from evlog/client', () => {
+    const code = `clearIdentity()`
+    const result = autoImportTransform(code, 'src/app.ts', {
+      imports: ['clearIdentity'],
+    })
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('import { clearIdentity } from \'evlog/client\'')
+  })
+
+  it('groups log and parseError in same evlog import', () => {
+    const code = `log.info('test', 'msg')\nconst e = parseError(err)`
+    const result = autoImportTransform(code)
+    expect(result).toBeTruthy()
+    expect(result.code).toContain('import { log, parseError } from \'evlog\'')
   })
 })

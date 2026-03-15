@@ -53,8 +53,14 @@ describe('evlog vite plugin', () => {
     expect(names).toContain('evlog:strip')
   })
 
-  it('does not include strip by default', () => {
+  it('includes strip by default with debug level', () => {
     const plugins = evlog({ service: 'my-app' })
+    const names = plugins.map((p: any) => p.name)
+    expect(names).toContain('evlog:strip')
+  })
+
+  it('disables strip when set to empty array', () => {
+    const plugins = evlog({ service: 'my-app', strip: [] })
     const names = plugins.map((p: any) => p.name)
     expect(names).not.toContain('evlog:strip')
   })
@@ -71,10 +77,10 @@ describe('evlog vite plugin', () => {
     expect(names).not.toContain('evlog:source-location')
   })
 
-  it('returns minimal plugin set with no options', () => {
+  it('returns auto-init and strip with no options', () => {
     const plugins = evlog()
     const names = plugins.map((p: any) => p.name)
-    expect(names).toEqual(['evlog:auto-init'])
+    expect(names).toEqual(['evlog:auto-init', 'evlog:strip'])
   })
 
   it('returns all plugins when fully configured', () => {
@@ -91,5 +97,41 @@ describe('evlog vite plugin', () => {
     expect(names).toContain('evlog:client-inject')
     expect(names).toContain('evlog:strip')
     expect(names).toContain('evlog:source-location')
+  })
+
+  it('includes source-location when set to dev', () => {
+    const plugins = evlog({ service: 'my-app', sourceLocation: 'dev' })
+    const names = plugins.map((p: any) => p.name)
+    expect(names).toContain('evlog:source-location')
+  })
+
+  it('does not include source-location when explicitly false', () => {
+    const plugins = evlog({ service: 'my-app', sourceLocation: false })
+    const names = plugins.map((p: any) => p.name)
+    expect(names).not.toContain('evlog:source-location')
+  })
+
+  it('preserves plugin order: auto-init, auto-imports, client, strip, source-location', () => {
+    const plugins = evlog({
+      service: 'my-app',
+      autoImports: true,
+      strip: ['debug'],
+      sourceLocation: true,
+      client: { service: 'web' },
+    })
+    const names = plugins.map((p: any) => p.name)
+    expect(names).toEqual([
+      'evlog:auto-init',
+      'evlog:auto-imports',
+      'evlog:client-inject',
+      'evlog:strip',
+      'evlog:source-location',
+    ])
+  })
+
+  it('includes strip with multiple levels', () => {
+    const plugins = evlog({ service: 'my-app', strip: ['debug', 'info'] })
+    const names = plugins.map((p: any) => p.name)
+    expect(names).toContain('evlog:strip')
   })
 })

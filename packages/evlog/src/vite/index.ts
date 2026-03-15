@@ -16,11 +16,7 @@ import { createSourceLocationPlugin } from './source-location'
  *
  * export default defineConfig({
  *   plugins: [
- *     evlog({
- *       service: 'my-app',
- *       autoImports: true,
- *       strip: ['debug'],
- *     }),
+ *     evlog({ service: 'my-app' }),
  *   ],
  * })
  * ```
@@ -39,12 +35,14 @@ export default function evlog(options: EvlogViteOptions = {}): Plugin[] {
     plugins.push(createClientInjectPlugin(options.client))
   }
 
-  if (options.strip && options.strip.length > 0) {
-    plugins.push(createStripPlugin(options.strip))
+  const stripLevels = options.strip ?? ['debug']
+  if (stripLevels.length > 0) {
+    plugins.push(createStripPlugin(stripLevels))
   }
 
   if (options.sourceLocation) {
-    plugins.push(createSourceLocationPlugin(true))
+    const enabled = options.sourceLocation === 'dev' ? undefined : true
+    plugins.push(createSourceLocationPlugin(enabled))
   }
 
   return plugins

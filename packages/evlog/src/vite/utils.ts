@@ -1,9 +1,16 @@
 const JS_RE = /\.[cm]?[jt]sx?$/
 
+/**
+ * Rolldown-native file filter for transform hooks.
+ * Runs on the Rust side in Vite 8+, skipping JS bridge for non-matching files.
+ * Older Vite versions ignore the filter and fall through to `shouldTransform()`.
+ */
+export const TRANSFORM_FILTER = { id: /\.[cm]?[jt]sx?$|\.vue\?|\.svelte\?/ }
+
 export function shouldTransform(id: string): boolean {
   if (id.includes('node_modules')) return false
   if (id.startsWith('\0')) return false
-  const cleanId = id.split('?')[0]
+  const [cleanId] = id.split('?')
   if (JS_RE.test(cleanId)) return true
   if ((cleanId.endsWith('.vue') || cleanId.endsWith('.svelte')) && id.includes('?')) return true
   return false

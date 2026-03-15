@@ -8,7 +8,6 @@ export default defineConfig({
     evlog({
       service: 'sveltekit-example',
       pretty: true,
-      strip: ['debug'],
       sourceLocation: true,
     }),
   ],

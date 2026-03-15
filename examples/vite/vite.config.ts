@@ -5,8 +5,6 @@ export default defineConfig({
   plugins: [
     evlog({
       service: 'vite-example',
-      autoImports: true,
-      strip: ['debug'],
       sourceLocation: true,
     }),
   ],
