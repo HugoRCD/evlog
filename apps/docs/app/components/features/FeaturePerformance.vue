@@ -266,7 +266,9 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-merge" class="size-3.5 text-accent-blue" />
               </div>
               <div>
-                <p class="font-mono text-xs text-zinc-300">1 event, not N log lines</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  1 event, not N log lines
+                </p>
                 <p class="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
                   Accumulate context, emit once. 75% less data downstream.
                 </p>
@@ -278,7 +280,9 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-pen-tool" class="size-3.5 text-accent-blue" />
               </div>
               <div>
-                <p class="font-mono text-xs text-zinc-300">In-place mutations</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  In-place mutations
+                </p>
                 <p class="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
                   No object spreads, no copies. Direct recursive merge.
                 </p>
@@ -290,7 +294,9 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-clock" class="size-3.5 text-accent-blue" />
               </div>
               <div>
-                <p class="font-mono text-xs text-zinc-300">Lazy allocation</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Lazy allocation
+                </p>
                 <p class="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
                   Timestamps, sampling context — created only when needed.
                 </p>
@@ -302,7 +308,9 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-file-code" class="size-3.5 text-accent-blue" />
               </div>
               <div>
-                <p class="font-mono text-xs text-zinc-300">No serialization until drain</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  No serialization until drain
+                </p>
                 <p class="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
                   Plain objects throughout. JSON.stringify runs once at the end.
                 </p>
@@ -314,7 +322,9 @@ onBeforeUnmount(() => {
                 <UIcon name="i-lucide-box" class="size-3.5 text-accent-blue" />
               </div>
               <div>
-                <p class="font-mono text-xs text-zinc-300">Zero dependencies</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Zero dependencies
+                </p>
                 <p class="mt-0.5 text-[11px] leading-relaxed text-zinc-600">
                   No transitive deps. Nothing to audit, nothing to break.
                 </p>
@@ -325,12 +335,20 @@ onBeforeUnmount(() => {
           <div class="border-t border-zinc-800/50 px-5 sm:px-6 py-4">
             <div class="flex items-center justify-between">
               <div>
-                <p class="font-mono text-xs text-zinc-300">Total overhead per request</p>
-                <p class="font-mono text-[10px] text-zinc-600 mt-0.5">create + 3x set + emit + sampling + enrichers</p>
+                <p class="font-mono text-xs text-zinc-300">
+                  Total overhead per request
+                </p>
+                <p class="font-mono text-[10px] text-zinc-600 mt-0.5">
+                  create + 3x set + emit + sampling + enrichers
+                </p>
               </div>
               <div class="text-right">
-                <p class="font-mono text-xl font-medium text-accent-blue tabular-nums">~7µs</p>
-                <p class="font-mono text-[10px] text-zinc-600">0.007ms</p>
+                <p class="font-mono text-xl font-medium text-accent-blue tabular-nums">
+                  ~7µs
+                </p>
+                <p class="font-mono text-[10px] text-zinc-600">
+                  0.007ms
+                </p>
               </div>
             </div>
           </div>
