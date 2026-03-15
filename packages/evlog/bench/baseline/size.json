@@ -3,27 +3,27 @@
     {
       "entry": "framework/nitro",
       "raw": 17856,
-      "gzip": 7012
+      "gzip": 7010
     },
     {
       "entry": "logger",
-      "raw": 11907,
-      "gzip": 3831
+      "raw": 11982,
+      "gzip": 3867
     },
     {
       "entry": "framework/next",
       "raw": 9145,
-      "gzip": 3090
+      "gzip": 3091
     },
     {
       "entry": "adapter/sentry",
       "raw": 6148,
-      "gzip": 2382
+      "gzip": 2381
     },
     {
       "entry": "adapter/otlp",
       "raw": 5850,
-      "gzip": 2140
+      "gzip": 2139
     },
     {
       "entry": "enrichers",
@@ -33,7 +33,7 @@
     {
       "entry": "framework/sveltekit",
       "raw": 4960,
-      "gzip": 1579
+      "gzip": 1578
     },
     {
       "entry": "adapter/posthog",
@@ -43,7 +43,7 @@
     {
       "entry": "adapter/fs",
       "raw": 3458,
-      "gzip": 1450
+      "gzip": 1448
     },
     {
       "entry": "utils",
@@ -58,7 +58,7 @@
     {
       "entry": "adapter/axiom",
       "raw": 3315,
-      "gzip": 1333
+      "gzip": 1332
     },
     {
       "entry": "browser",
@@ -73,22 +73,22 @@
     {
       "entry": "framework/nestjs",
       "raw": 2872,
-      "gzip": 1237
+      "gzip": 1236
     },
     {
       "entry": "adapter/better-stack",
       "raw": 2682,
-      "gzip": 1102
+      "gzip": 1101
     },
     {
       "entry": "framework/elysia",
       "raw": 2569,
-      "gzip": 1090
+      "gzip": 1093
     },
     {
       "entry": "framework/fastify",
       "raw": 2344,
-      "gzip": 1010
+      "gzip": 1009
     },
     {
       "entry": "workers",
@@ -98,17 +98,17 @@
     {
       "entry": "framework/express",
       "raw": 1322,
-      "gzip": 702
+      "gzip": 701
     },
     {
       "entry": "framework/hono",
       "raw": 1098,
-      "gzip": 593
+      "gzip": 594
     },
     {
       "entry": "toolkit",
       "raw": 486,
-      "gzip": 243
+      "gzip": 242
     },
     {
       "entry": "core (index)",
@@ -122,7 +122,7 @@
     }
   ],
   "total": {
-    "raw": 103587,
-    "gzip": 38780
+    "raw": 103662,
+    "gzip": 38808
   }
 }
