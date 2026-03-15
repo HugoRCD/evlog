@@ -6,6 +6,7 @@ on:
       - main
     paths:
       - 'packages/evlog/src/**'
+      - '!packages/evlog/src/vite/**'
       - 'packages/evlog/bench/**'
       - 'packages/evlog/vitest.config.ts'
   pull_request:
@@ -13,6 +14,7 @@ on:
       - main
     paths:
       - 'packages/evlog/src/**'
+      - '!packages/evlog/src/vite/**'
       - 'packages/evlog/bench/**'
       - 'packages/evlog/vitest.config.ts'
 
