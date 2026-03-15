@@ -338,11 +338,11 @@ describe('posthog adapter', () => {
     })
 
     it('catches and logs errors from sendBatchToOTLP', async () => {
-      fetchSpy.mockResolvedValueOnce(
+      fetchSpy.mockResolvedValue(
         new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' }),
       )
       const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-      const drain = createPostHogDrain({ apiKey: 'phc_test' })
+      const drain = createPostHogDrain({ apiKey: 'phc_test', retries: 0 })
       await drain(createDrainContext())
 
       expect(consoleSpy).toHaveBeenCalledWith(
