@@ -35,6 +35,7 @@ let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
 let globalEnabled = true
 let globalSilent = false
+let _locked = false
 
 /**
  * Initialize the logger with configuration.
@@ -68,6 +69,22 @@ export function initLogger(config: LoggerConfig = {}): void {
  */
 export function isEnabled(): boolean {
   return globalEnabled
+}
+
+/**
+ * @internal Lock the logger to prevent re-initialization.
+ * Called by instrumentation register() after setting up the logger with drain.
+ * Prevents configureHandler() from overwriting the drain config.
+ */
+export function _lockLogger(): void {
+  _locked = true
+}
+
+/**
+ * @internal Check if the logger has been locked by instrumentation.
+ */
+export function isLoggerLocked(): boolean {
+  return _locked
 }
 
 /**

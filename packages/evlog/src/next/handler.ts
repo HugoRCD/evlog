@@ -1,5 +1,5 @@
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, getGlobalDrain, initLogger, isEnabled } from '../logger'
+import { createRequestLogger, getGlobalDrain, initLogger, isEnabled, isLoggerLocked } from '../logger'
 import { filterSafeHeaders } from '../utils'
 import { shouldLog, getServiceForPath } from '../shared/routes'
 import { EvlogError } from '../error'
@@ -19,6 +19,10 @@ const state: WithEvlogState = {
 export function configureHandler(options: NextEvlogOptions): void {
   state.options = options
   state.initialized = true
+
+  // Skip if instrumentation register() already configured the logger.
+  // Re-initializing would wipe the global drain.
+  if (isLoggerLocked()) return
 
   // Don't pass drain to initLogger — the global drain fires inside emitWideEvent
   // which doesn't have request/header context. Instead, we call drain ourselves

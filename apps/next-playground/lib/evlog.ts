@@ -1,9 +1,11 @@
 import type { DrainContext } from 'evlog'
 import { createEvlog } from 'evlog/next'
+import { createInstrumentation } from 'evlog/next/instrumentation'
 import { createUserAgentEnricher, createRequestSizeEnricher } from 'evlog/enrichers'
 import { createDrainPipeline } from 'evlog/pipeline'
 import { createAxiomDrain } from 'evlog/axiom'
 import { createBetterStackDrain } from 'evlog/better-stack'
+import { createFsDrain } from 'evlog/fs'
 
 const enrichers = [createUserAgentEnricher(), createRequestSizeEnricher()]
 
@@ -17,6 +19,12 @@ const drain = pipeline(async (batch) => {
     console.log('[DRAIN]', JSON.stringify(ctx.event))
   }
   await Promise.allSettled([axiom(batch), betterStack(batch)])
+})
+
+export const { register, onRequestError } = createInstrumentation({
+  service: 'next-playground',
+  drain: createFsDrain(),
+  captureOutput: true,
 })
 
 export const { withEvlog, useLogger, log, createEvlogError } = createEvlog({
