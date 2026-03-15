@@ -18,9 +18,11 @@ function isRetryable(error: unknown): boolean {
 }
 
 export async function httpPost({ url, headers, body, timeout, label, retries = 2 }: HttpPostOptions): Promise<void> {
+  const normalizedRetries = Number.isFinite(retries) && retries >= 0 ? Math.floor(retries) : 2
+
   let lastError: Error | undefined
 
-  for (let attempt = 0; attempt <= retries; attempt++) {
+  for (let attempt = 0; attempt <= normalizedRetries; attempt++) {
     const controller = new AbortController()
     const timeoutId = setTimeout(() => controller.abort(), timeout)
 
@@ -49,7 +51,7 @@ export async function httpPost({ url, headers, body, timeout, label, retries = 2
         lastError = error as Error
       }
 
-      if (!isRetryable(error) || attempt === retries) {
+      if (!isRetryable(error) || attempt === normalizedRetries) {
         throw lastError
       }
 
