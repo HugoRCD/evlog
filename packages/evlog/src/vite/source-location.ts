@@ -30,7 +30,7 @@ export function createSourceLocationPlugin(enabled?: boolean): Plugin {
         }
 
         const [cleanId] = id.split('?')
-        const relativePath = relative(root, cleanId)
+        const relativePath = relative(root, cleanId).replaceAll('\\', '/')
         const s = new MagicString(code)
         let modified = false
 

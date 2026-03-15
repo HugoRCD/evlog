@@ -12,6 +12,7 @@ onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 })
 
+const NuxtLink = resolveComponent('NuxtLink')
 const activeTab = ref(0)
 
 const frameworkRows = [
@@ -30,6 +31,7 @@ const frameworkRows = [
     { name: 'Elysia', icon: 'i-custom-elysia', tab: 9 },
     { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 10 },
     { name: 'Bun', icon: 'i-simple-icons-bun', tab: 11 },
+    { name: 'Vite', icon: 'i-custom-vite', link: '/core-concepts/vite-plugin' },
   ],
 ]
 </script>
@@ -77,27 +79,29 @@ const frameworkRows = [
         :key="rowIndex"
         class="flex flex-wrap items-end justify-center gap-2 md:gap-3"
       >
-        <button
+        <component
+          :is="fw.link ? NuxtLink : 'button'"
           v-for="fw in row"
           :key="fw.name"
+          :to="fw.link"
           class="group flex flex-col items-center gap-2 px-4 py-3 border outline-none transition-all duration-300"
-          :class="activeTab === fw.tab
+          :class="fw.tab !== undefined && activeTab === fw.tab
             ? 'border-accent-blue/30 bg-accent-blue/5'
             : 'border-transparent hover:border-zinc-800'"
-          @click="activeTab = fw.tab"
+          @click="fw.tab !== undefined ? activeTab = fw.tab : undefined"
         >
           <UIcon
             :name="fw.icon"
             class="size-8 sm:size-10 transition-colors duration-300"
-            :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'"
+            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'"
           />
           <span
             class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
-            :class="activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'"
+            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'"
           >
             {{ fw.name }}
           </span>
-        </button>
+        </component>
       </div>
     </Motion>
 

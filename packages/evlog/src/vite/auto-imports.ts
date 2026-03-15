@@ -38,7 +38,7 @@ export function createAutoImportsPlugin(options: AutoImportsOptions = {}): Plugi
       handler(code, id) {
         if (!shouldTransform(id)) return
         if (!symbols.some(s => code.includes(s))) return
-        if (/from\s*['"]evlog['"]/.test(code) || /from\s*['"]#imports['"]/.test(code)) return
+        if (/from\s*['"]#imports['"]/.test(code)) return
 
         let ast: any
         try {
@@ -65,12 +65,31 @@ export function createAutoImportsPlugin(options: AutoImportsOptions = {}): Plugi
   }
 }
 
+function collectBindingNames(pattern: any, out: Set<string>): void {
+  if (!pattern) return
+  if (pattern.type === 'Identifier') {
+    out.add(pattern.name)
+  } else if (pattern.type === 'ObjectPattern') {
+    for (const prop of pattern.properties) {
+      collectBindingNames(prop.type === 'RestElement' ? prop.argument : prop.value, out)
+    }
+  } else if (pattern.type === 'ArrayPattern') {
+    for (const el of pattern.elements) {
+      if (el) collectBindingNames(el, out)
+    }
+  } else if (pattern.type === 'AssignmentPattern') {
+    collectBindingNames(pattern.left, out)
+  } else if (pattern.type === 'RestElement') {
+    collectBindingNames(pattern.argument, out)
+  }
+}
+
 function collectTopLevelDeclarations(ast: any): Set<string> {
   const declared = new Set<string>()
   for (const node of ast.body) {
     if (node.type === 'VariableDeclaration') {
       for (const decl of node.declarations) {
-        if (decl.id?.name) declared.add(decl.id.name)
+        collectBindingNames(decl.id, declared)
       }
     }
     if (node.type === 'FunctionDeclaration' && node.id?.name) {

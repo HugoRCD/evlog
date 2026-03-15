@@ -13,7 +13,7 @@
     "hono": "^4.11.9"
   },
   "devDependencies": {
-    "vite": "^6.3.5",
+    "vite": "^7.0.0",
     "vite-node": "^3.2.3"
   }
 }

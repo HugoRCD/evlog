@@ -260,6 +260,7 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
+    "acorn": "^8.14.1",
     "@codspeed/vitest-plugin": "^5.2.0",
     "@nestjs/common": "^11.1.16",
     "@nuxt/devtools": "^3.2.3",

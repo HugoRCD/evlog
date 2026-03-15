@@ -185,7 +185,7 @@ export default defineConfig({
 
 | Feature | Option | Description |
 |---------|--------|-------------|
-| Auto-init | `service` | Auto-calls `initLogger()` via virtual module `virtual:evlog/init` |
+| Auto-init | `service` | Injects `__EVLOG_CONFIG__` via Vite `define` — `initLogger()` is called automatically at import time |
 | Auto-imports | `autoImports: true` | Auto-import `log`, `createEvlogError`, `parseError` with `.d.ts` generation |
 | Client init | `client: {...}` | Inject `initLog()` via `transformIndexHtml` for client-side logging |
 | Log stripping | `strip: ['debug']` | Remove `log.debug()` calls from production builds via AST transform |
@@ -196,7 +196,7 @@ export default defineConfig({
 - Source lives in `packages/evlog/src/vite/`
 - Each feature is a separate Vite plugin returned as an array
 - Individual plugins (`createStripPlugin`, `createSourceLocationPlugin`) can be used standalone (e.g., from the Nuxt module via `addVitePlugin()`)
-- Transform functions use Rollup's built-in acorn parser (`this.parse()`) + MagicString — no extra dependencies
+- Transform functions use Rollup's built-in acorn parser (`this.parse()`) + MagicString (inlined at build time via tsdown)
 - `evlog/client` is a public re-export of `runtime/client/log.ts` for client-side init
 
 ### Nuxt module integration

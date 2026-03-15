@@ -479,5 +479,7 @@ export function getEnvironment(): EnvironmentContext {
   return { ...globalEnv }
 }
 
-// @ts-expect-error __EVLOG_CONFIG__ is a compile-time constant injected by evlog/vite
+// eslint-disable-next-line @typescript-eslint/naming-convention
+declare const __EVLOG_CONFIG__: import('./types').LoggerConfig | undefined
+
 if (typeof __EVLOG_CONFIG__ !== 'undefined') initLogger(__EVLOG_CONFIG__)
