@@ -1,0 +1,19 @@
+{
+  "name": "evlog-vite-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "vite-node src/server.ts",
+    "build": "vite build",
+    "start": "node dist/server.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.13.8",
+    "evlog": "workspace:*",
+    "hono": "^4.11.9"
+  },
+  "devDependencies": {
+    "vite": "^6.3.5",
+    "vite-node": "^3.2.3"
+  }
+}

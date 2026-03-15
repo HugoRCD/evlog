@@ -30,6 +30,7 @@
     "example:browser": "dotenv -- turbo run dev --filter=evlog-browser-example",
     "example:bun-script": "dotenv -- turbo run dev --filter=evlog-bun-script-example",
     "example:tanstack-start": "dotenv -- turbo run dev --filter=evlog-tanstack-start-example",
+    "example:vite": "dotenv -- turbo run dev --filter=evlog-vite-example",
     "build": "turbo run build",
     "build:package": "turbo run build --filter='./packages/*'",
     "build:docs": "turbo run build --filter=evlog-docs",
