@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
 license: MIT
 metadata:
   author: HugoRCD
@@ -722,6 +722,46 @@ createEvlog({
   },
 })
 ```
+
+---
+
+## AI SDK Integration
+
+Capture token usage, tool calls, model info, and streaming metrics from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >= 6.0.0` as a peer dependency.
+
+```typescript
+import { createAILogger } from 'evlog/ai'
+
+const log = useLogger(event) // or any RequestLogger
+const ai = createAILogger(log)
+
+const result = streamText({
+  model: ai.wrap('anthropic/claude-sonnet-4.6'),  // accepts string or model object
+  messages,
+  onFinish: ({ text }) => {
+    // User callbacks remain free — no conflict
+  },
+})
+```
+
+`ai.wrap()` uses model middleware to transparently capture all LLM calls. Works with `generateText`, `streamText`, `generateObject`, `streamObject`, and `ToolLoopAgent`.
+
+For embeddings (different model type):
+
+```typescript
+const { embedding, usage } = await embed({ model: embeddingModel, value: query })
+ai.captureEmbed({ usage })
+```
+
+Wide event `ai` field includes: `calls`, `model`, `provider`, `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadTokens`, `reasoningTokens`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`, `error`.
+
+Anti-patterns to detect:
+
+| Anti-Pattern | Fix |
+|--------------|-----|
+| Manual token tracking in `onFinish` | `ai.wrap()` — middleware captures automatically |
+| `console.log('tokens:', result.usage)` | `ai.wrap()` — structured `ai.*` fields in wide event |
+| No AI observability | Add `createAILogger(log)` + `ai.wrap()` |
 
 ---
 

@@ -37,6 +37,7 @@ Here are the available types and scopes:
 - sveltekit (SvelteKit integration)
 - workers (Cloudflare Workers adapter)
 - fs (File System adapter)
+- ai (AI SDK integration)
 - dx (developer experience improvements)
 -->
 

@@ -660,6 +660,32 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
+## AI SDK Integration
+
+Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Requires `ai >= 6.0.0`.
+
+```typescript
+import { streamText } from 'ai'
+import { createAILogger } from 'evlog/ai'
+
+export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
+  const ai = createAILogger(log)
+
+  const result = streamText({
+    model: ai.wrap('anthropic/claude-sonnet-4.6'),  // string or model object
+    messages,
+    onFinish: ({ text }) => saveConversation(text),  // no conflict
+  })
+
+  return result.toTextStreamResponse()
+})
+```
+
+The middleware captures: `inputTokens`, `outputTokens`, `cacheReadTokens`, `reasoningTokens`, `model`, `provider`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`.
+
+For embeddings: `ai.captureEmbed({ usage })`.
+
 ## Adapters
 
 Send your logs to external observability platforms with built-in adapters.

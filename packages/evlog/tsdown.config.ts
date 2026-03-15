@@ -43,6 +43,7 @@ export default defineConfig({
     'vite/index': 'src/vite/index.ts',
     'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
+    'ai/index': 'src/ai/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -77,6 +78,8 @@ export default defineConfig({
     '@nestjs/core',
     '@sveltejs/kit',
     'vite',
+    'ai',
+    '@ai-sdk/provider',
   ],
   inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })
