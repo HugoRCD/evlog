@@ -1,11 +1,20 @@
 /**
  * Try to get runtime config from Nitro/Nuxt environment.
+ * Supports both Nitro v2 (nitropack/runtime) and Nitro v3 (nitro/runtime-config).
  * Returns undefined if not in a Nitro context.
  */
 export function getRuntimeConfig(): Record<string, any> | undefined {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const { useRuntimeConfig } = require('nitropack/runtime')
+    return useRuntimeConfig()
+  } catch {
+    // nitropack not available — try Nitro v3
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const { useRuntimeConfig } = require('nitro/runtime-config')
     return useRuntimeConfig()
   } catch {
     return undefined
