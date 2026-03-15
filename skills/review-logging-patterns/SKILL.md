@@ -582,6 +582,31 @@ export default {
 }
 ```
 
+### Vite Plugin (any Vite-based framework)
+
+For any Vite-based project (SvelteKit, Astro, SolidStart, React+Vite, etc.), use the Vite plugin for auto-init, auto-imports, and build-time features:
+
+```typescript
+// vite.config.ts
+import evlog from 'evlog/vite'
+
+export default defineConfig({
+  plugins: [
+    evlog({
+      service: 'my-app',
+      autoImports: true,           // auto-import log, createEvlogError, parseError
+      strip: ['debug'],            // remove log.debug() in production
+      sourceLocation: true,        // inject file:line in dev
+      client: {                    // client-side logging
+        transport: { endpoint: '/api/logs' },
+      },
+    }),
+  ],
+})
+```
+
+Server-side middleware (drain, enrich, keep, routes) is still configured in the framework integration (e.g., `evlog()` middleware for Hono/Express/SvelteKit). The Vite plugin handles build-time DX only.
+
 ### Standalone TypeScript
 
 ```typescript

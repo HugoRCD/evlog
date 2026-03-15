@@ -478,3 +478,6 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
 export function getEnvironment(): EnvironmentContext {
   return { ...globalEnv }
 }
+
+// @ts-expect-error __EVLOG_CONFIG__ is a compile-time constant injected by evlog/vite
+if (typeof __EVLOG_CONFIG__ !== 'undefined') initLogger(__EVLOG_CONFIG__)

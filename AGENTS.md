@@ -51,6 +51,7 @@ evlog/
 │       ├── src/
 │       │   ├── nuxt/        # Nuxt module
 │       │   ├── nitro/       # Nitro plugin
+│       │   ├── vite/        # Vite plugin (evlog/vite)
 │       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
 │       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
@@ -157,6 +158,50 @@ try {
   if (error.fix) console.info(`💡 Fix: ${error.fix}`)
 }
 ```
+
+## Vite Plugin
+
+The `evlog/vite` plugin provides build-time DX for any Vite-based framework (SvelteKit, Astro, SolidStart, React+Vite, etc.). It complements runtime framework integrations — it does NOT replace them.
+
+```typescript
+// vite.config.ts
+import evlog from 'evlog/vite'
+
+export default defineConfig({
+  plugins: [
+    evlog({
+      service: 'my-app',
+      sampling: { rates: { info: 10, debug: 0 } },
+      autoImports: true,
+      strip: ['debug'],
+      sourceLocation: true,
+      client: { transport: { endpoint: '/api/logs' } },
+    }),
+  ],
+})
+```
+
+### Features
+
+| Feature | Option | Description |
+|---------|--------|-------------|
+| Auto-init | `service` | Auto-calls `initLogger()` via virtual module `virtual:evlog/init` |
+| Auto-imports | `autoImports: true` | Auto-import `log`, `createEvlogError`, `parseError` with `.d.ts` generation |
+| Client init | `client: {...}` | Inject `initLog()` via `transformIndexHtml` for client-side logging |
+| Log stripping | `strip: ['debug']` | Remove `log.debug()` calls from production builds via AST transform |
+| Source location | `sourceLocation: true` | Inject `__source: 'file:line'` into `log.*()` object-form calls |
+
+### Architecture
+
+- Source lives in `packages/evlog/src/vite/`
+- Each feature is a separate Vite plugin returned as an array
+- Individual plugins (`createStripPlugin`, `createSourceLocationPlugin`) can be used standalone (e.g., from the Nuxt module via `addVitePlugin()`)
+- Transform functions use Rollup's built-in acorn parser (`this.parse()`) + MagicString — no extra dependencies
+- `evlog/client` is a public re-export of `runtime/client/log.ts` for client-side init
+
+### Nuxt module integration
+
+The Nuxt module uses `addVitePlugin()` to add strip + source location plugins internally. Auto-imports and client init are NOT delegated (Nuxt handles those natively). This is purely additive — no breaking change.
 
 ## Framework Integration
 

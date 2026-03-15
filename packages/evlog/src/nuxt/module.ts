@@ -4,11 +4,14 @@ import {
   addServerHandler,
   addServerImports,
   addServerPlugin,
+  addVitePlugin,
   createResolver,
   defineNuxtModule,
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import { createStripPlugin } from '../vite/strip'
+import { createSourceLocationPlugin } from '../vite/source-location'
 import { name, version } from '../../package.json'
 
 interface ModuleAxiomBaseConfig {
@@ -318,5 +321,11 @@ export default defineNuxtModule<ModuleOptions>({
         from: resolver.resolve('../error'),
       },
     ])
+
+    addVitePlugin(createStripPlugin(['debug']))
+
+    if (nuxt.options.dev) {
+      addVitePlugin(createSourceLocationPlugin(true))
+    }
   },
 })

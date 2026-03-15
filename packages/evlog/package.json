@@ -25,6 +25,7 @@
     "elysia",
     "nestjs",
     "sveltekit",
+    "vite",
     "typescript"
   ],
   "license": "MIT",
@@ -141,6 +142,16 @@
       "import": "./dist/sveltekit/index.mjs",
       "default": "./dist/sveltekit/index.mjs"
     },
+    "./vite": {
+      "types": "./dist/vite/index.d.mts",
+      "import": "./dist/vite/index.mjs",
+      "default": "./dist/vite/index.mjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.mts",
+      "import": "./dist/client.mjs",
+      "default": "./dist/client.mjs"
+    },
     "./toolkit": {
       "types": "./dist/toolkit.d.mts",
       "import": "./dist/toolkit.mjs",
@@ -217,6 +228,12 @@
       "sveltekit": [
         "./dist/sveltekit/index.d.mts"
       ],
+      "vite": [
+        "./dist/vite/index.d.mts"
+      ],
+      "client": [
+        "./dist/client.d.mts"
+      ],
       "toolkit": [
         "./dist/toolkit.d.mts"
       ]
@@ -263,7 +280,9 @@
     "pino": "^10.3.1",
     "supertest": "^7.2.2",
     "tsdown": "^0.21.1",
+    "magic-string": "^0.30.17",
     "typescript": "^5.9.3",
+    "vite": "^6.3.5",
     "ufo": "^1.6.3",
     "winston": "^3.19.0"
   },
@@ -279,7 +298,8 @@
     "express": ">=5.2.1",
     "elysia": ">=1.4.27",
     "fastify": ">=5.8.2",
-    "@nestjs/common": ">=11.1.16"
+    "@nestjs/common": ">=11.1.16",
+    "vite": "^5.0.0 || ^6.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -316,6 +336,9 @@
       "optional": true
     },
     "@nestjs/common": {
+      "optional": true
+    },
+    "vite": {
       "optional": true
     }
   }

@@ -40,6 +40,8 @@ export default defineConfig({
     'fastify/index': 'src/fastify/index.ts',
     'nestjs/index': 'src/nestjs/index.ts',
     'sveltekit/index': 'src/sveltekit/index.ts',
+    'vite/index': 'src/vite/index.ts',
+    'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
   },
   format: 'esm',
@@ -74,6 +76,8 @@ export default defineConfig({
     '@nestjs/common',
     '@nestjs/core',
     '@sveltejs/kit',
+    'vite',
+    'magic-string',
   ],
   inlineOnly: ['ufo']
 })
