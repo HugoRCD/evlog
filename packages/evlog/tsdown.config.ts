@@ -34,6 +34,7 @@ export default defineConfig({
     'browser': 'src/browser.ts',
     'next/index': 'src/next/index.ts',
     'next/client': 'src/next/client.ts',
+    'next/instrumentation': 'src/next/instrumentation.ts',
     'hono/index': 'src/hono/index.ts',
     'express/index': 'src/express/index.ts',
     'elysia/index': 'src/elysia/index.ts',

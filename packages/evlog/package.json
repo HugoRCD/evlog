@@ -111,6 +111,11 @@
       "import": "./dist/next/client.mjs",
       "default": "./dist/next/client.mjs"
     },
+    "./next/instrumentation": {
+      "types": "./dist/next/instrumentation.d.mts",
+      "import": "./dist/next/instrumentation.mjs",
+      "default": "./dist/next/instrumentation.mjs"
+    },
     "./hono": {
       "types": "./dist/hono/index.d.mts",
       "import": "./dist/hono/index.mjs",
@@ -198,6 +203,9 @@
       ],
       "next/client": [
         "./dist/next/client.d.mts"
+      ],
+      "next/instrumentation": [
+        "./dist/next/instrumentation.d.mts"
       ],
       "hono": [
         "./dist/hono/index.d.mts"

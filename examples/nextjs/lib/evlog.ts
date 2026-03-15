@@ -1,5 +1,6 @@
 import type { DrainContext } from 'evlog'
 import { createEvlog } from 'evlog/next'
+import { createInstrumentation } from 'evlog/next/instrumentation'
 import { createUserAgentEnricher, createRequestSizeEnricher } from 'evlog/enrichers'
 import { createDrainPipeline } from 'evlog/pipeline'
 
@@ -14,6 +15,11 @@ const drain = pipeline((batch) => {
   for (const ctx of batch) {
     console.log('[DRAIN]', JSON.stringify(ctx.event))
   }
+})
+
+export const { register, onRequestError } = createInstrumentation({
+  service: 'nextjs-example',
+  drain,
 })
 
 export const { withEvlog, useLogger, log, createError } = createEvlog({
