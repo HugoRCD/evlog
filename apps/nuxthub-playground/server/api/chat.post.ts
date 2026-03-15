@@ -1,4 +1,5 @@
 import { ToolLoopAgent, createAgentUIStreamResponse, stepCountIs } from 'ai'
+import { createAILogger } from 'evlog/ai'
 import { queryEvents } from '../tools/query-events'
 
 const systemPrompt = `You are a helpful assistant that analyzes application logs stored in a SQLite database.
@@ -62,41 +63,24 @@ export default defineEventHandler(async (event) => {
 
   logger.set({ action: 'chat', messagesCount: messages.length })
 
-  const agent = new ToolLoopAgent({
-    model: 'google/gemini-3-flash',
-    instructions: systemPrompt,
-    tools: { queryEvents },
-    stopWhen: stepCountIs(5),
-    onFinish: ({ steps }) => {
-      const totalUsage = { inputTokens: 0, outputTokens: 0, totalTokens: 0 }
-      const toolCalls: string[] = []
+  const ai = createAILogger(logger)
 
-      for (const step of steps) {
-        totalUsage.inputTokens += step.usage?.inputTokens ?? 0
-        totalUsage.outputTokens += step.usage?.outputTokens ?? 0
-        totalUsage.totalTokens += step.usage?.totalTokens ?? 0
-
-        for (const tc of step.toolCalls ?? []) {
-          toolCalls.push(tc.toolName)
-        }
-      }
-
-      const lastStep = steps.at(-1)
-
-      logger.set({
-        ai: {
-          model: lastStep?.response?.modelId ?? 'google/gemini-3-flash',
-          steps: steps.length,
-          finishReason: lastStep?.finishReason,
-          usage: totalUsage,
-          toolCalls,
-        },
-      })
-    },
-  })
-
-  return createAgentUIStreamResponse({
-    agent,
-    uiMessages: messages,
-  })
+  try {
+    const agent = new ToolLoopAgent({
+      model: ai.wrap('google/gemini-3-flash'),
+      instructions: systemPrompt,
+      tools: { queryEvents },
+      stopWhen: stepCountIs(5),
+    })
+    return createAgentUIStreamResponse({
+      agent,
+      uiMessages: messages,
+    })
+  } catch (error) {
+    throw createError({
+      statusCode: 500,
+      statusMessage: 'Error creating agent',
+      cause: error,
+    })
+  }
 })

@@ -1,17 +1,19 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
       "devDependencies": {
+        "@ai-sdk/provider": "^3.0.8",
         "@changesets/changelog-github": "^0.6.0",
         "@changesets/cli": "^2.30.0",
         "@hrcd/eslint-config": "^3.0.3",
         "@types/node": "latest",
+        "ai": "^6.0.116",
         "automd": "^0.4.3",
         "dotenv-cli": "^11.0.0",
         "eslint": "^9.39.4",
+        "evlog": "workspace:*",
         "turbo": "^2.8.15",
         "typescript": "^5.9.3",
         "vitest": "^4.0.18",
@@ -91,6 +93,7 @@
       "name": "evlog-playground",
       "dependencies": {
         "@nuxt/ui": "^4.5.1",
+        "ai": "^6.0.116",
         "evlog": "workspace:*",
         "nuxt": "^4.4.2",
         "tailwindcss": "^4.2.1",
@@ -282,6 +285,7 @@
       "peerDependencies": {
         "@nestjs/common": ">=11.1.16",
         "@nuxt/kit": "^4.4.2",
+        "ai": ">=6.0.0",
         "elysia": ">=1.4.27",
         "express": ">=5.2.1",
         "fastify": ">=5.8.2",
@@ -297,6 +301,7 @@
       "optionalPeers": [
         "@nestjs/common",
         "@nuxt/kit",
+        "ai",
         "elysia",
         "express",
         "fastify",

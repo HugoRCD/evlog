@@ -53,6 +53,7 @@ evlog/
 │       │   ├── nitro/       # Nitro plugin
 │       │   ├── vite/        # Vite plugin (evlog/vite)
 │       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
+│       │   ├── ai/          # AI SDK integration (evlog/ai)
 │       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
@@ -113,6 +114,36 @@ import { log } from 'evlog'
 
 log.info('auth', 'User logged in')
 log.error({ action: 'payment', error: 'card_declined' })
+```
+
+### AI SDK Integration
+
+Use `createAILogger(log)` to capture AI SDK data (token usage, tool calls, model info, streaming metrics) into wide events. Works via model middleware — no callback conflicts.
+
+```typescript
+// server/api/chat.post.ts
+import { streamText } from 'ai'
+import { createAILogger } from 'evlog/ai'
+
+export default defineEventHandler(async (event) => {
+ const log = useLogger(event)
+ const ai = createAILogger(log)
+
+ const result = streamText({
+ model: ai.wrap('anthropic/claude-sonnet-4.6'),
+ messages,
+ onFinish: ({ text }) => saveConversation(text), // no conflict
+ })
+
+ return result.toTextStreamResponse()
+})
+```
+
+For embedding calls, use `captureEmbed`:
+
+```typescript
+const { embedding, usage } = await embed({ model: embeddingModel, value: query })
+ai.captureEmbed({ usage })
 ```
 
 ### Structured Errors

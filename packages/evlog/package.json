@@ -156,6 +156,11 @@
       "types": "./dist/toolkit.d.mts",
       "import": "./dist/toolkit.mjs",
       "default": "./dist/toolkit.mjs"
+    },
+    "./ai": {
+      "types": "./dist/ai/index.d.mts",
+      "import": "./dist/ai/index.mjs",
+      "default": "./dist/ai/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -236,6 +241,9 @@
       ],
       "toolkit": [
         "./dist/toolkit.d.mts"
+      ],
+      "ai": [
+        "./dist/ai/index.d.mts"
       ]
     }
   },
@@ -300,7 +308,8 @@
     "elysia": ">=1.4.27",
     "fastify": ">=5.8.2",
     "@nestjs/common": ">=11.1.16",
-    "vite": "^7.0.0 || ^8.0.0"
+    "vite": "^7.0.0 || ^8.0.0",
+    "ai": ">=6.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -340,6 +349,9 @@
       "optional": true
     },
     "vite": {
+      "optional": true
+    },
+    "ai": {
       "optional": true
     }
   }
