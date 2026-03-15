@@ -12,6 +12,7 @@ onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 })
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
 const NuxtLink = resolveComponent('NuxtLink')
 const activeTab = ref(0)
 
