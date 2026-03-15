@@ -16,14 +16,24 @@
       "gzip": 3091
     },
     {
+      "entry": "framework/vite",
+      "raw": 7278,
+      "gzip": 2432
+    },
+    {
       "entry": "adapter/sentry",
-      "raw": 6148,
-      "gzip": 2381
+      "raw": 6196,
+      "gzip": 2396
     },
     {
       "entry": "adapter/otlp",
-      "raw": 5850,
-      "gzip": 2139
+      "raw": 5898,
+      "gzip": 2149
+    },
+    {
+      "entry": "framework/ai",
+      "raw": 6588,
+      "gzip": 2032
     },
     {
       "entry": "enrichers",
@@ -37,8 +47,8 @@
     },
     {
       "entry": "adapter/posthog",
-      "raw": 4895,
-      "gzip": 1520
+      "raw": 4970,
+      "gzip": 1537
     },
     {
       "entry": "adapter/fs",
@@ -57,8 +67,8 @@
     },
     {
       "entry": "adapter/axiom",
-      "raw": 3315,
-      "gzip": 1332
+      "raw": 3363,
+      "gzip": 1350
     },
     {
       "entry": "browser",
@@ -77,8 +87,8 @@
     },
     {
       "entry": "adapter/better-stack",
-      "raw": 2682,
-      "gzip": 1101
+      "raw": 2730,
+      "gzip": 1117
     },
     {
       "entry": "framework/elysia",
@@ -116,13 +126,18 @@
       "gzip": 205
     },
     {
+      "entry": "client",
+      "raw": 166,
+      "gzip": 118
+    },
+    {
       "entry": "types",
       "raw": 11,
       "gzip": 31
     }
   ],
   "total": {
-    "raw": 103662,
-    "gzip": 38808
+    "raw": 117961,
+    "gzip": 43466
   }
 }
