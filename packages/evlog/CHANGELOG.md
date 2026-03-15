@@ -1,5 +1,42 @@
 # evlog
 
+## 2.8.0
+
+### Minor Changes
+
+- [#196](https://github.com/HugoRCD/evlog/pull/196) [`abda28c`](https://github.com/HugoRCD/evlog/commit/abda28cc00b6276a59c2cf9dcfca295f4d7b878c) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/ai` integration for AI SDK v6+ observability.
+
+  - `createAILogger(log)` returns an `AILogger` with `wrap()` and `captureEmbed()`
+  - Model middleware captures token usage, tool calls, finish reason, and streaming metrics
+  - Supports `generateText`, `streamText`, `generateObject`, `streamObject`, and `ToolLoopAgent`
+  - Accumulates data across multi-step agent runs (steps, models, tokens)
+  - String model IDs resolved via `gateway()` with full autocompletion
+  - Gateway provider parsing extracts actual provider and model name
+  - Streaming metrics: `msToFirstChunk`, `msToFinish`, `tokensPerSecond`
+  - Cache tokens (`cacheReadTokens`, `cacheWriteTokens`) and reasoning tokens tracked
+  - Error capture from failed model calls and stream error chunks
+  - `captureEmbed()` for embedding calls (`embed`, `embedMany`)
+  - `ai` is an optional peer dependency
+
+- [#189](https://github.com/HugoRCD/evlog/pull/189) [`d92fb46`](https://github.com/HugoRCD/evlog/commit/d92fb46b2d272dca0de73a0ffedda746304f57b6) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/vite` plugin for build-time DX enhancements in any Vite-based framework.
+
+  - Zero-config auto-initialization via Vite `define` (no `initLogger()` needed)
+  - Build-time `log.debug()` stripping in production builds (default)
+  - Source location injection (`__source: 'file:line'`) for object-form log calls
+  - Opt-in auto-imports for `log`, `createEvlogError`, `parseError`
+  - Client-side logger injection via `transformIndexHtml`
+  - New `evlog/client` public entrypoint
+  - Nuxt module gains `strip` and `sourceLocation` options (no breaking changes)
+
+### Patch Changes
+
+- [#197](https://github.com/HugoRCD/evlog/pull/197) [`3601d30`](https://github.com/HugoRCD/evlog/commit/3601d303c122509a8f665f20e8275248e6e6e7f5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add retry with exponential backoff to all HTTP drain adapters and improve timeout error messages.
+
+  - Transient failures (timeouts, network errors, 5xx) are retried up to 2 times with exponential backoff (200ms, 400ms)
+  - `AbortError` timeout errors now display a clear message: `"Axiom request timed out after 5000ms"` instead of the cryptic `"DOMException [AbortError]: This operation was aborted"`
+  - New `retries` option on all adapter configs (Axiom, OTLP, Sentry, PostHog, Better Stack)
+  - 4xx client errors are never retried
+
 ## 2.7.0
 
 ### Minor Changes
