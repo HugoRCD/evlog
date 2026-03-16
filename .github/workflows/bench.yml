@@ -60,7 +60,7 @@ jobs:
           echo "$EOF" >> "$GITHUB_OUTPUT"
 
       - name: Post PR comment
-        uses: actions/github-script@v7
+        uses: actions/github-script@v8
         with:
           script: |
             const body = `${{ steps.compare.outputs.report }}`;
