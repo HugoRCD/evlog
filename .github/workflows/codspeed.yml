@@ -35,6 +35,6 @@ jobs:
       - name: Build evlog package
         run: bunx turbo run build --filter=evlog
 
-      - uses: CodSpeedHQ/action@v3
+      - uses: CodSpeedHQ/action@v4
         with:
           run: cd packages/evlog && bunx vitest bench --run bench/core/
