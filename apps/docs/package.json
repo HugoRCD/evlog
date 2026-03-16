@@ -11,14 +11,14 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.5.1",
-    "@vercel/analytics": "^2.0.0",
+    "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "better-sqlite3": "^12.6.2",
+    "better-sqlite3": "^12.8.0",
     "docus": "^5.8.1",
-    "motion-v": "^2.0.0",
+    "motion-v": "^2.0.1",
     "nuxt": "^4.4.2",
     "nuxt-studio": "^1.4.0",
-    "shaders": "^2.3.75",
+    "shaders": "^2.4.77",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.1"
   },
