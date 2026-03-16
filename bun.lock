@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -252,7 +253,7 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "2.7.0",
+      "version": "2.8.0",
       "devDependencies": {
         "@codspeed/vitest-plugin": "^5.2.0",
         "@nestjs/common": "^11.1.16",
