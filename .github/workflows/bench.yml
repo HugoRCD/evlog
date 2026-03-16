@@ -118,7 +118,7 @@ jobs:
           bun bench/scripts/size.ts --json > bench/baseline/size.json
 
       - name: Create baseline PR
-        uses: peter-evans/create-pull-request@v7
+        uses: peter-evans/create-pull-request@v8
         with:
           commit-message: "chore(bench): update size baseline"
           title: "chore(bench): update size baseline"
