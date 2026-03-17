@@ -76,7 +76,7 @@ export function isEnabled(): boolean {
  * Called by instrumentation register() after setting up the logger with drain.
  * Prevents configureHandler() from overwriting the drain config.
  */
-export function _lockLogger(): void {
+export function lockLogger(): void {
   _locked = true
 }
 

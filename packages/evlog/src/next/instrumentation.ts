@@ -1,5 +1,5 @@
 import type { DrainContext, EnvironmentContext, SamplingConfig } from '../types'
-import { initLogger, log, _lockLogger } from '../logger'
+import { initLogger, log, lockLogger } from '../logger'
 
 export interface InstrumentationOptions {
   /** Enable or disable all logging globally. @default true */
@@ -52,7 +52,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       stringify: options.stringify,
       drain: options.drain,
     })
-    _lockLogger()
+    lockLogger()
 
     if (options.captureOutput && process.env.NEXT_RUNTIME === 'nodejs') {
       patchOutput()
@@ -64,7 +64,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
     const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
     const originalStderrWrite = proc.stderr.write.bind(proc.stderr)
 
-    proc.stdout.write = function (chunk: unknown, ...args: unknown[]): boolean {
+    proc.stdout.write = function(chunk: unknown, ...args: unknown[]): boolean {
       if (!patching) {
         patching = true
         try {
@@ -76,7 +76,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       return originalStdoutWrite(chunk, ...args as [])
     } as typeof process.stdout.write
 
-    proc.stderr.write = function (chunk: unknown, ...args: unknown[]): boolean {
+    proc.stderr.write = function(chunk: unknown, ...args: unknown[]): boolean {
       if (!patching) {
         patching = true
         try {
