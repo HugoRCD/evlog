@@ -41,14 +41,16 @@ const app = new Elysia()
     const result = findUserWithOrders(params.id)
     return result
   })
-  .get('/checkout', () => {
-    throw createError({
-      message: 'Payment failed',
-      status: 402,
-      why: 'Card declined by issuer',
-      fix: 'Try a different card or payment method',
-      link: 'https://docs.example.com/payments/declined',
-    })
+  .get('/checkout', ({ status, log }) => {
+    return status(
+      402,
+      createError({
+        message: 'Payment failed',
+        why: 'Card declined by issuer',
+        fix: 'Try a different card or payment method',
+        link: 'https://docs.example.com/payments/declined',
+      })
+    )
   })
   .onError(({ error, set }) => {
     const parsed = parseError(error)
