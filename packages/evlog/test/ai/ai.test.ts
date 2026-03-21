@@ -832,9 +832,7 @@ describe('createAILogger', () => {
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
-      expect(aiData.toolCalls).toEqual([
-        { name: 'searchWeb', input: { query: 'hello' } },
-      ])
+      expect(aiData.toolCalls).toEqual([{ name: 'searchWeb', input: { query: 'hello' } },])
     })
 
     it('does not capture stream tool inputs when toolInputs is false', async () => {
@@ -888,9 +886,7 @@ describe('createAILogger', () => {
       const wrappedModel = ai.wrap(model)
 
       ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
-        content: [
-          { type: 'tool-call', toolCallId: 'tc1', toolName: 'queryDB', input: '{"sql":"SELECT * FROM events WHERE status = 200 ORDER BY created_at DESC LIMIT 50"}' },
-        ],
+        content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'queryDB', input: '{"sql":"SELECT * FROM events WHERE status = 200 ORDER BY created_at DESC LIMIT 50"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
@@ -912,9 +908,7 @@ describe('createAILogger', () => {
       const wrappedModel = ai.wrap(model)
 
       ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
-        content: [
-          { type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"q":"hello"}' },
-        ],
+        content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"q":"hello"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
@@ -972,9 +966,7 @@ describe('createAILogger', () => {
       const wrappedModel = ai.wrap(model)
 
       ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
-        content: [
-          { type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"query":"a very long search query that exceeds the limit"}' },
-        ],
+        content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"query":"a very long search query that exceeds the limit"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
