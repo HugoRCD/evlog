@@ -317,4 +317,47 @@ describe('parseError', () => {
       expect(parsed.status).toBe(500)
     })
   })
+
+  describe('Error instances with status properties', () => {
+    it('respects .status on Error', () => {
+      const error = Object.assign(new Error('Bad Request'), { status: 400 })
+
+      const parsed = parseError(error)
+
+      expect(parsed.status).toBe(400)
+      expect(parsed.message).toBe('Bad Request')
+    })
+
+    it('respects .statusCode on Error', () => {
+      const error = Object.assign(new Error('Not Found'), { statusCode: 404 })
+
+      const parsed = parseError(error)
+
+      expect(parsed.status).toBe(404)
+    })
+
+    it('prefers .status over .statusCode', () => {
+      const error = Object.assign(new Error('Conflict'), { status: 409, statusCode: 500 })
+
+      const parsed = parseError(error)
+
+      expect(parsed.status).toBe(409)
+    })
+
+    it('defaults to 500 for plain Error without status', () => {
+      const error = new Error('Something broke')
+
+      const parsed = parseError(error)
+
+      expect(parsed.status).toBe(500)
+    })
+
+    it('defaults to 500 when status is not a valid number', () => {
+      const error = Object.assign(new Error('Weird'), { status: 'bad' })
+
+      const parsed = parseError(error)
+
+      expect(parsed.status).toBe(500)
+    })
+  })
 })
