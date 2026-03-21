@@ -1,8 +1,9 @@
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
-import type { DrainContext, EnrichContext, RouteConfig, ServerEvent, WideEvent } from '../src/types'
+import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, ServerEvent, WideEvent } from '../src/types'
 import { filterSafeHeaders, matchesPattern } from '../src/utils'
 import { shouldLog } from '../src/shared/routes'
+import { createRequestLogger, initLogger } from '../src/logger'
 
 vi.mock('h3', () => ({
   getHeaders: vi.fn(),
@@ -1040,102 +1041,150 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
 })
 
 describe('nitro plugin - middleware compatibility (#210)', () => {
-  it('logger is always created even when shouldLog returns false', () => {
-    expect(shouldLog('/dashboard', ['/api/**'])).toBe(false)
+  /**
+   * Replicates the plugin's `request` hook logic so we can test it directly.
+   * The real plugin registers this via nitroApp.hooks.hook('request', ...).
+   */
+  function simulateRequestHook(
+    event: ServerEvent,
+    config?: { include?: string[]; exclude?: string[] },
+  ): void {
+    event.context._evlogShouldEmit = shouldLog(event.path, config?.include, config?.exclude)
+    event.context._evlogStartTime = Date.now()
+    event.context.log = createRequestLogger(
+      { method: event.method, path: event.path, requestId: crypto.randomUUID() },
+      { _deferDrain: true },
+    )
+  }
 
-    const mockEvent: ServerEvent = {
-      method: 'GET',
-      path: '/dashboard',
-      context: {},
+  /**
+   * Replicates the plugin's `afterResponse` hook logic.
+   */
+  function simulateAfterResponseHook(event: ServerEvent): { emitted: boolean } {
+    if (event.context._evlogEmitted || !event.context._evlogShouldEmit) {
+      return { emitted: false }
     }
+    const log = event.context.log as RequestLogger | undefined
+    if (!log) return { emitted: false }
+    log.set({ status: 200 })
+    const result = log.emit()
+    return { emitted: result !== null }
+  }
 
-    const shouldEmit = shouldLog(mockEvent.path, ['/api/**'])
-    mockEvent.context._evlogShouldEmit = shouldEmit
-    expect(mockEvent.context._evlogShouldEmit).toBe(false)
+  /**
+   * Replicates the plugin's `error` hook logic.
+   */
+  function simulateErrorHook(event: ServerEvent, error: Error): { emitted: boolean } {
+    if (!event.context._evlogShouldEmit) return { emitted: false }
+    const log = event.context.log as RequestLogger | undefined
+    if (!log) return { emitted: false }
+    log.error(error)
+    log.set({ status: 500 })
+    event.context._evlogEmitted = true
+    const result = log.emit()
+    return { emitted: result !== null }
+  }
 
-    const mockLog = {
-      set: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      emit: vi.fn().mockReturnValue(null),
-      getContext: vi.fn().mockReturnValue({}),
-    }
-    mockEvent.context.log = mockLog
-
-    expect(mockEvent.context.log).toBeDefined()
-    mockEvent.context.log!.set({ user: { id: 'test' } })
-    expect(mockLog.set).toHaveBeenCalledWith({ user: { id: 'test' } })
+  beforeEach(() => {
+    initLogger({ env: { service: 'test-app' }, pretty: false })
   })
 
-  it('afterResponse skips emit when _evlogShouldEmit is false', () => {
-    const mockLog = {
-      set: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      emit: vi.fn().mockReturnValue({ level: 'info', service: 'test' }),
-      getContext: vi.fn().mockReturnValue({}),
-    }
-
-    const mockEvent: ServerEvent = {
-      method: 'GET',
-      path: '/dashboard',
-      context: {
-        log: mockLog,
-        _evlogShouldEmit: false,
-      },
-    }
-
-    const shouldSkip = mockEvent.context._evlogEmitted || !mockEvent.context._evlogShouldEmit
-    expect(shouldSkip).toBe(true)
-    expect(mockLog.emit).not.toHaveBeenCalled()
+  afterEach(() => {
+    vi.restoreAllMocks()
   })
 
-  it('afterResponse emits when _evlogShouldEmit is true', () => {
-    const mockLog = {
-      set: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      emit: vi.fn().mockReturnValue({ level: 'info', service: 'test' }),
-      getContext: vi.fn().mockReturnValue({}),
-    }
+  it('request hook creates logger even when route is filtered out by include', () => {
+    const event: ServerEvent = { method: 'GET', path: '/dashboard', context: {} }
 
-    const mockEvent: ServerEvent = {
-      method: 'GET',
-      path: '/api/users',
-      context: {
-        log: mockLog,
-        _evlogShouldEmit: true,
-      },
-    }
+    simulateRequestHook(event, { include: ['/api/**'] })
 
-    const shouldSkip = mockEvent.context._evlogEmitted || !mockEvent.context._evlogShouldEmit
-    expect(shouldSkip).toBe(false)
+    expect(event.context.log).toBeDefined()
+    expect(event.context._evlogShouldEmit).toBe(false)
+    expect(event.context._evlogStartTime).toBeTypeOf('number')
   })
 
-  it('error hook skips emit when _evlogShouldEmit is false', () => {
-    const mockLog = {
-      set: vi.fn(),
-      error: vi.fn(),
-      info: vi.fn(),
-      warn: vi.fn(),
-      emit: vi.fn().mockReturnValue(null),
-      getContext: vi.fn().mockReturnValue({}),
-    }
+  it('request hook sets _evlogShouldEmit true for matching routes', () => {
+    const event: ServerEvent = { method: 'GET', path: '/api/users', context: {} }
 
-    const mockEvent: ServerEvent = {
-      method: 'POST',
-      path: '/dashboard',
-      context: {
-        log: mockLog,
-        _evlogShouldEmit: false,
-      },
-    }
+    simulateRequestHook(event, { include: ['/api/**'] })
 
-    expect(mockEvent.context._evlogShouldEmit).toBe(false)
-    expect(mockLog.emit).not.toHaveBeenCalled()
-    expect(mockLog.error).not.toHaveBeenCalled()
+    expect(event.context.log).toBeDefined()
+    expect(event.context._evlogShouldEmit).toBe(true)
+  })
+
+  it('middleware can call set() on logger from a filtered route', () => {
+    const event: ServerEvent = { method: 'GET', path: '/dashboard', context: {} }
+
+    simulateRequestHook(event, { include: ['/api/**'] })
+
+    expect(event.context._evlogShouldEmit).toBe(false)
+    event.context.log!.set({ user: { id: 'usr_123', plan: 'enterprise' } })
+
+    const ctx = event.context.log!.getContext()
+    expect(ctx.user).toEqual({ id: 'usr_123', plan: 'enterprise' })
+  })
+
+  it('afterResponse does not emit for filtered routes', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const event: ServerEvent = { method: 'GET', path: '/dashboard', context: {} }
+
+    simulateRequestHook(event, { include: ['/api/**'] })
+    event.context.log!.set({ user: { id: 'test' } })
+
+    const { emitted } = simulateAfterResponseHook(event)
+
+    expect(emitted).toBe(false)
+    consoleSpy.mockRestore()
+  })
+
+  it('afterResponse emits for matching routes', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const event: ServerEvent = { method: 'GET', path: '/api/users', context: {} }
+
+    simulateRequestHook(event, { include: ['/api/**'] })
+
+    const { emitted } = simulateAfterResponseHook(event)
+
+    expect(emitted).toBe(true)
+    consoleSpy.mockRestore()
+  })
+
+  it('error hook does not emit for filtered routes', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const event: ServerEvent = { method: 'POST', path: '/dashboard', context: {} }
+
+    simulateRequestHook(event, { include: ['/api/**'] })
+
+    const { emitted } = simulateErrorHook(event, new Error('boom'))
+
+    expect(emitted).toBe(false)
+    expect(event.context._evlogEmitted).toBeUndefined()
+    consoleSpy.mockRestore()
+  })
+
+  it('error hook emits for matching routes', () => {
+    const consoleSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    const event: ServerEvent = { method: 'POST', path: '/api/checkout', context: {} }
+
+    simulateRequestHook(event, { include: ['/api/**'] })
+
+    const { emitted } = simulateErrorHook(event, new Error('payment failed'))
+
+    expect(emitted).toBe(true)
+    expect(event.context._evlogEmitted).toBe(true)
+    consoleSpy.mockRestore()
+  })
+
+  it('request hook creates logger for all routes when no include is set', () => {
+    const pageEvent: ServerEvent = { method: 'GET', path: '/', context: {} }
+    const apiEvent: ServerEvent = { method: 'GET', path: '/api/users', context: {} }
+
+    simulateRequestHook(pageEvent)
+    simulateRequestHook(apiEvent)
+
+    expect(pageEvent.context.log).toBeDefined()
+    expect(pageEvent.context._evlogShouldEmit).toBe(true)
+    expect(apiEvent.context.log).toBeDefined()
+    expect(apiEvent.context._evlogShouldEmit).toBe(true)
   })
 })
