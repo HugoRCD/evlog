@@ -2,6 +2,11 @@ export default defineNuxtConfig({
   extends: ['docus'],
 
   routeRules: {
+    '/getting-started': { redirect: { to: '/getting-started/introduction', statusCode: 301 } },
+    '/frameworks': { redirect: { to: '/frameworks/overview', statusCode: 301 } },
+    '/adapters': { redirect: { to: '/adapters/overview', statusCode: 301 } },
+    '/enrichers': { redirect: { to: '/enrichers/overview', statusCode: 301 } },
+    '/nuxthub': { redirect: { to: '/nuxthub/overview', statusCode: 301 } },
     '/examples/nextjs': { redirect: { to: '/frameworks/nextjs', statusCode: 301 } },
     '/examples/sveltekit': { redirect: { to: '/frameworks/sveltekit', statusCode: 301 } },
     '/examples/tanstack-start': { redirect: { to: '/frameworks/tanstack-start', statusCode: 301 } },
