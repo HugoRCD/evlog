@@ -78,7 +78,6 @@ export default defineConfig({
     '@nestjs/common',
     '@nestjs/core',
     'react-router',
-    '@react-router/node',
     '@sveltejs/kit',
     'vite',
     'ai',

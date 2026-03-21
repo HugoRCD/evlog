@@ -3,6 +3,8 @@ import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
+import { EvlogError } from '../error'
+import { serializeEvlogErrorResponse } from '../nitro'
 
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure the evlog middleware is added to your route.',
@@ -67,6 +69,16 @@ export function evlog(options: EvlogReactRouterOptions = {}) {
       return response
     } catch (error) {
       await finish({ error: error as Error })
+
+      if (error instanceof EvlogError) {
+        const status = error.status ?? 500
+        const body = serializeEvlogErrorResponse(error, url.pathname)
+        return new Response(JSON.stringify(body), {
+          status,
+          headers: { 'content-type': 'application/json' },
+        })
+      }
+
       throw error
     }
   }

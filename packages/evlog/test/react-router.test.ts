@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initLogger } from '../src/logger'
+import { createError } from '../src/error'
 import { evlog, loggerContext, useLogger } from '../src/react-router/index'
 import {
   assertDrainCalledWith,
@@ -113,6 +114,55 @@ describe('evlog/react-router', () => {
     const event = JSON.parse(lastCall![0] as string)
     expect(event.status).toBe(500)
     expect(event.path).toBe('/api/fail')
+  })
+
+  it('returns structured JSON response for EvlogError', async () => {
+    const middleware = evlog()
+    const context = createMockContext()
+    const next = vi.fn(() => {
+      throw createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined by issuer',
+        fix: 'Try a different payment method',
+        link: 'https://docs.example.com/payments/declined',
+      })
+    })
+
+    const response = await middleware({ request: createRequest('/api/checkout'), context }, next)
+
+    expect(response.status).toBe(402)
+    expect(response.headers.get('content-type')).toBe('application/json')
+
+    const body = await response.json()
+    expect(body.message).toBe('Payment failed')
+    expect(body.statusCode).toBe(402)
+    expect(body.data.why).toBe('Card declined by issuer')
+    expect(body.data.fix).toBe('Try a different payment method')
+    expect(body.data.link).toBe('https://docs.example.com/payments/declined')
+  })
+
+  it('logs EvlogError with correct status and level', async () => {
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
+    const context = createMockContext()
+    const next = vi.fn(() => {
+      throw createError({ message: 'Not found', status: 404 })
+    })
+
+    await middleware({ request: createRequest('/api/missing'), context }, next)
+
+    assertDrainCalledWith(drain, { path: '/api/missing', level: 'error', status: 404 })
+  })
+
+  it('re-throws non-EvlogError errors', async () => {
+    const middleware = evlog()
+    const context = createMockContext()
+    const next = vi.fn(() => Promise.reject(new TypeError('unexpected')))
+
+    await expect(
+      middleware({ request: createRequest('/api/fail'), context }, next),
+    ).rejects.toThrow('unexpected')
   })
 
   it('skips routes not matching include patterns', async () => {
