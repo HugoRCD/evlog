@@ -1,11 +1,34 @@
 # evlog
 
+## 2.9.0
+
+### Minor Changes
+
+- [#212](https://github.com/HugoRCD/evlog/pull/212) [`96c47cd`](https://github.com/HugoRCD/evlog/commit/96c47cd3adfbaf0e6c53db9be55b45f652dfbdb8) Thanks [@MrLightful](https://github.com/MrLightful)! - Add React Router middleware integration (`evlog/react-router`) with automatic wide-event logging, drain, enrich, and tail sampling support
+
+### Patch Changes
+
+- [#220](https://github.com/HugoRCD/evlog/pull/220) [`b0c26d5`](https://github.com/HugoRCD/evlog/commit/b0c26d5eacb2382402a0ab99744650796ea52be7) Thanks [@HugoRCD](https://github.com/HugoRCD)! - fix(nitro): make `evlogErrorHandler` compatible with TanStack Start's `createMiddleware().server()` API
+
+  `evlogErrorHandler` now accepts both `(next)` and `({ next })` signatures, so `createMiddleware().server(evlogErrorHandler)` works directly without a wrapper in all TanStack Start versions.
+
+- [#215](https://github.com/HugoRCD/evlog/pull/215) [`31cb4ab`](https://github.com/HugoRCD/evlog/commit/31cb4ab903c969107a368cb5a9629eff6fe0c63b) Thanks [@HugoRCD](https://github.com/HugoRCD)! - fix(nitro): always create logger in request hook so `useLogger()` works in server middleware
+
+  Previously, calling `useLogger(event)` inside a Nuxt server middleware would throw `"Logger not initialized"` because the Nitro plugin skipped logger creation for routes not matching `include` patterns. Since middleware runs for every request, this made it impossible to use `useLogger` there.
+
+  The `shouldLog` filtering is now evaluated at emit time instead of creation time — the logger is always available on `event.context.log`, but events for non-matching routes are silently discarded.
+
+- [#218](https://github.com/HugoRCD/evlog/pull/218) [`453a548`](https://github.com/HugoRCD/evlog/commit/453a5483d1a7b2db7979edbc306cd9b9584e9f40) Thanks [@benhid](https://github.com/benhid)! - fix(parseError): respect `.status` / `.statusCode` on Error instances instead of hardcoding 500
+
+  Frameworks like NestJS attach HTTP status directly on Error subclasses (e.g. `BadRequestException` has `.status = 400`). Previously, `parseError()` ignored these properties and always returned 500 for any `Error` instance without a `data` property. Now uses `extractErrorStatus()` to extract the correct status.
+
+- [#219](https://github.com/HugoRCD/evlog/pull/219) [`79f811d`](https://github.com/HugoRCD/evlog/commit/79f811dab02717470ed5f178b5c944a395dc4025) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Improve TanStack Start documentation with route filtering, pipeline (batching & retry), tail sampling sections, Vite plugin callout, and TanStack Router vs TanStack Start disambiguation
+
 ## 2.8.0
 
 ### Minor Changes
 
 - [#196](https://github.com/HugoRCD/evlog/pull/196) [`abda28c`](https://github.com/HugoRCD/evlog/commit/abda28cc00b6276a59c2cf9dcfca295f4d7b878c) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/ai` integration for AI SDK v6+ observability.
-
   - `createAILogger(log)` returns an `AILogger` with `wrap()` and `captureEmbed()`
   - Model middleware captures token usage, tool calls, finish reason, and streaming metrics
   - Supports `generateText`, `streamText`, `generateObject`, `streamObject`, and `ToolLoopAgent`
@@ -19,7 +42,6 @@
   - `ai` is an optional peer dependency
 
 - [#189](https://github.com/HugoRCD/evlog/pull/189) [`d92fb46`](https://github.com/HugoRCD/evlog/commit/d92fb46b2d272dca0de73a0ffedda746304f57b6) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/vite` plugin for build-time DX enhancements in any Vite-based framework.
-
   - Zero-config auto-initialization via Vite `define` (no `initLogger()` needed)
   - Build-time `log.debug()` stripping in production builds (default)
   - Source location injection (`__source: 'file:line'`) for object-form log calls
@@ -31,7 +53,6 @@
 ### Patch Changes
 
 - [#197](https://github.com/HugoRCD/evlog/pull/197) [`3601d30`](https://github.com/HugoRCD/evlog/commit/3601d303c122509a8f665f20e8275248e6e6e7f5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add retry with exponential backoff to all HTTP drain adapters and improve timeout error messages.
-
   - Transient failures (timeouts, network errors, 5xx) are retried up to 2 times with exponential backoff (200ms, 400ms)
   - `AbortError` timeout errors now display a clear message: `"Axiom request timed out after 5000ms"` instead of the cryptic `"DOMException [AbortError]: This operation was aborted"`
   - New `retries` option on all adapter configs (Axiom, OTLP, Sentry, PostHog, Better Stack)
