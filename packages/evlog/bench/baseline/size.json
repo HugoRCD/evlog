@@ -2,8 +2,8 @@
   "entries": [
     {
       "entry": "framework/nitro",
-      "raw": 17856,
-      "gzip": 7010
+      "raw": 18011,
+      "gzip": 7038
     },
     {
       "entry": "logger",
@@ -18,7 +18,7 @@
     {
       "entry": "framework/vite",
       "raw": 7278,
-      "gzip": 2432
+      "gzip": 2431
     },
     {
       "entry": "adapter/sentry",
@@ -83,7 +83,7 @@
     {
       "entry": "framework/nestjs",
       "raw": 2872,
-      "gzip": 1236
+      "gzip": 1237
     },
     {
       "entry": "adapter/better-stack",
@@ -92,13 +92,13 @@
     },
     {
       "entry": "framework/elysia",
-      "raw": 2569,
-      "gzip": 1093
+      "raw": 2540,
+      "gzip": 1074
     },
     {
       "entry": "framework/fastify",
       "raw": 2344,
-      "gzip": 1009
+      "gzip": 1010
     },
     {
       "entry": "workers",
@@ -108,17 +108,17 @@
     {
       "entry": "framework/express",
       "raw": 1322,
-      "gzip": 701
+      "gzip": 702
     },
     {
       "entry": "framework/hono",
       "raw": 1098,
-      "gzip": 594
+      "gzip": 595
     },
     {
       "entry": "toolkit",
       "raw": 486,
-      "gzip": 242
+      "gzip": 241
     },
     {
       "entry": "core (index)",
@@ -137,7 +137,7 @@
     }
   ],
   "total": {
-    "raw": 117961,
-    "gzip": 43466
+    "raw": 118087,
+    "gzip": 43477
   }
 }
