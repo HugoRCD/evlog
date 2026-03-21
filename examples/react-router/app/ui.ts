@@ -228,7 +228,7 @@ export function testUI(): string {
 
         const res = await fetch(path, opts)
         const ms = Math.round(performance.now() - start)
-        const data = await res.json()
+        const text = await res.text()
 
         el.header.style.display = 'flex'
         el.status.textContent = res.status
@@ -236,7 +236,12 @@ export function testUI(): string {
         el.methodPath.textContent = method + ' ' + path
         el.timing.textContent = ms + 'ms'
         el.body.className = 'response-body'
-        el.body.innerHTML = syntaxHighlight(data)
+
+        try {
+          el.body.innerHTML = syntaxHighlight(JSON.parse(text))
+        } catch {
+          el.body.textContent = text
+        }
       } catch (err) {
         el.header.style.display = 'none'
         el.body.className = 'response-body'

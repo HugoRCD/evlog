@@ -34,6 +34,7 @@ export function ErrorBoundary({ error }: Route.ErrorBoundaryProps) {
         <p>{parsed.message}</p>
         {parsed.why && <p>Why: {parsed.why}</p>}
         {parsed.fix && <p>Fix: {parsed.fix}</p>}
+        {parsed.link && <p><a href={parsed.link} style={{ color: '#60a5fa' }}>Learn more</a></p>}
         <Scripts />
       </body>
     </html>
