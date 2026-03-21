@@ -153,13 +153,12 @@ export default definePlugin((nitroApp) => {
 
   hooks.hook('request', (event) => {
     const { pathname } = parseURL(event.req.url)
-
-    // Skip logging for routes not matching include/exclude patterns
-    if (!shouldLog(pathname, evlogConfig?.include, evlogConfig?.exclude)) {
-      return
-    }
-
     const ctx = getContext(event)
+
+    // Evaluate route filtering but always create the logger so that server
+    // middleware (which runs for every request) can call useLogger(event)
+    // without throwing.  Filtering is enforced at emit time instead.
+    ctx._evlogShouldEmit = shouldLog(pathname, evlogConfig?.include, evlogConfig?.exclude)
 
     // Store start time for duration calculation in tail sampling
     ctx._evlogStartTime = Date.now()
@@ -187,8 +186,8 @@ export default definePlugin((nitroApp) => {
 
   hooks.hook('response', async (res, event) => {
     const ctx = event.req.context
-    // Skip if already emitted by error hook
-    if (ctx?._evlogEmitted) return
+    // Skip if already emitted by error hook or route was filtered out
+    if (ctx?._evlogEmitted || !ctx?._evlogShouldEmit) return
 
     const log = ctx?.log as RequestLogger | undefined
     if (!log || !ctx) return
@@ -221,8 +220,9 @@ export default definePlugin((nitroApp) => {
     const e = event as HTTPEvent
 
     const ctx = e.req.context
-    const log = ctx?.log as RequestLogger | undefined
-    if (!log || !ctx) return
+    if (!ctx?._evlogShouldEmit) return
+    const log = ctx.log as RequestLogger | undefined
+    if (!log) return
 
     // Check if error.cause is an EvlogError (thrown errors get wrapped in HTTPError by nitro)
     const actualError = (error.cause as Error)?.name === 'EvlogError' 

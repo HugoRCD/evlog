@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
 import type { DrainContext, EnrichContext, RouteConfig, ServerEvent, WideEvent } from '../src/types'
 import { filterSafeHeaders, matchesPattern } from '../src/utils'
+import { shouldLog } from '../src/shared/routes'
 
 vi.mock('h3', () => ({
   getHeaders: vi.fn(),
@@ -1035,5 +1036,106 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
 
     expect(enrichHeaders).toEqual(mockHeaders)
     expect(drainHeaders).toEqual(mockHeaders)
+  })
+})
+
+describe('nitro plugin - middleware compatibility (#210)', () => {
+  it('logger is always created even when shouldLog returns false', () => {
+    expect(shouldLog('/dashboard', ['/api/**'])).toBe(false)
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/dashboard',
+      context: {},
+    }
+
+    const shouldEmit = shouldLog(mockEvent.path, ['/api/**'])
+    mockEvent.context._evlogShouldEmit = shouldEmit
+    expect(mockEvent.context._evlogShouldEmit).toBe(false)
+
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      emit: vi.fn().mockReturnValue(null),
+      getContext: vi.fn().mockReturnValue({}),
+    }
+    mockEvent.context.log = mockLog
+
+    expect(mockEvent.context.log).toBeDefined()
+    mockEvent.context.log!.set({ user: { id: 'test' } })
+    expect(mockLog.set).toHaveBeenCalledWith({ user: { id: 'test' } })
+  })
+
+  it('afterResponse skips emit when _evlogShouldEmit is false', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      emit: vi.fn().mockReturnValue({ level: 'info', service: 'test' }),
+      getContext: vi.fn().mockReturnValue({}),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/dashboard',
+      context: {
+        log: mockLog,
+        _evlogShouldEmit: false,
+      },
+    }
+
+    const shouldSkip = mockEvent.context._evlogEmitted || !mockEvent.context._evlogShouldEmit
+    expect(shouldSkip).toBe(true)
+    expect(mockLog.emit).not.toHaveBeenCalled()
+  })
+
+  it('afterResponse emits when _evlogShouldEmit is true', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      emit: vi.fn().mockReturnValue({ level: 'info', service: 'test' }),
+      getContext: vi.fn().mockReturnValue({}),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/users',
+      context: {
+        log: mockLog,
+        _evlogShouldEmit: true,
+      },
+    }
+
+    const shouldSkip = mockEvent.context._evlogEmitted || !mockEvent.context._evlogShouldEmit
+    expect(shouldSkip).toBe(false)
+  })
+
+  it('error hook skips emit when _evlogShouldEmit is false', () => {
+    const mockLog = {
+      set: vi.fn(),
+      error: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      emit: vi.fn().mockReturnValue(null),
+      getContext: vi.fn().mockReturnValue({}),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'POST',
+      path: '/dashboard',
+      context: {
+        log: mockLog,
+        _evlogShouldEmit: false,
+      },
+    }
+
+    expect(mockEvent.context._evlogShouldEmit).toBe(false)
+    expect(mockLog.emit).not.toHaveBeenCalled()
+    expect(mockLog.error).not.toHaveBeenCalled()
   })
 })
