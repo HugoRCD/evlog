@@ -34,6 +34,7 @@ Here are the available types and scopes:
 - elysia (Elysia plugin)
 - fastify (Fastify plugin)
 - nestjs (NestJS middleware)
+- react-router (React Router integration)
 - sveltekit (SvelteKit integration)
 - workers (Cloudflare Workers adapter)
 - fs (File System adapter)

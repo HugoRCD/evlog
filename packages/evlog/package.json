@@ -25,6 +25,7 @@
     "elysia",
     "nestjs",
     "sveltekit",
+    "react-router",
     "vite",
     "typescript"
   ],
@@ -137,6 +138,11 @@
       "import": "./dist/nestjs/index.mjs",
       "default": "./dist/nestjs/index.mjs"
     },
+    "./react-router": {
+      "types": "./dist/react-router/index.d.mts",
+      "import": "./dist/react-router/index.mjs",
+      "default": "./dist/react-router/index.mjs"
+    },
     "./sveltekit": {
       "types": "./dist/sveltekit/index.d.mts",
       "import": "./dist/sveltekit/index.mjs",
@@ -230,6 +236,9 @@
       "nestjs": [
         "./dist/nestjs/index.d.mts"
       ],
+      "react-router": [
+        "./dist/react-router/index.d.mts"
+      ],
       "sveltekit": [
         "./dist/sveltekit/index.d.mts"
       ],
@@ -287,6 +296,7 @@
     "nitropack": "^2.13.1",
     "nuxt": "^4.4.2",
     "pino": "^10.3.1",
+    "react-router": "^7.9.0",
     "supertest": "^7.2.2",
     "tsdown": "^0.21.4",
     "magic-string": "^0.30.21",
@@ -308,6 +318,7 @@
     "elysia": ">=1.4.27",
     "fastify": ">=5.8.2",
     "@nestjs/common": ">=11.1.17",
+    "react-router": ">=7.9.0",
     "vite": "^7.0.0 || ^8.0.0",
     "ai": ">=6.0.116"
   },
@@ -346,6 +357,9 @@
       "optional": true
     },
     "@nestjs/common": {
+      "optional": true
+    },
+    "react-router": {
       "optional": true
     },
     "vite": {

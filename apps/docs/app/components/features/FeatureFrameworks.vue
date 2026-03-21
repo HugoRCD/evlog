@@ -23,15 +23,16 @@ const frameworkRows = [
     { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 2 },
     { name: 'Nitro', icon: 'i-custom-nitro', tab: 3 },
     { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 4 },
-    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 5 },
+    { name: 'React Router', icon: 'i-simple-icons-reactrouter', tab: 5 },
+    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 6 },
   ],
   [
-    { name: 'Express', icon: 'i-simple-icons-express', tab: 6 },
-    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 7 },
-    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 8 },
-    { name: 'Elysia', icon: 'i-custom-elysia', tab: 9 },
-    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 10 },
-    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 11 },
+    { name: 'Express', icon: 'i-simple-icons-express', tab: 7 },
+    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 8 },
+    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 9 },
+    { name: 'Elysia', icon: 'i-custom-elysia', tab: 10 },
+    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 11 },
+    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 12 },
     { name: 'Vite', icon: 'i-custom-vite', link: '/core-concepts/vite-plugin' },
   ],
 ]
@@ -129,24 +130,27 @@ const frameworkRows = [
         <slot name="tanstack-start" />
       </div>
       <div v-show="activeTab === 5" class="landing-code">
-        <slot name="nestjs" />
+        <slot name="react-router" />
       </div>
       <div v-show="activeTab === 6" class="landing-code">
-        <slot name="express" />
+        <slot name="nestjs" />
       </div>
       <div v-show="activeTab === 7" class="landing-code">
-        <slot name="hono" />
+        <slot name="express" />
       </div>
       <div v-show="activeTab === 8" class="landing-code">
-        <slot name="fastify" />
+        <slot name="hono" />
       </div>
       <div v-show="activeTab === 9" class="landing-code">
-        <slot name="elysia" />
+        <slot name="fastify" />
       </div>
       <div v-show="activeTab === 10" class="landing-code">
-        <slot name="cloudflare" />
+        <slot name="elysia" />
       </div>
       <div v-show="activeTab === 11" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 12" class="landing-code">
         <slot name="bun" />
       </div>
     </Motion>

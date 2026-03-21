@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
 license: MIT
 metadata:
   author: HugoRCD
@@ -556,6 +556,72 @@ app.use(evlog({
     if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
   },
 }))
+```
+
+### React Router
+
+```typescript
+// react-router.config.ts
+import type { Config } from '@react-router/dev/config'
+
+export default {
+  future: {
+    v8_middleware: true,
+  },
+} satisfies Config
+```
+
+```typescript
+// app/root.tsx
+import { initLogger } from 'evlog'
+import { evlog } from 'evlog/react-router'
+
+initLogger({ env: { service: 'my-api' } })
+
+export const middleware: Route.MiddlewareFunction[] = [
+  evlog(),
+]
+```
+
+Access the logger via `context.get(loggerContext)` in loaders and actions:
+
+```typescript
+// app/routes/api.users.$id.tsx
+import { loggerContext } from 'evlog/react-router'
+
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const log = context.get(loggerContext)
+  log.set({ user: { id: params.id } })
+  return { users: [] }
+}
+```
+
+Use `useLogger()` to access the logger from anywhere in the call stack without passing context:
+
+```typescript
+import { useLogger } from 'evlog/react-router'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+export const middleware: Route.MiddlewareFunction[] = [
+  evlog({
+    include: ['/api/**'],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+    keep: (ctx) => {
+      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+    },
+  }),
+]
 ```
 
 ### Cloudflare Workers
