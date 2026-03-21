@@ -2,13 +2,18 @@
   "entries": [
     {
       "entry": "framework/nitro",
-      "raw": 18011,
-      "gzip": 7038
+      "raw": 18108,
+      "gzip": 7072
     },
     {
       "entry": "logger",
       "raw": 11982,
       "gzip": 3867
+    },
+    {
+      "entry": "framework/ai",
+      "raw": 11537,
+      "gzip": 3189
     },
     {
       "entry": "framework/next",
@@ -29,11 +34,6 @@
       "entry": "adapter/otlp",
       "raw": 5898,
       "gzip": 2149
-    },
-    {
-      "entry": "framework/ai",
-      "raw": 6588,
-      "gzip": 2032
     },
     {
       "entry": "enrichers",
@@ -137,7 +137,7 @@
     }
   ],
   "total": {
-    "raw": 118087,
-    "gzip": 43477
+    "raw": 123133,
+    "gzip": 44668
   }
 }
