@@ -12,9 +12,9 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@nuxt/ui": "^4.5.1",
     "evlog": "workspace:*",
     "nuxt": "^4.4.2",
-    "@nuxt/ui": "^4.5.1",
     "tailwindcss": "^4.2.1"
   }
 }

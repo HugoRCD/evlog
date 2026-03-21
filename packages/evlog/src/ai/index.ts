@@ -4,6 +4,48 @@ import type { LanguageModelV3, LanguageModelV3Middleware, LanguageModelV3StreamP
 import type { RequestLogger } from '../types'
 
 /**
+ * Fine-grained control over tool call input capture.
+ */
+export interface ToolInputsOptions {
+  /**
+   * Max character length for the stringified input JSON.
+   * Inputs exceeding this limit are truncated with a `…` suffix.
+   */
+  maxLength?: number
+  /**
+   * Custom transform applied to each captured input before storing.
+   * Receives the parsed input and tool name; return value is stored.
+   * Runs before `maxLength` truncation.
+   */
+  transform?: (input: unknown, toolName: string) => unknown
+}
+
+/**
+ * Options for `createAILogger` and `createAIMiddleware`.
+ */
+export interface AILoggerOptions {
+  /**
+   * When enabled, `toolCalls` contains `{ name, input }` objects instead of plain tool name strings.
+   * Opt-in because inputs can be large and may contain sensitive data.
+   *
+   * - `true` — capture all inputs as-is
+   * - `{ maxLength, transform }` — capture with truncation or custom transform
+   * @default false
+   */
+  toolInputs?: boolean | ToolInputsOptions
+}
+
+/**
+ * Per-step token usage breakdown for multi-step agent runs.
+ */
+export interface AIStepUsage {
+  model: string
+  inputTokens: number
+  outputTokens: number
+  toolCalls?: string[]
+}
+
+/**
  * Shape of the `ai` field written to the wide event.
  */
 export interface AIEventData {
@@ -18,8 +60,10 @@ export interface AIEventData {
   cacheWriteTokens?: number
   reasoningTokens?: number
   finishReason?: string
-  toolCalls?: string[]
+  toolCalls?: string[] | Array<{ name: string, input: unknown }>
+  responseId?: string
   steps?: number
+  stepsUsage?: AIStepUsage[]
   msToFirstChunk?: number
   msToFinish?: number
   tokensPerSecond?: number
@@ -34,6 +78,9 @@ export interface AILogger {
    *
    * Accepts a `LanguageModelV3` object or a model string (e.g. `'anthropic/claude-sonnet-4.6'`).
    * Strings are resolved via the AI SDK gateway.
+   *
+   * Also works with pre-wrapped models (e.g. from supermemory, guardrails):
+   * `ai.wrap(withSupermemory(base, orgId))` composes correctly.
    *
    * @example
    * ```ts
@@ -99,6 +146,34 @@ function resolveProviderAndModel(provider: string, modelId: string): { provider:
 }
 
 /**
+ * Create the evlog AI middleware that captures AI SDK data into a wide event.
+ *
+ * Use this when you need explicit middleware composition with other wrappers
+ * (e.g. supermemory, guardrails). For most cases, use `createAILogger` instead.
+ *
+ * Note: `captureEmbed` is not available with the raw middleware — use
+ * `createAILogger` if you need embedding capture.
+ *
+ * @example Nuxt API route with supermemory
+ * ```ts
+ * import { createAIMiddleware } from 'evlog/ai'
+ * import { wrapLanguageModel } from 'ai'
+ *
+ * export default defineEventHandler(async (event) => {
+ *   const log = useLogger(event)
+ *
+ *   const model = wrapLanguageModel({
+ *     model: withSupermemory(base, orgId),
+ *     middleware: [createAIMiddleware(log, { toolInputs: true })],
+ *   })
+ * })
+ * ```
+ */
+export function createAIMiddleware(log: RequestLogger, options?: AILoggerOptions): LanguageModelV3Middleware {
+  return buildMiddleware(log, options)
+}
+
+/**
  * Create an AI logger that captures AI SDK data into the wide event.
  *
  * Uses model middleware (`wrapLanguageModel`) to transparently intercept
@@ -118,90 +193,215 @@ function resolveProviderAndModel(provider: string, modelId: string): { provider:
  *   onFinish: ({ text }) => saveConversation(text),
  * })
  * ```
+ *
+ * @example Capture tool call inputs
+ * ```ts
+ * const ai = createAILogger(log, { toolInputs: true })
+ * ```
  */
-export function createAILogger(log: RequestLogger): AILogger {
-  let calls = 0
-  let steps = 0
-  const usage: UsageAccumulator = {
+export function createAILogger(log: RequestLogger, options?: AILoggerOptions): AILogger {
+  const state = createAccumulatorState(options)
+  const middleware = buildMiddlewareFromState(log, state)
+
+  return {
+    wrap: (model: LanguageModelV3 | GatewayModelId) => {
+      const resolved = typeof model === 'string' ? gateway(model) : model
+      return wrapLanguageModel({ model: resolved, middleware })
+    },
+
+    captureEmbed: (result: { usage: { tokens: number } }) => {
+      state.calls++
+      state.usage.inputTokens += result.usage.tokens
+      flushState(log, state)
+    },
+  }
+}
+
+interface AccumulatorState {
+  calls: number
+  steps: number
+  usage: UsageAccumulator
+  models: string[]
+  lastProvider: string | undefined
+  allToolCalls: string[]
+  allToolCallInputs: Array<{ name: string, input: unknown }>
+  stepsUsage: AIStepUsage[]
+  lastFinishReason: string | undefined
+  lastMsToFirstChunk: number | undefined
+  lastMsToFinish: number | undefined
+  lastError: string | undefined
+  lastResponseId: string | undefined
+  toolInputs: boolean
+  toolInputsOptions: ToolInputsOptions | undefined
+}
+
+function resolveToolInputs(raw?: boolean | ToolInputsOptions): { enabled: boolean, options: ToolInputsOptions | undefined } {
+  if (!raw) return { enabled: false, options: undefined }
+  if (raw === true) return { enabled: true, options: undefined }
+  return { enabled: true, options: raw }
+}
+
+function processToolInput(input: unknown, toolName: string, options: ToolInputsOptions | undefined): unknown {
+  let value = input
+  if (options?.transform) {
+    value = options.transform(value, toolName)
+  }
+  if (options?.maxLength) {
+    const str = typeof value === 'string' ? value : JSON.stringify(value)
+    if (str.length > options.maxLength) {
+      return `${str.slice(0, options.maxLength)}…`
+    }
+  }
+  return value
+}
+
+function createAccumulatorState(options?: AILoggerOptions): AccumulatorState {
+  const { enabled, options: captureOpts } = resolveToolInputs(options?.toolInputs)
+  return {
+    calls: 0,
+    steps: 0,
+    usage: {
+      inputTokens: 0,
+      outputTokens: 0,
+      cacheReadTokens: 0,
+      cacheWriteTokens: 0,
+      reasoningTokens: 0,
+    },
+    models: [],
+    lastProvider: undefined,
+    allToolCalls: [],
+    allToolCallInputs: [],
+    stepsUsage: [],
+    lastFinishReason: undefined,
+    lastMsToFirstChunk: undefined,
+    lastMsToFinish: undefined,
+    lastError: undefined,
+    lastResponseId: undefined,
+    toolInputs: enabled,
+    toolInputsOptions: captureOpts,
+  }
+}
+
+function flushState(log: RequestLogger, state: AccumulatorState): void {
+  const uniqueModels = [...new Set(state.models)]
+  const lastModel = state.models[state.models.length - 1]
+
+  const data: Partial<AIEventData> & { calls: number, inputTokens: number, outputTokens: number, totalTokens: number } = {
+    calls: state.calls,
+    inputTokens: state.usage.inputTokens,
+    outputTokens: state.usage.outputTokens,
+    totalTokens: state.usage.inputTokens + state.usage.outputTokens,
+  }
+
+  if (lastModel) data.model = lastModel
+  if (state.lastProvider) data.provider = state.lastProvider
+  if (uniqueModels.length > 1) data.models = uniqueModels
+  if (state.usage.cacheReadTokens > 0) data.cacheReadTokens = state.usage.cacheReadTokens
+  if (state.usage.cacheWriteTokens > 0) data.cacheWriteTokens = state.usage.cacheWriteTokens
+  if (state.usage.reasoningTokens > 0) data.reasoningTokens = state.usage.reasoningTokens
+  if (state.lastFinishReason) data.finishReason = state.lastFinishReason
+  if (state.toolInputs && state.allToolCallInputs.length > 0) {
+    data.toolCalls = [...state.allToolCallInputs]
+  } else if (state.allToolCalls.length > 0) {
+    data.toolCalls = [...state.allToolCalls]
+  }
+  if (state.lastResponseId) data.responseId = state.lastResponseId
+  if (state.steps > 1) {
+    data.steps = state.steps
+    data.stepsUsage = [...state.stepsUsage]
+  }
+  if (state.lastMsToFirstChunk !== undefined) data.msToFirstChunk = state.lastMsToFirstChunk
+  if (state.lastMsToFinish !== undefined) {
+    data.msToFinish = state.lastMsToFinish
+    if (state.usage.outputTokens > 0 && state.lastMsToFinish > 0) {
+      data.tokensPerSecond = Math.round((state.usage.outputTokens / state.lastMsToFinish) * 1000)
+    }
+  }
+  if (state.lastError) data.error = state.lastError
+
+  log.set({ ai: data } as Record<string, unknown>)
+}
+
+function recordModel(state: AccumulatorState, provider: string, modelId: string, responseModelId?: string): void {
+  const resolved = resolveProviderAndModel(provider, responseModelId ?? modelId)
+  state.models.push(resolved.model)
+  state.lastProvider = resolved.provider
+}
+
+function safeParseJSON(input: string): unknown {
+  try {
+    return JSON.parse(input)
+  } catch {
+    return input
+  }
+}
+
+function recordError(log: RequestLogger, state: AccumulatorState, model: { provider: string, modelId: string }, error: unknown): void {
+  state.calls++
+  state.steps++
+  recordModel(state, model.provider, model.modelId)
+  state.lastFinishReason = 'error'
+  state.lastError = error instanceof Error ? error.message : String(error)
+
+  const resolved = resolveProviderAndModel(model.provider, model.modelId)
+  state.stepsUsage.push({
+    model: resolved.model,
     inputTokens: 0,
     outputTokens: 0,
-    cacheReadTokens: 0,
-    cacheWriteTokens: 0,
-    reasoningTokens: 0,
-  }
-  const models: string[] = []
-  const providers: string[] = []
-  const allToolCalls: string[] = []
-  let lastFinishReason: string | undefined
-  let lastMsToFirstChunk: number | undefined
-  let lastMsToFinish: number | undefined
-  let lastError: string | undefined
+  })
 
-  function flush(): void {
-    const uniqueModels = [...new Set(models)]
-    const lastModel = models[models.length - 1]
-    const lastProvider = providers[providers.length - 1]
+  flushState(log, state)
+}
 
-    const data: Partial<AIEventData> & { calls: number, inputTokens: number, outputTokens: number, totalTokens: number } = {
-      calls,
-      inputTokens: usage.inputTokens,
-      outputTokens: usage.outputTokens,
-      totalTokens: usage.inputTokens + usage.outputTokens,
-    }
+function buildMiddleware(log: RequestLogger, options?: AILoggerOptions): LanguageModelV3Middleware {
+  const state = createAccumulatorState(options)
+  return buildMiddlewareFromState(log, state)
+}
 
-    if (lastModel) data.model = lastModel
-    if (lastProvider) data.provider = lastProvider
-    if (uniqueModels.length > 1) data.models = uniqueModels
-    if (usage.cacheReadTokens > 0) data.cacheReadTokens = usage.cacheReadTokens
-    if (usage.cacheWriteTokens > 0) data.cacheWriteTokens = usage.cacheWriteTokens
-    if (usage.reasoningTokens > 0) data.reasoningTokens = usage.reasoningTokens
-    if (lastFinishReason) data.finishReason = lastFinishReason
-    if (allToolCalls.length > 0) data.toolCalls = [...allToolCalls]
-    if (steps > 1) data.steps = steps
-    if (lastMsToFirstChunk !== undefined) data.msToFirstChunk = lastMsToFirstChunk
-    if (lastMsToFinish !== undefined) {
-      data.msToFinish = lastMsToFinish
-      if (usage.outputTokens > 0 && lastMsToFinish > 0) {
-        data.tokensPerSecond = Math.round((usage.outputTokens / lastMsToFinish) * 1000)
-      }
-    }
-    if (lastError) data.error = lastError
-
-    log.set({ ai: data } as Record<string, unknown>)
-  }
-
-  function recordModel(provider: string, modelId: string, responseModelId?: string): void {
-    const resolved = resolveProviderAndModel(provider, responseModelId ?? modelId)
-    models.push(resolved.model)
-    providers.push(resolved.provider)
-  }
-
-  const middleware: LanguageModelV3Middleware = {
+function buildMiddlewareFromState(log: RequestLogger, state: AccumulatorState): LanguageModelV3Middleware {
+  return {
+    specificationVersion: 'v3',
     wrapGenerate: async ({ doGenerate, model }) => {
       try {
         const result = await doGenerate()
 
-        calls++
-        steps++
-        addUsage(usage, result.usage)
-        recordModel(model.provider, model.modelId, result.response?.modelId)
-        lastFinishReason = result.finishReason.unified
+        state.calls++
+        state.steps++
+        addUsage(state.usage, result.usage)
+        recordModel(state, model.provider, model.modelId, result.response?.modelId)
+        state.lastFinishReason = result.finishReason.unified
 
+        if (result.response?.id) {
+          state.lastResponseId = result.response.id
+        }
+
+        const stepToolCalls: string[] = []
         for (const item of result.content) {
           if (item.type === 'tool-call') {
-            allToolCalls.push(item.toolName)
+            state.allToolCalls.push(item.toolName)
+            stepToolCalls.push(item.toolName)
+            if (state.toolInputs) {
+              const raw = typeof item.input === 'string' ? safeParseJSON(item.input) : item.input
+              state.allToolCallInputs.push({
+                name: item.toolName,
+                input: processToolInput(raw, item.toolName, state.toolInputsOptions),
+              })
+            }
           }
         }
 
-        flush()
+        const resolvedModel = resolveProviderAndModel(model.provider, result.response?.modelId ?? model.modelId)
+        state.stepsUsage.push({
+          model: resolvedModel.model,
+          inputTokens: result.usage.inputTokens.total ?? 0,
+          outputTokens: result.usage.outputTokens.total ?? 0,
+          ...(stepToolCalls.length > 0 ? { toolCalls: stepToolCalls } : {}),
+        })
+
+        flushState(log, state)
         return result
       } catch (error) {
-        calls++
-        steps++
-        recordModel(model.provider, model.modelId)
-        lastFinishReason = 'error'
-        lastError = error instanceof Error ? error.message : String(error)
-        flush()
+        recordError(log, state, model, error)
         throw error
       }
     },
@@ -213,19 +413,16 @@ export function createAILogger(log: RequestLogger): AILogger {
       let streamUsage: UsageAccumulator | undefined
       let streamFinishReason: string | undefined
       let streamModelId: string | undefined
+      let streamResponseId: string | undefined
       const streamToolCalls: string[] = []
+      const streamToolInputBuffers = new Map<string, { name: string, chunks: string[] }>()
       let streamError: string | undefined
 
       let doStreamResult: Awaited<ReturnType<typeof doStream>>
       try {
         doStreamResult = await doStream()
       } catch (error) {
-        calls++
-        steps++
-        recordModel(model.provider, model.modelId)
-        lastFinishReason = 'error'
-        lastError = error instanceof Error ? error.message : String(error)
-        flush()
+        recordError(log, state, model, error)
         throw error
       }
 
@@ -242,6 +439,28 @@ export function createAILogger(log: RequestLogger): AILogger {
 
           if (chunk.type === 'tool-input-start') {
             streamToolCalls.push(chunk.toolName)
+            if (state.toolInputs) {
+              streamToolInputBuffers.set(chunk.id, { name: chunk.toolName, chunks: [] })
+            }
+          }
+
+          if (chunk.type === 'tool-input-delta' && state.toolInputs) {
+            const buffer = streamToolInputBuffers.get(chunk.id)
+            if (buffer) {
+              buffer.chunks.push(chunk.delta)
+            }
+          }
+
+          if (chunk.type === 'tool-input-end' && state.toolInputs) {
+            const buffer = streamToolInputBuffers.get(chunk.id)
+            if (buffer) {
+              const raw = safeParseJSON(buffer.chunks.join(''))
+              state.allToolCallInputs.push({
+                name: buffer.name,
+                input: processToolInput(raw, buffer.name, state.toolInputsOptions),
+              })
+              streamToolInputBuffers.delete(chunk.id)
+            }
           }
 
           if (chunk.type === 'finish') {
@@ -255,8 +474,9 @@ export function createAILogger(log: RequestLogger): AILogger {
             streamFinishReason = chunk.finishReason.unified
           }
 
-          if (chunk.type === 'response-metadata' && 'modelId' in chunk && chunk.modelId) {
-            streamModelId = chunk.modelId as string
+          if (chunk.type === 'response-metadata') {
+            if (chunk.modelId) streamModelId = chunk.modelId
+            if (chunk.id) streamResponseId = chunk.id
           }
 
           if (chunk.type === 'error') {
@@ -267,32 +487,42 @@ export function createAILogger(log: RequestLogger): AILogger {
         },
 
         flush() {
-          calls++
-          steps++
+          state.calls++
+          state.steps++
 
           if (streamUsage) {
-            usage.inputTokens += streamUsage.inputTokens
-            usage.outputTokens += streamUsage.outputTokens
-            usage.cacheReadTokens += streamUsage.cacheReadTokens
-            usage.cacheWriteTokens += streamUsage.cacheWriteTokens
-            usage.reasoningTokens += streamUsage.reasoningTokens
+            state.usage.inputTokens += streamUsage.inputTokens
+            state.usage.outputTokens += streamUsage.outputTokens
+            state.usage.cacheReadTokens += streamUsage.cacheReadTokens
+            state.usage.cacheWriteTokens += streamUsage.cacheWriteTokens
+            state.usage.reasoningTokens += streamUsage.reasoningTokens
           }
 
-          recordModel(model.provider, model.modelId, streamModelId)
-          lastFinishReason = streamFinishReason
+          recordModel(state, model.provider, model.modelId, streamModelId)
+          state.lastFinishReason = streamFinishReason
 
-          for (const name of streamToolCalls) {
-            allToolCalls.push(name)
+          state.allToolCalls.push(...streamToolCalls)
+
+          if (streamResponseId) {
+            state.lastResponseId = streamResponseId
           }
 
           if (firstChunkTime) {
-            lastMsToFirstChunk = firstChunkTime - streamStart
+            state.lastMsToFirstChunk = firstChunkTime - streamStart
           }
-          lastMsToFinish = Date.now() - streamStart
+          state.lastMsToFinish = Date.now() - streamStart
 
-          if (streamError) lastError = streamError
+          if (streamError) state.lastError = streamError
 
-          flush()
+          const resolvedModel = resolveProviderAndModel(model.provider, streamModelId ?? model.modelId)
+          state.stepsUsage.push({
+            model: resolvedModel.model,
+            inputTokens: streamUsage?.inputTokens ?? 0,
+            outputTokens: streamUsage?.outputTokens ?? 0,
+            ...(streamToolCalls.length > 0 ? { toolCalls: [...streamToolCalls] } : {}),
+          })
+
+          flushState(log, state)
         },
       })
 
@@ -300,19 +530,6 @@ export function createAILogger(log: RequestLogger): AILogger {
         stream: stream.pipeThrough(transformStream),
         ...rest,
       }
-    },
-  }
-
-  return {
-    wrap: (model: LanguageModelV3 | GatewayModelId) => {
-      const resolved = typeof model === 'string' ? gateway(model) : model
-      return wrapLanguageModel({ model: resolved, middleware })
-    },
-
-    captureEmbed: (result: { usage: { tokens: number } }) => {
-      calls++
-      usage.inputTokens += result.usage.tokens
-      flush()
     },
   }
 }

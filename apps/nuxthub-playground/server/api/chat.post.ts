@@ -63,7 +63,7 @@ export default defineEventHandler(async (event) => {
 
   logger.set({ action: 'chat', messagesCount: messages.length })
 
-  const ai = createAILogger(logger)
+  const ai = createAILogger(logger, { toolInputs: true })
 
   try {
     const agent = new ToolLoopAgent({
