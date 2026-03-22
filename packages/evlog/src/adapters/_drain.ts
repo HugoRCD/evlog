@@ -2,7 +2,7 @@ import type { DrainContext, WideEvent } from '../types'
 
 export interface DrainOptions<TConfig> {
   name: string
-  resolve: () => TConfig | null
+  resolve: () => TConfig | null | Promise<TConfig | null>
   send: (events: WideEvent[], config: TConfig) => Promise<void>
 }
 
@@ -11,7 +11,7 @@ export function defineDrain<TConfig>(options: DrainOptions<TConfig>): (ctx: Drai
     const contexts = Array.isArray(ctx) ? ctx : [ctx]
     if (contexts.length === 0) return
 
-    const config = options.resolve()
+    const config = await options.resolve()
     if (!config) return
 
     try {

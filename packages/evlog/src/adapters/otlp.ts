@@ -245,8 +245,8 @@ function getHeadersFromEnv(): Record<string, string> | undefined {
 export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
   return defineDrain<OTLPConfig>({
     name: 'otlp',
-    resolve: () => {
-      const config = resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
 
       // OTLP-specific: resolve headers from env if not provided via config
       if (!config.headers) {

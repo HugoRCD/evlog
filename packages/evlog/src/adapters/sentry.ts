@@ -224,8 +224,8 @@ function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
 export function createSentryDrain(overrides?: Partial<SentryConfig>) {
   return defineDrain<SentryConfig>({
     name: 'sentry',
-    resolve: () => {
-      const config = resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
       if (!config.dsn) {
         console.error('[evlog/sentry] Missing DSN. Set NUXT_SENTRY_DSN/SENTRY_DSN env var or pass to createSentryDrain()')
         return null

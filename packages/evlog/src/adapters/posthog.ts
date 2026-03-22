@@ -105,8 +105,8 @@ export function toPostHogEvent(event: WideEvent, config: PostHogEventsConfig): P
 export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
   return defineDrain<PostHogConfig>({
     name: 'posthog',
-    resolve: () => {
-      const config = resolveAdapterConfig<PostHogConfig>('posthog', POSTHOG_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<PostHogConfig>('posthog', POSTHOG_FIELDS, overrides)
       if (!config.apiKey) {
         console.error('[evlog/posthog] Missing apiKey. Set NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY env var or pass to createPostHogDrain()')
         return null
@@ -172,8 +172,8 @@ export async function sendBatchToPostHog(events: WideEvent[], config: PostHogCon
 export function createPostHogEventsDrain(overrides?: Partial<PostHogEventsConfig>) {
   return defineDrain<PostHogEventsConfig>({
     name: 'posthog-events',
-    resolve: () => {
-      const config = resolveAdapterConfig<PostHogEventsConfig>('posthog', POSTHOG_EVENTS_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<PostHogEventsConfig>('posthog', POSTHOG_EVENTS_FIELDS, overrides)
       if (!config.apiKey) {
         console.error('[evlog/posthog-events] Missing apiKey. Set NUXT_POSTHOG_API_KEY/POSTHOG_API_KEY env var or pass to createPostHogEventsDrain()')
         return null

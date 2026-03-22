@@ -3,18 +3,16 @@
  * Supports both Nitro v2 (nitropack/runtime) and Nitro v3 (nitro/runtime-config).
  * Returns undefined if not in a Nitro context.
  */
-export function getRuntimeConfig(): Record<string, any> | undefined {
+export async function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
+    const { useRuntimeConfig } = await import('nitropack/runtime')
     return useRuntimeConfig()
   } catch {
     // nitropack not available — try Nitro v3
   }
 
   try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitro/runtime-config')
+    const { useRuntimeConfig } = await import('nitro/runtime-config')
     return useRuntimeConfig()
   } catch {
     return undefined
@@ -26,12 +24,12 @@ export interface ConfigField<T> {
   env?: string[]
 }
 
-export function resolveAdapterConfig<T>(
+export async function resolveAdapterConfig<T>(
   namespace: string,
   fields: ConfigField<T>[],
   overrides?: Partial<T>,
-): Partial<T> {
-  const runtimeConfig = getRuntimeConfig()
+): Promise<Partial<T>> {
+  const runtimeConfig = await getRuntimeConfig()
   const evlogNs = runtimeConfig?.evlog?.[namespace]
   const rootNs = runtimeConfig?.[namespace]
 

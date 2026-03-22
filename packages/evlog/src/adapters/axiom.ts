@@ -75,8 +75,8 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
 export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
   return defineDrain<AxiomConfig>({
     name: 'axiom',
-    resolve: () => {
-      const config = resolveAdapterConfig<ResolvedAxiomConfig>(
+    resolve: async () => {
+      const config = await resolveAdapterConfig<ResolvedAxiomConfig>(
         'axiom',
         AXIOM_FIELDS,
         overrides as Partial<ResolvedAxiomConfig>,

@@ -54,8 +54,8 @@ export function toBetterStackEvent(event: WideEvent): Record<string, unknown> {
 export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>) {
   return defineDrain<BetterStackConfig>({
     name: 'better-stack',
-    resolve: () => {
-      const config = resolveAdapterConfig<BetterStackConfig>('betterStack', BETTER_STACK_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<BetterStackConfig>('betterStack', BETTER_STACK_FIELDS, overrides)
       if (!config.sourceToken) {
         console.error('[evlog/better-stack] Missing source token. Set NUXT_BETTER_STACK_SOURCE_TOKEN env var or pass to createBetterStackDrain()')
         return null
