@@ -86,6 +86,11 @@
       "gzip": 1237
     },
     {
+      "entry": "adapter/hyperdx",
+      "raw": 2959,
+      "gzip": 1216
+    },
+    {
       "entry": "adapter/better-stack",
       "raw": 2730,
       "gzip": 1117
@@ -137,7 +142,7 @@
     }
   ],
   "total": {
-    "raw": 123133,
-    "gzip": 44668
+    "raw": 126092,
+    "gzip": 45884
   }
 }
