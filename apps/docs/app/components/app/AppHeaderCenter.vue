@@ -74,6 +74,12 @@ const landingItems = [
         to: '/adapters/otlp'
       },
       {
+        label: 'HyperDX',
+        icon: 'i-custom-hyperdx',
+        description: 'Send logs to HyperDX via OTLP',
+        to: '/adapters/hyperdx'
+      },
+      {
         label: 'PostHog',
         icon: 'i-simple-icons-posthog',
         description: 'Send logs to PostHog',

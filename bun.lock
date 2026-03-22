@@ -272,7 +272,7 @@
     },
     "packages/evlog": {
       "name": "evlog",
-      "version": "2.8.0",
+      "version": "2.9.0",
       "devDependencies": {
         "@codspeed/vitest-plugin": "^5.2.0",
         "@nestjs/common": "^11.1.17",

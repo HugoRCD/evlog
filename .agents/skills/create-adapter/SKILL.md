@@ -71,7 +71,7 @@ Add a build entry in `packages/evlog/tsdown.config.ts` alongside the existing ad
 'adapters/{name}': 'src/adapters/{name}.ts',
 ```
 
-Place it after the last adapter entry (currently `sentry` at line 22).
+Place it after the last adapter entry (currently `hyperdx` in `tsdown.config.ts`).
 
 ## Step 3: Package Exports
 

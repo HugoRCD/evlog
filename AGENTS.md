@@ -54,7 +54,7 @@ evlog/
 │       │   ├── vite/        # Vite plugin (evlog/vite)
 │       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
 │       │   ├── ai/          # AI SDK integration (evlog/ai)
-│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
+│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
 │       └── test/            # Tests
@@ -321,6 +321,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 |---------|--------|-------------|
 | Axiom | `evlog/axiom` | Send logs to Axiom for querying and dashboards |
 | OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
+| HyperDX | `evlog/hyperdx` | Send logs to HyperDX via OTLP/HTTP ([documented](https://hyperdx.io/docs/install/opentelemetry) endpoint and `authorization` header) |
 | PostHog | `evlog/posthog` | Send logs to PostHog Logs via OTLP for structured logging and observability |
 | Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
 | Better Stack | `evlog/better-stack` | Send logs to Better Stack for log management and alerting |
@@ -350,6 +351,19 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set environment variable: `NUXT_OTLP_ENDPOINT`.
+
+**Using HyperDX Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createHyperDXDrain } from 'evlog/hyperdx'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createHyperDXDrain())
+})
+```
+
+Set environment variable: `NUXT_HYPERDX_API_KEY` or `HYPERDX_API_KEY` (see [HyperDX OpenTelemetry](https://hyperdx.io/docs/install/opentelemetry)).
 
 **Using PostHog Adapter:**
 

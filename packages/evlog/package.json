@@ -83,6 +83,11 @@
       "import": "./dist/adapters/better-stack.mjs",
       "default": "./dist/adapters/better-stack.mjs"
     },
+    "./hyperdx": {
+      "types": "./dist/adapters/hyperdx.d.mts",
+      "import": "./dist/adapters/hyperdx.mjs",
+      "default": "./dist/adapters/hyperdx.mjs"
+    },
     "./fs": {
       "types": "./dist/adapters/fs.d.mts",
       "import": "./dist/adapters/fs.mjs",
@@ -202,6 +207,9 @@
       ],
       "better-stack": [
         "./dist/adapters/better-stack.d.mts"
+      ],
+      "hyperdx": [
+        "./dist/adapters/hyperdx.d.mts"
       ],
       "fs": [
         "./dist/adapters/fs.d.mts"

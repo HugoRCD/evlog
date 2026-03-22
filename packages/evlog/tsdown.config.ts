@@ -28,6 +28,7 @@ export default defineConfig({
     'adapters/posthog': 'src/adapters/posthog.ts',
     'adapters/sentry': 'src/adapters/sentry.ts',
     'adapters/better-stack': 'src/adapters/better-stack.ts',
+    'adapters/hyperdx': 'src/adapters/hyperdx.ts',
     'adapters/fs': 'src/adapters/fs.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',

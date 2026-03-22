@@ -8,6 +8,7 @@ const canvasRef = ref<HTMLCanvasElement>()
 const adapters = [
   { name: 'Axiom', icon: 'i-custom-axiom' },
   { name: 'OTLP', icon: 'i-simple-icons-opentelemetry' },
+  { name: 'HyperDX', icon: 'i-custom-hyperdx' },
   { name: 'Sentry', icon: 'i-simple-icons-sentry' },
   { name: 'PostHog', icon: 'i-simple-icons-posthog' },
   { name: 'Better Stack', icon: 'i-simple-icons-betterstack' },
