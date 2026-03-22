@@ -8,7 +8,6 @@ const canvasRef = ref<HTMLCanvasElement>()
 const adapters = [
   { name: 'Axiom', icon: 'i-custom-axiom' },
   { name: 'OTLP', icon: 'i-simple-icons-opentelemetry' },
-  { name: 'HyperDX', icon: 'i-custom-hyperdx' },
   { name: 'Sentry', icon: 'i-simple-icons-sentry' },
   { name: 'PostHog', icon: 'i-simple-icons-posthog' },
   { name: 'Better Stack', icon: 'i-simple-icons-betterstack' },
@@ -385,10 +384,12 @@ function setupCanvas() {
               </div>
             </div>
 
-            <div class="relative z-10 mt-3 flex items-center gap-3">
+            <div class="relative z-10 mt-3 flex flex-wrap items-center justify-center gap-x-3 gap-y-1">
               <span class="font-mono text-[9px] text-zinc-600">+ File System</span>
               <span class="font-mono text-[9px] text-zinc-700">·</span>
               <span class="font-mono text-[9px] text-zinc-600">Custom drains</span>
+              <span class="font-mono text-[9px] text-zinc-700">·</span>
+              <span class="font-mono text-[9px] text-zinc-500">and more</span>
             </div>
           </div>
         </div>
