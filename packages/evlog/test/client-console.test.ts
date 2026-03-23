@@ -54,6 +54,20 @@ describe('client console option', () => {
     expect(fetchSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('uses custom credentials mode for transport', () => {
+    initLog({
+      enabled: true,
+      console: false,
+      pretty: false,
+      transport: { enabled: true, endpoint: '/api/_evlog/ingest', credentials: 'include' },
+    })
+
+    log.info({ action: 'test' })
+
+    const [, options] = fetchSpy.mock.calls[0]!
+    expect(options?.credentials).toBe('include')
+  })
+
   it('suppresses pretty console output when console is false', () => {
     initLog({ enabled: true, console: false, pretty: true })
 

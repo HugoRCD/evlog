@@ -73,6 +73,12 @@ export interface TransportConfig {
    * @default '/api/_evlog/ingest'
    */
   endpoint?: string
+
+  /**
+   * Fetch credentials mode
+   * @default 'same-origin'
+   */
+  credentials?: RequestCredentials
 }
 
 /**
