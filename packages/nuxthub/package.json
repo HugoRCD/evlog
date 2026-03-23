@@ -42,7 +42,7 @@
   "devDependencies": {
     "@nuxt/module-builder": "^1.0.2",
     "evlog": "workspace:*",
-    "typescript": "^5.9.3"
+    "typescript": "^6.0.2"
   },
   "peerDependencies": {
     "evlog": "^2.8.0",

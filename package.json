@@ -57,7 +57,7 @@
     "eslint": "^9.39.4",
     "evlog": "workspace:*",
     "turbo": "^2.8.17",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.2",
     "vitest": "^4.1.0",
     "vue-tsc": "^3.2.5"
   },
