@@ -1,5 +1,19 @@
 # evlog
 
+## 2.10.0
+
+### Minor Changes
+
+- [#225](https://github.com/HugoRCD/evlog/pull/225) [`3d1dcd4`](https://github.com/HugoRCD/evlog/commit/3d1dcd4678da83c05e754623b7443426231565ab) Thanks [@izadoesdev](https://github.com/izadoesdev)! - Add HyperDX drain adapter (`evlog/hyperdx`) for OTLP/HTTP ingest, with defaults aligned to [HyperDX OpenTelemetry documentation](https://hyperdx.io/docs/install/opentelemetry) (`https://in-otel.hyperdx.io`, `authorization` header). Includes docs site and `review-logging-patterns` skill updates.
+
+- [#232](https://github.com/HugoRCD/evlog/pull/232) [`767ba27`](https://github.com/HugoRCD/evlog/commit/767ba2702c5e8c254360c315c76491128bd54169) Thanks [@MrLightful](https://github.com/MrLightful)! - Add configurable `credentials` (`RequestCredentials`, default `same-origin`) for the client log transport and browser drain `fetch` calls. The Nuxt module forwards `transport.credentials` into `runtimeConfig.public.evlog` so client `initLog()` receives it.
+
+### Patch Changes
+
+- [#228](https://github.com/HugoRCD/evlog/pull/228) [`4385dbc`](https://github.com/HugoRCD/evlog/commit/4385dbc6551577388123b77bcfaf3d709897ee08) Thanks [@shubh73](https://github.com/shubh73)! - Resolve Nitro runtime config in drain adapters via dynamic `import()` (Cloudflare Workers and other runtimes without `require`). Cache Nitro module namespaces after first load to avoid repeated imports on every drain. Fix HyperDX drain to `await` `resolveAdapterConfig()` so env/runtime config is applied when using `createHyperDXDrain()` without inline overrides.
+
+- [#188](https://github.com/HugoRCD/evlog/pull/188) [`e3ebe9f`](https://github.com/HugoRCD/evlog/commit/e3ebe9faeac8bce7091ba9a8d90b31e8d66e4f43) Thanks [@mnismt](https://github.com/mnismt)! - Add `defineNodeInstrumentation()` for Next.js root `instrumentation.ts`: gate on `NEXT_RUNTIME === 'nodejs'`, cache the dynamic `import()` of `lib/evlog` between `register` and `onRequestError`, and export `NextInstrumentationRequest` / `NextInstrumentationErrorContext` types.
+
 ## 2.9.0
 
 ### Minor Changes
