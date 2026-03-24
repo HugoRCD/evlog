@@ -81,8 +81,8 @@ export function toHyperDXOTLPConfig(config: HyperDXConfig): OTLPConfig {
 export function createHyperDXDrain(overrides?: Partial<HyperDXConfig>) {
   return defineDrain<HyperDXConfig>({
     name: 'hyperdx',
-    resolve: () => {
-      const config = resolveAdapterConfig<HyperDXConfig>('hyperdx', HYPERDX_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<HyperDXConfig>('hyperdx', HYPERDX_FIELDS, overrides)
       if (!config.apiKey) {
         console.error('[evlog/hyperdx] Missing apiKey. Set HYPERDX_API_KEY or NUXT_HYPERDX_API_KEY, or pass to createHyperDXDrain()')
         return null

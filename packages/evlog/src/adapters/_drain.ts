@@ -6,6 +6,11 @@ export interface DrainOptions<TConfig> {
   send: (events: WideEvent[], config: TConfig) => Promise<void>
 }
 
+/**
+ * Build a drain callback for `evlog:drain` (or `initLogger({ drain })`).
+ * The returned function is async so `resolve` can load Nitro runtime config; hosts typically attach
+ * the resulting promise to `waitUntil` so the HTTP response is not blocked (see Nitro plugin).
+ */
 export function defineDrain<TConfig>(options: DrainOptions<TConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
   return async (ctx: DrainContext | DrainContext[]) => {
     const contexts = Array.isArray(ctx) ? ctx : [ctx]
