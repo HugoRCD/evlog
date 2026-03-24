@@ -299,7 +299,7 @@ describe('otlp adapter', () => {
     })
 
     it('throws error on non-OK response', async () => {
-      fetchSpy.mockResolvedValueOnce(
+      fetchSpy.mockResolvedValue(
         new Response('Internal Server Error', { status: 500, statusText: 'Internal Server Error' }),
       )
 
@@ -307,6 +307,7 @@ describe('otlp adapter', () => {
 
       await expect(sendToOTLP(event, {
         endpoint: 'http://localhost:4318',
+        retries: 0,
       })).rejects.toThrow('OTLP API error: 500 Internal Server Error')
     })
   })

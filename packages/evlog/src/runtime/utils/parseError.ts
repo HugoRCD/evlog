@@ -1,5 +1,6 @@
 import type { FetchError } from 'ofetch'
 import type { ParsedError } from '../../types'
+import { extractErrorStatus } from '../../shared/errors'
 
 export type { ParsedError }
 
@@ -25,7 +26,7 @@ export function parseError(error: unknown): ParsedError {
   if (error instanceof Error) {
     return {
       message: error.message,
-      status: 500,
+      status: extractErrorStatus(error),
       raw: error,
     }
   }

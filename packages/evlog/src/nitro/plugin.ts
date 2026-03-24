@@ -136,10 +136,10 @@ export default defineNitroPlugin(async (nitroApp) => {
   nitroApp.hooks.hook('request', (event) => {
     const e = event as ServerEvent
 
-    // Skip logging for routes not matching include/exclude patterns
-    if (!shouldLog(e.path, evlogConfig?.include, evlogConfig?.exclude)) {
-      return
-    }
+    // Evaluate route filtering but always create the logger so that server
+    // middleware (which runs for every request) can call useLogger(event)
+    // without throwing.  Filtering is enforced at emit time instead.
+    e.context._evlogShouldEmit = shouldLog(e.path, evlogConfig?.include, evlogConfig?.exclude)
 
     // Store start time for duration calculation in tail sampling
     e.context._evlogStartTime = Date.now()
@@ -168,6 +168,7 @@ export default defineNitroPlugin(async (nitroApp) => {
   nitroApp.hooks.hook('error', async (error, { event }) => {
     const e = event as ServerEvent | undefined
     if (!e) return
+    if (!e.context._evlogShouldEmit) return
 
     const requestLog = e.context.log as RequestLogger | undefined
     if (requestLog) {
@@ -201,8 +202,8 @@ export default defineNitroPlugin(async (nitroApp) => {
 
   nitroApp.hooks.hook('afterResponse', async (event) => {
     const e = event as ServerEvent
-    // Skip if already emitted by error hook
-    if (e.context._evlogEmitted) return
+    // Skip if already emitted by error hook or route was filtered out
+    if (e.context._evlogEmitted || !e.context._evlogShouldEmit) return
 
     const requestLog = e.context.log as RequestLogger | undefined
     if (requestLog) {

@@ -73,6 +73,12 @@ export interface TransportConfig {
    * @default '/api/_evlog/ingest'
    */
   endpoint?: string
+
+  /**
+   * Fetch credentials mode
+   * @default 'same-origin'
+   */
+  credentials?: RequestCredentials
 }
 
 /**
@@ -507,6 +513,8 @@ export interface H3EventContext {
   _evlogStartTime?: number
   /** Internal: flag to prevent double emission on errors */
   _evlogEmitted?: boolean
+  /** Internal: whether the route matched shouldLog filtering (emit-time guard) */
+  _evlogShouldEmit?: boolean
   [key: string]: unknown
 }
 

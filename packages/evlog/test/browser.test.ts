@@ -58,6 +58,15 @@ describe('createBrowserDrain', () => {
     })
   })
 
+  it('uses custom credentials mode', async () => {
+    const drain = createBrowserDrain({ endpoint: '/api/logs', credentials: 'include' })
+
+    await drain([createTestContext(1)])
+
+    const [, options] = vi.mocked(fetch).mock.calls[0]!
+    expect(options?.credentials).toBe('include')
+  })
+
   it('skips empty batches', async () => {
     const drain = createBrowserDrain({ endpoint: '/api/logs' })
 

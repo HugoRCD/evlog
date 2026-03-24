@@ -23,7 +23,8 @@ import { serializeEvlogErrorResponse } from '../nitro'
  * ```
  */
 
-export async function evlogErrorHandler<T>(next: (...args: any[]) => Promise<T>): Promise<T> {
+export async function evlogErrorHandler<T>(nextOrOptions: ((...args: any[]) => Promise<T>) | { next: (...args: any[]) => Promise<T> }): Promise<T> {
+  const next = typeof nextOrOptions === 'function' ? nextOrOptions : nextOrOptions.next
   try {
     return await next()
   } catch (error: unknown) {

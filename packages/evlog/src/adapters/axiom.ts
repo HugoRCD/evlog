@@ -13,6 +13,8 @@ interface BaseAxiomConfig {
   orgId?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
 }
 
 interface EdgeAxiomConfig {
@@ -47,6 +49,7 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
   { key: 'edgeUrl', env: ['NUXT_AXIOM_EDGE_URL', 'AXIOM_EDGE_URL'] },
   { key: 'baseUrl', env: ['NUXT_AXIOM_URL', 'AXIOM_URL'] },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 /**
@@ -72,8 +75,8 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
 export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
   return defineDrain<AxiomConfig>({
     name: 'axiom',
-    resolve: () => {
-      const config = resolveAdapterConfig<ResolvedAxiomConfig>(
+    resolve: async () => {
+      const config = await resolveAdapterConfig<ResolvedAxiomConfig>(
         'axiom',
         AXIOM_FIELDS,
         overrides as Partial<ResolvedAxiomConfig>,
@@ -137,6 +140,7 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
     headers,
     body: JSON.stringify(events),
     timeout: config.timeout ?? 5000,
+    retries: config.retries,
     label: 'Axiom',
   })
 }

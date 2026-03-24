@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack), sampling, and enrichers.
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
 license: MIT
 metadata:
   author: HugoRCD
@@ -558,6 +558,72 @@ app.use(evlog({
 }))
 ```
 
+### React Router
+
+```typescript
+// react-router.config.ts
+import type { Config } from '@react-router/dev/config'
+
+export default {
+  future: {
+    v8_middleware: true,
+  },
+} satisfies Config
+```
+
+```typescript
+// app/root.tsx
+import { initLogger } from 'evlog'
+import { evlog } from 'evlog/react-router'
+
+initLogger({ env: { service: 'my-api' } })
+
+export const middleware: Route.MiddlewareFunction[] = [
+  evlog(),
+]
+```
+
+Access the logger via `context.get(loggerContext)` in loaders and actions:
+
+```typescript
+// app/routes/api.users.$id.tsx
+import { loggerContext } from 'evlog/react-router'
+
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const log = context.get(loggerContext)
+  log.set({ user: { id: params.id } })
+  return { users: [] }
+}
+```
+
+Use `useLogger()` to access the logger from anywhere in the call stack without passing context:
+
+```typescript
+import { useLogger } from 'evlog/react-router'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+export const middleware: Route.MiddlewareFunction[] = [
+  evlog({
+    include: ['/api/**'],
+    drain: createAxiomDrain(),
+    enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+    keep: (ctx) => {
+      if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+    },
+  }),
+]
+```
+
 ### Cloudflare Workers
 
 ```typescript
@@ -581,6 +647,31 @@ export default {
   },
 }
 ```
+
+### Vite Plugin (any Vite-based framework)
+
+For any Vite-based project (SvelteKit, Astro, SolidStart, React+Vite, etc.), use the Vite plugin for auto-init, auto-imports, and build-time features:
+
+```typescript
+// vite.config.ts
+import evlog from 'evlog/vite'
+
+export default defineConfig({
+  plugins: [
+    evlog({
+      service: 'my-app',
+      autoImports: true,           // auto-import log, createEvlogError, parseError
+      strip: ['debug'],            // remove log.debug() in production
+      sourceLocation: true,        // inject file:line in dev + prod
+      client: {                    // client-side logging
+        transport: { endpoint: '/api/logs' },
+      },
+    }),
+  ],
+})
+```
+
+Server-side middleware (drain, enrich, keep, routes) is still configured in the framework integration (e.g., `evlog()` middleware for Hono/Express/SvelteKit). The Vite plugin handles build-time DX only.
 
 ### Standalone TypeScript
 
@@ -632,6 +723,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 |---------|--------|----------|
 | Axiom | `evlog/axiom` | `AXIOM_TOKEN`, `AXIOM_DATASET` |
 | OTLP | `evlog/otlp` | `OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) |
+| HyperDX | `evlog/hyperdx` | `HYPERDX_API_KEY` (optional `HYPERDX_OTLP_ENDPOINT`; defaults to `https://in-otel.hyperdx.io`) |
 | PostHog | `evlog/posthog` | `POSTHOG_API_KEY`, `POSTHOG_HOST` |
 | Sentry | `evlog/sentry` | `SENTRY_DSN` |
 | Better Stack | `evlog/better-stack` | `BETTER_STACK_SOURCE_TOKEN` |
@@ -697,6 +789,46 @@ createEvlog({
   },
 })
 ```
+
+---
+
+## AI SDK Integration
+
+Capture token usage, tool calls, model info, and streaming metrics from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >= 6.0.0` as a peer dependency.
+
+```typescript
+import { createAILogger } from 'evlog/ai'
+
+const log = useLogger(event) // or any RequestLogger
+const ai = createAILogger(log)
+
+const result = streamText({
+  model: ai.wrap('anthropic/claude-sonnet-4.6'),  // accepts string or model object
+  messages,
+  onFinish: ({ text }) => {
+    // User callbacks remain free — no conflict
+  },
+})
+```
+
+`ai.wrap()` uses model middleware to transparently capture all LLM calls. Works with `generateText`, `streamText`, `generateObject`, `streamObject`, and `ToolLoopAgent`.
+
+For embeddings (different model type):
+
+```typescript
+const { embedding, usage } = await embed({ model: embeddingModel, value: query })
+ai.captureEmbed({ usage })
+```
+
+Wide event `ai` field includes: `calls`, `model`, `provider`, `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadTokens`, `reasoningTokens`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`, `error`.
+
+Anti-patterns to detect:
+
+| Anti-Pattern | Fix |
+|--------------|-----|
+| Manual token tracking in `onFinish` | `ai.wrap()` — middleware captures automatically |
+| `console.log('tokens:', result.usage)` | `ai.wrap()` — structured `ai.*` fields in wide event |
+| No AI observability | Add `createAILogger(log)` + `ai.wrap()` |
 
 ---
 

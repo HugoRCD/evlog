@@ -51,8 +51,10 @@ evlog/
 │       ├── src/
 │       │   ├── nuxt/        # Nuxt module
 │       │   ├── nitro/       # Nitro plugin
+│       │   ├── vite/        # Vite plugin (evlog/vite)
 │       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
-│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, PostHog, Sentry, Better Stack)
+│       │   ├── ai/          # AI SDK integration (evlog/ai)
+│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
 │       └── test/            # Tests
@@ -114,6 +116,36 @@ log.info('auth', 'User logged in')
 log.error({ action: 'payment', error: 'card_declined' })
 ```
 
+### AI SDK Integration
+
+Use `createAILogger(log)` to capture AI SDK data (token usage, tool calls, model info, streaming metrics) into wide events. Works via model middleware — no callback conflicts.
+
+```typescript
+// server/api/chat.post.ts
+import { streamText } from 'ai'
+import { createAILogger } from 'evlog/ai'
+
+export default defineEventHandler(async (event) => {
+ const log = useLogger(event)
+ const ai = createAILogger(log)
+
+ const result = streamText({
+ model: ai.wrap('anthropic/claude-sonnet-4.6'),
+ messages,
+ onFinish: ({ text }) => saveConversation(text), // no conflict
+ })
+
+ return result.toTextStreamResponse()
+})
+```
+
+For embedding calls, use `captureEmbed`:
+
+```typescript
+const { embedding, usage } = await embed({ model: embeddingModel, value: query })
+ai.captureEmbed({ usage })
+```
+
 ### Structured Errors
 
 Use `createError()` to throw errors with context. Works with Nitro's error handling.
@@ -157,6 +189,50 @@ try {
   if (error.fix) console.info(`💡 Fix: ${error.fix}`)
 }
 ```
+
+## Vite Plugin
+
+The `evlog/vite` plugin provides build-time DX for any Vite-based framework (SvelteKit, Astro, SolidStart, React+Vite, etc.). It complements runtime framework integrations — it does NOT replace them.
+
+```typescript
+// vite.config.ts
+import evlog from 'evlog/vite'
+
+export default defineConfig({
+  plugins: [
+    evlog({
+      service: 'my-app',
+      sampling: { rates: { info: 10, debug: 0 } },
+      autoImports: true,
+      strip: ['debug'],
+      sourceLocation: true,
+      client: { transport: { endpoint: '/api/logs' } },
+    }),
+  ],
+})
+```
+
+### Features
+
+| Feature | Option | Description |
+|---------|--------|-------------|
+| Auto-init | `service` | Injects `__EVLOG_CONFIG__` via Vite `define` — `initLogger()` is called automatically at import time |
+| Auto-imports | `autoImports: true` | Auto-import `log`, `createEvlogError`, `parseError` with `.d.ts` generation |
+| Client init | `client: {...}` | Inject `initLog()` via `transformIndexHtml` for client-side logging |
+| Log stripping | `strip: ['debug']` | Remove `log.debug()` calls from production builds via AST transform |
+| Source location | `sourceLocation: true` | Inject `__source: 'file:line'` into `log.*()` object-form calls |
+
+### Architecture
+
+- Source lives in `packages/evlog/src/vite/`
+- Each feature is a separate Vite plugin returned as an array
+- Individual plugins (`createStripPlugin`, `createSourceLocationPlugin`) can be used standalone (e.g., from the Nuxt module via `addVitePlugin()`)
+- Transform functions use Rollup's built-in acorn parser (`this.parse()`) + MagicString (inlined at build time via tsdown)
+- `evlog/client` is a public re-export of `runtime/client/log.ts` for client-side init
+
+### Nuxt module integration
+
+The Nuxt module uses `addVitePlugin()` to add strip + source location plugins internally. Auto-imports and client init are NOT delegated (Nuxt handles those natively). This is purely additive — no breaking change.
 
 ## Framework Integration
 
@@ -245,6 +321,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 |---------|--------|-------------|
 | Axiom | `evlog/axiom` | Send logs to Axiom for querying and dashboards |
 | OTLP | `evlog/otlp` | OpenTelemetry Protocol for Grafana, Datadog, Honeycomb, etc. |
+| HyperDX | `evlog/hyperdx` | Send logs to HyperDX via OTLP/HTTP ([documented](https://hyperdx.io/docs/install/opentelemetry) endpoint and `authorization` header) |
 | PostHog | `evlog/posthog` | Send logs to PostHog Logs via OTLP for structured logging and observability |
 | Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
 | Better Stack | `evlog/better-stack` | Send logs to Better Stack for log management and alerting |
@@ -274,6 +351,19 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set environment variable: `NUXT_OTLP_ENDPOINT`.
+
+**Using HyperDX Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createHyperDXDrain } from 'evlog/hyperdx'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createHyperDXDrain())
+})
+```
+
+Set environment variable: `NUXT_HYPERDX_API_KEY` or `HYPERDX_API_KEY` (see [HyperDX OpenTelemetry](https://hyperdx.io/docs/install/opentelemetry)).
 
 **Using PostHog Adapter:**
 

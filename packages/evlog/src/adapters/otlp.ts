@@ -16,6 +16,8 @@ export interface OTLPConfig {
   headers?: Record<string, string>
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
 }
 
 /** OTLP Log Record structure */
@@ -63,6 +65,7 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
   { key: 'headers' },
   { key: 'resourceAttributes' },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 /**
@@ -242,8 +245,8 @@ function getHeadersFromEnv(): Record<string, string> | undefined {
 export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
   return defineDrain<OTLPConfig>({
     name: 'otlp',
-    resolve: () => {
-      const config = resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
 
       // OTLP-specific: resolve headers from env if not provided via config
       if (!config.headers) {
@@ -323,6 +326,7 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
     headers,
     body: JSON.stringify(payload),
     timeout: config.timeout ?? 5000,
+    retries: config.retries,
     label: 'OTLP',
   })
 }

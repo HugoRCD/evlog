@@ -16,6 +16,8 @@ export interface SentryConfig {
   tags?: Record<string, string>
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
 }
 
 /** Sentry Log attribute value with type annotation */
@@ -48,6 +50,7 @@ const SENTRY_FIELDS: ConfigField<SentryConfig>[] = [
   { key: 'release', env: ['NUXT_SENTRY_RELEASE', 'SENTRY_RELEASE'] },
   { key: 'tags' },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 function parseSentryDsn(dsn: string): SentryDsnParts {
@@ -221,8 +224,8 @@ function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
 export function createSentryDrain(overrides?: Partial<SentryConfig>) {
   return defineDrain<SentryConfig>({
     name: 'sentry',
-    resolve: () => {
-      const config = resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
+    resolve: async () => {
+      const config = await resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
       if (!config.dsn) {
         console.error('[evlog/sentry] Missing DSN. Set NUXT_SENTRY_DSN/SENTRY_DSN env var or pass to createSentryDrain()')
         return null
@@ -273,6 +276,7 @@ export async function sendBatchToSentry(events: WideEvent[], config: SentryConfi
     },
     body,
     timeout: config.timeout ?? 5000,
+    retries: config.retries,
     label: 'Sentry',
   })
 }

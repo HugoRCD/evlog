@@ -9,8 +9,20 @@ import {
   createPipelineSpies,
 } from './helpers/framework'
 
+function delay(ms = 1) {
+  return new Promise((resolve) => {
+    setImmediate(resolve)
+  })
+}
+
 function request(app: Elysia, path: string, init?: RequestInit) {
-  return app.handle(new Request(`http://localhost${path}`, init))
+  return app.handle(new Request(`http://localhost${path}`, init)).then(async (response) => {
+    // using Elysia.afterResponse is scheduled to run
+    // after response is sent but not immediately
+    await delay()
+
+    return response
+  })
 }
 
 describe('evlog/elysia', () => {
@@ -60,6 +72,27 @@ describe('evlog/elysia', () => {
     expect(event.method).toBe('GET')
     expect(event.path).toBe('/api/users')
     expect(event.status).toBe(200)
+    expect(event.level).toBe('info')
+    expect(event.duration).toBeDefined()
+  })
+
+  it('emits event with correct status when using Elysia.status', async () => {
+    const app = new Elysia()
+      .use(evlog())
+      .get('/api/users', ({ status }) => status(422, ({ users: [] })))
+
+    const consoleSpy = vi.mocked(console.info)
+    await request(app, '/api/users')
+
+    const lastCall = consoleSpy.mock.calls.find(call =>
+      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
+    )
+    expect(lastCall).toBeDefined()
+
+    const event = JSON.parse(lastCall![0] as string)
+    expect(event.method).toBe('GET')
+    expect(event.path).toBe('/api/users')
+    expect(event.status).toBe(422)
     expect(event.level).toBe('info')
     expect(event.duration).toBeDefined()
   })

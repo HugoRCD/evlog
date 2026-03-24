@@ -28,6 +28,7 @@ export default defineConfig({
     'adapters/posthog': 'src/adapters/posthog.ts',
     'adapters/sentry': 'src/adapters/sentry.ts',
     'adapters/better-stack': 'src/adapters/better-stack.ts',
+    'adapters/hyperdx': 'src/adapters/hyperdx.ts',
     'adapters/fs': 'src/adapters/fs.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
@@ -40,8 +41,12 @@ export default defineConfig({
     'elysia/index': 'src/elysia/index.ts',
     'fastify/index': 'src/fastify/index.ts',
     'nestjs/index': 'src/nestjs/index.ts',
+    'react-router/index': 'src/react-router/index.ts',
     'sveltekit/index': 'src/sveltekit/index.ts',
+    'vite/index': 'src/vite/index.ts',
+    'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
+    'ai/index': 'src/ai/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -74,7 +79,11 @@ export default defineConfig({
     'fastify',
     '@nestjs/common',
     '@nestjs/core',
+    'react-router',
     '@sveltejs/kit',
+    'vite',
+    'ai',
+    '@ai-sdk/provider',
   ],
-  inlineOnly: ['ufo']
+  inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })

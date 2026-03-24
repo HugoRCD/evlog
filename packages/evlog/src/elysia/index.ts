@@ -3,6 +3,7 @@ import { Elysia } from 'elysia'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { extractSafeHeaders } from '../shared/headers'
+import { filterSafeHeaders } from '../utils'
 
 const storage = new AsyncLocalStorage<RequestLogger>()
 
@@ -77,14 +78,14 @@ export function evlog(options: EvlogElysiaOptions = {}) {
   const requestState = new WeakMap<Request, RequestState>()
 
   return new Elysia({ name: 'evlog' })
-    .derive({ as: 'global' }, ({ request }) => {
-      const url = new URL(request.url)
-
+    .derive({ as: 'global' }, ({ request, path, headers }) => {
       const { logger, finish, skipped } = createMiddlewareLogger({
         method: request.method,
-        path: url.pathname,
-        requestId: request.headers.get('x-request-id') || crypto.randomUUID(),
-        headers: extractSafeHeaders(request.headers),
+        path,
+        requestId: headers['x-request-id'] || crypto.randomUUID(),
+        // It's recommended to use context.headers instead of context.request.headers
+        // because Elysia has fast path for getting headers on Bun
+        headers: filterSafeHeaders(headers as Record<string, string>),
         ...options,
       })
 
@@ -94,7 +95,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
 
       return { log: logger }
     })
-    .onAfterHandle({ as: 'global' }, async ({ request, set }) => {
+    .onAfterResponse({ as: 'global' }, async ({ request, set }) => {
       const state = requestState.get(request)
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)

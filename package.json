@@ -25,11 +25,13 @@
     "example:fastify": "dotenv -- turbo run dev --filter=evlog-fastify-example",
     "example:nestjs": "dotenv -- turbo run dev --filter=evlog-nestjs-example",
     "example:sveltekit": "dotenv -- turbo run dev --filter=evlog-sveltekit-example",
+    "example:react-router": "dotenv -- turbo run dev --filter=evlog-react-router-example",
     "example:hono": "dotenv -- turbo run dev --filter=evlog-hono-example",
     "example:workers": "dotenv -- turbo run dev --filter=evlog-workers-example",
     "example:browser": "dotenv -- turbo run dev --filter=evlog-browser-example",
     "example:bun-script": "dotenv -- turbo run dev --filter=evlog-bun-script-example",
     "example:tanstack-start": "dotenv -- turbo run dev --filter=evlog-tanstack-start-example",
+    "example:vite": "dotenv -- turbo run dev --filter=evlog-vite-example",
     "build": "turbo run build",
     "build:package": "turbo run build --filter='./packages/*'",
     "build:docs": "turbo run build --filter=evlog-docs",
@@ -44,17 +46,20 @@
     "release": "turbo run build --filter='./packages/*' && changeset publish"
   },
   "devDependencies": {
+    "@ai-sdk/provider": "^3.0.8",
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.30.0",
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
+    "ai": "^6.0.137",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
-    "turbo": "^2.8.15",
-    "typescript": "^5.9.3",
-    "vitest": "^4.0.18",
-    "vue-tsc": "^3.2.5"
+    "evlog": "workspace:*",
+    "turbo": "^2.8.20",
+    "typescript": "^6.0.2",
+    "vitest": "^4.1.1",
+    "vue-tsc": "^3.2.6"
   },
   "workspaces": [
     "apps/*",

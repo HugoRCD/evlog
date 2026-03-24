@@ -464,6 +464,33 @@ Use `useLogger()` to access the logger from anywhere in the call stack.
 
 See the full [elysia example](https://github.com/HugoRCD/evlog/tree/main/examples/elysia) for a complete working project.
 
+## React Router
+
+```typescript
+// app/root.tsx
+import { initLogger } from 'evlog'
+import { evlog, loggerContext } from 'evlog/react-router'
+
+initLogger({ env: { service: 'react-router-api' } })
+
+export const middleware: Route.MiddlewareFunction[] = [
+  evlog(),
+]
+
+// app/routes/api.users.$id.tsx
+import { loggerContext } from 'evlog/react-router'
+
+export async function loader({ params, context }: Route.LoaderArgs) {
+  const log = context.get(loggerContext)
+  log.set({ users: { count: 42 } })
+  return { users: [] }
+}
+```
+
+Use `context.get(loggerContext)` in loaders/actions, or `useLogger()` from anywhere in the call stack. Requires `v8_middleware: true` in `react-router.config.ts`.
+
+See the full [react-router example](https://github.com/HugoRCD/evlog/tree/main/examples/react-router) for a complete working project.
+
 ## NestJS
 
 ```typescript
@@ -659,6 +686,32 @@ export default defineNitroPlugin((nitroApp) => {
   })
 })
 ```
+
+## AI SDK Integration
+
+Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Requires `ai >= 6.0.0`.
+
+```typescript
+import { streamText } from 'ai'
+import { createAILogger } from 'evlog/ai'
+
+export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
+  const ai = createAILogger(log)
+
+  const result = streamText({
+    model: ai.wrap('anthropic/claude-sonnet-4.6'),  // string or model object
+    messages,
+    onFinish: ({ text }) => saveConversation(text),  // no conflict
+  })
+
+  return result.toTextStreamResponse()
+})
+```
+
+The middleware captures: `inputTokens`, `outputTokens`, `cacheReadTokens`, `reasoningTokens`, `model`, `provider`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`.
+
+For embeddings: `ai.captureEmbed({ usage })`.
 
 ## Adapters
 
@@ -1069,6 +1122,7 @@ try {
 | **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
 | **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
 | **TanStack Start** | Nitro v3 module setup ([example](./examples/tanstack-start)) |
+| **React Router** | `evlog()` middleware with `import { evlog } from 'evlog/react-router'` ([example](./examples/react-router)) |
 | **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([example](./examples/nestjs)) |
 | **Express** | `app.use(evlog())` with `import { evlog } from 'evlog/express'` ([example](./examples/express)) |
 | **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([example](./examples/hono)) |

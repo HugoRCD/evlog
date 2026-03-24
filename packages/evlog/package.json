@@ -1,6 +1,6 @@
 {
   "name": "evlog",
-  "version": "2.7.0",
+  "version": "2.9.0",
   "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -25,6 +25,8 @@
     "elysia",
     "nestjs",
     "sveltekit",
+    "react-router",
+    "vite",
     "typescript"
   ],
   "license": "MIT",
@@ -80,6 +82,11 @@
       "types": "./dist/adapters/better-stack.d.mts",
       "import": "./dist/adapters/better-stack.mjs",
       "default": "./dist/adapters/better-stack.mjs"
+    },
+    "./hyperdx": {
+      "types": "./dist/adapters/hyperdx.d.mts",
+      "import": "./dist/adapters/hyperdx.mjs",
+      "default": "./dist/adapters/hyperdx.mjs"
     },
     "./fs": {
       "types": "./dist/adapters/fs.d.mts",
@@ -141,15 +148,35 @@
       "import": "./dist/nestjs/index.mjs",
       "default": "./dist/nestjs/index.mjs"
     },
+    "./react-router": {
+      "types": "./dist/react-router/index.d.mts",
+      "import": "./dist/react-router/index.mjs",
+      "default": "./dist/react-router/index.mjs"
+    },
     "./sveltekit": {
       "types": "./dist/sveltekit/index.d.mts",
       "import": "./dist/sveltekit/index.mjs",
       "default": "./dist/sveltekit/index.mjs"
     },
+    "./vite": {
+      "types": "./dist/vite/index.d.mts",
+      "import": "./dist/vite/index.mjs",
+      "default": "./dist/vite/index.mjs"
+    },
+    "./client": {
+      "types": "./dist/client.d.mts",
+      "import": "./dist/client.mjs",
+      "default": "./dist/client.mjs"
+    },
     "./toolkit": {
       "types": "./dist/toolkit.d.mts",
       "import": "./dist/toolkit.mjs",
       "default": "./dist/toolkit.mjs"
+    },
+    "./ai": {
+      "types": "./dist/ai/index.d.mts",
+      "import": "./dist/ai/index.mjs",
+      "default": "./dist/ai/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -185,6 +212,9 @@
       ],
       "better-stack": [
         "./dist/adapters/better-stack.d.mts"
+      ],
+      "hyperdx": [
+        "./dist/adapters/hyperdx.d.mts"
       ],
       "fs": [
         "./dist/adapters/fs.d.mts"
@@ -222,11 +252,23 @@
       "nestjs": [
         "./dist/nestjs/index.d.mts"
       ],
+      "react-router": [
+        "./dist/react-router/index.d.mts"
+      ],
       "sveltekit": [
         "./dist/sveltekit/index.d.mts"
       ],
+      "vite": [
+        "./dist/vite/index.d.mts"
+      ],
+      "client": [
+        "./dist/client.d.mts"
+      ],
       "toolkit": [
         "./dist/toolkit.d.mts"
+      ],
+      "ai": [
+        "./dist/ai/index.d.mts"
       ]
     }
   },
@@ -251,43 +293,50 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
+    "acorn": "^8.16.0",
     "@codspeed/vitest-plugin": "^5.2.0",
-    "@nestjs/common": "^11.1.16",
-    "@nuxt/devtools": "^3.2.3",
+    "@nestjs/common": "^11.1.17",
+    "@nuxt/devtools": "^3.2.4",
     "@nuxt/schema": "^4.4.2",
     "@nuxt/test-utils": "^4.0.0",
     "@types/express": "^5.0.6",
     "@types/supertest": "^7.2.0",
     "changelogen": "^0.6.2",
     "consola": "^3.4.2",
-    "elysia": "^1.4.27",
+    "elysia": "^1.4.28",
     "express": "^5.2.1",
-    "fastify": "^5.8.2",
-    "h3": "^1.15.6",
-    "happy-dom": "^20.8.3",
+    "fastify": "^5.8.4",
+    "h3": "^1.15.10",
+    "happy-dom": "^20.8.4",
     "nitro": "^3.0.260311-beta",
-    "nitropack": "^2.13.1",
+    "nitropack": "^2.13.2",
     "nuxt": "^4.4.2",
     "pino": "^10.3.1",
+    "react-router": "^7.13.2",
     "supertest": "^7.2.2",
-    "tsdown": "^0.21.1",
-    "typescript": "^5.9.3",
+    "tsdown": "^0.21.4",
+    "magic-string": "^0.30.21",
+    "typescript": "^6.0.2",
+    "vite": "^8.0.2",
     "ufo": "^1.6.3",
     "winston": "^3.19.0"
   },
   "peerDependencies": {
     "@nuxt/kit": "^4.4.2",
-    "h3": "^1.15.6",
-    "nitropack": "^2.13.1",
+    "h3": "^1.15.10",
+    "nitropack": "^2.13.2",
     "ofetch": "^1.5.1",
     "nitro": "^3.0.260311-beta",
-    "next": ">=16.1.6",
+    "next": ">=16.2.1",
     "react": ">=19.2.4",
     "hono": "",
     "express": ">=5.2.1",
-    "elysia": ">=1.4.27",
-    "fastify": ">=5.8.2",
-    "@nestjs/common": ">=11.1.16"
+    "elysia": ">=1.4.28",
+    "fastify": ">=5.8.4",
+    "@nestjs/common": ">=11.1.17",
+    "react-router": ">=7.13.2",
+    "vite": "^7.0.0 || ^8.0.0",
+    "ai": ">=6.0.137"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -324,6 +373,15 @@
       "optional": true
     },
     "@nestjs/common": {
+      "optional": true
+    },
+    "react-router": {
+      "optional": true
+    },
+    "vite": {
+      "optional": true
+    },
+    "ai": {
       "optional": true
     }
   }

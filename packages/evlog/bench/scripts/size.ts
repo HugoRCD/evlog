@@ -37,10 +37,11 @@ const ENTRY_POINTS: Record<string, string> = {
   'browser': 'browser.mjs',
   'toolkit': 'toolkit.mjs',
   'workers': 'workers.mjs',
+  'client': 'client.mjs',
 }
 
 const ADAPTER_GLOB = 'adapters/*.mjs'
-const FRAMEWORK_DIRS = ['hono', 'express', 'elysia', 'fastify', 'nestjs', 'sveltekit', 'next', 'nitro']
+const FRAMEWORK_DIRS = ['hono', 'express', 'elysia', 'fastify', 'nestjs', 'sveltekit', 'next', 'nitro', 'vite', 'ai']
 
 function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`

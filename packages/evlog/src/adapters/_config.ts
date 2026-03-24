@@ -1,15 +1,37 @@
 /**
- * Try to get runtime config from Nitro/Nuxt environment.
- * Returns undefined if not in a Nitro context.
+ * Nitro runtime modules resolved via dynamic `import()` (Workers-safe: avoids a bundler-injected
+ * `createRequire` polyfill from sync `require()`). Module namespaces are cached after first
+ * successful load; `useRuntimeConfig()` is still invoked on each call so config stays current.
+ *
+ * Drain handlers remain non-blocking for the HTTP response when the host provides `waitUntil`
+ * (see Nitro plugin); the extra `await` here only sequences work inside that background drain.
  */
-export function getRuntimeConfig(): Record<string, any> | undefined {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const { useRuntimeConfig } = require('nitropack/runtime')
-    return useRuntimeConfig()
-  } catch {
-    return undefined
+let nitropackRuntime: typeof import('nitropack/runtime') | null | undefined
+let nitroV3Runtime: typeof import('nitro/runtime-config') | null | undefined
+
+export async function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
+  if (nitropackRuntime === undefined) {
+    try {
+      nitropackRuntime = await import('nitropack/runtime')
+    } catch {
+      nitropackRuntime = null
+    }
   }
+  if (nitropackRuntime) {
+    return nitropackRuntime.useRuntimeConfig()
+  }
+
+  if (nitroV3Runtime === undefined) {
+    try {
+      nitroV3Runtime = await import('nitro/runtime-config')
+    } catch {
+      nitroV3Runtime = null
+    }
+  }
+  if (nitroV3Runtime) {
+    return nitroV3Runtime.useRuntimeConfig()
+  }
+  return undefined
 }
 
 export interface ConfigField<T> {
@@ -17,12 +39,12 @@ export interface ConfigField<T> {
   env?: string[]
 }
 
-export function resolveAdapterConfig<T>(
+export async function resolveAdapterConfig<T>(
   namespace: string,
   fields: ConfigField<T>[],
   overrides?: Partial<T>,
-): Partial<T> {
-  const runtimeConfig = getRuntimeConfig()
+): Promise<Partial<T>> {
+  const runtimeConfig = await getRuntimeConfig()
   const evlogNs = runtimeConfig?.evlog?.[namespace]
   const rootNs = runtimeConfig?.[namespace]
 

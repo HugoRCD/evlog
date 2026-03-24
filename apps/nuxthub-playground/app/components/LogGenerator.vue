@@ -32,11 +32,14 @@ async function fireAll() {
       <button @click="fire('/api/test/warn')">
         Slow Request
       </button>
+      <button @click="fire('/api/test/ai-wrap')">
+        AI Wrap Composition
+      </button>
       <button @click="fireAll">
         Fire All (x3)
       </button>
     </div>
-    <p v-if="lastResult" style="margin-top: 0.5rem; color: #666; font-size: 0.85rem;">
+    <p v-if="lastResult" style="margin-top: 0.5rem; color: #666; font-size: 0.85rem; word-break: break-all; overflow-wrap: anywhere;">
       {{ lastResult }}
     </p>
   </section>

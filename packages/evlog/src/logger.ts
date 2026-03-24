@@ -495,3 +495,8 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
 export function getEnvironment(): EnvironmentContext {
   return { ...globalEnv }
 }
+
+// eslint-disable-next-line @typescript-eslint/naming-convention
+declare const __EVLOG_CONFIG__: import('./types').LoggerConfig | undefined
+
+if (typeof __EVLOG_CONFIG__ !== 'undefined') initLogger(__EVLOG_CONFIG__)

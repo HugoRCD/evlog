@@ -12,6 +12,8 @@ onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
 })
 
+// eslint-disable-next-line @typescript-eslint/naming-convention
+const NuxtLink = resolveComponent('NuxtLink')
 const activeTab = ref(0)
 
 const frameworkRows = [
@@ -21,15 +23,17 @@ const frameworkRows = [
     { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 2 },
     { name: 'Nitro', icon: 'i-custom-nitro', tab: 3 },
     { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 4 },
-    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 5 },
+    { name: 'React Router', icon: 'i-simple-icons-reactrouter', tab: 5 },
+    { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 6 },
   ],
   [
-    { name: 'Express', icon: 'i-simple-icons-express', tab: 6 },
-    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 7 },
-    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 8 },
-    { name: 'Elysia', icon: 'i-custom-elysia', tab: 9 },
-    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 10 },
-    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 11 },
+    { name: 'Express', icon: 'i-simple-icons-express', tab: 7 },
+    { name: 'Hono', icon: 'i-simple-icons-hono', tab: 8 },
+    { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 9 },
+    { name: 'Elysia', icon: 'i-custom-elysia', tab: 10 },
+    { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 11 },
+    { name: 'Bun', icon: 'i-simple-icons-bun', tab: 12 },
+    { name: 'Vite', icon: 'i-custom-vite', link: '/core-concepts/vite-plugin' },
   ],
 ]
 </script>
@@ -77,27 +81,29 @@ const frameworkRows = [
         :key="rowIndex"
         class="flex flex-wrap items-end justify-center gap-2 md:gap-3"
       >
-        <button
+        <component
+          :is="fw.link ? NuxtLink : 'button'"
           v-for="fw in row"
           :key="fw.name"
+          :to="fw.link"
           class="group flex flex-col items-center gap-2 px-4 py-3 border outline-none transition-all duration-300"
-          :class="activeTab === fw.tab
+          :class="fw.tab !== undefined && activeTab === fw.tab
             ? 'border-accent-blue/30 bg-accent-blue/5'
             : 'border-transparent hover:border-zinc-800'"
-          @click="activeTab = fw.tab"
+          @click="fw.tab !== undefined ? activeTab = fw.tab : undefined"
         >
           <UIcon
             :name="fw.icon"
             class="size-8 sm:size-10 transition-colors duration-300"
-            :class="activeTab === fw.tab ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'"
+            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-white' : 'text-zinc-400 group-hover:text-zinc-300'"
           />
           <span
             class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
-            :class="activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'"
+            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-zinc-300' : 'text-zinc-500 group-hover:text-zinc-300'"
           >
             {{ fw.name }}
           </span>
-        </button>
+        </component>
       </div>
     </Motion>
 
@@ -124,24 +130,27 @@ const frameworkRows = [
         <slot name="tanstack-start" />
       </div>
       <div v-show="activeTab === 5" class="landing-code">
-        <slot name="nestjs" />
+        <slot name="react-router" />
       </div>
       <div v-show="activeTab === 6" class="landing-code">
-        <slot name="express" />
+        <slot name="nestjs" />
       </div>
       <div v-show="activeTab === 7" class="landing-code">
-        <slot name="hono" />
+        <slot name="express" />
       </div>
       <div v-show="activeTab === 8" class="landing-code">
-        <slot name="fastify" />
+        <slot name="hono" />
       </div>
       <div v-show="activeTab === 9" class="landing-code">
-        <slot name="elysia" />
+        <slot name="fastify" />
       </div>
       <div v-show="activeTab === 10" class="landing-code">
-        <slot name="cloudflare" />
+        <slot name="elysia" />
       </div>
       <div v-show="activeTab === 11" class="landing-code">
+        <slot name="cloudflare" />
+      </div>
+      <div v-show="activeTab === 12" class="landing-code">
         <slot name="bun" />
       </div>
     </Motion>
