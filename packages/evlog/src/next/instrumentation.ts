@@ -1,6 +1,73 @@
 import type { DrainContext, EnvironmentContext, SamplingConfig } from '../types'
 import { initLogger, log, lockLogger } from '../logger'
 
+/** Request payload passed to Next.js `onRequestError` (App Router). */
+export interface NextInstrumentationRequest {
+  path: string
+  method: string
+  headers: Record<string, string>
+}
+
+/** Routing context passed to Next.js `onRequestError`. */
+export interface NextInstrumentationErrorContext {
+  routerKind: string
+  routePath: string
+  routeType: string
+  renderSource: string
+}
+
+/**
+ * What `lib/evlog.ts` should export for use with {@link defineNodeInstrumentation}
+ * (typically the return values of `createInstrumentation()`).
+ */
+export interface NodeInstrumentationModule {
+  register: () => void | Promise<void>
+  onRequestError: (
+    error: { digest?: string } & Error,
+    request: NextInstrumentationRequest,
+    context: NextInstrumentationErrorContext,
+  ) => void | Promise<void>
+}
+
+/**
+ * Root `instrumentation.ts` entry: load your real config only in the Node.js runtime so Edge
+ * bundles never pull Node-only drains/adapters. Caches the dynamic `import()` so `register` and
+ * repeated `onRequestError` calls share one module instance (avoids re-importing on every error).
+ *
+ * @example
+ * ```ts
+ * // instrumentation.ts
+ * import { defineNodeInstrumentation } from 'evlog/next/instrumentation'
+ *
+ * export const { register, onRequestError } = defineNodeInstrumentation(() => import('./lib/evlog'))
+ * ```
+ */
+export function defineNodeInstrumentation(loader: () => Promise<NodeInstrumentationModule>) {
+  let cached: Promise<NodeInstrumentationModule> | undefined
+
+  function load(): Promise<NodeInstrumentationModule> {
+    cached ??= loader()
+    return cached
+  }
+
+  return {
+    async register() {
+      if (process.env.NEXT_RUNTIME !== 'nodejs') return
+      const mod = await load()
+      await mod.register()
+    },
+    async onRequestError(
+      error: { digest?: string } & Error,
+      request: NextInstrumentationRequest,
+      context: NextInstrumentationErrorContext,
+    ) {
+      if (process.env.NEXT_RUNTIME !== 'nodejs') return
+      const mod = await load()
+      await mod.onRequestError(error, request, context)
+    },
+  }
+}
+
 export interface InstrumentationOptions {
   /** Enable or disable all logging globally. @default true */
   enabled?: boolean
@@ -26,8 +93,8 @@ interface InstrumentationResult {
   register: () => void
   onRequestError: (
     error: { digest?: string } & Error,
-    request: { path: string; method: string; headers: Record<string, string> },
-    context: { routerKind: string; routePath: string; routeType: string; renderSource: string },
+    request: NextInstrumentationRequest,
+    context: NextInstrumentationErrorContext,
   ) => void
 }
 

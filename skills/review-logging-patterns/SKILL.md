@@ -187,7 +187,11 @@ log.info({ action: 'checkout_click' })
 clearIdentity()
 ```
 
-**Step 7: Client ingest endpoint** — receives client logs:
+**Step 7 (optional): Instrumentation** — startup + global `onRequestError` (SSR/RSC errors outside `withEvlog`). Use `defineNodeInstrumentation(() => import('./lib/evlog'))` in root `instrumentation.ts` to gate Node + cache the import, **or** write `register`/`onRequestError` manually — both are valid. For custom logic, wrap evlog’s `register`/`onRequestError` inside `lib/evlog.ts` (compose with your own init or metrics), then re-export.
+
+Export `createInstrumentation()` from `lib/evlog.ts` alongside `createEvlog()`. See framework docs for coexistence with `lockLogger`.
+
+**Step 8: Client ingest endpoint** — receives client logs:
 
 ```typescript
 // app/api/evlog/ingest/route.ts

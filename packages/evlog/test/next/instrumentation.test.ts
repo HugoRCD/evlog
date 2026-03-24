@@ -274,3 +274,78 @@ describe('createInstrumentation', () => {
     expect(process.stderr.write).toBe(originalStderrWrite)
   })
 })
+
+describe('defineNodeInstrumentation', () => {
+  let originalNextRuntime: string | undefined
+
+  beforeEach(() => {
+    originalNextRuntime = process.env.NEXT_RUNTIME
+    vi.resetModules()
+  })
+
+  afterEach(() => {
+    if (originalNextRuntime === undefined) {
+      delete process.env.NEXT_RUNTIME
+    } else {
+      process.env.NEXT_RUNTIME = originalNextRuntime
+    }
+  })
+
+  it('does not call loader when NEXT_RUNTIME is edge', async () => {
+    process.env.NEXT_RUNTIME = 'edge'
+    const loader = vi.fn().mockResolvedValue({
+      register: vi.fn(),
+      onRequestError: vi.fn(),
+    })
+    const { defineNodeInstrumentation } = await import('../../src/next/instrumentation')
+    const { register, onRequestError } = defineNodeInstrumentation(loader)
+    await register()
+    await onRequestError(
+      new Error('x'),
+      { path: '/', method: 'GET', headers: {} },
+      {
+        routerKind: 'App Router',
+        routePath: '/',
+        routeType: 'route',
+        renderSource: 'react-server-components',
+      },
+    )
+    expect(loader).not.toHaveBeenCalled()
+  })
+
+  it('caches loader: one import for register plus multiple onRequestError', async () => {
+    process.env.NEXT_RUNTIME = 'nodejs'
+    const registerFn = vi.fn()
+    const onRequestErrorFn = vi.fn()
+    const loader = vi.fn().mockResolvedValue({
+      register: registerFn,
+      onRequestError: onRequestErrorFn,
+    })
+    const { defineNodeInstrumentation } = await import('../../src/next/instrumentation')
+    const { register, onRequestError } = defineNodeInstrumentation(loader)
+    await register()
+    await onRequestError(
+      new Error('a'),
+      { path: '/a', method: 'GET', headers: {} },
+      {
+        routerKind: 'App Router',
+        routePath: '/a',
+        routeType: 'route',
+        renderSource: 'react-server-components',
+      },
+    )
+    await onRequestError(
+      new Error('b'),
+      { path: '/b', method: 'GET', headers: {} },
+      {
+        routerKind: 'App Router',
+        routePath: '/b',
+        routeType: 'route',
+        renderSource: 'react-server-components',
+      },
+    )
+    expect(loader).toHaveBeenCalledTimes(1)
+    expect(registerFn).toHaveBeenCalledTimes(1)
+    expect(onRequestErrorFn).toHaveBeenCalledTimes(2)
+  })
+})
