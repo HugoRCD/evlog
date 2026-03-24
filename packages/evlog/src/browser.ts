@@ -11,6 +11,8 @@ export interface BrowserDrainConfig {
   timeout?: number
   /** Use sendBeacon when the page is hidden. @default true */
   useBeacon?: boolean
+  /** Fetch credentials mode. @default 'same-origin' */
+  credentials?: RequestCredentials
 }
 
 export interface BrowserLogDrainOptions {
@@ -39,7 +41,7 @@ export interface BrowserLogDrainOptions {
  * ```
  */
 export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainContext[]) => Promise<void> {
-  const { endpoint, headers: customHeaders, timeout = 5000, useBeacon = true } = config
+  const { endpoint, headers: customHeaders, timeout = 5000, useBeacon = true, credentials = 'same-origin' } = config
 
   return async (batch: DrainContext[]): Promise<void> => {
     if (batch.length === 0) return
@@ -70,7 +72,7 @@ export function createBrowserDrain(config: BrowserDrainConfig): (batch: DrainCon
         body,
         signal: controller.signal,
         keepalive: true,
-        credentials: 'same-origin',
+        credentials,
       })
 
       if (!response.ok) {

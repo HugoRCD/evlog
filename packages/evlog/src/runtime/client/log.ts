@@ -9,6 +9,7 @@ let clientPretty = true
 let clientService = 'client'
 let transportEnabled = false
 let transportEndpoint = '/api/_evlog/ingest'
+let transportCredentials: RequestCredentials = 'same-origin'
 let identityContext: Record<string, unknown> = {}
 
 export function setIdentity(identity: Record<string, unknown>): void {
@@ -27,6 +28,7 @@ export function initLog(options: { enabled?: boolean, console?: boolean, pretty?
   clientService = options.service ?? 'client'
   transportEnabled = options.transport?.enabled ?? false
   transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
+  transportCredentials = options.transport?.credentials ?? 'same-origin'
 }
 
 async function sendToServer(event: Record<string, unknown>): Promise<void> {
@@ -38,7 +40,7 @@ async function sendToServer(event: Record<string, unknown>): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(event),
       keepalive: true,
-      credentials: 'same-origin',
+      credentials: transportCredentials,
     })
   } catch {
     // Silently fail - don't break the app

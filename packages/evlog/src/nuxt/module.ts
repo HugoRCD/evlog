@@ -136,8 +136,9 @@ export interface ModuleOptions {
    * @example
    * ```ts
    * transport: {
-   *   enabled: true,  // Send logs to server API
-   *   endpoint: '/api/_evlog/ingest'  // Custom endpoint
+   *   enabled: true, // send client logs to server via API endpoint
+   *   endpoint: '/api/_evlog/ingest', // default endpoint (or custom endpoint)
+   *   credentials: 'include', // optional: cross-origin ingest
    * }
    * ```
    */
@@ -264,6 +265,7 @@ export default defineNuxtModule<ModuleOptions>({
 
     const transportEnabled = options.transport?.enabled ?? false
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
+    const transportCredentials = options.transport?.credentials ?? 'same-origin'
 
     // Register custom error handler for proper EvlogError serialization
     // Only set if not already configured to avoid overwriting user's custom handler
@@ -280,6 +282,7 @@ export default defineNuxtModule<ModuleOptions>({
       transport: {
         enabled: transportEnabled,
         endpoint: transportEndpoint,
+        credentials: transportCredentials,
       },
     }
 
