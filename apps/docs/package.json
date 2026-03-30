@@ -18,7 +18,7 @@
     "motion-v": "^2.2.0",
     "nuxt": "^4.4.2",
     "nuxt-studio": "^1.5.1",
-    "shaders": "^2.5.84",
+    "shaders": "^2.5.85",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.2"
   },
