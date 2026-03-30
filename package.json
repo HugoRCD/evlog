@@ -51,14 +51,14 @@
     "@changesets/cli": "^2.30.0",
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
-    "ai": "^6.0.137",
+    "ai": "^6.0.141",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "evlog": "workspace:*",
-    "turbo": "^2.8.20",
+    "turbo": "^2.8.21",
     "typescript": "^6.0.2",
-    "vitest": "^4.1.1",
+    "vitest": "^4.1.2",
     "vue-tsc": "^3.2.6"
   },
   "workspaces": [
