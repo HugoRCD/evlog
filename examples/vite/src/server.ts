@@ -1,5 +1,6 @@
 import { serve } from '@hono/node-server'
 import { Hono } from 'hono'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
 import { evlog, type EvlogVariables } from 'evlog/hono'
 import { createError, log, parseError } from 'evlog'
 import { chargeUser } from './utils/billing'
@@ -47,11 +48,14 @@ app.get('/error', () => {
 app.onError((error, c) => {
   c.get('log').error(error)
   const parsed = parseError(error)
-  return c.json({
-    message: parsed.message,
-    why: parsed.why,
-    fix: parsed.fix,
-  }, parsed.status as any)
+  return c.json(
+    {
+      message: parsed.message,
+      why: parsed.why,
+      fix: parsed.fix,
+    },
+    parsed.status as ContentfulStatusCode,
+  )
 })
 
 serve({ fetch: app.fetch, port: 3000 })

@@ -457,6 +457,22 @@ app.get('/api/users', (c) => {
 
 Access the logger via `c.get('log')` in handlers. No `useLogger()` — use `c.get('log')` and pass it down explicitly, or use Express/Fastify/Elysia if you need `useLogger()` across async boundaries.
 
+Structured errors: throw `createError()`, then in `app.onError` use `parseError()` and pass `parsed.status as ContentfulStatusCode` to `c.json()` (Hono types the status argument as `ContentfulStatusCode`, not `number`).
+
+```typescript
+import { createError, parseError } from 'evlog'
+import type { ContentfulStatusCode } from 'hono/utils/http-status'
+
+app.onError((error, c) => {
+  c.get('log').error(error)
+  const parsed = parseError(error)
+  return c.json(
+    { message: parsed.message, why: parsed.why, fix: parsed.fix, link: parsed.link },
+    parsed.status as ContentfulStatusCode,
+  )
+})
+```
+
 Full pipeline with drain, enrich, and tail sampling:
 
 ```typescript
