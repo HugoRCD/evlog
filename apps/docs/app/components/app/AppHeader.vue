@@ -1,8 +1,11 @@
 <script setup lang="ts">
+import { useSubNavigation } from '#imports'
+
 const appConfig = useAppConfig()
 const site = useSiteConfig()
 const route = useRoute()
 const { isEnabled: isAssistantEnabled } = useAssistant()
+const { subNavigationMode } = useSubNavigation()
 
 const isHome = computed(() => route.path === '/')
 const links = computed(() => appConfig.github?.url
@@ -25,6 +28,7 @@ const headerUi = computed(() => isHome.value
   <Blur v-if="isHome" position="both" class="z-10" />
   <UHeader
     :ui="headerUi"
+    :class="{ 'flex flex-col': subNavigationMode === 'header' }"
     to="/"
     :title="appConfig.header?.title || site.name"
   >
@@ -62,6 +66,13 @@ const headerUi = computed(() => isHome.value
 
     <template #body>
       <AppHeaderBody />
+    </template>
+
+    <template
+      v-if="subNavigationMode === 'header'"
+      #bottom
+    >
+      <AppHeaderBottom />
     </template>
   </UHeader>
 </template>

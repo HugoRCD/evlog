@@ -45,7 +45,7 @@ const pills = [
             {{ pill.label }}
           </span>
         </div>
-        <NuxtLink to="/core-concepts/structured-errors" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-dimmed hover:text-primary transition-colors">
+        <NuxtLink to="/logging/structured-errors" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-dimmed hover:text-primary transition-colors">
           Learn about structured errors
           <UIcon name="i-lucide-arrow-right" class="size-3" />
         </NuxtLink>

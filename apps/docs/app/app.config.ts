@@ -1,4 +1,7 @@
 export default defineAppConfig({
+  navigation: {
+    sub: 'header',
+  },
   github: {
     rootDir: 'apps/docs',
   },

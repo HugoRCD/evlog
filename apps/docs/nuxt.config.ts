@@ -5,6 +5,7 @@ export default defineNuxtConfig({
     '/getting-started': { redirect: { to: '/getting-started/introduction', statusCode: 301 } },
     '/frameworks': { redirect: { to: '/frameworks/overview', statusCode: 301 } },
     '/adapters': { redirect: { to: '/adapters/overview', statusCode: 301 } },
+    '/core-concepts': { redirect: { to: '/core-concepts/lifecycle', statusCode: 301 } },
     '/enrichers': { redirect: { to: '/enrichers/overview', statusCode: 301 } },
     '/nuxthub': { redirect: { to: '/nuxthub/overview', statusCode: 301 } },
     '/examples/nextjs': { redirect: { to: '/frameworks/nextjs', statusCode: 301 } },
@@ -15,6 +16,12 @@ export default defineNuxtConfig({
     '/examples/hono': { redirect: { to: '/frameworks/hono', statusCode: 301 } },
     '/examples/fastify': { redirect: { to: '/frameworks/fastify', statusCode: 301 } },
     '/examples/elysia': { redirect: { to: '/frameworks/elysia', statusCode: 301 } },
+    '/examples/react-router': { redirect: { to: '/frameworks/react-router', statusCode: 301 } },
+    '/logging': { redirect: { to: '/logging/overview', statusCode: 301 } },
+    '/core-concepts/wide-events': { redirect: { to: '/logging/wide-events', statusCode: 301 } },
+    '/core-concepts/structured-errors': { redirect: { to: '/logging/structured-errors', statusCode: 301 } },
+    '/core-concepts/client-logging': { redirect: { to: '/logging/client-logging', statusCode: 301 } },
+    '/core-concepts/ai-sdk': { redirect: { to: '/logging/ai-sdk', statusCode: 301 } },
   },
 
   modules: [
@@ -50,6 +57,9 @@ export default defineNuxtConfig({
   },
 
   studio: {
+    development: {
+      sync: false,
+    },
     repository: {
       owner: 'HugoRCD',
       repo: 'evlog',
@@ -63,8 +73,8 @@ export default defineNuxtConfig({
 
   content: {
     experimental: {
-      sqliteConnector: 'native'
-    }
+      sqliteConnector: 'native',
+    },
   },
 
   mdc: {

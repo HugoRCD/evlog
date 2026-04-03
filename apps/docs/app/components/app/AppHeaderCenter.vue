@@ -34,26 +34,38 @@ const landingItems = [
     ]
   },
   {
-    label: 'Core Concepts',
-    to: '/core-concepts/wide-events',
+    label: 'Logging',
+    to: '/logging/overview',
     children: [
+      {
+        label: 'Simple Logging',
+        icon: 'i-lucide-terminal',
+        description: 'Fire-and-forget structured logs',
+        to: '/logging/simple-logging'
+      },
       {
         label: 'Wide Events',
         icon: 'i-lucide-rows-3',
-        description: 'One log per request, full context',
-        to: '/core-concepts/wide-events'
+        description: 'Accumulate context, emit once',
+        to: '/logging/wide-events'
       },
       {
         label: 'Structured Errors',
         icon: 'i-lucide-shield-alert',
         description: 'Errors that explain why and how to fix',
-        to: '/core-concepts/structured-errors'
+        to: '/logging/structured-errors'
       },
       {
-        label: 'Typed Fields',
-        icon: 'i-lucide-braces',
-        description: 'Type-safe log fields',
-        to: '/core-concepts/typed-fields'
+        label: 'Client Logging',
+        icon: 'i-lucide-monitor',
+        description: 'Browser-side logging and transport',
+        to: '/logging/client-logging'
+      },
+      {
+        label: 'AI SDK',
+        icon: 'i-simple-icons-vercel',
+        description: 'AI observability with token tracking',
+        to: '/logging/ai-sdk'
       }
     ]
   },
@@ -106,24 +118,6 @@ const landingItems = [
   }
 ]
 
-const docsItems = [
-  {
-    label: 'Getting Started',
-    to: '/getting-started/introduction',
-  },
-  {
-    label: 'Core Concepts',
-    to: '/core-concepts/wide-events',
-  },
-  {
-    label: 'Adapters',
-    to: '/adapters/overview',
-  },
-  {
-    label: 'Enrichers',
-    to: '/enrichers/overview',
-  }
-]
 </script>
 
 <template>
@@ -139,11 +133,11 @@ const docsItems = [
       viewportWrapper: 'w-[600px] transition-all duration-500 left-1/2 -translate-x-1/2',
     }"
   />
-  <UNavigationMenu
+  <UContentSearchButton
     v-else
-    variant="link"
-    color="neutral"
-    :items="docsItems"
-    :ui="{ linkTrailingIcon: 'hidden' }"
+    :collapsed="false"
+    class="w-full"
+    variant="soft"
+    :ui="{ leadingIcon: 'size-4 mr-1' }"
   />
 </template>
