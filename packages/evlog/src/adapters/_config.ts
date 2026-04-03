@@ -7,7 +7,7 @@ import { getNitroRuntimeConfigRecord } from '../shared/nitroConfigBridge'
  * Drain handlers remain non-blocking when the host provides `waitUntil`.
  */
 
-export async function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
+export function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
   return getNitroRuntimeConfigRecord()
 }
 

@@ -59,7 +59,7 @@ function isRuntimeConfigModule(mod: unknown): mod is NitroRuntimeConfigModule {
 /** Snapshot from env, or `undefined` if unset / invalid JSON. */
 export function readEvlogConfigFromNitroEnv(): EvlogConfig | undefined {
   const raw = process.env[EVLOG_NITRO_ENV]
-  if (raw == null || raw === '') return undefined
+  if (raw === undefined || raw === '') return undefined
   try {
     return JSON.parse(raw) as EvlogConfig
   } catch {
@@ -93,7 +93,7 @@ async function getNitropackInternalRuntimeConfig(): Promise<NitroRuntimeConfigMo
 }
 
 function evlogSlice(config: Record<string, any>): EvlogConfig | undefined {
-  const evlog = config.evlog
+  const { evlog } = config
   if (evlog && typeof evlog === 'object') return evlog as EvlogConfig
   return undefined
 }
