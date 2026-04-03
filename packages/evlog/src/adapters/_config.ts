@@ -1,37 +1,14 @@
+import { getNitroRuntimeConfigRecord } from '../shared/nitroConfigBridge'
+
 /**
- * Nitro runtime modules resolved via dynamic `import()` (Workers-safe: avoids a bundler-injected
- * `createRequire` polyfill from sync `require()`). Module namespaces are cached after first
- * successful load; `useRuntimeConfig()` is still invoked on each call so config stays current.
+ * Adapter runtime-config reads go through `getNitroRuntimeConfigRecord` in
+ * `shared/nitroConfigBridge.ts` (documented there — Workers-safe dynamic imports).
  *
- * Drain handlers remain non-blocking for the HTTP response when the host provides `waitUntil`
- * (see Nitro plugin); the extra `await` here only sequences work inside that background drain.
+ * Drain handlers remain non-blocking when the host provides `waitUntil`.
  */
-let nitropackRuntime: typeof import('nitropack/runtime') | null | undefined
-let nitroV3Runtime: typeof import('nitro/runtime-config') | null | undefined
 
 export async function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
-  if (nitropackRuntime === undefined) {
-    try {
-      nitropackRuntime = await import('nitropack/runtime')
-    } catch {
-      nitropackRuntime = null
-    }
-  }
-  if (nitropackRuntime) {
-    return nitropackRuntime.useRuntimeConfig()
-  }
-
-  if (nitroV3Runtime === undefined) {
-    try {
-      nitroV3Runtime = await import('nitro/runtime-config')
-    } catch {
-      nitroV3Runtime = null
-    }
-  }
-  if (nitroV3Runtime) {
-    return nitroV3Runtime.useRuntimeConfig()
-  }
-  return undefined
+  return getNitroRuntimeConfigRecord()
 }
 
 export interface ConfigField<T> {

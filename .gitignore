@@ -40,5 +40,6 @@ apps/web/.data
 apps/chat/.data
 .codex/environments/
 .claude/
+packages/evlog/test/nitro-v3/fixture/.wrangler
 apps/nuxthub-playground/.data
 .next/

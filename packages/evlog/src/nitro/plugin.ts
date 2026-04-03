@@ -7,7 +7,7 @@ import { defineNitroPlugin } from 'nitropack/runtime/internal/plugin'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger, isEnabled } from '../logger'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
-import type { EvlogConfig } from '../nitro'
+import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
 import type { EnrichContext, RequestLogger, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -106,21 +106,7 @@ async function callEnrichAndDrain(
 }
 
 export default defineNitroPlugin(async (nitroApp) => {
-  // Config resolution: process.env bridge first (always set by the module),
-  // then lazy useRuntimeConfig() for production builds where env may not persist.
-  let evlogConfig: EvlogConfig | undefined
-  if (process.env.__EVLOG_CONFIG) {
-    evlogConfig = JSON.parse(process.env.__EVLOG_CONFIG)
-  } else {
-    try {
-      // nitropack/runtime/internal/config imports virtual modules —
-      // only works inside rollup-bundled output (production builds).
-      const { useRuntimeConfig } = await import('nitropack/runtime/internal/config')
-      evlogConfig = (useRuntimeConfig() as Record<string, any>).evlog
-    } catch {
-      // Expected in dev mode — virtual modules unavailable outside rollup
-    }
-  }
+  const evlogConfig = await resolveEvlogConfigForNitroPlugin()
 
   initLogger({
     enabled: evlogConfig?.enabled,

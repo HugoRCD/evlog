@@ -1,11 +1,10 @@
 import { definePlugin } from 'nitro'
-import { useRuntimeConfig } from 'nitro/runtime-config'
 import type { CaptureError } from 'nitro/types'
 import type { HTTPEvent } from 'nitro/h3'
 import { parseURL } from 'ufo'
 import { createRequestLogger, initLogger, isEnabled } from '../logger'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
-import type { EvlogConfig } from '../nitro'
+import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
 import type { EnrichContext, RequestLogger, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -131,12 +130,8 @@ async function callEnrichAndDrain(
  * export { default } from 'evlog/nitro/v3'
  * ```
  */
-export default definePlugin((nitroApp) => {
-  // In production builds the plugin is bundled and useRuntimeConfig()
-  // resolves the virtual module correctly. In dev mode the plugin is
-  // loaded externally so useRuntimeConfig() returns a stub — fall back
-  // to the env var bridge set by the module.
-  const evlogConfig = (useRuntimeConfig().evlog ?? (process.env.__EVLOG_CONFIG ? JSON.parse(process.env.__EVLOG_CONFIG) : undefined)) as EvlogConfig | undefined
+export default definePlugin(async (nitroApp) => {
+  const evlogConfig = await resolveEvlogConfigForNitroPlugin()
 
   initLogger({
     enabled: evlogConfig?.enabled,
