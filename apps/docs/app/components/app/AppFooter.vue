@@ -17,11 +17,13 @@ const columns = computed<FooterColumn[]>(() => [
         to: '/getting-started/introduction'
       },
       ...(justUseEvlogUrl.value
-        ? [{
+        ? [
+          {
             label: 'Just fucking use evlog',
             to: justUseEvlogUrl.value,
             target: '_blank' as const,
-          }]
+          }
+        ]
         : []),
       {
         label: 'Releases',
