@@ -29,6 +29,7 @@ export default defineConfig({
     'adapters/sentry': 'src/adapters/sentry.ts',
     'adapters/better-stack': 'src/adapters/better-stack.ts',
     'adapters/hyperdx': 'src/adapters/hyperdx.ts',
+    'adapters/datadog': 'src/adapters/datadog.ts',
     'adapters/fs': 'src/adapters/fs.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',

@@ -27,7 +27,8 @@
     "sveltekit",
     "react-router",
     "vite",
-    "typescript"
+    "typescript",
+    "datadog"
   ],
   "license": "MIT",
   "type": "module",
@@ -87,6 +88,11 @@
       "types": "./dist/adapters/hyperdx.d.mts",
       "import": "./dist/adapters/hyperdx.mjs",
       "default": "./dist/adapters/hyperdx.mjs"
+    },
+    "./datadog": {
+      "types": "./dist/adapters/datadog.d.mts",
+      "import": "./dist/adapters/datadog.mjs",
+      "default": "./dist/adapters/datadog.mjs"
     },
     "./fs": {
       "types": "./dist/adapters/fs.d.mts",
@@ -215,6 +221,9 @@
       ],
       "hyperdx": [
         "./dist/adapters/hyperdx.d.mts"
+      ],
+      "datadog": [
+        "./dist/adapters/datadog.d.mts"
       ],
       "fs": [
         "./dist/adapters/fs.d.mts"

@@ -754,6 +754,29 @@ Set environment variables:
 NUXT_OTLP_ENDPOINT=http://localhost:4318
 ```
 
+### Datadog
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createDatadogDrain } from 'evlog/datadog'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createDatadogDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_DATADOG_API_KEY=your-api-key
+# Optional — defaults to datadoghq.com
+NUXT_DATADOG_SITE=datadoghq.eu
+```
+
+You can also use standard Datadog names: `DD_API_KEY` and `DD_SITE`.
+
+Wide events are sent with a short **`message` line** (method, path, level) and full context under the **`evlog`** attribute (facets like `@evlog.path`). See the [Datadog adapter docs](https://www.evlog.dev/adapters/datadog).
+
 ### PostHog
 
 ```typescript

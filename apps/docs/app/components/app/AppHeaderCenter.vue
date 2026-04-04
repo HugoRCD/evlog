@@ -108,6 +108,12 @@ const landingItems = [
         icon: 'i-simple-icons-betterstack',
         description: 'Stream logs to Better Stack',
         to: '/adapters/better-stack'
+      },
+      {
+        label: 'Datadog',
+        icon: 'i-simple-icons-datadog',
+        description: 'Send logs to Datadog',
+        to: '/adapters/datadog'
       }
     ]
   },

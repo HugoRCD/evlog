@@ -54,7 +54,7 @@ evlog/
 │       │   ├── vite/        # Vite plugin (evlog/vite)
 │       │   ├── shared/      # Toolkit: building blocks for custom framework integrations (evlog/toolkit)
 │       │   ├── ai/          # AI SDK integration (evlog/ai)
-│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack)
+│       │   ├── adapters/    # Log drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog)
 │       │   ├── enrichers/   # Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
 │       │   └── runtime/     # Runtime code (client/, server/, utils/)
 │       └── test/            # Tests
@@ -325,6 +325,7 @@ evlog provides built-in adapters for popular observability platforms. Use the `e
 | PostHog | `evlog/posthog` | Send logs to PostHog Logs via OTLP for structured logging and observability |
 | Sentry | `evlog/sentry` | Send logs to Sentry Logs for structured logging and debugging |
 | Better Stack | `evlog/better-stack` | Send logs to Better Stack for log management and alerting |
+| Datadog | `evlog/datadog` | Send logs to Datadog Logs via the HTTP intake API (`DD-API-KEY`) |
 
 **Using Axiom Adapter:**
 
@@ -403,6 +404,19 @@ export default defineNitroPlugin((nitroApp) => {
 ```
 
 Set environment variable: `NUXT_BETTER_STACK_SOURCE_TOKEN`.
+
+**Using Datadog Adapter:**
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createDatadogDrain } from 'evlog/datadog'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createDatadogDrain())
+})
+```
+
+Set environment variables: `NUXT_DATADOG_API_KEY` or `DD_API_KEY`, and optionally `DD_SITE` (e.g. `datadoghq.eu`).
 
 **Multiple Destinations:**
 

@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
 license: MIT
 metadata:
   author: HugoRCD
@@ -747,6 +747,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | PostHog | `evlog/posthog` | `POSTHOG_API_KEY`, `POSTHOG_HOST` |
 | Sentry | `evlog/sentry` | `SENTRY_DSN` |
 | Better Stack | `evlog/better-stack` | `BETTER_STACK_SOURCE_TOKEN` |
+| Datadog | `evlog/datadog` | `DD_API_KEY` or `DATADOG_API_KEY`, optional `DD_SITE` / `DATADOG_LOGS_URL` |
 | File System | `evlog/fs` | None (local file system) |
 
 In Nuxt/Nitro, use the `NUXT_` prefix (e.g., `NUXT_AXIOM_TOKEN`) so values are available via `useRuntimeConfig()`. All adapters also read unprefixed variables as fallback.
