@@ -1081,8 +1081,11 @@ createError({
   fix?: string      // How to fix it
   link?: string     // Documentation URL
   cause?: Error     // Original error
+  internal?: Record<string, unknown>  // Backend-only; never in HTTP body or toJSON()
 })
 ```
+
+**`internal`** — Optional context for support, auditing, or debugging (IDs, gateway codes, raw diagnostics). It is stored on `EvlogError` and exposed as `error.internal` in server code. It is **not** included in JSON error responses, `toJSON()`, or `parseError()` results. When the error is passed to `log.error()` (or thrown in integrations that record errors on the wide event), `internal` is copied into the emitted event under `error.internal`.
 
 ### `parseError(error)`
 

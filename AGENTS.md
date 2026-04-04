@@ -893,9 +893,10 @@ When creating errors with `createError()`:
 | `why` | No | Technical reason (for debugging) |
 | `fix` | No | Actionable solution (for developers/users) |
 | `link` | No | Documentation URL for more info |
-| `cause` | No | Original error (if wrapping)
+| `cause` | No | Original error (if wrapping) |
+| `internal` | No | Backend-only `Record<string, unknown>` — wide events / `log.error()` only; never HTTP, `toJSON()`, or client `parseError()` |
 
-**Best practice**: At minimum, provide `message` and `status`. Add `why` and `fix` for errors that users can act on. Add `link` for documented error codes.
+**Best practice**: At minimum, provide `message` and `status`. Add `why` and `fix` for errors that users can act on. Add `link` for documented error codes. Use `internal` for non-user-facing diagnostics (correlation IDs, processor codes) that must not reach browsers.
 
 ### Code Style
 

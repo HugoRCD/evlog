@@ -491,6 +491,11 @@ export interface ErrorOptions {
   link?: string
   /** The original error that caused this */
   cause?: Error
+  /**
+   * Backend-only diagnostic context (auditing, support, debugging).
+   * Never included in HTTP responses or `EvlogError#toJSON`; included in wide events when the error is passed to `log.error()`.
+   */
+  internal?: Record<string, unknown>
 }
 
 /**

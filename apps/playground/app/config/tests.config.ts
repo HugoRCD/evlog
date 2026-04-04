@@ -227,7 +227,7 @@ export const testConfig = {
       label: 'Structured Errors',
       icon: 'i-lucide-shield-alert',
       title: 'Structured Error → Toast',
-      description: 'This demonstrates how a structured createError() from the backend can be displayed as a toast in the frontend with all context (message, why, fix, link).',
+      description: 'This demonstrates how a structured createError() from the backend can be displayed as a toast in the frontend with all context (message, why, fix, link). Use “Error with internal” to verify internal-only fields: they appear in the terminal wide event under error.internal, never in the HTTP body.',
       layout: 'cards',
       tests: [
         {
@@ -246,7 +246,14 @@ export const testConfig = {
                 description: error.why,
                 color: 'error',
                 actions: error.link
-                  ? [{ label: 'Learn more', onClick: () => window.open(error.link, '_blank') }]
+                  ? [
+                    {
+                      label: 'Learn more',
+                      onClick: () => {
+                        window.open(error.link, '_blank')
+                      },
+                    }
+                  ]
                   : undefined,
               })
               if (error.fix) {
@@ -257,6 +264,55 @@ export const testConfig = {
           badge: {
             label: 'parseError()',
             color: 'red',
+          },
+        },
+        {
+          id: 'structured-error-internal',
+          label: 'Error with internal',
+          description: 'createError includes internal: { supportRef, gatewayCode, … } for logs only. Open the devtools console after click, then check the terminal wide event for error.internal.',
+          color: 'warning',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/error-internal')
+            } catch (err) {
+              const { data } = err as { data?: Record<string, unknown> }
+              const serialized = JSON.stringify(data ?? {})
+              const leaked
+                = serialized.includes('playground-support-ref-EVL140')
+                  || serialized.includes('proc_declined_simulated')
+              if (leaked) {
+                console.error(
+                  '[playground] internal context leaked into HTTP body — this should not happen',
+                  data,
+                )
+              } else {
+                console.info(
+                  '[playground] HTTP body has no internal secrets — OK. In the terminal, find this request and check error.internal (supportRef, gatewayCode).',
+                  data,
+                )
+              }
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: `${error.why ?? ''} See browser console for the HTTP body check.`,
+                color: 'error',
+                actions: error.link
+                  ? [
+                    {
+                      label: 'Learn more',
+                      onClick: () => {
+                        window.open(error.link, '_blank')
+                      },
+                    }
+                  ]
+                  : undefined,
+              })
+            }
+          },
+          badge: {
+            label: 'GET /api/test/error-internal',
+            color: 'warning',
           },
         },
       ],

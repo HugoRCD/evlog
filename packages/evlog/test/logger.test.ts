@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { createError } from '../src/error'
 import { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../src/logger'
 
 describe('initLogger', () => {
@@ -311,6 +312,25 @@ describe('createRequestLogger', () => {
       statusMessage: 'Internal Server Error',
       data: { code: 'VALIDATION_ERROR', why: 'Invalid input' },
       cause: expect.any(Error),
+    })
+  })
+
+  it('captures EvlogError internal on wide-event error object', () => {
+    const logger = createRequestLogger({})
+    const error = createError({
+      message: 'Forbidden',
+      status: 403,
+      internal: { tenantId: 't-9', attemptedResource: 'proj/secret' },
+    })
+
+    logger.error(error)
+
+    const context = logger.getContext()
+    expect(context.error).toMatchObject({
+      name: 'EvlogError',
+      message: 'Forbidden',
+      status: 403,
+      internal: { tenantId: 't-9', attemptedResource: 'proj/secret' },
     })
   })
 

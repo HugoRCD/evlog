@@ -872,9 +872,17 @@ throw createError({
   link: 'https://docs.example.com/payments/declined',
   cause: originalError,
 })
+
+// Backend-only context (wide events / drains — never HTTP body or parseError())
+throw createError({
+  message: 'Not allowed',
+  status: 403,
+  why: 'Insufficient permissions',
+  internal: { correlationId: 'req_abc', resourceId: 'proj_123' },
+})
 ```
 
-Frontend — extract all fields with `parseError()`:
+Frontend — extract user-facing fields with `parseError()` (`internal` is never returned to clients):
 
 ```typescript
 import { parseError } from 'evlog'
@@ -897,6 +905,7 @@ See [references/structured-errors.md](references/structured-errors.md) for commo
 | No logging in request handlers | Add `useLogger(event)` / `useLogger()` / `createRequestLogger()` |
 | Flat log data `{ uid, n, t }` | Grouped objects: `{ user: {...}, cart: {...} }` |
 | Logging sensitive data `log.set({ user: body })` | Explicit fields: `{ user: { id: body.id, plan: body.plan } }` |
+| Putting support-only IDs in `why` / `message` | Use `createError({ ..., internal: { ... } })` for non-user-facing diagnostics |
 
 See [references/code-review.md](references/code-review.md) for the full checklist.
 

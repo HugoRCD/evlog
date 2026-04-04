@@ -1,6 +1,9 @@
 import type { ErrorOptions } from './types'
 import { colors, isServer } from './utils'
 
+/** Non-enumerable storage so `JSON.stringify(error)` never exposes internal context */
+const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
+
 /**
  * Structured error with context for better debugging
  *
@@ -24,6 +27,14 @@ export class EvlogError extends Error {
   readonly fix?: string
   readonly link?: string
 
+  /**
+   * Backend-only context from `createError({ internal: … })`.
+   * Omitted from {@link EvlogError#toJSON} and all framework HTTP serializers.
+   */
+  get internal(): Record<string, unknown> | undefined {
+    return (this as EvlogError & { [evlogErrorInternalKey]?: Record<string, unknown> })[evlogErrorInternalKey]
+  }
+
   constructor(options: ErrorOptions | string) {
     const opts = typeof options === 'string' ? { message: options } : options
 
@@ -34,6 +45,15 @@ export class EvlogError extends Error {
     this.why = opts.why
     this.fix = opts.fix
     this.link = opts.link
+
+    if (opts.internal !== undefined) {
+      Object.defineProperty(this, evlogErrorInternalKey, {
+        value: opts.internal,
+        enumerable: false,
+        writable: false,
+        configurable: true,
+      })
+    }
 
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {

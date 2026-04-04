@@ -262,6 +262,7 @@ export default defineEventHandler(async (event) => {
 - [ ] Fixable errors include `fix` with actionable steps
 - [ ] Documented errors include `link` to docs
 - [ ] Wrapped errors preserve `cause`
+- [ ] Support-only or sensitive diagnostics use `internal`, not `message` / `why` / `fix`
 
 ### Frontend Error Handling
 

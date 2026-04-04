@@ -33,8 +33,18 @@ throw createError({
   fix: 'Try a different payment method',  // How to fix it
   link: 'https://docs.example.com/...',   // More information
   cause: originalError,                   // Original error
+  internal: {                             // Optional: backend / logs only
+    correlationId: 'pay_abc',
+    processorCode: 'card_declined',
+  },
 })
 ```
+
+### `internal` (backend-only)
+
+- Use `internal` for IDs, gateway codes, or diagnostics that **must not** appear in HTTP error bodies or in client-side `parseError()` results.
+- Access in server code via **`error.internal`**. Values are omitted from **`toJSON()`** and from framework serializers; they are included on wide events under **`error.internal`** when the error is captured with **`log.error()`** (or equivalent automatic capture).
+- Stored with a non-enumerable symbol so `JSON.stringify(error)` does not leak `internal`; devtools may show it as `[Symbol(evlog.error.internal)]`.
 
 ### Console Output (Development)
 
@@ -344,11 +354,16 @@ The wide event will include:
     "message": "Payment failed",
     "why": "Card declined by issuer",
     "fix": "Try a different payment method",
-    "link": "https://docs.stripe.com/declines/codes"
+    "link": "https://docs.stripe.com/declines/codes",
+    "internal": {
+      "stripeRequestId": "req_123"
+    }
   },
   "step": "payment"
 }
 ```
+
+If you use `createError({ ..., internal: { ... } })` without calling `log.error(error)` yourself, framework integrations that attach thrown errors to the wide event still merge **`internal`** into **`error.internal`** on emit.
 
 ## Best Practices
 
@@ -359,11 +374,13 @@ The wide event will include:
 - Add `link` to documentation for complex errors
 - Preserve `cause` when wrapping errors
 - Be specific about what failed and why
+- Put operator-only or sensitive diagnostics in `internal`, not in `why`/`fix`/`message`
 
 ### Don't
 
 - Use generic messages like "Error" or "Failed"
 - Leak sensitive data (passwords, tokens, PII)
+- Expect `internal` in HTTP JSON or in `parseError()` — it is for server logs and drains only
 - Make `why` and `message` identical
 - Suggest fixes that aren't actually possible
 - Create errors without any context

@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { createError, createEvlogError, EvlogError } from '../src/error'
+import { serializeEvlogErrorResponse } from '../src/nitro'
 import { parseError } from '../src/runtime/utils/parseError'
 
 describe('EvlogError', () => {
@@ -161,6 +162,55 @@ describe('EvlogError', () => {
       const error = new EvlogError('No cause')
       const json = error.toJSON()
       expect(json.cause).toBeUndefined()
+    })
+
+    it('never includes internal (client-safe JSON)', () => {
+      const error = new EvlogError({
+        message: 'Public message',
+        status: 403,
+        why: 'User facing why',
+        internal: { correlationId: 'corr-1', riskyDetail: 'issuer raw response' },
+      })
+
+      const json = error.toJSON()
+      expect(json.internal).toBeUndefined()
+      expect((JSON.stringify(error) as string).includes('corr-1')).toBe(false)
+      expect((JSON.stringify(error) as string).includes('riskyDetail')).toBe(false)
+    })
+  })
+
+  describe('internal (backend-only)', () => {
+    it('exposes internal via getter when provided', () => {
+      const error = createError({
+        message: 'x',
+        internal: { orderId: 'o1', supportRef: 's2' },
+      })
+      expect(error.internal).toEqual({ orderId: 'o1', supportRef: 's2' })
+    })
+
+    it('omits internal from toString()', () => {
+      const error = createError({
+        message: 'Payment failed',
+        why: 'Card declined',
+        internal: { gatewayCode: '05', raw: 'do not print' },
+      })
+      const str = error.toString()
+      expect(str).toContain('Payment failed')
+      expect(str).toContain('Card declined')
+      expect(str).not.toContain('gatewayCode')
+      expect(str).not.toContain('do not print')
+    })
+
+    it('omits internal from serializeEvlogErrorResponse', () => {
+      const error = createError({
+        message: 'Bad',
+        status: 400,
+        why: 'Reason',
+        internal: { secret: 'nope' },
+      })
+      const body = serializeEvlogErrorResponse(error, '/api/x')
+      expect(body.internal).toBeUndefined()
+      expect(body.data).toEqual({ why: 'Reason', fix: undefined, link: undefined })
     })
   })
 })

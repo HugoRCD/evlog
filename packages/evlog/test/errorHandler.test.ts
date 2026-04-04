@@ -18,8 +18,10 @@ vi.mock('nitropack/runtime', () => ({
   defineNitroErrorHandler: <T>(handler: T) => handler,
 }))
 
-// eslint-disable-next-line import/first -- Must import after vi.mock
+/* eslint-disable import/first -- Must import after vi.mock */
+import { createError } from '../src/error'
 import errorHandler from '../src/nitro/errorHandler'
+/* eslint-enable import/first */
 
 describe('errorHandler', () => {
   const mockEvent = { node: { req: {}, res: {} } }
@@ -98,6 +100,27 @@ describe('errorHandler', () => {
       errorHandler(evlogError as Error, mockEvent)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
+    })
+
+    it('does not expose internal context on EvlogError responses', () => {
+      const err = createError({
+        message: 'Not allowed',
+        status: 403,
+        why: 'Insufficient role',
+        internal: { userId: 'u-internal', rawPolicy: 'deny:admin' },
+      })
+
+      errorHandler(err, mockEvent)
+
+      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      expect(sentBody.internal).toBeUndefined()
+      expect(JSON.stringify(sentBody)).not.toContain('u-internal')
+      expect(JSON.stringify(sentBody)).not.toContain('rawPolicy')
+      expect(sentBody.data).toEqual({
+        why: 'Insufficient role',
+        fix: undefined,
+        link: undefined,
+      })
     })
   })
 
