@@ -23,7 +23,7 @@ const frameworkRows = [
     { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 2 },
     { name: 'Nitro', icon: 'i-custom-nitro', tab: 3 },
     { name: 'TanStack Start', icon: 'i-custom-tanstack', tab: 4 },
-    { name: 'React Router', icon: 'i-simple-icons-reactrouter', tab: 5 },
+    { name: 'React Router', icon: 'i-custom-reactrouter', tab: 5 },
     { name: 'NestJS', icon: 'i-simple-icons-nestjs', tab: 6 },
   ],
   [
