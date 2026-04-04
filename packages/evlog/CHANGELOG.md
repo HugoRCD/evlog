@@ -1,5 +1,21 @@
 # evlog
 
+## 2.11.0
+
+### Minor Changes
+
+- [#249](https://github.com/HugoRCD/evlog/pull/249) [`72d7d6e`](https://github.com/HugoRCD/evlog/commit/72d7d6e57c9341fb2a1df78c3f80588ca50b08f5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `internal` to `createError` / `ErrorOptions`: backend-only context stored on `EvlogError`, included in wide events via `log.error()`, never serialized in HTTP responses or `toJSON()` ([EVL-140](https://linear.app/evlog/issue/EVL-140)).
+
+- [#251](https://github.com/HugoRCD/evlog/pull/251) [`19ae4a9`](https://github.com/HugoRCD/evlog/commit/19ae4a98e0da89c4b1ea0e00f32e238927da1fbb) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add Datadog Logs HTTP drain adapter (`evlog/datadog`): `createDatadogDrain()`, `sendToDatadog` / `sendBatchToDatadog`, env vars `DD_API_KEY` / `NUXT_DATADOG_*` / `DD_SITE`, and intake URL for all Datadog sites. Maps wide events with a short `message` line, full payload under `evlog`, severity `status`, and recursive `httpStatusCode` renaming so HTTP `status` fields never clash with Datadog’s reserved severity ([EVL-144](https://linear.app/evlog/issue/EVL-144)).
+
+### Patch Changes
+
+- [#245](https://github.com/HugoRCD/evlog/pull/245) [`c96967b`](https://github.com/HugoRCD/evlog/commit/c96967bdff5b4e5d423f59cea436cd57cb281b57) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix Nitro server builds on strict Worker presets (e.g. `cloudflare-durable`) by avoiding Rollup-resolvable literals for `nitro/runtime-config` in published dist. Centralize runtime config access in an internal bridge (`__EVLOG_CONFIG` first, then dynamic `import()` with computed module specifiers for Nitro v3 and nitropack). Add regression tests for dist output and a `cloudflare-durable` production build using the compiled plugin.
+
+- [#242](https://github.com/HugoRCD/evlog/pull/242) [`24c9a80`](https://github.com/HugoRCD/evlog/commit/24c9a80289561584f6b302a5e1b5419b8aac7401) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Export `createError`, `createEvlogError`, `EvlogError`, and `parseError` from `evlog/nitro/v3` so Nitro v3 apps can use the documented single import path alongside `useLogger` ([#241](https://github.com/HugoRCD/evlog/issues/241)).
+
+- [#247](https://github.com/HugoRCD/evlog/pull/247) [`730c984`](https://github.com/HugoRCD/evlog/commit/730c984c16bf1543da6525caa6aa5ca788f64306) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Align `evlogErrorHandler` with TanStack Start’s `createMiddleware().server()` types: widen `next()` to sync-or-async results, match `RequestServerFn` return typing via `RequestServerResult`, and declare an optional peer on `@tanstack/start-client-core` for accurate declarations ([#235](https://github.com/HugoRCD/evlog/issues/235), [EVL-142](https://linear.app/evlog/issue/EVL-142)).
+
 ## 2.10.0
 
 ### Minor Changes
