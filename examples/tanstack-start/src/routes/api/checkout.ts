@@ -8,6 +8,9 @@ export const Route = createFileRoute('/api/checkout')({
     handlers: {
       POST: async ({ request }) => {
         const req = useRequest()
+        if (!req.context) {
+          throw new Error('Missing Nitro request context')
+        }
         const log = req.context.log as RequestLogger
 
         const body = await request.json() as {

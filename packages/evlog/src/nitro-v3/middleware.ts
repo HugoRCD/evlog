@@ -1,6 +1,6 @@
+import type { RequestServerResult } from '@tanstack/start-client-core'
 import type { RequestLogger } from '../types'
 import { EvlogError } from '../error'
-import { serializeEvlogErrorResponse } from '../nitro'
 
 /**
  * Server middleware handler that catches EvlogError and returns a structured JSON response.
@@ -23,10 +23,19 @@ import { serializeEvlogErrorResponse } from '../nitro'
  * ```
  */
 
-export async function evlogErrorHandler<T>(nextOrOptions: ((...args: any[]) => Promise<T>) | { next: (...args: any[]) => Promise<T> }): Promise<T> {
+/**
+ * TanStack's `RequestServerNextFn` may return synchronously or as a `Promise`, and uses a
+ * typed `options` argument. A rest-args `any[]` signature keeps `RequestServerNextFn`
+ * assignable under `strictFunctionTypes`. The return type matches `createMiddleware().server()`.
+ */
+type EvlogServerMiddlewareNext = (...args: any[]) => unknown | Promise<unknown>
+
+export async function evlogErrorHandler(
+  nextOrOptions: EvlogServerMiddlewareNext | { next: EvlogServerMiddlewareNext },
+): Promise<RequestServerResult<any, any, any> | Response> {
   const next = typeof nextOrOptions === 'function' ? nextOrOptions : nextOrOptions.next
   try {
-    return await next()
+    return (await Promise.resolve(next())) as RequestServerResult<any, any, any>
   } catch (error: unknown) {
     if (error instanceof EvlogError || (error && typeof error === 'object' && (error as Error).name === 'EvlogError')) {
       const evlogError = error as EvlogError

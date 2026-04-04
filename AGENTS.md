@@ -572,6 +572,8 @@ export const Route = createRootRoute({
 })
 ```
 
+For TypeScript, `evlog` declares an optional peer on `@tanstack/start-client-core` so `evlogErrorHandler` is typed as TanStack’s `RequestServerFn`. Apps using `@tanstack/react-start` already pull that package in for type resolution.
+
 Use `useRequest()` from `nitro/context` to access the logger in routes:
 
 ```typescript

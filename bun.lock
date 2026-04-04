@@ -1,6 +1,5 @@
 {
   "lockfileVersion": 1,
-  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -300,6 +299,7 @@
         "@nuxt/devtools": "^3.2.4",
         "@nuxt/schema": "^4.4.2",
         "@nuxt/test-utils": "^4.0.0",
+        "@tanstack/start-client-core": "^1.167.7",
         "@types/express": "^5.0.6",
         "@types/supertest": "^7.2.0",
         "acorn": "^8.16.0",
@@ -326,6 +326,7 @@
       "peerDependencies": {
         "@nestjs/common": ">=11.1.17",
         "@nuxt/kit": "^4.4.2",
+        "@tanstack/start-client-core": "^1.161.0",
         "ai": ">=6.0.142",
         "elysia": ">=1.4.28",
         "express": ">=5.2.1",
@@ -343,6 +344,7 @@
       "optionalPeers": [
         "@nestjs/common",
         "@nuxt/kit",
+        "@tanstack/start-client-core",
         "ai",
         "elysia",
         "express",

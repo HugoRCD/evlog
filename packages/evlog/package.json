@@ -293,6 +293,7 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {
+    "@tanstack/start-client-core": "^1.167.7",
     "acorn": "^8.16.0",
     "@codspeed/vitest-plugin": "^5.2.0",
     "@nestjs/common": "^11.1.17",
@@ -336,7 +337,8 @@
     "@nestjs/common": ">=11.1.17",
     "react-router": ">=7.13.2",
     "vite": "^7.0.0 || ^8.0.0",
-    "ai": ">=6.0.142"
+    "ai": ">=6.0.142",
+    "@tanstack/start-client-core": "^1.161.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -382,6 +384,9 @@
       "optional": true
     },
     "ai": {
+      "optional": true
+    },
+    "@tanstack/start-client-core": {
       "optional": true
     }
   }
