@@ -12,13 +12,18 @@
     },
     {
       "entry": "logger",
-      "raw": 12405,
-      "gzip": 3999
+      "raw": 12421,
+      "gzip": 4002
     },
     {
       "entry": "framework/ai",
       "raw": 11537,
       "gzip": 3189
+    },
+    {
+      "entry": "adapter/datadog",
+      "raw": 6149,
+      "gzip": 2503
     },
     {
       "entry": "framework/vite",
@@ -51,6 +56,11 @@
       "gzip": 1543
     },
     {
+      "entry": "error",
+      "raw": 3673,
+      "gzip": 1491
+    },
+    {
       "entry": "adapter/fs",
       "raw": 3458,
       "gzip": 1450
@@ -79,11 +89,6 @@
       "entry": "framework/nestjs",
       "raw": 2872,
       "gzip": 1241
-    },
-    {
-      "entry": "error",
-      "raw": 3130,
-      "gzip": 1240
     },
     {
       "entry": "adapter/hyperdx",
@@ -142,7 +147,7 @@
     }
   ],
   "total": {
-    "raw": 128891,
-    "gzip": 46821
+    "raw": 135599,
+    "gzip": 49578
   }
 }
