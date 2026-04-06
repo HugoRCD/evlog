@@ -321,7 +321,7 @@
         "tsdown": "^0.21.7",
         "typescript": "^6.0.2",
         "ufo": "^1.6.3",
-        "vite": "^8.0.4",
+        "vite": "^8.0.5",
         "winston": "^3.19.0",
       },
       "peerDependencies": {
@@ -3913,7 +3913,7 @@
 
     "vinxi": ["vinxi@0.5.11", "", { "dependencies": { "@babel/core": "^7.22.11", "@babel/plugin-syntax-jsx": "^7.22.5", "@babel/plugin-syntax-typescript": "^7.22.5", "@types/micromatch": "^4.0.2", "@vinxi/listhen": "^1.5.6", "boxen": "^8.0.1", "chokidar": "^4.0.3", "citty": "^0.1.6", "consola": "^3.4.2", "crossws": "^0.3.4", "dax-sh": "^0.43.0", "defu": "^6.1.4", "es-module-lexer": "^1.7.0", "esbuild": "^0.25.3", "get-port-please": "^3.1.2", "h3": "1.15.3", "hookable": "^5.5.3", "http-proxy": "^1.18.1", "micromatch": "^4.0.8", "nitropack": "^2.11.10", "node-fetch-native": "^1.6.6", "path-to-regexp": "^6.2.1", "pathe": "^1.1.1", "radix3": "^1.1.2", "resolve": "^1.22.10", "serve-placeholder": "^2.0.1", "serve-static": "^1.15.0", "tinyglobby": "^0.2.14", "ufo": "^1.6.1", "unctx": "^2.4.1", "unenv": "^1.10.0", "unstorage": "^1.16.0", "vite": "^6.4.1", "zod": "^4.0.0" }, "bin": { "vinxi": "bin/cli.mjs" } }, "sha512-82Qm+EG/b2PRFBvXBbz1lgWBGcd9totIL6SJhnrZYfakjloTVG9+5l6gfO6dbCCtztm5pqWFzLY0qpZ3H3ww/w=="],
 
-    "vite": ["vite@8.0.4", "", { "dependencies": { "lightningcss": "^1.32.0", "picomatch": "^4.0.4", "postcss": "^8.5.8", "rolldown": "1.0.0-rc.12", "tinyglobby": "^0.2.15" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.1.0", "esbuild": "^0.27.0 || ^0.28.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-baBr4jUVSLJ0RPyZ2nK0zS2+W8hNHbM4hEzfvllukmRPVS3xDG5ATTNtbRXrKIOE2b8/FsPWJAOnuIxcs7g3cw=="],
+    "vite": ["vite@8.0.5", "", { "dependencies": { "lightningcss": "^1.32.0", "picomatch": "^4.0.4", "postcss": "^8.5.8", "rolldown": "1.0.0-rc.12", "tinyglobby": "^0.2.15" }, "optionalDependencies": { "fsevents": "~2.3.3" }, "peerDependencies": { "@types/node": "^20.19.0 || >=22.12.0", "@vitejs/devtools": "^0.1.0", "esbuild": "^0.27.0 || ^0.28.0", "jiti": ">=1.21.0", "less": "^4.0.0", "sass": "^1.70.0", "sass-embedded": "^1.70.0", "stylus": ">=0.54.8", "sugarss": "^5.0.0", "terser": "^5.16.0", "tsx": "^4.8.1", "yaml": "^2.4.2" }, "optionalPeers": ["@types/node", "@vitejs/devtools", "esbuild", "jiti", "less", "sass", "sass-embedded", "stylus", "sugarss", "terser", "tsx", "yaml"], "bin": { "vite": "bin/vite.js" } }, "sha512-nmu43Qvq9UopTRfMx2jOYW5l16pb3iDC1JH6yMuPkpVbzK0k+L7dfsEDH4jRgYFmsg0sTAqkojoZgzLMlwHsCQ=="],
 
     "vite-dev-rpc": ["vite-dev-rpc@1.1.0", "", { "dependencies": { "birpc": "^2.4.0", "vite-hot-client": "^2.1.0" }, "peerDependencies": { "vite": "^2.9.0 || ^3.0.0-0 || ^4.0.0-0 || ^5.0.0-0 || ^6.0.1 || ^7.0.0-0" } }, "sha512-pKXZlgoXGoE8sEKiKJSng4hI1sQ4wi5YT24FCrwrLt6opmkjlqPPVmiPWWJn8M8byMxRGzp1CrFuqQs4M/Z39A=="],
 
