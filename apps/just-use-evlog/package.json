@@ -17,7 +17,7 @@
     "@nuxtjs/sitemap": "^8.0.11",
     "@vercel/analytics": "^2.0.1",
     "better-sqlite3": "^12.8.0",
-    "minimark": "^0.2.0",
+    "minimark": "^1.0.0",
     "nuxt": "^4.4.2",
     "shiki": "3.23.0",
     "tailwindcss": "^4.2.2"
