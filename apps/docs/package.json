@@ -12,7 +12,7 @@
   },
   "dependencies": {
     "@nuxt/fonts": "0.14.0",
-    "@nuxt/ui": "^4.6.0",
+    "@nuxt/ui": "^4.6.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
     "better-sqlite3": "^12.8.0",
@@ -20,7 +20,7 @@
     "motion-v": "^2.2.0",
     "nuxt": "^4.4.2",
     "nuxt-studio": "^1.5.1",
-    "shaders": "^2.5.87",
+    "shaders": "^2.5.91",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.2"
   },

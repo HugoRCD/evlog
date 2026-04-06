@@ -11,7 +11,7 @@
     "evlog": "workspace:*"
   },
   "devDependencies": {
-    "h3": "^1.15.10",
-    "nitropack": "^2.13.2"
+    "h3": "^1.15.11",
+    "nitropack": "^2.13.3"
   }
 }
