@@ -1,5 +1,11 @@
 # evlog
 
+## 2.11.1
+
+### Patch Changes
+
+- [#261](https://github.com/HugoRCD/evlog/pull/261) [`08cab7b`](https://github.com/HugoRCD/evlog/commit/08cab7b8e3e7d9e8179cf7add784349acd3632ea) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix Nuxt `evlog` options not reaching the Nitro plugin in dev: the Nuxt module now mirrors standalone Nitro by setting `process.env.__EVLOG_CONFIG` during `nitro:config`. When `enabled` is `false`, the Nitro plugins still attach a no-op request logger so `useLogger(event)` does not throw.
+
 ## 2.11.0
 
 ### Minor Changes
