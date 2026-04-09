@@ -117,7 +117,24 @@ export default defineNitroPlugin(async (nitroApp) => {
     _suppressDrainWarning: true,
   })
 
-  if (!isEnabled()) return
+  // When globally disabled, createRequestLogger returns a no-op logger — still
+  // attach it so handlers can call useLogger(event) without throwing.
+  if (!isEnabled()) {
+    nitroApp.hooks.hook('request', (event) => {
+      const e = event as ServerEvent
+      let requestIdOverride: string | undefined
+      if (globalThis.navigator?.userAgent === 'Cloudflare-Workers') {
+        const cfRay = getSafeHeaders(e)?.['cf-ray']
+        if (cfRay) requestIdOverride = cfRay
+      }
+      e.context.log = createRequestLogger({
+        method: e.method,
+        path: e.path,
+        requestId: requestIdOverride || e.context.requestId || crypto.randomUUID(),
+      }, { _deferDrain: true })
+    })
+    return
+  }
 
   nitroApp.hooks.hook('request', (event) => {
     const e = event as ServerEvent

@@ -234,6 +234,8 @@ export default defineConfig({
 
 The Nuxt module uses `addVitePlugin()` to add strip + source location plugins internally. Auto-imports and client init are NOT delegated (Nuxt handles those natively). This is purely additive — no breaking change.
 
+On `nitro:config`, the module serializes `runtimeConfig.evlog` into **`process.env.__EVLOG_CONFIG`** (same bridge as standalone Nitro). The Nitro plugin resolves config with **env first**, then `useRuntimeConfig().evlog`. That env injection is required because dev workers often cannot resolve the virtual Nitro runtime-config module reliably. **Do not** set `__EVLOG_CONFIG` yourself in a Nuxt app unless you mean to override the entire `evlog` block from `nuxt.config`.
+
 ## Framework Integration
 
 > **Creating a new framework integration?** Follow the skill at `.agents/skills/create-framework-integration/SKILL.md`. It covers all touchpoints: source code, build config, package exports, tests, example app, and all documentation updates.

@@ -267,14 +267,22 @@ export default defineNuxtModule<ModuleOptions>({
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
     const transportCredentials = options.transport?.credentials ?? 'same-origin'
 
+    nuxt.options.runtimeConfig.evlog = options
+
     // Register custom error handler for proper EvlogError serialization
     // Only set if not already configured to avoid overwriting user's custom handler
+    // Mirror standalone Nitro modules: serialize evlog options into __EVLOG_CONFIG so
+    // resolveEvlogConfigForNitroPlugin() picks them up in dev (Nitro worker threads
+    // often cannot resolve useRuntimeConfig().evlog via dynamic import reliably).
     // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
     nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
       nitroConfig.errorHandler = nitroConfig.errorHandler || resolver.resolve('../nitro/errorHandler')
-    })
 
-    nuxt.options.runtimeConfig.evlog = options
+      const evlogForNitro = nuxt.options.runtimeConfig.evlog ?? options
+      if (evlogForNitro !== undefined && typeof evlogForNitro === 'object') {
+        process.env.__EVLOG_CONFIG = JSON.stringify(evlogForNitro)
+      }
+    })
     nuxt.options.runtimeConfig.public.evlog = {
       enabled: options.enabled ?? true,
       console: options.console,
