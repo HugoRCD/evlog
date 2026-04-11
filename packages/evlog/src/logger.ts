@@ -639,7 +639,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     },
 
     getContext(): FieldContext<T> & Record<string, unknown> {
-      return { ...context }
+      return { ...context } as FieldContext<T> & Record<string, unknown>
     },
   }
 }
