@@ -2,43 +2,38 @@
   "entries": [
     {
       "entry": "framework/nitro",
-      "raw": 18446,
-      "gzip": 6852
+      "raw": 18760,
+      "gzip": 6988
     },
     {
       "entry": "framework/next",
-      "raw": 12055,
-      "gzip": 4152
-    },
-    {
-      "entry": "logger",
-      "raw": 12421,
-      "gzip": 4002
+      "raw": 12226,
+      "gzip": 4228
     },
     {
       "entry": "framework/ai",
-      "raw": 11537,
-      "gzip": 3189
+      "raw": 15214,
+      "gzip": 4138
     },
     {
       "entry": "adapter/datadog",
       "raw": 6149,
-      "gzip": 2503
+      "gzip": 2500
     },
     {
       "entry": "framework/vite",
-      "raw": 7278,
-      "gzip": 2432
+      "raw": 7432,
+      "gzip": 2455
     },
     {
       "entry": "adapter/sentry",
       "raw": 6208,
-      "gzip": 2404
+      "gzip": 2401
     },
     {
       "entry": "adapter/otlp",
       "raw": 5910,
-      "gzip": 2155
+      "gzip": 2153
     },
     {
       "entry": "enrichers",
@@ -48,12 +43,17 @@
     {
       "entry": "framework/sveltekit",
       "raw": 4960,
-      "gzip": 1581
+      "gzip": 1578
+    },
+    {
+      "entry": "utils",
+      "raw": 3634,
+      "gzip": 1558
     },
     {
       "entry": "adapter/posthog",
       "raw": 4994,
-      "gzip": 1543
+      "gzip": 1541
     },
     {
       "entry": "error",
@@ -63,12 +63,7 @@
     {
       "entry": "adapter/fs",
       "raw": 3458,
-      "gzip": 1450
-    },
-    {
-      "entry": "utils",
-      "raw": 3362,
-      "gzip": 1440
+      "gzip": 1448
     },
     {
       "entry": "pipeline",
@@ -78,27 +73,27 @@
     {
       "entry": "adapter/axiom",
       "raw": 3375,
-      "gzip": 1357
+      "gzip": 1354
     },
     {
-      "entry": "browser",
-      "raw": 3010,
-      "gzip": 1249
+      "entry": "http",
+      "raw": 2980,
+      "gzip": 1259
     },
     {
       "entry": "framework/nestjs",
       "raw": 2872,
-      "gzip": 1241
+      "gzip": 1237
     },
     {
       "entry": "adapter/hyperdx",
       "raw": 2971,
-      "gzip": 1222
+      "gzip": 1220
     },
     {
       "entry": "adapter/better-stack",
       "raw": 2742,
-      "gzip": 1123
+      "gzip": 1121
     },
     {
       "entry": "framework/elysia",
@@ -108,37 +103,47 @@
     {
       "entry": "framework/fastify",
       "raw": 2344,
-      "gzip": 1014
+      "gzip": 1010
     },
     {
       "entry": "workers",
-      "raw": 2126,
-      "gzip": 960
+      "raw": 2145,
+      "gzip": 977
     },
     {
       "entry": "framework/express",
       "raw": 1322,
-      "gzip": 705
+      "gzip": 702
     },
     {
       "entry": "framework/hono",
       "raw": 1098,
-      "gzip": 596
+      "gzip": 595
+    },
+    {
+      "entry": "browser",
+      "raw": 650,
+      "gzip": 289
+    },
+    {
+      "entry": "core (index)",
+      "raw": 596,
+      "gzip": 254
     },
     {
       "entry": "toolkit",
       "raw": 486,
-      "gzip": 243
+      "gzip": 242
     },
     {
-      "entry": "core (index)",
-      "raw": 497,
-      "gzip": 205
+      "entry": "logger",
+      "raw": 380,
+      "gzip": 207
     },
     {
       "entry": "client",
-      "raw": 166,
-      "gzip": 118
+      "raw": 192,
+      "gzip": 128
     },
     {
       "entry": "types",
@@ -147,7 +152,7 @@
     }
   ],
   "total": {
-    "raw": 136569,
-    "gzip": 49679
+    "raw": 129880,
+    "gzip": 47526
   }
 }
