@@ -1384,7 +1384,7 @@ describe('createAILogger', () => {
       expect(integration.onFinish).toBeTypeOf('function')
     })
 
-    it('captures tool execution timing and success', async () => {
+    it('captures tool execution timing and success', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
@@ -1413,7 +1413,7 @@ describe('createAILogger', () => {
       expect(aiData.totalDurationMs).toBeGreaterThanOrEqual(0)
     })
 
-    it('captures tool execution errors', async () => {
+    it('captures tool execution errors', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
@@ -1439,7 +1439,7 @@ describe('createAILogger', () => {
       })
     })
 
-    it('captures multiple tool executions', async () => {
+    it('captures multiple tool executions', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
@@ -1519,7 +1519,7 @@ describe('createAILogger', () => {
       expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
     })
 
-    it('handles string errors from tool execution', async () => {
+    it('handles string errors from tool execution', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
@@ -1539,7 +1539,7 @@ describe('createAILogger', () => {
       expect(tools[0].error).toBe('Something went wrong')
     })
 
-    it('omits tools field when no tool executions', async () => {
+    it('omits tools field when no tool executions', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
