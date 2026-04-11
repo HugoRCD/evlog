@@ -720,6 +720,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | `include` | `string[]` | All routes | Route glob patterns to log |
 | `exclude` | `string[]` | None | Route patterns to exclude (takes precedence) |
 | `routes` | `Record<string, { service }>` | -- | Route-specific service names |
+| `minLevel` | `'debug' \| 'info' \| 'warn' \| 'error'` | `'debug'` | Hard threshold for the global `log` API and client `log` (not request wide events). Use `sampling.rates` for probabilistic volume on requests |
 | `sampling.rates` | `object` | -- | Head sampling: `{ info: 10, warn: 50 }` (0-100%) |
 | `sampling.keep` | `array` | -- | Tail sampling: `[{ status: 400 }, { duration: 1000 }]` |
 | `drain` | `(ctx) => void` | -- | Drain callback (Next.js, standalone) |

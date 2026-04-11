@@ -985,6 +985,8 @@ log.error({ action: 'payment', error: 'validation_failed' })
 
 Client logs output to the browser console with colored tags in development.
 
+`setMinLevel` is auto-imported in Nuxt (from `evlog/client`) — call it to change the client severity threshold at runtime (same as `initLog({ minLevel })`).
+
 #### Client Transport
 
 To send client logs to your server for centralized logging, enable the transport:

@@ -1,4 +1,4 @@
-import type { DrainContext, EnvironmentContext, SamplingConfig } from '../types'
+import type { DrainContext, EnvironmentContext, LogLevel, SamplingConfig } from '../types'
 import { initLogger, log, lockLogger } from '../logger'
 
 /** Request payload passed to Next.js `onRequestError` (App Router). */
@@ -81,6 +81,8 @@ export interface InstrumentationOptions {
   silent?: boolean
   /** Sampling configuration for filtering logs. */
   sampling?: SamplingConfig
+  /** Minimum severity for the global `log` API. @default 'debug' */
+  minLevel?: LogLevel
   /** When pretty is disabled, emit JSON strings or raw objects. @default true */
   stringify?: boolean
   /** Drain callback called with every emitted event. */
@@ -116,6 +118,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       pretty: options.pretty,
       silent: options.silent,
       sampling: options.sampling,
+      minLevel: options.minLevel,
       stringify: options.stringify,
       drain: options.drain,
     })

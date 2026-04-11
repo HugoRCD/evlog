@@ -52,6 +52,15 @@ function makeDrainEvent(action: string, extra?: Record<string, unknown>) {
 export const testConfig = {
   sections: [
     {
+      id: 'min-level',
+      label: 'Min level',
+      icon: 'i-lucide-sliders-horizontal',
+      title: 'Minimum log level (client)',
+      description:
+        'Deterministic filter for the client `log` API: choose a minimum severity, trigger each level, and confirm blocked lines never reach the console or ingest. Use `setMinLevel` at runtime without reload.',
+      tests: [],
+    } as TestSection,
+    {
       id: 'client-logging',
       label: 'Client Logging',
       icon: 'i-lucide-laptop',

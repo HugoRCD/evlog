@@ -1,11 +1,20 @@
 import type { Log, LogLevel, TransportConfig } from '../../types'
-import { cssColors, escapeFormatString, getConsoleMethod, getCssLevelColor } from '../../utils'
+import { cssColors, escapeFormatString, getCssLevelColor, isLevelEnabled } from '../../utils'
 
-const isClient = typeof window !== 'undefined'
+/**
+ * Browser DevTools often hide or bucket `console.debug` under "Verbose" in a way that looks like
+ * nothing happened. Use `console.log` for debug-level client output so it shows with the default
+ * Info filter; the structured payload still has `level: 'debug'`.
+ */
+function browserConsoleMethod(level: LogLevel): 'log' | 'info' | 'warn' | 'error' {
+  if (level === 'debug') return 'log'
+  return level as 'info' | 'warn' | 'error'
+}
 
 let clientEnabled = true
 let clientConsole = true
 let clientPretty = true
+let clientMinLevel: LogLevel = 'debug'
 let clientService = 'client'
 let transportEnabled = false
 let transportEndpoint = '/api/_evlog/ingest'
@@ -21,14 +30,22 @@ export function clearIdentity(): void {
 }
 
 
-export function initLog(options: { enabled?: boolean, console?: boolean, pretty?: boolean, service?: string, transport?: TransportConfig } = {}): void {
+export function initLog(options: { enabled?: boolean, console?: boolean, pretty?: boolean, minLevel?: LogLevel, service?: string, transport?: TransportConfig } = {}): void {
   clientEnabled = typeof options.enabled === 'boolean' ? options.enabled : true
   clientConsole = typeof options.console === 'boolean' ? options.console : true
   clientPretty = typeof options.pretty === 'boolean' ? options.pretty : true
+  clientMinLevel = options.minLevel ?? 'debug'
   clientService = options.service ?? 'client'
   transportEnabled = options.transport?.enabled ?? false
   transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
   transportCredentials = options.transport?.credentials ?? 'same-origin'
+}
+
+/**
+ * Update the minimum log level at runtime (e.g. enable verbose client logs from a debug toggle).
+ */
+export function setMinLevel(level: LogLevel): void {
+  clientMinLevel = level
 }
 
 async function sendToServer(event: Record<string, unknown>): Promise<void> {
@@ -49,6 +66,7 @@ async function sendToServer(event: Record<string, unknown>): Promise<void> {
 
 function emitLog(level: LogLevel, event: Record<string, unknown>): void {
   if (!clientEnabled) return
+  if (!isLevelEnabled(level, clientMinLevel)) return
 
   const formatted = {
     timestamp: new Date().toISOString(),
@@ -59,7 +77,7 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
   }
 
   if (clientConsole) {
-    const method = getConsoleMethod(level)
+    const method = browserConsoleMethod(level)
     if (clientPretty) {
       const { level: lvl, service, ...rest } = formatted
       console[method](`%c[${escapeFormatString(String(service))}]%c ${lvl}`, getCssLevelColor(lvl), cssColors.reset, rest)
@@ -73,9 +91,10 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!clientEnabled) return
+  if (!isLevelEnabled(level, clientMinLevel)) return
   if (clientPretty) {
     if (clientConsole) {
-      console[getConsoleMethod(level)](`%c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`, getCssLevelColor(level), cssColors.reset)
+      console[browserConsoleMethod(level)](`%c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`, getCssLevelColor(level), cssColors.reset)
     }
     sendToServer({
       timestamp: new Date().toISOString(),
@@ -92,7 +111,8 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
 
 function createLogMethod(level: LogLevel) {
   return function logMethod(tagOrEvent: string | Record<string, unknown>, message?: string): void {
-    if (!(import.meta.client ?? isClient)) {
+    // Call-time check: avoid relying on import.meta.client (can be false in some mixed bundles).
+    if (typeof window === 'undefined') {
       return
     }
 

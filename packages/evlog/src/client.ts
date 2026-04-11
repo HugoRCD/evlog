@@ -1,1 +1,1 @@
-export { initLog, log, setIdentity, clearIdentity } from './runtime/client/log'
+export { initLog, log, setIdentity, clearIdentity, setMinLevel } from './runtime/client/log'

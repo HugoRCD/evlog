@@ -44,6 +44,16 @@ describe('vite auto-init plugin', () => {
     expect(config.env.environment).toBe('staging')
   })
 
+  it('includes minLevel', () => {
+    const plugin = createAutoInitPlugin({
+      service: 'my-app',
+      minLevel: 'warn',
+    })
+    const define = getDefineConfig(plugin)
+    const config = JSON.parse(define.__EVLOG_CONFIG__)
+    expect(config.minLevel).toBe('warn')
+  })
+
   it('includes all serializable options', () => {
     const plugin = createAutoInitPlugin({
       service: 'api',

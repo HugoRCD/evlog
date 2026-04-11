@@ -131,6 +131,13 @@ export interface ModuleOptions {
   sampling?: SamplingConfig
 
   /**
+   * Minimum severity for the global `log` API on server and client (not request wide events).
+   * Order: debug < info < warn < error.
+   * @default 'debug'
+   */
+  minLevel?: LogLevel
+
+  /**
    * Transport configuration for sending client logs to the server.
    *
    * @example
@@ -287,6 +294,7 @@ export default defineNuxtModule<ModuleOptions>({
       enabled: options.enabled ?? true,
       console: options.console,
       pretty: options.pretty,
+      minLevel: options.minLevel,
       transport: {
         enabled: transportEnabled,
         endpoint: transportEndpoint,
@@ -320,6 +328,10 @@ export default defineNuxtModule<ModuleOptions>({
       },
       {
         name: 'clearIdentity',
+        from: resolver.resolve('../runtime/client/log'),
+      },
+      {
+        name: 'setMinLevel',
         from: resolver.resolve('../runtime/client/log'),
       },
       {

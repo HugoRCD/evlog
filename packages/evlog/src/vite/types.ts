@@ -14,6 +14,8 @@ export interface ClientOptions {
   pretty?: boolean
   /** Enable console output on client @default true */
   console?: boolean
+  /** Minimum severity for client `log` calls (debug < info < warn < error) @default 'debug' */
+  minLevel?: LogLevel
   /** Transport configuration for sending client logs to the server */
   transport?: TransportConfig
 }
@@ -31,6 +33,8 @@ export interface EvlogViteOptions {
   silent?: boolean
   /** Sampling configuration */
   sampling?: SamplingConfig
+  /** Minimum severity for the global `log` API (not request wide events) @default 'debug' */
+  minLevel?: LogLevel
   /** Emit JSON strings or raw objects @default true */
   stringify?: boolean
   /** Opt-in auto-imports for log, createEvlogError, parseError */

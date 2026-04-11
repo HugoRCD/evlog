@@ -1,4 +1,4 @@
-import type { EnvironmentContext, RouteConfig, SamplingConfig } from './types'
+import type { EnvironmentContext, LogLevel, RouteConfig, SamplingConfig } from './types'
 import { extractErrorStatus } from './shared/errors'
 
 export { shouldLog, getServiceForPath } from './shared/routes'
@@ -53,6 +53,13 @@ export interface NitroModuleOptions {
    * Sampling configuration for filtering logs.
    */
   sampling?: SamplingConfig
+
+  /**
+   * Minimum severity for the global `log` API (not request wide events).
+   * Order: debug < info < warn < error.
+   * @default 'debug'
+   */
+  minLevel?: LogLevel
 }
 
 export interface EvlogConfig {
@@ -64,6 +71,7 @@ export interface EvlogConfig {
   exclude?: string[]
   routes?: Record<string, RouteConfig>
   sampling?: SamplingConfig
+  minLevel?: LogLevel
 }
 
 /**

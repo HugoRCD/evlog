@@ -1,5 +1,5 @@
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
-import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, matchesPattern } from './utils'
+import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, isLevelEnabled, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
@@ -35,6 +35,8 @@ let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
 let globalEnabled = true
 let globalSilent = false
+/** Minimum level for the global `log` API only (`ownsEvent === false`). Default: all levels. */
+let globalMinLevel: LogLevel = 'debug'
 let _locked = false
 
 /**
@@ -58,6 +60,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
   globalSilent = config.silent ?? false
+  globalMinLevel = config.minLevel ?? 'debug'
 
   if (globalSilent && !globalDrain && !config._suppressDrainWarning) {
     console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
@@ -143,8 +146,13 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
 function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDrain = false, ownsEvent = false): WideEvent | null {
   if (!globalEnabled) return null
 
-  if (!ownsEvent && !shouldSample(level)) {
-    return null
+  if (!ownsEvent) {
+    if (!isLevelEnabled(level, globalMinLevel)) {
+      return null
+    }
+    if (!shouldSample(level)) {
+      return null
+    }
   }
 
   let formatted: WideEvent
@@ -189,6 +197,9 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   if (!globalEnabled) return
 
   if (globalPretty && !globalSilent) {
+    if (!isLevelEnabled(level, globalMinLevel)) {
+      return
+    }
     if (!shouldSample(level)) {
       return
     }

@@ -46,7 +46,11 @@ const currentSection = computed(() =>
         :title="currentSection.title"
         :description="currentSection.description"
       >
-        <div class="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <PlaygroundMinLevelPanel v-if="currentSection.id === 'min-level'" />
+        <div
+          v-else
+          class="grid gap-4 md:grid-cols-2 xl:grid-cols-3"
+        >
           <PlaygroundTestCard
             v-for="test in currentSection.tests"
             :key="test.id"

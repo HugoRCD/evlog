@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest'
-import { colors, formatDuration, getLevelColor, isClient, isDev, isServer, matchesPattern } from '../src/utils'
+import { colors, formatDuration, getLevelColor, isClient, isDev, isLevelEnabled, isServer, matchesPattern } from '../src/utils'
 
 // Helper to test shouldLog logic (mirrors plugin.ts implementation)
 function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
@@ -87,6 +87,19 @@ describe('getLevelColor', () => {
 
   it('returns white for unknown level', () => {
     expect(getLevelColor('unknown')).toBe(colors.white)
+  })
+})
+
+describe('isLevelEnabled', () => {
+  it('treats debug as least severe', () => {
+    expect(isLevelEnabled('debug', 'debug')).toBe(true)
+    expect(isLevelEnabled('debug', 'info')).toBe(false)
+  })
+
+  it('allows levels at or above minLevel', () => {
+    expect(isLevelEnabled('info', 'warn')).toBe(false)
+    expect(isLevelEnabled('warn', 'warn')).toBe(true)
+    expect(isLevelEnabled('error', 'warn')).toBe(true)
   })
 })
 

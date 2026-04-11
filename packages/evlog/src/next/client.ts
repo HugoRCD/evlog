@@ -1,10 +1,10 @@
 'use client'
 
 import { useEffect } from 'react'
-import type { TransportConfig } from '../types'
+import type { LogLevel, TransportConfig } from '../types'
 import { initLog, log, setIdentity, clearIdentity } from '../runtime/client/log'
 
-export { log, setIdentity, clearIdentity } from '../runtime/client/log'
+export { log, setIdentity, clearIdentity, setMinLevel } from '../runtime/client/log'
 
 export interface EvlogProviderProps {
   /**
@@ -38,6 +38,12 @@ export interface EvlogProviderProps {
    */
   console?: boolean
 
+  /**
+   * Minimum severity for client `log` calls (debug < info < warn < error).
+   * @default 'debug'
+   */
+  minLevel?: LogLevel
+
   children: React.ReactNode
 }
 
@@ -60,16 +66,17 @@ export interface EvlogProviderProps {
  * ```
  */
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export function EvlogProvider({ service, pretty, transport, enabled, console: consoleOutput, children }: EvlogProviderProps) {
+export function EvlogProvider({ service, pretty, transport, enabled, console: consoleOutput, minLevel, children }: EvlogProviderProps) {
   useEffect(() => {
     initLog({
       enabled,
       console: consoleOutput,
       pretty,
+      minLevel,
       service,
       transport,
     })
-  }, [enabled, consoleOutput, pretty, service, transport])
+  }, [enabled, consoleOutput, pretty, minLevel, service, transport])
 
   return children
 }

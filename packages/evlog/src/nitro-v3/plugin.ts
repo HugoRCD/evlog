@@ -139,6 +139,7 @@ export default definePlugin(async (nitroApp) => {
     pretty: evlogConfig?.pretty,
     silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
+    minLevel: evlogConfig?.minLevel,
     _suppressDrainWarning: true,
   })
 

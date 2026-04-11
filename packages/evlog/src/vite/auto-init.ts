@@ -27,6 +27,7 @@ function buildConfig(options: EvlogViteOptions): Record<string, unknown> {
   if (options.pretty !== undefined) config.pretty = options.pretty
   if (options.silent !== undefined) config.silent = options.silent
   if (options.sampling) config.sampling = options.sampling
+  if (options.minLevel !== undefined) config.minLevel = options.minLevel
   if (options.stringify !== undefined) config.stringify = options.stringify
 
   return config

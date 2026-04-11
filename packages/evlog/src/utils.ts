@@ -44,6 +44,20 @@ export function detectEnvironment(): Partial<EnvironmentContext> {
   }
 }
 
+const LEVEL_ORDER: Record<LogLevel, number> = {
+  debug: 0,
+  info: 1,
+  warn: 2,
+  error: 3,
+}
+
+/**
+ * True if `level` is at least as severe as `minLevel` (debug < info < warn < error).
+ */
+export function isLevelEnabled(level: LogLevel, minLevel: LogLevel): boolean {
+  return LEVEL_ORDER[level] >= LEVEL_ORDER[minLevel]
+}
+
 export function getConsoleMethod(level: LogLevel): LogLevel {
   return level
 }

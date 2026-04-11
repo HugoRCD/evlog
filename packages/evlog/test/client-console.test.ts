@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { initLog, log } from '../src/runtime/client/log'
+import { initLog, log, setMinLevel } from '../src/runtime/client/log'
 
 describe('client console option', () => {
   let infoSpy: ReturnType<typeof vi.spyOn>
@@ -26,6 +26,14 @@ describe('client console option', () => {
     log.info({ action: 'test' })
 
     expect(infoSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('uses console.log for debug level (not console.debug) for DevTools visibility', () => {
+    const logSpy = vi.spyOn(console, 'log').mockImplementation(() => {})
+    initLog({ enabled: true, pretty: false, minLevel: 'debug' })
+    log.debug({ action: 'dbg' })
+    expect(logSpy).toHaveBeenCalledTimes(1)
+    expect(infoSpy).not.toHaveBeenCalled()
   })
 
   it('suppresses console output when console is false', () => {
@@ -112,6 +120,45 @@ describe('client console option', () => {
     expect(infoSpy).not.toHaveBeenCalled()
 
     initLog({ enabled: true, console: true, pretty: false })
+    log.info({ action: 'visible' })
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('client minLevel', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+  let fetchSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('suppresses console and transport below minLevel', () => {
+    initLog({
+      enabled: true,
+      pretty: false,
+      minLevel: 'warn',
+      transport: { enabled: true, endpoint: '/api/_evlog/ingest' },
+    })
+    log.info({ action: 'x' })
+    expect(infoSpy).not.toHaveBeenCalled()
+    expect(fetchSpy).not.toHaveBeenCalled()
+  })
+
+  it('setMinLevel enables verbose logs at runtime', () => {
+    initLog({ enabled: true, pretty: false, minLevel: 'warn' })
+    log.info({ action: 'hidden' })
+    expect(infoSpy).not.toHaveBeenCalled()
+
+    setMinLevel('debug')
     log.info({ action: 'visible' })
     expect(infoSpy).toHaveBeenCalledTimes(1)
   })

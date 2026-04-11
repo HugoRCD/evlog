@@ -16,6 +16,7 @@ export function createClientInjectPlugin(clientOptions: ClientOptions): Plugin {
       config.service = clientOptions.service ?? 'client'
       if (clientOptions.console !== undefined) config.console = clientOptions.console
       config.pretty = clientOptions.pretty ?? isDev
+      if (clientOptions.minLevel !== undefined) config.minLevel = clientOptions.minLevel
       if (clientOptions.transport) config.transport = clientOptions.transport
 
       const configJson = JSON.stringify(config)

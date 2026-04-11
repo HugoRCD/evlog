@@ -1,4 +1,4 @@
-import type { EnvironmentContext, SamplingConfig } from '../types'
+import type { EnvironmentContext, LogLevel, SamplingConfig } from '../types'
 import type { BaseEvlogOptions } from '../shared/middleware'
 
 export interface NextEvlogOptions extends BaseEvlogOptions {
@@ -29,6 +29,12 @@ export interface NextEvlogOptions extends BaseEvlogOptions {
    * Sampling configuration for filtering logs.
    */
   sampling?: SamplingConfig
+
+  /**
+   * Minimum severity for the global `log` API (not request wide events).
+   * @default 'debug'
+   */
+  minLevel?: LogLevel
 
   /**
    * When pretty is disabled, emit JSON strings (default) or raw objects.

@@ -104,6 +104,63 @@ describe('log', () => {
   })
 })
 
+describe('minLevel', () => {
+  let infoSpy: ReturnType<typeof vi.spyOn>
+  let warnSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    infoSpy = vi.spyOn(console, 'info').mockImplementation(() => {})
+    warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(console, 'debug').mockImplementation(() => {})
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('suppresses simple log calls below minLevel', () => {
+    initLogger({ pretty: false, minLevel: 'warn' })
+    log.info({ action: 'x' })
+    log.debug({ action: 'y' })
+    expect(infoSpy).not.toHaveBeenCalled()
+    log.warn({ action: 'z' })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not apply minLevel to createLogger.emit wide events', () => {
+    initLogger({ pretty: false, minLevel: 'warn' })
+    const logger = createRequestLogger({ method: 'GET', path: '/ok' })
+    logger.set({ ok: true })
+    logger.emit()
+    expect(infoSpy).toHaveBeenCalledTimes(1)
+    const [[output]] = infoSpy.mock.calls
+    expect(String(output)).toContain('"level":"info"')
+  })
+
+  it('filters by minLevel even when sampling would keep the level', () => {
+    initLogger({
+      pretty: false,
+      minLevel: 'warn',
+      sampling: { rates: { info: 100, warn: 100 } },
+    })
+    log.info({ n: 1 })
+    expect(infoSpy).not.toHaveBeenCalled()
+    log.warn({ n: 2 })
+    expect(warnSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('still applies head sampling when minLevel allows the level', () => {
+    initLogger({
+      pretty: false,
+      minLevel: 'debug',
+      sampling: { rates: { info: 0 } },
+    })
+    log.info({ n: 1 })
+    expect(infoSpy).not.toHaveBeenCalled()
+  })
+})
+
 describe('createRequestLogger', () => {
   let infoSpy: ReturnType<typeof vi.spyOn>
 

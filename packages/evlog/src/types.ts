@@ -263,6 +263,13 @@ export interface LoggerConfig {
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
   /**
+   * Minimum severity for the global `log` API (tagged and object form).
+   * Does not apply to `createLogger().emit()` / request wide events (use `sampling` for volume).
+   * Order: debug < info < warn < error.
+   * @default 'debug' (all levels)
+   */
+  minLevel?: LogLevel
+  /**
    * When pretty is disabled, emit JSON strings (default) or raw objects.
    * Set to false for environments like Cloudflare Workers that expect objects.
    * @default true
