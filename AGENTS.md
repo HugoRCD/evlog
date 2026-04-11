@@ -887,6 +887,12 @@ The `src/shared/` directory is exposed as `evlog/toolkit` (not `evlog/shared`). 
 
 `README.md` at the repo root is a symlink to `packages/evlog/README.md`. Edit the source (`packages/evlog/README.md`) directly — it's the same file.
 
+### `evlog/http` vs `evlog/browser` vs `evlog/client`
+
+- **`evlog/http`** — HTTP ingest drain (`createHttpDrain`, `createHttpLogDrain`). Prefer this for batched transport to a server endpoint.
+- **`evlog/browser`** — Deprecated re-export of `evlog/http` (same API). **Will be removed in the next major release.** Document migrations toward `evlog/http`.
+- **`evlog/client`** — Client-side `log` / `initLog` runtime (not a drain transport).
+
 ## Development Guidelines
 
 ### Wide Event Fields

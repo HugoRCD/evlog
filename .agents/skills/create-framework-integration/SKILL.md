@@ -281,7 +281,7 @@ links:
 6. **Pipeline (Batching & Retry)** — `createDrainPipeline` example
 7. **Tail Sampling** — `keep` callback
 8. **Route Filtering** — `include` / `exclude` / `routes`
-9. **Client-Side Logging** — browser drain (only if framework has a client-side story)
+9. **Client-Side Logging** — HTTP drain (`evlog/http`) (only if framework has a client-side story)
 10. **Run Locally** — clone + `bun run example:{framework}`
 11. **Card group** linking to GitHub source
 

@@ -1,5 +1,5 @@
 import { createError, parseError } from 'evlog'
-import { createBrowserLogDrain } from 'evlog/browser'
+import { createHttpLogDrain } from 'evlog/http'
 
 export interface TestConfig {
   id: string
@@ -488,7 +488,7 @@ export const testConfig = {
           description: 'Creates a browser drain, pushes a single event, and flushes immediately.',
           color: 'primary',
           onClick: async () => {
-            const drain = createBrowserLogDrain({
+            const drain = createHttpLogDrain({
               drain: { endpoint: '/api/test/browser-ingest' },
               pipeline: { batch: { size: 1, intervalMs: 500 } },
               autoFlush: false,
@@ -511,7 +511,7 @@ export const testConfig = {
           description: 'Creates the drain, pushes 5 events, and flushes. Demonstrates batching.',
           color: 'success',
           onClick: async () => {
-            const drain = createBrowserLogDrain({
+            const drain = createHttpLogDrain({
               drain: { endpoint: '/api/test/browser-ingest' },
               pipeline: { batch: { size: 10, intervalMs: 500 } },
               autoFlush: false,
@@ -536,7 +536,7 @@ export const testConfig = {
           description: 'Pushes events with autoFlush enabled. Switch tabs or navigate away to flush via sendBeacon.',
           color: 'warning',
           onClick: () => {
-            const drain = createBrowserLogDrain({
+            const drain = createHttpLogDrain({
               drain: { endpoint: '/api/test/browser-ingest' },
               pipeline: { batch: { size: 25, intervalMs: 60000 } },
             })

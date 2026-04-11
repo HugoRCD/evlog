@@ -23,7 +23,8 @@ What users actually pay when importing a specific path (after tree-shaking):
 | `evlog/posthog` | 12.2 kB | **4.6 kB** | posthog + otlp + _http + _severity |
 | `evlog/pipeline` | 4.2 kB | **1.4 kB** | pipeline |
 | `evlog/enrichers` | 6.1 kB | **1.9 kB** | enrichers |
-| `evlog/browser` | 2.9 kB | **1.2 kB** | browser |
+| `evlog/http` | 2.9 kB | **1.2 kB** | http |
+| `evlog/browser` | — | — | deprecated; re-exports `evlog/http` (removed next major) |
 | `evlog/workers` | 2.1 kB | **965 B** | workers |
 
 ### Shared Chunks

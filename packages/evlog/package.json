@@ -109,6 +109,11 @@
       "import": "./dist/pipeline.mjs",
       "default": "./dist/pipeline.mjs"
     },
+    "./http": {
+      "types": "./dist/http.d.mts",
+      "import": "./dist/http.mjs",
+      "default": "./dist/http.mjs"
+    },
     "./browser": {
       "types": "./dist/browser.d.mts",
       "import": "./dist/browser.mjs",
@@ -233,6 +238,9 @@
       ],
       "pipeline": [
         "./dist/pipeline.d.mts"
+      ],
+      "http": [
+        "./dist/http.d.mts"
       ],
       "browser": [
         "./dist/browser.d.mts"

@@ -22,6 +22,7 @@ export default defineNuxtConfig({
     '/core-concepts/structured-errors': { redirect: { to: '/logging/structured-errors', statusCode: 301 } },
     '/core-concepts/client-logging': { redirect: { to: '/logging/client-logging', statusCode: 301 } },
     '/core-concepts/ai-sdk': { redirect: { to: '/logging/ai-sdk', statusCode: 301 } },
+    '/adapters/browser': { redirect: { to: '/adapters/http', statusCode: 301 } },
   },
 
   modules: [

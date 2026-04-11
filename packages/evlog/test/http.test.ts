@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DrainContext } from '../src/types'
-import { createBrowserDrain, createBrowserLogDrain } from '../src/browser'
+import { createHttpDrain, createHttpLogDrain } from '../src/http'
 
 function createTestContext(id: number): DrainContext {
   return {
@@ -15,7 +15,7 @@ function createTestContext(id: number): DrainContext {
   }
 }
 
-describe('createBrowserDrain', () => {
+describe('createHttpDrain', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
@@ -27,7 +27,7 @@ describe('createBrowserDrain', () => {
   })
 
   it('sends batch as JSON to the configured endpoint', async () => {
-    const drain = createBrowserDrain({ endpoint: '/api/logs' })
+    const drain = createHttpDrain({ endpoint: '/api/logs' })
     const batch = [createTestContext(1), createTestContext(2)]
 
     await drain(batch)
@@ -43,7 +43,7 @@ describe('createBrowserDrain', () => {
   })
 
   it('sends custom headers with fetch', async () => {
-    const drain = createBrowserDrain({
+    const drain = createHttpDrain({
       endpoint: '/api/logs',
       headers: { 'Authorization': 'Bearer tok_123', 'X-API-Key': 'key_456' },
     })
@@ -59,7 +59,7 @@ describe('createBrowserDrain', () => {
   })
 
   it('uses custom credentials mode', async () => {
-    const drain = createBrowserDrain({ endpoint: '/api/logs', credentials: 'include' })
+    const drain = createHttpDrain({ endpoint: '/api/logs', credentials: 'include' })
 
     await drain([createTestContext(1)])
 
@@ -68,7 +68,7 @@ describe('createBrowserDrain', () => {
   })
 
   it('skips empty batches', async () => {
-    const drain = createBrowserDrain({ endpoint: '/api/logs' })
+    const drain = createHttpDrain({ endpoint: '/api/logs' })
 
     await drain([])
 
@@ -78,9 +78,9 @@ describe('createBrowserDrain', () => {
   it('throws on non-ok response', async () => {
     vi.mocked(fetch).mockResolvedValueOnce(new Response(null, { status: 500 }))
 
-    const drain = createBrowserDrain({ endpoint: '/api/logs' })
+    const drain = createHttpDrain({ endpoint: '/api/logs' })
 
-    await expect(drain([createTestContext(1)])).rejects.toThrow('[evlog/browser] Server responded with 500')
+    await expect(drain([createTestContext(1)])).rejects.toThrow('[evlog/http] Server responded with 500')
   })
 
   it('aborts after timeout', async () => {
@@ -98,7 +98,7 @@ describe('createBrowserDrain', () => {
       })
     })
 
-    const drain = createBrowserDrain({ endpoint: '/api/logs', timeout: 10 })
+    const drain = createHttpDrain({ endpoint: '/api/logs', timeout: 10 })
 
     await expect(drain([createTestContext(1)])).rejects.toThrow(/abort/i)
   })
@@ -129,7 +129,7 @@ describe('createBrowserDrain', () => {
     })
 
     it('uses sendBeacon when page is hidden', async () => {
-      const drain = createBrowserDrain({ endpoint: '/api/logs' })
+      const drain = createHttpDrain({ endpoint: '/api/logs' })
       const batch = [createTestContext(1)]
 
       await drain(batch)
@@ -145,13 +145,13 @@ describe('createBrowserDrain', () => {
     it('throws if sendBeacon returns false', async () => {
       vi.mocked(navigator.sendBeacon).mockReturnValue(false)
 
-      const drain = createBrowserDrain({ endpoint: '/api/logs' })
+      const drain = createHttpDrain({ endpoint: '/api/logs' })
 
       await expect(drain([createTestContext(1)])).rejects.toThrow('sendBeacon failed')
     })
 
     it('falls back to fetch when useBeacon is false', async () => {
-      const drain = createBrowserDrain({ endpoint: '/api/logs', useBeacon: false })
+      const drain = createHttpDrain({ endpoint: '/api/logs', useBeacon: false })
 
       await drain([createTestContext(1)])
 
@@ -166,7 +166,7 @@ describe('createBrowserDrain', () => {
         configurable: true,
       })
 
-      const drain = createBrowserDrain({ endpoint: '/api/logs' })
+      const drain = createHttpDrain({ endpoint: '/api/logs' })
 
       await drain([createTestContext(1)])
 
@@ -175,7 +175,7 @@ describe('createBrowserDrain', () => {
   })
 })
 
-describe('createBrowserLogDrain', () => {
+describe('createHttpLogDrain', () => {
   beforeEach(() => {
     vi.useFakeTimers()
     vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
@@ -187,7 +187,7 @@ describe('createBrowserLogDrain', () => {
   })
 
   it('returns a PipelineDrainFn with flush and pending', () => {
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
       autoFlush: false,
     })
@@ -198,7 +198,7 @@ describe('createBrowserLogDrain', () => {
   })
 
   it('batches and sends events through the pipeline', async () => {
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
       pipeline: { batch: { size: 2, intervalMs: 60000 } },
       autoFlush: false,
@@ -215,7 +215,7 @@ describe('createBrowserLogDrain', () => {
   })
 
   it('flush drains all pending events', async () => {
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
       pipeline: { batch: { size: 100 } },
       autoFlush: false,
@@ -234,7 +234,7 @@ describe('createBrowserLogDrain', () => {
   it('registers visibilitychange listener by default', () => {
     const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
 
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
     })
 
@@ -247,7 +247,7 @@ describe('createBrowserLogDrain', () => {
   it('dispose removes visibilitychange listener', () => {
     const removeEventListenerSpy = vi.spyOn(document, 'removeEventListener')
 
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
     })
 
@@ -261,7 +261,7 @@ describe('createBrowserLogDrain', () => {
   it('does not register visibilitychange listener when autoFlush is false', () => {
     const addEventListenerSpy = vi.spyOn(document, 'addEventListener')
 
-    createBrowserLogDrain({
+    createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
       autoFlush: false,
     })
@@ -272,7 +272,7 @@ describe('createBrowserLogDrain', () => {
   })
 
   it('uses custom pipeline options', async () => {
-    const drain = createBrowserLogDrain({
+    const drain = createHttpLogDrain({
       drain: { endpoint: '/api/logs' },
       pipeline: { batch: { size: 1, intervalMs: 100 } },
       autoFlush: false,

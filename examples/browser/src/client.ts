@@ -1,5 +1,5 @@
 import { initLogger, log } from 'evlog'
-import { createBrowserLogDrain } from 'evlog/browser'
+import { createHttpLogDrain } from 'evlog/http'
 
 // Visual feedback
 const logList = document.getElementById('log-list')!
@@ -13,7 +13,7 @@ function notify(action: string, level: 'info' | 'error' = 'info') {
 }
 
 // Initialize once at app startup
-const drain = createBrowserLogDrain({
+const drain = createHttpLogDrain({
   drain: { endpoint: '/v1/ingest' },
 })
 initLogger({ drain })

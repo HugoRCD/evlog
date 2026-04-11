@@ -518,7 +518,7 @@ See the full [nestjs example](https://github.com/HugoRCD/evlog/tree/main/example
 Use the `log` API on the client side for structured browser logging:
 
 ```typescript
-import { log } from 'evlog/browser'
+import { log } from 'evlog/client'
 
 log.info('checkout', 'User initiated checkout')
 log.error({ action: 'payment', error: 'validation_failed' })
@@ -555,6 +555,8 @@ When enabled:
 2. Server enriches with environment context (service, version, etc.)
 3. `evlog:drain` hook is called with `source: 'client'`
 4. External services receive the log
+
+For a **framework-agnostic** batched HTTP drain (e.g. vanilla JS or custom endpoints), use `createHttpLogDrain` from [`evlog/http`](https://www.evlog.dev/adapters/http). The legacy import path `evlog/browser` is deprecated and will be removed in the next major release.
 
 ## Structured Errors
 

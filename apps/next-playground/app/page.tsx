@@ -3,7 +3,7 @@
 import { useState, useCallback, useEffect } from 'react'
 import { log, setIdentity, clearIdentity } from 'evlog/next/client'
 import { parseError } from 'evlog'
-import { createBrowserLogDrain } from 'evlog/browser'
+import { createHttpLogDrain } from 'evlog/http'
 
 // ---------------------------------------------------------------------------
 // Types
@@ -276,21 +276,21 @@ const sections: TestSection[] = [
     id: 'browser-drain',
     label: 'Browser Drain',
     title: 'Browser Log Drain',
-    description: 'Send structured log events from the browser directly to the server. Uses evlog/browser createBrowserLogDrain for batched transport via fetch/sendBeacon.',
+    description: 'Send structured log events from the browser directly to the server. Uses evlog/http createHttpLogDrain for batched transport via fetch/sendBeacon.',
     tests: [
       {
         id: 'browser-drain-quick',
         label: 'Quick Setup',
         description: 'Create a browser drain, log one event, and manually flush to /api/test/browser-ingest',
         onClick: async () => {
-          const drain = createBrowserLogDrain({
+          const drain = createHttpLogDrain({
             drain: { endpoint: '/api/test/browser-ingest' },
             pipeline: { batch: { size: 1, intervalMs: 500 } },
           })
           drain(makeDrainEvent({ action: 'quick_setup_test' }))
           await drain.flush()
         },
-        badge: 'createBrowserLogDrain',
+        badge: 'createHttpLogDrain',
       },
       {
         id: 'browser-drain-batch',
@@ -298,7 +298,7 @@ const sections: TestSection[] = [
         description: 'Push 5 events into the browser drain and flush — appears as one batch on the server',
         color: 'success',
         onClick: async () => {
-          const drain = createBrowserLogDrain({
+          const drain = createHttpLogDrain({
             drain: { endpoint: '/api/test/browser-ingest' },
             pipeline: { batch: { size: 5, intervalMs: 10000 } },
           })
@@ -315,7 +315,7 @@ const sections: TestSection[] = [
         description: 'Events are auto-flushed via sendBeacon when the page becomes hidden (switch tabs to test)',
         color: 'warning',
         onClick: async () => {
-          const drain = createBrowserLogDrain({
+          const drain = createHttpLogDrain({
             drain: { endpoint: '/api/test/browser-ingest' },
             pipeline: { batch: { size: 25, intervalMs: 60000 } },
             autoFlush: true,

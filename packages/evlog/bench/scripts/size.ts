@@ -34,6 +34,7 @@ const ENTRY_POINTS: Record<string, string> = {
   'types': 'types.mjs',
   'enrichers': 'enrichers.mjs',
   'pipeline': 'pipeline.mjs',
+  'http': 'http.mjs',
   'browser': 'browser.mjs',
   'toolkit': 'toolkit.mjs',
   'workers': 'workers.mjs',

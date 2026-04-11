@@ -60,7 +60,7 @@ app.get('/', (c) => {
 </head>
 <body>
   <h1>Mini Store</h1>
-  <p class="subtitle">evlog/browser demo — check your terminal for [BROWSER] logs</p>
+  <p class="subtitle">evlog/http demo — check your terminal for [BROWSER] logs</p>
 
   <div class="product">
     <h2>T-Shirt</h2>
@@ -74,7 +74,7 @@ app.get('/', (c) => {
     <button type="submit">Checkout</button>
   </form>
 
-  <p class="hint">A page_view event is logged on load. Each interaction logs to your server via evlog/browser.</p>
+  <p class="hint">A page_view event is logged on load. Each interaction logs to your server via evlog/http.</p>
 
   <div id="log-list"></div>
   <script type="module" src="/dist/client.js"></script>

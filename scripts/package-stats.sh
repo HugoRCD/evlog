@@ -119,6 +119,9 @@ row "evlog/pipeline" "pipeline" \
 row "evlog/enrichers" "enrichers" \
   "$DIST/enrichers.mjs" >> "$OUT"
 
+row "evlog/http" "http" \
+  "$DIST/http.mjs" >> "$OUT"
+
 row "evlog/browser" "browser" \
   "$DIST/browser.mjs" >> "$OUT"
 

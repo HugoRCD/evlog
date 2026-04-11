@@ -33,6 +33,7 @@ export default defineConfig({
     'adapters/fs': 'src/adapters/fs.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
+    'http': 'src/http.ts',
     'browser': 'src/browser.ts',
     'next/index': 'src/next/index.ts',
     'next/client': 'src/next/client.ts',

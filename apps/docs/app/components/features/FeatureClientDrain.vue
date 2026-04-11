@@ -118,14 +118,14 @@ const pills = [
               <div class="size-3 rounded-full bg-accented" />
               <div class="size-3 rounded-full bg-accented" />
             </div>
-            <span class="ml-3 font-mono text-xs text-dimmed">browser-drain.ts</span>
+            <span class="ml-3 font-mono text-xs text-dimmed">http-drain.ts</span>
           </div>
 
           <div class="px-5 pt-5 pb-4 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
             <!-- eslint-disable vue/multiline-html-element-content-newline -->
-            <pre><code><span class="text-violet-400">import</span> { createBrowserLogDrain } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/browser'</span>
+            <pre><code><span class="text-violet-400">import</span> { createHttpLogDrain } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/http'</span>
 
-<span class="text-violet-400">const</span> drain = <span class="text-amber-400">createBrowserLogDrain</span>({
+<span class="text-violet-400">const</span> drain = <span class="text-amber-400">createHttpLogDrain</span>({
   <span class="text-sky-400">drain</span>: {
     <span class="text-sky-400">endpoint</span>: <span class="text-emerald-400">'/api/_evlog/ingest'</span>,
   },
