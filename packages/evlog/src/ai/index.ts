@@ -1,5 +1,5 @@
-import { gateway, wrapLanguageModel } from 'ai'
-import type { GatewayModelId } from 'ai'
+import { gateway, wrapLanguageModel, bindTelemetryIntegration } from 'ai'
+import type { GatewayModelId, TelemetryIntegration, OnStartEvent, OnToolCallFinishEvent, OnFinishEvent } from 'ai'
 import type { LanguageModelV3, LanguageModelV3Middleware, LanguageModelV3StreamPart } from '@ai-sdk/provider'
 import type { RequestLogger } from '../types'
 
@@ -21,6 +21,14 @@ export interface ToolInputsOptions {
 }
 
 /**
+ * Pricing entry for a single model: cost per 1 million tokens in dollars.
+ */
+export interface ModelCost {
+  input: number
+  output: number
+}
+
+/**
  * Options for `createAILogger` and `createAIMiddleware`.
  */
 export interface AILoggerOptions {
@@ -33,6 +41,24 @@ export interface AILoggerOptions {
    * @default false
    */
   toolInputs?: boolean | ToolInputsOptions
+  /**
+   * Pricing map for estimating request cost.
+   * Keys are model IDs (e.g. `'claude-sonnet-4.6'`, `'gpt-4o'`), values are
+   * `{ input, output }` in dollars per 1M tokens.
+   *
+   * When provided, the wide event includes `ai.estimatedCost` (in dollars).
+   *
+   * @example
+   * ```ts
+   * const ai = createAILogger(log, {
+   *   cost: {
+   *     'claude-sonnet-4.6': { input: 3, output: 15 },
+   *     'gpt-4o': { input: 2.5, output: 10 },
+   *   },
+   * })
+   * ```
+   */
+  cost?: Record<string, ModelCost>
 }
 
 /**
@@ -43,6 +69,26 @@ export interface AIStepUsage {
   inputTokens: number
   outputTokens: number
   toolCalls?: string[]
+}
+
+/**
+ * Tool execution detail captured via `TelemetryIntegration`.
+ */
+export interface AIToolExecution {
+  name: string
+  durationMs: number
+  success: boolean
+  error?: string
+}
+
+/**
+ * Embedding metadata captured via `captureEmbed`.
+ */
+export interface AIEmbeddingData {
+  model?: string
+  tokens: number
+  dimensions?: number
+  count?: number
 }
 
 /**
@@ -68,13 +114,17 @@ export interface AIEventData {
   msToFinish?: number
   tokensPerSecond?: number
   error?: string
+  tools?: AIToolExecution[]
+  totalDurationMs?: number
+  embedding?: AIEmbeddingData
+  estimatedCost?: number
 }
 
 export interface AILogger {
   /**
    * Wrap a language model with evlog middleware.
-   * All `generateText`, `streamText`, `generateObject`, and `streamObject` calls
-   * using the wrapped model are captured automatically into the wide event.
+   * All `generateText` and `streamText` calls using the wrapped model
+   * are captured automatically into the wide event.
    *
    * Accepts a `LanguageModelV3` object or a model string (e.g. `'anthropic/claude-sonnet-4.6'`).
    * Strings are resolved via the AI SDK gateway.
@@ -102,9 +152,26 @@ export interface AILogger {
    * ```ts
    * const { embedding, usage } = await embed({ model: embeddingModel, value: query })
    * ai.captureEmbed({ usage })
+   *
+   * // With model info (v2)
+   * ai.captureEmbed({ usage, model: 'text-embedding-3-small', dimensions: 1536 })
+   *
+   * // After embedMany
+   * ai.captureEmbed({ usage, count: texts.length })
    * ```
    */
-  captureEmbed: (result: { usage: { tokens: number } }) => void
+  captureEmbed: (result: {
+    usage: { tokens: number }
+    model?: string
+    dimensions?: number
+    count?: number
+  }) => void
+
+  /**
+   * Internal accumulator state exposed for `createEvlogIntegration` to share.
+   * @internal
+   */
+  _state: AccumulatorState
 }
 
 interface UsageAccumulator {
@@ -201,6 +268,7 @@ export function createAIMiddleware(log: RequestLogger, options?: AILoggerOptions
  */
 export function createAILogger(log: RequestLogger, options?: AILoggerOptions): AILogger {
   const state = createAccumulatorState(options)
+  state._log = log
   const middleware = buildMiddlewareFromState(log, state)
 
   return {
@@ -209,11 +277,24 @@ export function createAILogger(log: RequestLogger, options?: AILoggerOptions): A
       return wrapLanguageModel({ model: resolved, middleware })
     },
 
-    captureEmbed: (result: { usage: { tokens: number } }) => {
+    captureEmbed: (result: {
+      usage: { tokens: number }
+      model?: string
+      dimensions?: number
+      count?: number
+    }) => {
       state.calls++
       state.usage.inputTokens += result.usage.tokens
+      state.embedding = {
+        tokens: (state.embedding?.tokens ?? 0) + result.usage.tokens,
+        ...(result.model ? { model: result.model } : state.embedding?.model ? { model: state.embedding.model } : {}),
+        ...(result.dimensions ? { dimensions: result.dimensions } : state.embedding?.dimensions ? { dimensions: state.embedding.dimensions } : {}),
+        ...(result.count ? { count: (state.embedding?.count ?? 0) + result.count } : state.embedding?.count ? { count: state.embedding.count } : {}),
+      }
       flushState(log, state)
     },
+
+    _state: state,
   }
 }
 
@@ -233,6 +314,13 @@ interface AccumulatorState {
   lastResponseId: string | undefined
   toolInputs: boolean
   toolInputsOptions: ToolInputsOptions | undefined
+  toolExecutions: AIToolExecution[]
+  generationStartTime: number | undefined
+  totalDurationMs: number | undefined
+  embedding: AIEmbeddingData | undefined
+  costMap: Record<string, ModelCost> | undefined
+  /** @internal Logger reference for integration flush */
+  _log?: RequestLogger
 }
 
 function resolveToolInputs(raw?: boolean | ToolInputsOptions): { enabled: boolean, options: ToolInputsOptions | undefined } {
@@ -279,7 +367,24 @@ function createAccumulatorState(options?: AILoggerOptions): AccumulatorState {
     lastResponseId: undefined,
     toolInputs: enabled,
     toolInputsOptions: captureOpts,
+    toolExecutions: [],
+    generationStartTime: undefined,
+    totalDurationMs: undefined,
+    embedding: undefined,
+    costMap: options?.cost,
   }
+}
+
+function computeEstimatedCost(state: AccumulatorState): number | undefined {
+  if (!state.costMap) return undefined
+  const lastModel = state.models[state.models.length - 1]
+  if (!lastModel) return undefined
+  const pricing = state.costMap[lastModel]
+  if (!pricing) return undefined
+  const inputCost = (state.usage.inputTokens / 1_000_000) * pricing.input
+  const outputCost = (state.usage.outputTokens / 1_000_000) * pricing.output
+  const total = inputCost + outputCost
+  return total > 0 ? Math.round(total * 1_000_000) / 1_000_000 : undefined
 }
 
 function flushState(log: RequestLogger, state: AccumulatorState): void {
@@ -318,6 +423,11 @@ function flushState(log: RequestLogger, state: AccumulatorState): void {
     }
   }
   if (state.lastError) data.error = state.lastError
+  if (state.toolExecutions.length > 0) data.tools = [...state.toolExecutions]
+  if (state.totalDurationMs !== undefined) data.totalDurationMs = state.totalDurationMs
+  if (state.embedding) data.embedding = { ...state.embedding }
+  const cost = computeEstimatedCost(state)
+  if (cost !== undefined) data.estimatedCost = cost
 
   log.set({ ai: data } as Record<string, unknown>)
 }
@@ -355,6 +465,7 @@ function recordError(log: RequestLogger, state: AccumulatorState, model: { provi
 
 function buildMiddleware(log: RequestLogger, options?: AILoggerOptions): LanguageModelV3Middleware {
   const state = createAccumulatorState(options)
+  state._log = log
   return buildMiddlewareFromState(log, state)
 }
 
@@ -532,4 +643,93 @@ function buildMiddlewareFromState(log: RequestLogger, state: AccumulatorState): 
       }
     },
   }
+}
+
+/**
+ * Create an AI SDK `TelemetryIntegration` that captures tool execution
+ * timing, errors, and total generation wall time into the wide event.
+ *
+ * Complements the middleware-based `createAILogger`: the middleware captures
+ * token usage and streaming metrics at the model level, while the integration
+ * captures application-level lifecycle events (tool execution, total duration).
+ *
+ * When passed an `AILogger`, shares its accumulator so both paths write to
+ * the same `ai.*` field. Can also be used standalone with a `RequestLogger`.
+ *
+ * @example Combined with middleware (recommended)
+ * ```ts
+ * import { createAILogger, createEvlogIntegration } from 'evlog/ai'
+ *
+ * const log = useLogger(event)
+ * const ai = createAILogger(log)
+ *
+ * const result = await generateText({
+ *   model: ai.wrap('anthropic/claude-sonnet-4.6'),
+ *   tools: { getWeather },
+ *   experimental_telemetry: {
+ *     isEnabled: true,
+ *     integrations: [createEvlogIntegration(ai)],
+ *   },
+ * })
+ * ```
+ *
+ * @example Standalone (no middleware wrapping)
+ * ```ts
+ * import { createEvlogIntegration } from 'evlog/ai'
+ *
+ * const integration = createEvlogIntegration(log)
+ *
+ * const result = await generateText({
+ *   model: openai('gpt-4o'),
+ *   experimental_telemetry: {
+ *     isEnabled: true,
+ *     integrations: [integration],
+ *   },
+ * })
+ * ```
+ */
+export function createEvlogIntegration(
+  logOrAi: RequestLogger | AILogger,
+  options?: AILoggerOptions,
+): TelemetryIntegration {
+  let log: RequestLogger
+  let state: AccumulatorState
+
+  if ('_state' in logOrAi && logOrAi._state) {
+    state = logOrAi._state
+    log = state._log!
+  } else {
+    log = logOrAi as RequestLogger
+    state = createAccumulatorState(options)
+    state._log = log
+  }
+
+  class EvlogIntegration implements TelemetryIntegration {
+
+    onStart(_event: OnStartEvent) {
+      state.generationStartTime = Date.now()
+    }
+
+    onToolCallFinish(event: OnToolCallFinishEvent) {
+      const execution: AIToolExecution = {
+        name: (event.toolCall as { toolName: string }).toolName,
+        durationMs: event.durationMs,
+        success: event.success,
+      }
+      if (!event.success && event.error) {
+        execution.error = event.error instanceof Error ? event.error.message : String(event.error)
+      }
+      state.toolExecutions.push(execution)
+    }
+
+    onFinish(_event: OnFinishEvent) {
+      if (state.generationStartTime) {
+        state.totalDurationMs = Date.now() - state.generationStartTime
+      }
+      flushState(log, state)
+    }
+  
+  }
+
+  return bindTelemetryIntegration(new EvlogIntegration())
 }

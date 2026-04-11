@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics).
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics, telemetry integration, cost estimation, embedding metadata).
 license: MIT
 metadata:
   author: HugoRCD
@@ -866,7 +866,9 @@ Works in all frameworks: Nuxt (`evlog` config), Nitro (`evlog()` module options)
 
 ## AI SDK Integration
 
-Capture token usage, tool calls, model info, and streaming metrics from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >= 6.0.0` as a peer dependency.
+Capture token usage, tool calls, model info, streaming metrics, tool execution timing, cost estimation, and embedding metadata from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >= 6.0.0` as a peer dependency.
+
+### Basic setup (middleware)
 
 ```typescript
 import { createAILogger } from 'evlog/ai'
@@ -877,22 +879,62 @@ const ai = createAILogger(log)
 const result = streamText({
   model: ai.wrap('anthropic/claude-sonnet-4.6'),  // accepts string or model object
   messages,
-  onFinish: ({ text }) => {
-    // User callbacks remain free — no conflict
+})
+```
+
+`ai.wrap()` uses model middleware to transparently capture all LLM calls. Works with `generateText`, `streamText`, and `ToolLoopAgent`.
+
+### Telemetry integration (deeper observability)
+
+For tool execution timing, success/failure tracking, and total generation wall time, add `createEvlogIntegration()`:
+
+```typescript
+import { createAILogger, createEvlogIntegration } from 'evlog/ai'
+
+const ai = createAILogger(log)
+
+const agent = new ToolLoopAgent({
+  model: ai.wrap('anthropic/claude-sonnet-4.6'),
+  tools: { searchWeb, queryDatabase },
+  stopWhen: stepCountIs(5),
+  experimental_telemetry: {
+    isEnabled: true,
+    integrations: [createEvlogIntegration(ai)],
   },
 })
 ```
 
-`ai.wrap()` uses model middleware to transparently capture all LLM calls. Works with `generateText`, `streamText`, `generateObject`, `streamObject`, and `ToolLoopAgent`.
+This adds `ai.tools` (per-tool `{ name, durationMs, success, error? }`) and `ai.totalDurationMs` to the wide event.
 
-For embeddings (different model type):
+### Embeddings
 
 ```typescript
 const { embedding, usage } = await embed({ model: embeddingModel, value: query })
-ai.captureEmbed({ usage })
+ai.captureEmbed({ usage, model: 'text-embedding-3-small', dimensions: 1536 })
 ```
 
-Wide event `ai` field includes: `calls`, `model`, `provider`, `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadTokens`, `reasoningTokens`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`, `error`.
+For `embedMany`, pass the batch count:
+
+```typescript
+ai.captureEmbed({ usage, model: 'text-embedding-3-small', count: documents.length })
+```
+
+### Cost estimation
+
+Pass a pricing map to get `ai.estimatedCost` in the wide event:
+
+```typescript
+const ai = createAILogger(log, {
+  cost: {
+    'claude-sonnet-4.6': { input: 3, output: 15 },
+    'gpt-4o': { input: 2.5, output: 10 },
+  },
+})
+```
+
+### Wide event `ai` field
+
+Includes: `calls`, `model`, `provider`, `inputTokens`, `outputTokens`, `totalTokens`, `cacheReadTokens`, `reasoningTokens`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`, `error`, `tools` (via telemetry integration), `totalDurationMs` (via telemetry integration), `embedding` (via `captureEmbed`), `estimatedCost` (via `cost` option).
 
 Anti-patterns to detect:
 
@@ -901,6 +943,8 @@ Anti-patterns to detect:
 | Manual token tracking in `onFinish` | `ai.wrap()` — middleware captures automatically |
 | `console.log('tokens:', result.usage)` | `ai.wrap()` — structured `ai.*` fields in wide event |
 | No AI observability | Add `createAILogger(log)` + `ai.wrap()` |
+| No tool execution timing | Add `createEvlogIntegration(ai)` to `experimental_telemetry.integrations` |
+| Manual cost calculation | Use `cost` option in `createAILogger()` |
 
 ---
 

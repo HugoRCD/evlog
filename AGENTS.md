@@ -139,11 +139,32 @@ export default defineEventHandler(async (event) => {
 })
 ```
 
+For deeper observability (tool execution timing, total generation wall time), add `createEvlogIntegration()`:
+
+```typescript
+import { createAILogger, createEvlogIntegration } from 'evlog/ai'
+
+const ai = createAILogger(log, {
+ cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+})
+
+const agent = new ToolLoopAgent({
+ model: ai.wrap('anthropic/claude-sonnet-4.6'),
+ tools: { searchWeb, queryDatabase },
+ experimental_telemetry: {
+ isEnabled: true,
+ integrations: [createEvlogIntegration(ai)],
+ },
+})
+```
+
+This adds `ai.tools` (per-tool `{ name, durationMs, success, error? }`), `ai.totalDurationMs`, and `ai.estimatedCost` to the wide event.
+
 For embedding calls, use `captureEmbed`:
 
 ```typescript
 const { embedding, usage } = await embed({ model: embeddingModel, value: query })
-ai.captureEmbed({ usage })
+ai.captureEmbed({ usage, model: 'text-embedding-3-small', dimensions: 1536 })
 ```
 
 ### Structured Errors

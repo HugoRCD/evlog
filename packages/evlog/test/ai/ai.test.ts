@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LanguageModelV3, LanguageModelV3StreamPart } from '@ai-sdk/provider'
 import type { RequestLogger } from '../../src/types'
-import { createAILogger, createAIMiddleware } from '../../src/ai'
+import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
 
 function createMockLogger(): RequestLogger & { setCalls: Array<Record<string, unknown>> } {
   const setCalls: Array<Record<string, unknown>> = []
@@ -1244,6 +1244,310 @@ describe('createAILogger', () => {
       expect(aiData.calls).toBe(1)
       expect(aiData.toolCalls).toEqual([{ name: 'search', input: { q: 'test' } }])
       expect(aiData.responseId).toBe('msg_abc')
+    })
+  })
+
+  describe('captureEmbed v2', () => {
+    it('captures embedding model info', () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+
+      ai.captureEmbed({ usage: { tokens: 500 }, model: 'text-embedding-3-small', dimensions: 1536 })
+
+      const aiData = log.setCalls[0].ai as Record<string, unknown>
+      expect(aiData.calls).toBe(1)
+      expect(aiData.inputTokens).toBe(500)
+      expect(aiData.embedding).toEqual({
+        tokens: 500,
+        model: 'text-embedding-3-small',
+        dimensions: 1536,
+      })
+    })
+
+    it('captures embedMany count', () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+
+      ai.captureEmbed({ usage: { tokens: 2000 }, model: 'text-embedding-3-small', count: 10 })
+
+      const aiData = log.setCalls[0].ai as Record<string, unknown>
+      const embedding = aiData.embedding as Record<string, unknown>
+      expect(embedding.count).toBe(10)
+      expect(embedding.tokens).toBe(2000)
+    })
+
+    it('accumulates multiple embed calls', () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+
+      ai.captureEmbed({ usage: { tokens: 100 }, model: 'text-embedding-3-small', dimensions: 1536, count: 5 })
+      ai.captureEmbed({ usage: { tokens: 200 }, count: 10 })
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.calls).toBe(2)
+      const embedding = aiData.embedding as Record<string, unknown>
+      expect(embedding.tokens).toBe(300)
+      expect(embedding.model).toBe('text-embedding-3-small')
+      expect(embedding.dimensions).toBe(1536)
+      expect(embedding.count).toBe(15)
+    })
+
+    it('is backward compatible with basic usage', () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+
+      ai.captureEmbed({ usage: { tokens: 100 } })
+
+      const aiData = log.setCalls[0].ai as Record<string, unknown>
+      expect(aiData.calls).toBe(1)
+      expect(aiData.inputTokens).toBe(100)
+      expect(aiData.embedding).toEqual({ tokens: 100 })
+    })
+  })
+
+  describe('cost estimation', () => {
+    it('computes estimatedCost from pricing map', async () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log, {
+        cost: {
+          'claude-sonnet-4.6': { input: 3, output: 15 },
+        },
+      })
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        content: [],
+        finishReason: createFinishReason(),
+        usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
+        response: { modelId: 'claude-sonnet-4.6' },
+      })
+
+      await wrappedModel.doGenerate({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      // 1M input * $3/1M = $3 + 500K output * $15/1M = $7.5 => $10.5
+      expect(aiData.estimatedCost).toBe(10.5)
+    })
+
+    it('omits estimatedCost when model not in pricing map', async () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log, {
+        cost: {
+          'gpt-4o': { input: 2.5, output: 10 },
+        },
+      })
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        content: [],
+        finishReason: createFinishReason(),
+        usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+        response: { modelId: 'claude-sonnet-4.6' },
+      })
+
+      await wrappedModel.doGenerate({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.estimatedCost).toBeUndefined()
+    })
+
+    it('omits estimatedCost when no pricing map provided', async () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        content: [],
+        finishReason: createFinishReason(),
+        usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+        response: { modelId: 'claude-sonnet-4.6' },
+      })
+
+      await wrappedModel.doGenerate({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.estimatedCost).toBeUndefined()
+    })
+  })
+
+  describe('createEvlogIntegration', () => {
+    it('returns a valid TelemetryIntegration', () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      expect(integration).toBeDefined()
+      expect(integration.onStart).toBeTypeOf('function')
+      expect(integration.onToolCallFinish).toBeTypeOf('function')
+      expect(integration.onFinish).toBeTypeOf('function')
+    })
+
+    it('captures tool execution timing and success', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({
+        model: { provider: 'anthropic', modelId: 'claude-sonnet-4.6' },
+      } as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+        durationMs: 150,
+        success: true,
+        output: { temperature: 22 },
+      } as any)
+
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const tools = aiData.tools as Array<Record<string, unknown>>
+      expect(tools).toHaveLength(1)
+      expect(tools[0]).toEqual({
+        name: 'getWeather',
+        durationMs: 150,
+        success: true,
+      })
+      expect(aiData.totalDurationMs).toBeTypeOf('number')
+      expect(aiData.totalDurationMs).toBeGreaterThanOrEqual(0)
+    })
+
+    it('captures tool execution errors', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({} as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'searchDB', toolCallId: 'tc2', input: {} },
+        durationMs: 50,
+        success: false,
+        error: new Error('Connection refused'),
+      } as any)
+
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const tools = aiData.tools as Array<Record<string, unknown>>
+      expect(tools).toHaveLength(1)
+      expect(tools[0]).toEqual({
+        name: 'searchDB',
+        durationMs: 50,
+        success: false,
+        error: 'Connection refused',
+      })
+    })
+
+    it('captures multiple tool executions', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({} as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+        durationMs: 100,
+        success: true,
+        output: {},
+      } as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'searchDB', toolCallId: 'tc2', input: {} },
+        durationMs: 250,
+        success: true,
+        output: {},
+      } as any)
+
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const tools = aiData.tools as Array<Record<string, unknown>>
+      expect(tools).toHaveLength(2)
+      expect(tools[0].name).toBe('getWeather')
+      expect(tools[1].name).toBe('searchDB')
+    })
+
+    it('shares state with AILogger when passed AILogger', async () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+      const integration = createEvlogIntegration(ai)
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'getWeather', input: '{}' }],
+        finishReason: createFinishReason('tool-calls'),
+        usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
+        response: { modelId: 'claude-sonnet-4.6' },
+      })
+
+      integration.onStart!({} as any)
+      await wrappedModel.doGenerate({} as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+        durationMs: 75,
+        success: true,
+        output: { temp: 20 },
+      } as any)
+
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.calls).toBe(1)
+      expect(aiData.model).toBe('claude-sonnet-4.6')
+      expect(aiData.inputTokens).toBe(200)
+      expect(aiData.outputTokens).toBe(100)
+      const tools = aiData.tools as Array<Record<string, unknown>>
+      expect(tools).toHaveLength(1)
+      expect(tools[0].name).toBe('getWeather')
+      expect(tools[0].durationMs).toBe(75)
+      expect(aiData.totalDurationMs).toBeTypeOf('number')
+    })
+
+    it('computes totalDurationMs from onStart to onFinish', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({} as any)
+      await new Promise(resolve => setTimeout(resolve, 20))
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.totalDurationMs).toBeTypeOf('number')
+      expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
+    })
+
+    it('handles string errors from tool execution', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({} as any)
+
+      integration.onToolCallFinish!({
+        toolCall: { toolName: 'myTool', toolCallId: 'tc1', input: {} },
+        durationMs: 10,
+        success: false,
+        error: 'Something went wrong',
+      } as any)
+
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const tools = aiData.tools as Array<Record<string, unknown>>
+      expect(tools[0].error).toBe('Something went wrong')
+    })
+
+    it('omits tools field when no tool executions', async () => {
+      const log = createMockLogger()
+      const integration = createEvlogIntegration(log)
+
+      integration.onStart!({} as any)
+      integration.onFinish!({} as any)
+
+      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      expect(aiData.tools).toBeUndefined()
     })
   })
 })

@@ -237,12 +237,10 @@ function formatValue(value: unknown): string {
     return String(value)
   }
   if (typeof value === 'object') {
-    // Flatten object to key=value pairs
     const pairs: string[] = []
     for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
       if (v !== undefined && v !== null) {
         if (typeof v === 'object') {
-          // For nested objects, show as JSON
           pairs.push(`${k}=${JSON.stringify(v)}`)
         } else {
           pairs.push(`${k}=${v}`)
@@ -252,6 +250,136 @@ function formatValue(value: unknown): string {
     return pairs.join(' ')
   }
   return String(value)
+}
+
+function formatCost(cost: number): string {
+  if (cost < 0.01) return `$${cost.toFixed(6)}`
+  if (cost < 1) return `$${cost.toFixed(4)}`
+  return `$${cost.toFixed(2)}`
+}
+
+interface TreeEntry {
+  key: string
+  value: string
+  children?: string[]
+}
+
+function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
+  const entries: TreeEntry[] = []
+
+  // Header
+  const headerParts: string[] = []
+  if (ai.model) {
+    let m = String(ai.model)
+    if (ai.provider) m += ` (${ai.provider})`
+    headerParts.push(m)
+  }
+  if (ai.calls) headerParts.push(`${ai.calls} call${(ai.calls as number) > 1 ? 's' : ''}`)
+  if (ai.steps && (ai.steps as number) > 1) headerParts.push(`${ai.steps} steps`)
+  entries.push({ key: 'ai', value: headerParts.join(' · ') })
+
+  // Tokens
+  const inputTokens = ai.inputTokens as number | undefined
+  const outputTokens = ai.outputTokens as number | undefined
+  const totalTokens = ai.totalTokens as number | undefined
+  if (inputTokens !== undefined && outputTokens !== undefined) {
+    let tokLine = `${inputTokens} in → ${outputTokens} out`
+    if (totalTokens) tokLine += ` (${totalTokens} total)`
+    const extras: string[] = []
+    if (ai.cacheReadTokens) extras.push(`${ai.cacheReadTokens} cache read`)
+    if (ai.cacheWriteTokens) extras.push(`${ai.cacheWriteTokens} cache write`)
+    if (ai.reasoningTokens) extras.push(`${ai.reasoningTokens} reasoning`)
+    if (extras.length) tokLine += ` · ${extras.join(' · ')}`
+    entries.push({ key: 'ai.tokens', value: tokLine })
+  }
+
+  // Streaming
+  const msFirst = ai.msToFirstChunk as number | undefined
+  const msFinish = ai.msToFinish as number | undefined
+  const tps = ai.tokensPerSecond as number | undefined
+  if (msFirst !== undefined || msFinish !== undefined) {
+    const parts: string[] = []
+    if (msFirst !== undefined) parts.push(`${formatDuration(msFirst)} to first chunk`)
+    if (msFinish !== undefined) parts.push(`${formatDuration(msFinish)} total`)
+    let streamLine = parts.join(' → ')
+    if (tps) streamLine += ` · ${tps} tok/s`
+    entries.push({ key: 'ai.streaming', value: streamLine })
+  }
+
+  // Cost
+  if (ai.estimatedCost !== undefined) {
+    entries.push({ key: 'ai.cost', value: formatCost(ai.estimatedCost as number) })
+  }
+
+  // Total duration
+  if (ai.totalDurationMs !== undefined) {
+    entries.push({ key: 'ai.totalDuration', value: formatDuration(ai.totalDurationMs as number) })
+  }
+
+  // Tools — merged from toolCalls (middleware) + tools (telemetry)
+  const toolCalls = ai.toolCalls as unknown[] | undefined
+  const tools = ai.tools as Array<{ name: string, durationMs: number, success: boolean, error?: string }> | undefined
+  const hasInputs = toolCalls?.length ? typeof toolCalls[0] === 'object' : false
+
+  if (tools?.length) {
+    const children = tools.map((t, idx) => {
+      const mark = t.success ? '✓' : '✗'
+      let line = `${t.name} ${formatDuration(t.durationMs)} ${mark}`
+      if (t.error) line += ` ${t.error}`
+      if (hasInputs && toolCalls && idx < toolCalls.length) {
+        const tc = toolCalls[idx] as { input: unknown }
+        const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+        const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
+        line += ` ${truncated}`
+      }
+      return line
+    })
+    entries.push({ key: 'ai.tools', value: '', children })
+  } else if (toolCalls?.length) {
+    if (hasInputs) {
+      const children = (toolCalls as Array<{ name: string, input: unknown }>).map((tc) => {
+        const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+        const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
+        return `${tc.name}(${truncated})`
+      })
+      entries.push({ key: 'ai.tools', value: '', children })
+    } else {
+      entries.push({ key: 'ai.tools', value: (toolCalls as string[]).join(', ') })
+    }
+  }
+
+  // Steps
+  const stepsUsage = ai.stepsUsage as Array<Record<string, unknown>> | undefined
+  if (stepsUsage?.length) {
+    const allSameModel = stepsUsage.every(s => s.model === stepsUsage[0]!.model)
+    const children = stepsUsage.map((s) => {
+      const prefix = allSameModel ? '' : `${s.model} `
+      let line = `${prefix}${s.inputTokens} in → ${s.outputTokens} out`
+      const stepTools = s.toolCalls as string[] | undefined
+      if (stepTools?.length) line += ` [${stepTools.join(', ')}]`
+      return line
+    })
+    entries.push({ key: 'ai.steps', value: '', children })
+  } else if (ai.steps && (ai.steps as number) > 1) {
+    entries.push({ key: 'ai.steps', value: String(ai.steps) })
+  }
+
+  // Embedding
+  const embedding = ai.embedding as Record<string, unknown> | undefined
+  if (embedding) {
+    const parts: string[] = []
+    if (embedding.model) parts.push(String(embedding.model))
+    parts.push(`${embedding.tokens} tokens`)
+    if (embedding.dimensions) parts.push(`${embedding.dimensions}d`)
+    if (embedding.count) parts.push(`${embedding.count} items`)
+    entries.push({ key: 'ai.embedding', value: parts.join(' · ') })
+  }
+
+  if (ai.finishReason) entries.push({ key: 'ai.finishReason', value: String(ai.finishReason) })
+  if (ai.error) entries.push({ key: 'ai.error', value: String(ai.error) })
+  if (ai.responseId) entries.push({ key: 'ai.responseId', value: String(ai.responseId) })
+
+  return entries
 }
 
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
@@ -302,18 +430,47 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
 
   console.log(parts.join(''), ...styles)
 
-  const entries = Object.entries(rest).filter(([_, v]) => v !== undefined)
-  const lastIndex = entries.length - 1
+  const aiData = rest.ai as Record<string, unknown> | undefined
+  if (aiData && typeof aiData === 'object') {
+    delete rest.ai
+  }
 
-  entries.forEach(([key, value], index) => {
-    const prefix = index === lastIndex ? '└─' : '├─'
-    const val = formatValue(value)
+  const restEntries = Object.entries(rest).filter(([_, v]) => v !== undefined)
+  const aiEntries = aiData ? buildAIEntries(aiData) : []
+  const allEntries: TreeEntry[] = [
+    ...restEntries.map(([key, value]) => ({ key, value: formatValue(value) })),
+    ...aiEntries,
+  ]
+
+  for (let i = 0; i < allEntries.length; i++) {
+    const entry = allEntries[i]!
+    const hasChildren = entry.children && entry.children.length > 0
+    const isLast = i === allEntries.length - 1 && !hasChildren
+    const prefix = isLast ? '└─' : '├─'
+
     if (browser) {
-      console.log(`  %c${prefix}%c %c${escapeFormatString(key)}:%c ${escapeFormatString(val)}`, cssColors.dim, cssColors.reset, cssColors.cyan, cssColors.reset)
+      const val = entry.value ? ` ${escapeFormatString(entry.value)}` : ''
+      console.log(`  %c${prefix}%c %c${escapeFormatString(entry.key)}:%c${val}`, cssColors.dim, cssColors.reset, cssColors.cyan, cssColors.reset)
     } else {
-      console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${key}:${colors.reset} ${val}`)
+      const val = entry.value ? ` ${entry.value}` : ''
+      console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${entry.key}:${colors.reset}${val}`)
     }
-  })
+
+    if (hasChildren) {
+      const isLastEntry = i === allEntries.length - 1
+      const connector = isLastEntry ? ' ' : '│'
+      for (let j = 0; j < entry.children!.length; j++) {
+        const child = entry.children![j]!
+        const isLastChild = j === entry.children!.length - 1
+        const childPrefix = isLastChild ? '└─' : '├─'
+        if (browser) {
+          console.log(`  %c${connector}  ${childPrefix}%c ${escapeFormatString(child)}`, cssColors.dim, cssColors.reset)
+        } else {
+          console.log(`  ${colors.dim}${connector}  ${childPrefix}${colors.reset} ${child}`)
+        }
+      }
+    }
+  }
 }
 
 function createLogMethod(level: LogLevel) {

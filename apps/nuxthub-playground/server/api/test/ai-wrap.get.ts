@@ -1,6 +1,6 @@
 import { gateway, generateText, wrapLanguageModel } from 'ai'
 import type { LanguageModelV3Middleware } from '@ai-sdk/provider'
-import { createAILogger } from 'evlog/ai'
+import { createAILogger, createEvlogIntegration } from 'evlog/ai'
 
 /**
  * Simulates an external middleware (supermemory, guardrails, etc.)
@@ -23,7 +23,12 @@ export default defineEventHandler(async (event) => {
   const logger = useLogger(event)
   logger.set({ action: 'test-ai-wrap-composition' })
 
-  const ai = createAILogger(logger, { toolInputs: true })
+  const ai = createAILogger(logger, {
+    toolInputs: true,
+    cost: {
+      'gemini-3-flash': { input: 0.1, output: 0.4 },
+    },
+  })
 
   const base = gateway('google/gemini-3-flash')
   const preWrapped = wrapLanguageModel({ model: base, middleware: externalMiddleware })
@@ -33,6 +38,10 @@ export default defineEventHandler(async (event) => {
     model,
     prompt: 'Say hello.',
     maxOutputTokens: 200,
+    experimental_telemetry: {
+      isEnabled: true,
+      integrations: [createEvlogIntegration(ai)],
+    },
   })
 
   const middlewareRan = result.text.startsWith('MIDDLEWARE_OK:')

@@ -1,5 +1,5 @@
 import { ToolLoopAgent, createAgentUIStreamResponse, stepCountIs } from 'ai'
-import { createAILogger } from 'evlog/ai'
+import { createAILogger, createEvlogIntegration } from 'evlog/ai'
 import { queryEvents } from '../tools/query-events'
 
 const systemPrompt = `You are a helpful assistant that analyzes application logs stored in a SQLite database.
@@ -63,7 +63,12 @@ export default defineEventHandler(async (event) => {
 
   logger.set({ action: 'chat', messagesCount: messages.length })
 
-  const ai = createAILogger(logger, { toolInputs: true })
+  const ai = createAILogger(logger, {
+    toolInputs: true,
+    cost: {
+      'gemini-3-flash': { input: 0.1, output: 0.4 },
+    },
+  })
 
   try {
     const agent = new ToolLoopAgent({
@@ -71,6 +76,10 @@ export default defineEventHandler(async (event) => {
       instructions: systemPrompt,
       tools: { queryEvents },
       stopWhen: stepCountIs(5),
+      experimental_telemetry: {
+        isEnabled: true,
+        integrations: [createEvlogIntegration(ai)],
+      },
     })
     return createAgentUIStreamResponse({
       agent,
