@@ -1,4 +1,5 @@
-import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import { redactEvent, resolveRedactConfig } from './redact'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, isLevelEnabled, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -33,6 +34,7 @@ let globalPretty = isDev()
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
+let globalRedact: RedactConfig | undefined
 let globalEnabled = true
 let globalSilent = false
 /** Minimum level for the global `log` API only (`ownsEvent === false`). Default: all levels. */
@@ -59,6 +61,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
+  globalRedact = resolveRedactConfig(config.redact ?? !isDev())
   globalSilent = config.silent ?? false
   globalMinLevel = config.minLevel ?? 'debug'
 
@@ -172,6 +175,10 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDra
       ...globalEnv,
       ...event,
     }
+  }
+
+  if (globalRedact) {
+    redactEvent(formatted, globalRedact)
   }
 
   if (!globalSilent) {

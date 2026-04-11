@@ -9,7 +9,7 @@ import {
   defineNuxtModule,
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
-import type { EnvironmentContext, LogLevel, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig, TransportConfig } from '../types'
 import { createStripPlugin } from '../vite/strip'
 import { createSourceLocationPlugin } from '../vite/source-location'
 import { name, version } from '../../package.json'
@@ -236,6 +236,26 @@ export interface ModuleOptions {
     /** Request timeout in milliseconds. Default: 5000 */
     timeout?: number
   }
+
+  /**
+   * Auto-redaction configuration for PII protection.
+   * `true` enables all built-in PII patterns (email, credit card, IPv4, phone, SSN).
+   * Pass an object for fine-grained control.
+   *
+   * @example
+   * ```ts
+   * // Enable all built-in PII patterns
+   * evlog: { redact: true }
+   *
+   * // Add custom paths on top of built-ins
+   * evlog: {
+   *   redact: {
+   *     paths: ['user.password', 'headers.authorization'],
+   *   }
+   * }
+   * ```
+   */
+  redact?: boolean | RedactConfig
 
   /**
    * Log levels to strip from production builds. Set to [] to disable.

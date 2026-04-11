@@ -979,6 +979,75 @@ export function maskCard(card: string): string {
 - [ ] PII is masked or omitted
 - [ ] Request bodies are selectively logged (not `log.set({ body })`)
 
+### Auto-Redaction (PII Protection)
+
+Built-in redaction scrubs sensitive data from wide events **before** console output and **before** any drain sees the data. **Enabled by default in production** (`NODE_ENV === 'production'`), disabled in development for full debugging visibility. Override with `redact: false` to disable or `redact: { ... }` for fine-grained control.
+
+**Built-in patterns** (enabled by default with `redact: true`) use **smart partial masking** — preserving enough context for debugging while protecting PII:
+
+| Name | Detects | Masked Output |
+|------|---------|---------------|
+| `creditCard` | Credit card numbers | `****1111` (last 4 digits) |
+| `email` | Email addresses | `a***@***.com` (first char + TLD) |
+| `ipv4` | IPv4 addresses (excludes 127.0.0.1, 0.0.0.0) | `***.***.***.1` (last octet) |
+| `phone` | International phone numbers | `+33 ****5678` (last 4 digits) |
+| `jwt` | JWT tokens (eyJhbG...) | `eyJ***.***` (prefix only) |
+| `bearer` | Bearer tokens (Bearer sk_live_...) | `Bearer ***` (type only) |
+| `iban` | International Bank Account Numbers | `FR76****189` (country + check + last 3) |
+
+Custom `patterns` still use the flat `replacement` string (default `[REDACTED]`).
+
+```typescript
+// Simplest: enable all built-in PII patterns
+evlog: { redact: true }
+
+// Add custom paths on top of built-ins
+evlog: {
+  redact: {
+    paths: ['user.password', 'headers.authorization'],
+  }
+}
+
+// Only specific built-ins
+evlog: {
+  redact: {
+    builtins: ['email', 'creditCard'],
+  }
+}
+
+// No built-ins, only custom
+evlog: {
+  redact: {
+    builtins: false,
+    paths: ['user.ssn'],
+    patterns: [/SECRET_\w+/g],
+  }
+}
+```
+
+```typescript
+// Standalone
+import { initLogger } from 'evlog'
+
+initLogger({ redact: true })
+```
+
+**Configuration:**
+
+| Field | Type | Default | Description |
+|-------|------|---------|-------------|
+| `redact` | `boolean \| RedactConfig` | `true` in production | Enabled by default in production. `false` to disable. Object for fine-grained control |
+| `paths` | `string[]` | `undefined` | Dot-notation paths to redact (e.g. `user.email`) |
+| `patterns` | `RegExp[]` | `undefined` | Additional regex patterns applied to all string values recursively (uses flat `replacement`) |
+| `builtins` | `false \| BuiltinPatternName[]` | all enabled | `false` disables built-ins; array selects specific ones (`'creditCard'`, `'email'`, `'ipv4'`, `'phone'`, `'jwt'`, `'bearer'`, `'iban'`) |
+| `replacement` | `string` | `'[REDACTED]'` | Replacement string for path-based and custom pattern redaction. Built-in patterns use smart partial masking instead |
+
+**Architecture:** Redaction runs inside `emitWideEvent()` after the `WideEvent` is built but before console output and `globalDrain`. This is the single chokepoint for all events. Framework middleware (`BaseEvlogOptions.redact`) also applies redaction before enrich/drain as a safety net.
+
+**Source:** `packages/evlog/src/redact.ts` — `redactEvent()` (path-based + masker-based + pattern-based), `resolveRedactConfig()` (resolves `true`/object into concrete config with `_maskers` for built-in smart masking), `normalizeRedactConfig()` (deserializes from JSON for Nitro env bridge).
+
+**Serialization note:** RegExp patterns from Nuxt config are serialized to JSON via `process.env.__EVLOG_CONFIG`. The Nitro plugin uses `normalizeRedactConfig()` to reconstruct RegExp instances from `{ source, flags }` objects or plain strings.
+
 ### Client-Side Logging
 
 The `log` API also works on the client side (auto-imported in Nuxt):

@@ -219,6 +219,10 @@ const result = streamText({
 
 No callback conflicts. No separate pipeline for AI observability.
 
+### PII auto-redaction, zero config
+
+Enabled by default in production. Credit cards become `****1111`, emails become `a***@***.com`, IPs, phone numbers, JWTs, IBANs — all smart-masked before your console or drain ever sees them. No flag to remember, no manual sanitize helpers, no forgotten fields leaking to Axiom. GDPR compliance shouldn't require a sprint.
+
 ### Head + tail sampling
 
 Drop 90% of `info` in prod, keep 100% of errors, force-keep anything slower than 1s. Two config blocks, no custom code. Stop storing noise and missing the incidents.

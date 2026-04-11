@@ -1,5 +1,6 @@
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
+import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
 import { createRequestLogger, getGlobalDrain, isEnabled, shouldKeep } from '../logger'
+import { redactEvent, resolveRedactConfig } from '../redact'
 import { extractErrorStatus } from './errors'
 import { shouldLog, getServiceForPath } from './routes'
 
@@ -34,6 +35,13 @@ export interface BaseEvlogOptions {
    * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
    */
   keep?: (ctx: TailSamplingContext) => void | Promise<void>
+  /**
+   * Auto-redaction configuration for PII protection.
+   * `true` enables all built-in PII patterns. Pass an object for fine-grained control.
+   * Applied before enrich/drain. Also applied at the core `emitWideEvent` level
+   * when configured via `initLogger()`.
+   */
+  redact?: boolean | RedactConfig
 }
 
 /**
@@ -78,6 +86,11 @@ async function runEnrichAndDrain(
   requestInfo: { method: string; path: string; requestId?: string },
   responseStatus?: number,
 ): Promise<void> {
+  const resolvedRedact = resolveRedactConfig(options.redact)
+  if (resolvedRedact) {
+    redactEvent(emittedEvent, resolvedRedact)
+  }
+
   if (options.enrich) {
     const enrichCtx: EnrichContext = {
       event: emittedEvent,

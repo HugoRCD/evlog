@@ -19,6 +19,7 @@ export type {
   LoggerConfig,
   LogLevel,
   ParsedError,
+  RedactConfig,
   RequestLogger,
   RequestLoggerOptions,
   SamplingConfig,

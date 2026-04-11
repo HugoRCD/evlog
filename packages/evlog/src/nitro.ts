@@ -1,4 +1,4 @@
-import type { EnvironmentContext, LogLevel, RouteConfig, SamplingConfig } from './types'
+import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig } from './types'
 import { extractErrorStatus } from './shared/errors'
 
 export { shouldLog, getServiceForPath } from './shared/routes'
@@ -60,6 +60,12 @@ export interface NitroModuleOptions {
    * @default 'debug'
    */
   minLevel?: LogLevel
+
+  /**
+   * Auto-redaction configuration for PII protection.
+   * `true` enables all built-in PII patterns. Pass an object for fine-grained control.
+   */
+  redact?: boolean | RedactConfig
 }
 
 export interface EvlogConfig {
@@ -72,6 +78,7 @@ export interface EvlogConfig {
   routes?: Record<string, RouteConfig>
   sampling?: SamplingConfig
   minLevel?: LogLevel
+  redact?: boolean | RedactConfig | Record<string, unknown>
 }
 
 /**

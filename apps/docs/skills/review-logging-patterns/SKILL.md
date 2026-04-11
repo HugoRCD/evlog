@@ -726,6 +726,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | `drain` | `(ctx) => void` | -- | Drain callback (Next.js, standalone) |
 | `enrich` | `(ctx) => void` | -- | Enrich callback (Next.js) |
 | `keep` | `(ctx) => void` | -- | Custom tail sampling callback (Next.js) |
+| `redact` | `boolean \| RedactConfig` | `true` in production | Enabled by default in production. `false` to disable. Object for fine-grained control |
 
 ### Nitro Hooks (Nuxt, Nitro v2/v3)
 
@@ -812,6 +813,54 @@ createEvlog({
   },
 })
 ```
+
+---
+
+## Auto-Redaction (PII Protection)
+
+Built-in redaction scrubs sensitive data from wide events **before** console output and **before** any drain sees the data. **Enabled by default in production** (`NODE_ENV === 'production'`), disabled in development. Uses **smart partial masking** — preserving enough context for debugging.
+
+```typescript
+// Disable in production (opt-out)
+evlog: { redact: false }
+
+// Add custom paths on top of built-ins
+evlog: {
+  redact: {
+    paths: ['user.password', 'headers.authorization'],
+  }
+}
+
+// Only specific built-ins
+evlog: {
+  redact: {
+    builtins: ['email', 'creditCard'],
+  }
+}
+
+// No built-ins, only custom (uses flat [REDACTED] replacement)
+evlog: {
+  redact: {
+    builtins: false,
+    paths: ['user.ssn'],
+    patterns: [/SECRET_\w+/g],
+  }
+}
+```
+
+**Built-in patterns** with smart masking output:
+
+| Pattern | Example Input | Masked Output |
+|---------|---------------|---------------|
+| `creditCard` | `4111111111111111` | `****1111` |
+| `email` | `alice@example.com` | `a***@***.com` |
+| `ipv4` | `192.168.1.100` | `***.***.***.100` |
+| `phone` | `+33 6 12 34 56 78` | `+33 ****5678` |
+| `jwt` | `eyJhbGciOi...` | `eyJ***.***` |
+| `bearer` | `Bearer sk_live_abc...` | `Bearer ***` |
+| `iban` | `FR76 3000 6000 ...189` | `FR76****189` |
+
+Works in all frameworks: Nuxt (`evlog` config), Nitro (`evlog()` module options), Next.js (`createEvlog()`), standalone (`initLogger()`), and all middleware integrations (Hono, Express, Fastify, Elysia, NestJS).
 
 ---
 
@@ -907,7 +956,7 @@ See [references/structured-errors.md](references/structured-errors.md) for commo
 | `console.error(e); throw e` | `log.error(e); throw createError(...)` |
 | No logging in request handlers | Add `useLogger(event)` / `useLogger()` / `createRequestLogger()` |
 | Flat log data `{ uid, n, t }` | Grouped objects: `{ user: {...}, cart: {...} }` |
-| Logging sensitive data `log.set({ user: body })` | Explicit fields: `{ user: { id: body.id, plan: body.plan } }` |
+| Logging sensitive data `log.set({ user: body })` | Explicit fields: `{ user: { id: body.id, plan: body.plan } }` + enable `redact: true` |
 | Putting support-only IDs in `why` / `message` | Use `createError({ ..., internal: { ... } })` for non-user-facing diagnostics |
 
 See [references/code-review.md](references/code-review.md) for the full checklist.

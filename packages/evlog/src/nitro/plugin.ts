@@ -7,6 +7,7 @@ import { defineNitroPlugin } from 'nitropack/runtime/internal/plugin'
 import { getHeaders } from 'h3'
 import { createRequestLogger, initLogger, isEnabled } from '../logger'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
+import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
 import type { EnrichContext, RequestLogger, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
@@ -108,6 +109,8 @@ async function callEnrichAndDrain(
 export default defineNitroPlugin(async (nitroApp) => {
   const evlogConfig = await resolveEvlogConfigForNitroPlugin()
 
+  const redact = normalizeRedactConfig(evlogConfig?.redact as boolean | Record<string, unknown> | undefined)
+
   initLogger({
     enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
@@ -115,6 +118,7 @@ export default defineNitroPlugin(async (nitroApp) => {
     silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
     minLevel: evlogConfig?.minLevel,
+    redact,
     _suppressDrainWarning: true,
   })
 

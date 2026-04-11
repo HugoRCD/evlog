@@ -14,6 +14,7 @@ export default defineNuxtConfig({
     transport: {
       enabled: true,
     },
+    redact: true,
     routes: {
       '/api/auth/**': { service: 'auth-service' },
       '/api/payment/**': { service: 'payment-service' },

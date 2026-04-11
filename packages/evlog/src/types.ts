@@ -91,6 +91,37 @@ export interface IngestPayload {
 }
 
 /**
+ * Auto-redaction configuration for PII protection.
+ * Scrubs sensitive data from wide events before console output and draining.
+ *
+ * Built-in patterns are included by default. Opt out with `builtins: false`
+ * or select specific ones with `builtins: ['email', 'creditCard']`.
+ */
+export interface RedactConfig {
+  /** Dot-notation paths to redact (e.g., 'user.email', 'headers.x-forwarded-for') */
+  paths?: string[]
+  /** Additional regex patterns to match and replace string values anywhere in the event */
+  patterns?: RegExp[]
+  /**
+   * Control built-in PII patterns.
+   * - `undefined` / omitted → all built-ins enabled (default)
+   * - `false` → no built-ins, only custom `paths`/`patterns`
+   * - `['email', 'creditCard', ...]` → only the listed built-ins
+   *
+   * Available: `'creditCard'`, `'email'`, `'ipv4'`, `'phone'`, `'jwt'`, `'bearer'`, `'iban'`
+   */
+  builtins?: false | Array<'creditCard' | 'email' | 'ipv4' | 'phone' | 'jwt' | 'bearer' | 'iban'>
+  /**
+   * Replacement string used for path-based and custom pattern redaction.
+   * Built-in patterns use smart partial masking instead (e.g. `****1111` for credit cards).
+   * @default '[REDACTED]'
+   */
+  replacement?: string
+  /** @internal Resolved masker functions from built-in patterns. Not user-facing. */
+  _maskers?: Array<[RegExp, (match: string) => string]>
+}
+
+/**
  * Sampling rates per log level (0-100 percentage)
  */
 export interface SamplingRates {
@@ -283,6 +314,38 @@ export interface LoggerConfig {
    * @default false
    */
   silent?: boolean
+  /**
+   * Auto-redaction configuration for PII protection.
+   * Scrubs sensitive data from wide events before console output and before any drain.
+   *
+   * - `true` → enable with all built-in patterns (email, credit card, IPv4, phone, JWT, Bearer, IBAN)
+   * - `{ paths, patterns, builtins }` → fine-grained control
+   * - `false` → explicitly disable redaction
+   *
+   * @default true in production, false in development
+   *
+   * @example
+   * ```ts
+   * // Disable in production
+   * initLogger({ redact: false })
+   *
+   * // With custom paths on top of built-ins
+   * initLogger({
+   *   redact: {
+   *     paths: ['user.password', 'headers.authorization'],
+   *   },
+   * })
+   *
+   * // Only specific built-ins + custom patterns
+   * initLogger({
+   *   redact: {
+   *     builtins: ['email', 'creditCard'],
+   *     patterns: [/SECRET_\w+/g],
+   *   },
+   * })
+   * ```
+   */
+  redact?: boolean | RedactConfig
   /**
    * Drain callback called with every emitted event (fire-and-forget).
    * Use this to send logs to external services outside of Nitro.
