@@ -1,5 +1,23 @@
 # evlog
 
+## 2.12.0
+
+### Minor Changes
+
+- [#272](https://github.com/HugoRCD/evlog/pull/272) [`2b5c8a4`](https://github.com/HugoRCD/evlog/commit/2b5c8a44de2aaeb38b3c9dbb5883e90f88b607b7) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add AI SDK telemetry integration (`createEvlogIntegration`), cost estimation, and enriched embedding capture. `createEvlogIntegration()` implements the AI SDK's `TelemetryIntegration` interface to capture per-tool execution timing/success/errors and total generation wall time. Cost estimation computes `ai.estimatedCost` from a user-provided pricing map. `captureEmbed` now accepts model ID, dimensions, and batch count for richer embedding observability.
+
+- [#271](https://github.com/HugoRCD/evlog/pull/271) [`583fab4`](https://github.com/HugoRCD/evlog/commit/583fab4ccd739bb735ad8e816d3bb397f6d08144) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add auto-redaction (PII protection) with smart partial masking, enabled by default in production (`NODE_ENV === 'production'`). Built-in patterns (credit card, email, IPv4, phone, JWT, Bearer, IBAN) use context-preserving masks (e.g. `****1111`, `a***@***.com`) instead of flat `[REDACTED]`. Disabled in development for full debugging visibility. Fine-tune with `paths`, `patterns`, and `builtins`, or opt out with `redact: false`. Custom patterns use the configurable `replacement` string. Redaction runs before console output and before any drain sees the data.
+
+- [#269](https://github.com/HugoRCD/evlog/pull/269) [`037dc81`](https://github.com/HugoRCD/evlog/commit/037dc8115001de081c0b524320cafc414346c25c) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/http` as the canonical HTTP ingest drain (`createHttpDrain`, `createHttpLogDrain`, `HttpDrainConfig`). Deprecate `evlog/browser`; it re-exports the same API and will be removed in the next **major** release.
+
+- [#266](https://github.com/HugoRCD/evlog/pull/266) [`3898a3f`](https://github.com/HugoRCD/evlog/commit/3898a3f0972d21e21cded7dcdcb33e47869002cd) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `minLevel` for a deterministic severity threshold on the global `log` API and client `initLog`, plus `setMinLevel()` for runtime toggling in the browser. Orthogonal to probabilistic `sampling.rates`; request wide events from `useLogger` / `createLogger().emit()` are unchanged. Includes `isLevelEnabled()` helper and wiring for Nuxt, Vite, and Next.js.
+
+  **2026-04-11** — Playground: interactive panel to try client `minLevel` / `setMinLevel` and trigger logs per level.
+
+### Patch Changes
+
+- [#270](https://github.com/HugoRCD/evlog/pull/270) [`79cb4a4`](https://github.com/HugoRCD/evlog/commit/79cb4a4e6a9300df2758f62ad1dda4794f9b4f05) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add an [AWS Lambda](https://www.evlog.dev/frameworks/aws-lambda) guide to the documentation site (`initLogger` once, `createLogger` per invocation, manual `emit`).
+
 ## 2.11.1
 
 ### Patch Changes
