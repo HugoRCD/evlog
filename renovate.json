@@ -3,6 +3,9 @@
   "extends": [
     "github>nuxt/renovate-config-nuxt"
   ],
+  "ignoreDeps": [
+    "bun"
+  ],
   "schedule": ["before 3am on Monday"],
   "timezone": "UTC",
   "packageRules": [

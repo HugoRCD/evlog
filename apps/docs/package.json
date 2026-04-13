@@ -11,7 +11,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/content": "^3.13.0",
+    "@nuxt/content": "^3.12.0",
     "@nuxt/fonts": "0.14.0",
     "@nuxt/ui": "^4.6.1",
     "@vercel/analytics": "^2.0.1",
