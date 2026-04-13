@@ -12,11 +12,11 @@
   },
   "dependencies": {
     "@comark/nuxt": "^0.2.1",
-    "@nuxt/content": "^3.12.0",
+    "@nuxt/content": "^3.13.0",
     "@nuxt/ui": "^4.6.1",
     "@nuxtjs/sitemap": "^8.0.12",
     "@vercel/analytics": "^2.0.1",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.9.0",
     "minimark": "^1.0.0",
     "nuxt": "^4.4.2",
     "shiki": "4.0.2",

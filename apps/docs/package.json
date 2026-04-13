@@ -11,18 +11,18 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/content": "^3.12.0",
+    "@nuxt/content": "^3.13.0",
     "@nuxt/fonts": "0.14.0",
     "@nuxt/ui": "^4.6.1",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "better-sqlite3": "^12.8.0",
+    "better-sqlite3": "^12.9.0",
     "docus": "^5.9.0",
-    "motion-v": "^2.2.0",
+    "motion-v": "^2.2.1",
     "nuxt": "^4.4.2",
     "nuxt-studio": "^1.6.0",
     "vaul-vue": "0.4.1",
-    "shaders": "^2.5.92",
+    "shaders": "^2.5.93",
     "zod": "^4.3.6",
     "zod-to-json-schema": "^3.25.2"
   },
