@@ -200,6 +200,7 @@
       "types": "./dist/orpc/index.d.mts",
       "import": "./dist/orpc/index.mjs",
       "default": "./dist/orpc/index.mjs"
+    },
     "./better-auth": {
       "types": "./dist/better-auth/index.d.mts",
       "import": "./dist/better-auth/index.mjs",
@@ -308,6 +309,7 @@
       ],
       "orpc": [
         "./dist/orpc/index.d.mts"
+      ],
       "better-auth": [
         "./dist/better-auth/index.d.mts"
       ]
@@ -381,7 +383,7 @@
     "ai": ">=6.0.154",
     "@tanstack/start-client-core": "^1.167.9",
     "@trpc/server": ">=11.0.0",
-    "@orpc/server": "^1.0.0"
+    "@orpc/server": "^1.0.0",
     "better-auth": ">=1.2.0"
   },
   "peerDependenciesMeta": {
