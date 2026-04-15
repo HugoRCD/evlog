@@ -1,15 +1,15 @@
 import { initTRPC } from '@trpc/server'
 import type { RequestLogger } from 'evlog'
-import { useLogger } from 'evlog/next'
-import { createEvlogMiddleware } from 'evlog/trpc'
+import { useLogger as useHttpLogger } from 'evlog/next'
+import { createEvlogMiddleware, useLogger } from 'evlog/trpc'
 import { z } from 'zod'
 
-// Context: useLogger() from evlog/next reads from evlogStorage populated by withEvlog()
+// createContext runs before tRPC middleware — must use the HTTP-level logger from withEvlog()
 type Context = { role: 'user'; log: RequestLogger }
 
 export const createContext = async (): Promise<Context> => ({
   role: 'user',
-  log: useLogger(),
+  log: useHttpLogger(),
 })
 
 const t = initTRPC.context<Context>().create()

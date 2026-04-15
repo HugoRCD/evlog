@@ -1,4 +1,6 @@
 import type { RequestLogger } from '../types'
+import { createRequestLogger } from '../logger'
+import { formatDuration } from '../utils'
 import { createLoggerStorage } from '../shared/storage'
 
 const CONTEXT_ERROR = `[evlog/trpc] useLogger() was called outside of an evlog request context.
@@ -30,14 +32,43 @@ export function createEvlogMiddleware() {
       throw new Error(CONTEXT_ERROR)
     }
 
-    log.set({ procedure: opts.path, type: opts.type })
+    const parentContext = log.getContext()
+    const isBatched = String(parentContext.path ?? '').split('/').pop()?.includes(',') ?? false
 
-    // Run next() inside storage so useLogger() works inside procedures
-    const result = await storage.run(log, () => opts.next())
+    if (!isBatched) {
+      // Single procedure: set context at root level on the HTTP logger (original behavior)
+      log.set({ procedure: opts.path, type: opts.type })
+      const result = await storage.run(log, () => opts.next())
+      if (!result.ok) {
+        log.error(result.error, { procedure: opts.path })
+      }
+      log.set({ ok: result.ok })
+      return result
+    }
+
+    // Batch: create an isolated logger per procedure, accumulate into procedures[]
+    const procedureLog = createRequestLogger(
+      {
+        method: parentContext.method as string,
+        path: parentContext.path as string,
+        requestId: parentContext.requestId as string,
+      },
+      { _deferDrain: true },
+    )
+    procedureLog.set({ procedure: opts.path, type: opts.type })
+
+    const start = Date.now()
+    const result = await storage.run(procedureLog, () => opts.next())
+    const duration = formatDuration(Date.now() - start)
 
     if (!result.ok) {
-      log.error(result.error, { procedure: opts.path })
+      procedureLog.error(result.error, { procedure: opts.path })
     }
+    procedureLog.set({ ok: result.ok })
+
+    const { method: _m, path: _p, requestId: _r, ...procedureCtx } = procedureLog.getContext() as Record<string, unknown>
+    const existing = (log.getContext().procedures as Record<string, unknown> | undefined) ?? {}
+    log.set({ procedures: { ...existing, [opts.path]: procedureCtx } } as Record<string, unknown>)
 
     return result
   }

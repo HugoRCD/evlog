@@ -19,7 +19,7 @@ describe('evlog/trpc', () => {
 
   describe('createEvlogMiddleware', () => {
     it('procedure exitoso — llama log.set con procedure y type, no llama log.error', async () => {
-      const mockLog = { set: vi.fn(), error: vi.fn() } as unknown as RequestLogger
+      const mockLog = { set: vi.fn(), error: vi.fn(), getContext: vi.fn(() => ({ path: '/trpc/user.getById' })) } as unknown as RequestLogger
       mockStorageRun.mockImplementation((_log: unknown, fn: () => unknown) => fn())
 
       const middleware = createEvlogMiddleware()
@@ -35,7 +35,7 @@ describe('evlog/trpc', () => {
     })
 
     it('procedure con error — llama log.error con el error', async () => {
-      const mockLog = { set: vi.fn(), error: vi.fn() } as unknown as RequestLogger
+      const mockLog = { set: vi.fn(), error: vi.fn(), getContext: vi.fn(() => ({ path: '/trpc/user.getById' })) } as unknown as RequestLogger
       mockStorageRun.mockImplementation((_log: unknown, fn: () => unknown) => fn())
 
       const error = new Error('not found')
