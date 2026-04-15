@@ -19,6 +19,8 @@ function mergeInto(target: Record<string, unknown>, source: Record<string, unkno
     const targetVal = target[key]
     if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
       mergeInto(targetVal, sourceVal)
+    } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
+      target[key] = [...targetVal, ...sourceVal]
     } else {
       target[key] = sourceVal
     }

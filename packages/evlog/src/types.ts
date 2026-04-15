@@ -466,7 +466,10 @@ export type FieldContext<T extends object = Record<string, unknown>> =
  */
 export interface RequestLogger<T extends object = Record<string, unknown>> {
   /**
-   * Add context to the wide event (deep merge via defu)
+   * Add context to the wide event. Plain objects are merged recursively.
+   * When both the existing and incoming values for a key are arrays, elements are
+   * concatenated (existing order preserved, new elements appended). Otherwise the
+   * new value replaces the old one (including when only one side is an array).
    */
   set: (context: FieldContext<T>) => void
 
