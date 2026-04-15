@@ -1,5 +1,6 @@
 import type { FastifyPluginCallback } from 'fastify'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeNodeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
 
@@ -30,18 +31,21 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
     const headers = extractSafeNodeHeaders(request.headers)
     const path = new URL(request.url, 'http://localhost').pathname
 
-    const { logger, finish, skipped } = createMiddlewareLogger({
+    const middlewareOpts = {
       method: request.method,
       path,
       requestId: headers['x-request-id'] || crypto.randomUUID(),
       headers,
       ...options,
-    })
+    }
+    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       done()
       return
     }
+
+    attachForkToLogger(storage, logger, middlewareOpts)
 
     // Shadow Fastify's built-in pino logger with evlog's request-scoped logger
     const req = request as any

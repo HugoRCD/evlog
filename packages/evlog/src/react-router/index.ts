@@ -1,6 +1,7 @@
 import { createContext } from 'react-router'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
 
@@ -47,18 +48,20 @@ export function evlog(options: EvlogReactRouterOptions = {}) {
     next: () => Promise<Response>,
   ): Promise<Response> => {
     const url = new URL(request.url)
-    const { logger, finish, skipped } = createMiddlewareLogger({
+    const middlewareOpts = {
       method: request.method,
       path: url.pathname,
       requestId: request.headers.get('x-request-id') || crypto.randomUUID(),
       headers: extractSafeHeaders(request.headers),
       ...options,
-    })
+    }
+    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       return next()
     }
 
+    attachForkToLogger(storage, logger, middlewareOpts)
     context.set(loggerContext, logger)
 
     try {

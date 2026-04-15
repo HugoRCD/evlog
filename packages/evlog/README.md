@@ -1066,6 +1066,40 @@ log.emit()                         // Emit final event
 log.getContext()                   // Get current context
 ```
 
+### Wide event lifecycle and `log.fork()`
+
+The framework emits **one wide event per HTTP request** when the response finishes (or on error). After `emit()` runs — including when head sampling drops the event (`emit()` returns `null`) — that logger instance is **sealed**: further `set`, `error`, `info`, and `warn` calls are ignored and emit a **`[evlog]` console warning** listing dropped keys. A second `emit()` is ignored with a warning. This avoids silent data loss when async work (unawaited promises, `setTimeout`, etc.) still resolves `useLogger()` to the same logger via `AsyncLocalStorage` after the response has already been logged.
+
+**`log.fork(label, fn)`** runs work under a **child** request logger: inside `fn`, `useLogger()` returns the child. When `fn` settles, the child emits its **own** wide event with `operation` set to `label` and `_parentRequestId` set to the parent’s `requestId` (query and dashboard correlation). The parent event may be emitted **before** the child event; they are two separate events ordered by time.
+
+`fork` is attached by integrations that use `AsyncLocalStorage` for `useLogger()`. Standalone `createLogger()` instances do not have `fork`.
+
+| Integration | `log.fork()` |
+|-------------|----------------|
+| Express, Fastify, NestJS, SvelteKit, React Router, Elysia | Yes |
+| Next.js `withEvlog` | Yes |
+| Hono (`c.get('log')` only) | Not yet |
+| Nitro / Nuxt `useLogger(event)` | Not yet — use post-emit warnings; see [Wide events](https://evlog.dev/logging/wide-events) |
+
+```typescript
+import { evlog, useLogger } from 'evlog/express'
+
+app.post('/checkout', (req, res) => {
+  const log = req.log
+  log.set({ order_dispatched: true })
+
+  log.fork!('process_order', async () => {
+    const childLog = useLogger()
+    childLog.set({ inventory_checked: true })
+    // child emits automatically when this async function completes
+  })
+
+  res.json({ ok: true })
+})
+```
+
+Use optional chaining if `fork` might be absent: `log.fork?.('task', async () => { ... })`.
+
 ### `initWorkersLogger(options?)`
 
 Initialize evlog for Cloudflare Workers (object logs + correct severity).

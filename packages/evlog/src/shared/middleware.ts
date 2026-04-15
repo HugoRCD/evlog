@@ -80,7 +80,13 @@ const noopResult: MiddlewareLoggerResult = {
   skipped: true,
 }
 
-async function runEnrichAndDrain(
+/**
+ * Apply redact, enrich, and drain to an emitted wide event — same pipeline as
+ * {@link createMiddlewareLogger}'s `finish`.
+ *
+ * @beta Part of `evlog/toolkit` — used by framework integrations and `fork()`.
+ */
+export async function runEnrichAndDrain(
   emittedEvent: WideEvent,
   options: MiddlewareLoggerOptions,
   requestInfo: { method: string; path: string; requestId?: string },

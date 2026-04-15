@@ -29,6 +29,12 @@ describe('evlog/toolkit barrel exports', () => {
   it('exports getServiceForPath', () => {
     expect(toolkit.getServiceForPath).toBeTypeOf('function')
   })
+
+  it('exports fork helpers and runEnrichAndDrain', () => {
+    expect(toolkit.attachForkToLogger).toBeTypeOf('function')
+    expect(toolkit.forkBackgroundLogger).toBeTypeOf('function')
+    expect(toolkit.runEnrichAndDrain).toBeTypeOf('function')
+  })
 })
 
 describe('extractErrorStatus', () => {
