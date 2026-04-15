@@ -17,6 +17,8 @@ const pills = [
   { label: 'Token tracking', icon: 'i-lucide-coins' },
   { label: 'Tool calls', icon: 'i-lucide-wrench' },
   { label: 'Streaming metrics', icon: 'i-lucide-gauge' },
+  { label: 'Cost estimation', icon: 'i-lucide-dollar-sign' },
+  { label: 'Tool timing', icon: 'i-lucide-timer' },
 ]
 
 const benefits = [
@@ -28,12 +30,17 @@ const benefits = [
   {
     icon: 'i-lucide-box',
     title: 'Works with everything',
-    text: 'generateText, streamText, ToolLoopAgent, generateObject.',
+    text: 'generateText, streamText, ToolLoopAgent, embed, multi-step agents.',
   },
   {
     icon: 'i-lucide-bar-chart-3',
     title: 'Cost and performance',
-    text: 'Token usage, cache hits, time to first chunk, tokens per second.',
+    text: 'Token usage, cache hits, cost estimation, time to first chunk, tokens per second.',
+  },
+  {
+    icon: 'i-lucide-timer',
+    title: 'Telemetry integration',
+    text: 'Per-tool execution timing, success/failure tracking, and total generation wall time.',
   },
 ]
 
@@ -175,11 +182,17 @@ function setView(view: 'without' | 'with') {
 
           <div class="px-5 pt-4 pb-3 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto border-b border-muted/50">
             <!-- eslint-disable vue/multiline-html-element-content-newline -->
-            <pre><code><span class="text-violet-400">const</span> ai = <span class="text-amber-400">createAILogger</span>(log)
+            <pre><code><span class="text-violet-400">const</span> ai = <span class="text-amber-400">createAILogger</span>(log, {
+  <span class="text-sky-400">cost</span>: { <span class="text-emerald-400">'claude-sonnet-4.6'</span>: { <span class="text-sky-400">input</span>: <span class="text-pink-400">3</span>, <span class="text-sky-400">output</span>: <span class="text-pink-400">15</span> } },
+})
 
 <span class="text-violet-400">const</span> result = <span class="text-amber-400">streamText</span>({
   <span class="text-sky-400">model</span>: ai.<span class="text-amber-400">wrap</span>(<span class="text-emerald-400">'anthropic/claude-sonnet-4.6'</span>),
   messages,
+  <span class="text-sky-400">experimental_telemetry</span>: {
+    <span class="text-sky-400">isEnabled</span>: <span class="text-violet-400">true</span>,
+    <span class="text-sky-400">integrations</span>: [<span class="text-amber-400">createEvlogIntegration</span>(ai)],
+  },
 })</code></pre>
             <!-- eslint-enable -->
           </div>
@@ -248,8 +261,12 @@ function setView(view: 'without' | 'with') {
                   <span class="text-amber-400"> ["searchWeb", "queryDB"]</span>
                 </div>
                 <div>
-                  <span class="text-sky-400">ai.steps</span><span class="text-dimmed">:</span>
-                  <span class="text-pink-400"> 3</span>
+                  <span class="text-sky-400">ai.tools</span><span class="text-dimmed">:</span>
+                  <span class="text-amber-400"> [{name: "searchWeb", durationMs: 150, ...}]</span>
+                </div>
+                <div>
+                  <span class="text-sky-400">ai.estimatedCost</span><span class="text-dimmed">:</span>
+                  <span class="text-emerald-400"> 0.022</span>
                 </div>
                 <div>
                   <span class="text-sky-400">ai.msToFirstChunk</span><span class="text-dimmed">:</span>
