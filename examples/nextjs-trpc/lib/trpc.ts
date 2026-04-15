@@ -1,4 +1,4 @@
-import { initTRPC } from '@trpc/server'
+import { initTRPC, TRPCError } from '@trpc/server'
 import type { RequestLogger } from 'evlog'
 import { useLogger as useHttpLogger } from 'evlog/next'
 import { createEvlogMiddleware, useLogger } from 'evlog/trpc'
@@ -27,12 +27,15 @@ export const appRouter = t.router({
       .input(z.object({ id: z.string() }))
       .query(({ input }) => findUser(input.id)),
   }),
-  post: t.router({
-    create: loggedProcedure
-      .input(z.object({ title: z.string(), body: z.string() }))
+  checkout: t.router({
+    process: loggedProcedure
+      .input(z.object({ amount: z.number(), apiKey: z.string() }))
       .mutation(({ input, ctx }) => {
-        ctx.log.set({ post: { title: input.title } })
-        return { id: 'post_1', ...input }
+        ctx.log.set({ paymentAmount: input.amount, apiKey: input.apiKey })
+        if (input.amount > 1000) {
+          throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: 'Amount exceeds maximum limit' })
+        }
+        return { success: true }
       }),
   }),
   health: t.router({
