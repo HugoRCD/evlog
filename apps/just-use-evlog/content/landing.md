@@ -168,6 +168,38 @@ app.post('/api/checkout', async (request) => {
 })
 ```
 
+```ts [SvelteKit]
+export const POST = (async ({ locals }) => {
+  const log = locals.log
+  const userId = locals.user.id
+  log.set({ user: { id: userId } })
+
+  const cart = await getCart(userId)
+  log.set({ cart: { items: cart.length, total: cart.total } })
+
+  const charge = await processPayment(cart)
+  log.set({ payment: { provider: 'stripe', status: charge.status } })
+
+  return json({ ok: true })
+}) satisfies RequestHandler
+```
+
+```ts [React Router]
+export async function action({ context }: Route.ActionArgs) {
+  const log = context.get(loggerContext)
+  const userId = formData.get('userId')
+  log.set({ user: { id: userId } })
+
+  const cart = await getCart(userId)
+  log.set({ cart: { items: cart.length, total: cart.total } })
+
+  const charge = await processPayment(cart)
+  log.set({ payment: { provider: 'stripe', status: charge.status } })
+
+  return { ok: true }
+}
+```
+
 ```json [Result]
 {
   "level": "info",
@@ -197,27 +229,30 @@ Same code pattern, same output, every framework. Human-readable in dev, structur
 
 No peer deps, no polyfills, no bundler drama. Nothing to audit, nothing that breaks on the next Node LTS. Just one `bun add evlog` and you're done.
 
-### 9 frameworks, same API
+### 12 frameworks, same API
 
-Nuxt, Next.js, Nitro, Express, Fastify, Hono, Elysia, NestJS, TanStack Start. Add the middleware, get wide events. Switch frameworks, keep the same `log.set()` pattern.
+Nuxt, Next.js, SvelteKit, Nitro, Express, Fastify, Hono, Elysia, NestJS, React Router, TanStack Start, Cloudflare Workers. Add the middleware, get wide events. Switch frameworks, keep the same `log.set()` pattern.
 
-### 6 drain adapters, plug and play
+### 8 drain adapters, plug and play
 
-Axiom, OTLP (Grafana, Datadog, Honeycomb), Sentry, PostHog, Better Stack, HyperDX. Two lines of config. Async, batched, out-of-band. Your users don't wait on your log pipeline.
+Axiom, OTLP (Grafana, Honeycomb), Datadog, Sentry, PostHog, Better Stack, HyperDX, filesystem. Two lines of config. Async, batched, out-of-band. Your users don't wait on your log pipeline.
 
 ### AI SDK integration, built in
 
-Wrap the model once. Token usage, tool calls, streaming metrics, finish reason: all land in the **same** wide event.
+Wrap the model once. Token usage, tool calls, streaming metrics, cost estimation, multi-step agents, cache hits, reasoning tokens — all land in the **same** wide event. Add the telemetry integration for tool execution timing and total generation wall time.
 
 ```ts [server/api/chat.post.ts]
-const ai = createAILogger(log)
+const ai = createAILogger(log, {
+  toolInputs: { maxLength: 500 },
+  cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+})
 const result = streamText({
   model: ai.wrap('anthropic/claude-sonnet-4.6'),
   messages,
 })
 ```
 
-No callback conflicts. No separate pipeline for AI observability.
+Multi-step agents, embeddings, cost estimation — zero extra code. No callback conflicts. No separate pipeline for AI observability.
 
 ### PII auto-redaction, zero config
 
@@ -241,7 +276,7 @@ Write NDJSON to disk. Your AI agents, scripts, and teammates query structured ev
 
 ### "I already use pino."
 
-pino gives you fast line-by-line JSON. evlog gives you that **plus** wide events, structured errors with `why`/`fix`/`link`, head + tail sampling, six drain adapters, AI SDK integration, and auto-instrumentation for nine frameworks. Zero transitive deps, lighter install, same job done better. pino was the standard. evlog is what comes next.
+pino gives you fast line-by-line JSON. evlog gives you that **plus** wide events, structured errors with `why`/`fix`/`link`, head + tail sampling, eight drain adapters, AI SDK integration with full o11y, and auto-instrumentation for twelve frameworks. Zero transitive deps, lighter install, same job done better. pino was the standard. evlog is what comes next.
 
 ### "I already have Sentry / Datadog."
 
