@@ -1,5 +1,31 @@
 # evlog
 
+## 2.13.0
+
+### Minor Changes
+
+- [#280](https://github.com/HugoRCD/evlog/pull/280) [`fa0ee26`](https://github.com/HugoRCD/evlog/commit/fa0ee267a10d65164b4aec6caa64208ce08af291) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/better-auth` integration for automatic user identification from [Better Auth](https://better-auth.com/) sessions.
+
+  **New exports** (`evlog/better-auth`):
+  - `identifyUser(log, session, options?)` — sets `userId`, `user`, and `session` fields on a wide event. Returns `true` if identified
+  - `createAuthMiddleware(auth, options?)` — framework-agnostic `(log, headers, path?) => Promise<boolean>` with route filtering, timing capture, and lifecycle hooks
+  - `createAuthIdentifier(auth, options?)` — Nitro `request` hook factory for standalone Nitro apps
+  - `maskEmail(email)` — utility to mask emails for safe logging (`h***@example.com`)
+  - `BetterAuthInstance` — reusable type for the auth parameter
+
+  **Features:**
+  - `include`/`exclude` route pattern filtering on `createAuthMiddleware`
+  - `extend` callback for Better Auth plugin fields (organizations, roles, etc.)
+  - `auth.resolvedIn` timing in every wide event
+  - `auth.identified` boolean in every wide event
+  - `session.userAgent` captured by default
+  - `onIdentify`/`onAnonymous` lifecycle hooks
+  - `console.warn` in development when session resolution fails
+
+- [#284](https://github.com/HugoRCD/evlog/pull/284) [`861f6d2`](https://github.com/HugoRCD/evlog/commit/861f6d2c4e89ca99ef628484a68d69779acf4056) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `log.set()` concatenates arrays when merging context for the same key. For example, `set({ items: [1, 2] })` followed by `set({ items: [3] })` yields `{ items: [1, 2, 3] }` instead of replacing with `[3]`. Plain objects are still deep-merged recursively; if either the existing or incoming value is not an array, the new value replaces the old one.
+
+  **Breaking change:** Call sites that relied on the last `set` overwriting an array now accumulate elements. To replace a value at emit time, use `emit({ ... })` overrides or a different field name.
+
 ## 2.12.0
 
 ### Minor Changes
