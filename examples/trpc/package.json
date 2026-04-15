@@ -1,0 +1,18 @@
+{
+  "name": "evlog-trpc-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun src/index.ts"
+  },
+  "dependencies": {
+    "@trpc/server": "^11.0.0",
+    "evlog": "workspace:*",
+    "express": "^5.2.1",
+    "zod": "^3.24.0"
+  },
+  "devDependencies": {
+    "@types/express": "^5.0.6"
+  }
+}
