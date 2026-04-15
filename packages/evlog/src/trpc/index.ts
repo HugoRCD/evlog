@@ -38,12 +38,20 @@ export function createEvlogMiddleware() {
     if (!isBatched) {
       // Single procedure: set context at root level on the HTTP logger (original behavior)
       log.set({ procedure: opts.path, type: opts.type })
-      const result = await storage.run(log, () => opts.next())
-      if (!result.ok) {
-        log.error(result.error, { procedure: opts.path })
+      const start = Date.now()
+      try {
+        const result = await storage.run(log, () => opts.next())
+        const duration = formatDuration(Date.now() - start)
+        if (!result.ok) {
+          log.error(result.error, { procedure: opts.path })
+        }
+        log.set({ ok: result.ok, duration })
+        return result
+      } catch (err: unknown) {
+        log.error(err instanceof Error ? err : new Error(String(err)), { procedure: opts.path })
+        log.set({ ok: false, duration: formatDuration(Date.now() - start) })
+        throw err
       }
-      log.set({ ok: result.ok })
-      return result
     }
 
     // Batch: create an isolated logger per procedure, accumulate into procedures[]
@@ -58,19 +66,24 @@ export function createEvlogMiddleware() {
     procedureLog.set({ procedure: opts.path, type: opts.type })
 
     const start = Date.now()
-    const result = await storage.run(procedureLog, () => opts.next())
-    const duration = formatDuration(Date.now() - start)
+    try {
+      const result = await storage.run(procedureLog, () => opts.next())
+      const duration = formatDuration(Date.now() - start)
 
-    if (!result.ok) {
-      procedureLog.error(result.error, { procedure: opts.path })
+      if (!result.ok) {
+        procedureLog.error(result.error, { procedure: opts.path })
+      }
+      procedureLog.set({ ok: result.ok, duration })
+      return result
+    } catch (err: unknown) {
+      procedureLog.error(err instanceof Error ? err : new Error(String(err)), { procedure: opts.path })
+      procedureLog.set({ ok: false, duration: formatDuration(Date.now() - start) })
+      throw err
+    } finally {
+      const { method: _m, path: _p, requestId: _r, ...procedureCtx } = procedureLog.getContext() as Record<string, unknown>
+      const existing = (log.getContext().procedures as Record<string, unknown> | undefined) ?? {}
+      log.set({ procedures: { ...existing, [opts.path]: procedureCtx } } as Record<string, unknown>)
     }
-    procedureLog.set({ ok: result.ok })
-
-    const { method: _m, path: _p, requestId: _r, ...procedureCtx } = procedureLog.getContext() as Record<string, unknown>
-    const existing = (log.getContext().procedures as Record<string, unknown> | undefined) ?? {}
-    log.set({ procedures: { ...existing, [opts.path]: procedureCtx } } as Record<string, unknown>)
-
-    return result
   }
 }
 
