@@ -2,43 +2,40 @@ import type { RequestLogger } from '../types'
 import { createLoggerStorage } from '../shared/storage'
 
 const CONTEXT_ERROR = `[evlog/orpc] useLogger() was called outside of an evlog request context.
-Make sure an evlog HTTP adapter (evlog/next, evlog/hono, etc.)
-is set up before using createEvlogInterceptor().`
+Make sure an evlog HTTP adapter (evlog/next, evlog/express, evlog/hono, etc.)
+is set up before using createEvlogMiddleware().`
 
-const { useLogger } = createLoggerStorage(
-  'oRPC interceptor context. Make sure an evlog HTTP adapter is set up before your routes.',
+const { storage, useLogger } = createLoggerStorage(
+  'oRPC middleware context. Make sure an evlog HTTP adapter is set up before your routes.',
 )
 
 export { useLogger }
 
 /**
- * oRPC interceptor factory for evlog. Use in the `interceptors` array of `RPCHandler`.
+ * oRPC middleware factory for evlog. Use with `.use()` on a base procedure.
  *
  * @example
  * ```ts
- * import { createEvlogInterceptor } from 'evlog/orpc'
+ * import { os } from '@orpc/server'
+ * import { createEvlogMiddleware } from 'evlog/orpc'
  *
- * const handler = new RPCHandler(router, {
- *   interceptors: [createEvlogInterceptor()],
- * })
+ * const base = os.$context<Context>().use(createEvlogMiddleware())
  * ```
  */
-export function createEvlogInterceptor() {
-  return async ({ next, path, input }: { next: () => Promise<unknown>; path: string[]; input: unknown }): Promise<unknown> => {
-    let log: RequestLogger
-    try {
-      log = useLogger()
-    } catch {
+export function createEvlogMiddleware() {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return async (opts: any, input: unknown, output: any): Promise<any> => {
+    const log: RequestLogger | undefined = opts.context?.log
+    if (!log) {
       throw new Error(CONTEXT_ERROR)
     }
 
-    log.set({ procedure: path.join('.'), input })
+    log.set({ procedure: opts.path.join('.'), input })
 
     try {
-      const result = await next()
-      return result
+      return await storage.run(log, () => opts.next())
     } catch (error) {
-      log.error(error, { procedure: path.join('.') })
+      log.error(error as string | Error, { procedure: opts.path.join('.') })
       throw error
     }
   }
@@ -51,19 +48,22 @@ export function createEvlogInterceptor() {
  * ```ts
  * import { createEvlogContext } from 'evlog/orpc'
  *
- * const handler = new RPCHandler(router, {
- *   context: (request) => createEvlogContext(request, { userId: '123' }),
+ * app.use('/rpc', async (req, res) => {
+ *   await handler.handle(req, res, {
+ *     prefix: '/rpc',
+ *     context: createEvlogContext(req, { role: 'user' }),
+ *   })
  * })
  * ```
  */
 export function createEvlogContext<TBase extends object>(
-  _request: Request,
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  req: any,
   baseContext: TBase,
 ): TBase & { log: RequestLogger } {
-  let log: RequestLogger
-  try {
-    log = useLogger()
-  } catch {
+  // Read logger from the HTTP adapter's request object (req.log set by evlog/express, evlog/fastify, etc.)
+  const log: RequestLogger | undefined = req?.log
+  if (!log) {
     throw new Error(CONTEXT_ERROR)
   }
 

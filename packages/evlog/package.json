@@ -374,7 +374,7 @@
     "ai": ">=6.0.154",
     "@tanstack/start-client-core": "^1.167.9",
     "@trpc/server": ">=11.0.0",
-    "@orpc/server": ">=0.0.1"
+    "@orpc/server": "^1.0.0"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {

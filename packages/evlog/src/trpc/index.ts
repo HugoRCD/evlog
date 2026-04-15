@@ -5,7 +5,7 @@ const CONTEXT_ERROR = `[evlog/trpc] useLogger() was called outside of an evlog r
 Make sure an evlog HTTP adapter (evlog/next, evlog/express, evlog/hono, etc.)
 is set up before using createEvlogMiddleware().`
 
-const { useLogger } = createLoggerStorage(
+const { storage, useLogger } = createLoggerStorage(
   'tRPC middleware context. Make sure an evlog HTTP adapter is set up before your routes.',
 )
 
@@ -25,17 +25,15 @@ export { useLogger }
 export function createEvlogMiddleware() {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (opts: any): Promise<any> => {
-    let log: RequestLogger
-    try {
-      log = useLogger()
-    } catch {
+    const log: RequestLogger | undefined = opts.ctx?.log
+    if (!log) {
       throw new Error(CONTEXT_ERROR)
     }
 
     log.set({ procedure: opts.path, type: opts.type })
 
-    // tRPC middleware result
-    const result = await opts.next()
+    // Run next() inside storage so useLogger() works inside procedures
+    const result = await storage.run(log, () => opts.next())
 
     if (!result.ok) {
       log.error(result.error, { procedure: opts.path })
@@ -65,10 +63,9 @@ export function createEvlogTRPCContext<TBase extends object>(
   return async (opts: any): Promise<TBase & { log: RequestLogger }> => {
     const base = await factory(opts)
 
-    let log: RequestLogger
-    try {
-      log = useLogger()
-    } catch {
+    // Read logger from the HTTP adapter's request object (req.log set by evlog/express, evlog/fastify, etc.)
+    const log: RequestLogger | undefined = opts.req?.log
+    if (!log) {
       throw new Error(CONTEXT_ERROR)
     }
 
