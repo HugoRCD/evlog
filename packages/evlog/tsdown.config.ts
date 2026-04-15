@@ -49,6 +49,7 @@ export default defineConfig({
     'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
     'ai/index': 'src/ai/index.ts',
+    'trpc/index': 'src/trpc/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -86,6 +87,7 @@ export default defineConfig({
     'vite',
     'ai',
     '@ai-sdk/provider',
+    '@trpc/server',
   ],
   inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })

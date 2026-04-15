@@ -1,5 +1,6 @@
 {
   "lockfileVersion": 1,
+  "configVersion": 0,
   "workspaces": {
     "": {
       "name": "evlog-monorepo",
@@ -329,6 +330,7 @@
         "@nestjs/common": ">=11.1.18",
         "@nuxt/kit": "^4.4.2",
         "@tanstack/start-client-core": "^1.167.9",
+        "@trpc/server": ">=11.0.0",
         "ai": ">=6.0.154",
         "elysia": ">=1.4.28",
         "express": ">=5.2.1",
@@ -347,6 +349,7 @@
         "@nestjs/common",
         "@nuxt/kit",
         "@tanstack/start-client-core",
+        "@trpc/server",
         "ai",
         "elysia",
         "express",
