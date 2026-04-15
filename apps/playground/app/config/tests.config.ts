@@ -1,5 +1,6 @@
 import { createError, parseError } from 'evlog'
 import { createHttpLogDrain } from 'evlog/http'
+import { authClient } from '~/lib/auth-client'
 
 export interface TestConfig {
   id: string
@@ -551,6 +552,97 @@ export const testConfig = {
           toastOnSuccess: {
             title: 'Events buffered',
             description: 'Navigate away or switch tabs — events will flush via sendBeacon',
+          },
+        },
+      ],
+    } as TestSection,
+    {
+      id: 'better-auth',
+      label: 'Better Auth',
+      icon: 'i-simple-icons-betterauth',
+      title: 'Better Auth Integration',
+      description: 'Real Better Auth integration with SQLite. Sign up creates an account, sign in sets a session cookie, then all subsequent API calls include userId, user, and session on the wide event. Check the terminal output.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'ba-signup',
+          label: 'Sign Up',
+          description: 'Creates a new user account via Better Auth (email: demo@evlog.dev, password: playground123).',
+          color: 'success',
+          onClick: async () => {
+            const { error } = await authClient.signUp.email({
+              email: 'demo@evlog.dev',
+              password: 'playground123',
+              name: 'Hugo Richard',
+            })
+            if (error) {
+              console.error('[better-auth] Sign up failed:', error.message)
+            }
+          },
+          badge: {
+            label: 'signUp.email()',
+            color: 'green',
+          },
+        },
+        {
+          id: 'ba-signin',
+          label: 'Sign In',
+          description: 'Signs in with email/password. Sets a real session cookie for auto-identification.',
+          color: 'primary',
+          onClick: async () => {
+            const { error } = await authClient.signIn.email({
+              email: 'demo@evlog.dev',
+              password: 'playground123',
+            })
+            if (error) {
+              console.error('[better-auth] Sign in failed:', error.message)
+            }
+          },
+          badge: {
+            label: 'signIn.email()',
+            color: 'blue',
+          },
+        },
+        {
+          id: 'ba-whoami',
+          label: 'Who am I?',
+          description: 'Calls an API route — the wide event in the terminal will include user identity if signed in.',
+          endpoint: '/api/test/better-auth/whoami',
+          method: 'GET',
+          color: 'primary',
+          showResult: true,
+          badge: {
+            label: 'GET /whoami',
+            color: 'blue',
+          },
+        },
+        {
+          id: 'ba-wide-event',
+          label: 'Wide Event (identified)',
+          description: 'Triggers the full wide event demo — if signed in, user context is automatically included.',
+          endpoint: '/api/test/wide-event',
+          method: 'GET',
+          color: 'primary',
+          badge: {
+            label: 'Wide Event + User',
+            color: 'blue',
+          },
+          toastOnSuccess: {
+            title: 'Wide event emitted',
+            description: 'Check terminal — user fields should be present if session is active',
+          },
+        },
+        {
+          id: 'ba-signout',
+          label: 'Sign Out',
+          description: 'Signs out and clears the session. Subsequent requests will be anonymous.',
+          color: 'error',
+          onClick: async () => {
+            await authClient.signOut()
+          },
+          badge: {
+            label: 'signOut()',
+            color: 'red',
           },
         },
       ],

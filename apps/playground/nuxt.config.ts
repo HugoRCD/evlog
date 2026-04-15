@@ -30,6 +30,7 @@ export default defineNuxtConfig({
         { duration: 500 }, // Keep slow requests (>500ms)
         { path: '/api/test/critical/**' }, // Keep critical paths
         { path: '/api/test/drain' }, // Always keep drain test logs
+        { path: '/api/test/better-auth/**' }, // Always keep better-auth test logs
       ],
     },
   },

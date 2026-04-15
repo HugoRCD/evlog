@@ -51,6 +51,7 @@ export default defineConfig({
     'ai/index': 'src/ai/index.ts',
     'trpc/index': 'src/trpc/index.ts',
     'orpc/index': 'src/orpc/index.ts',
+    'better-auth/index': 'src/better-auth/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -90,6 +91,8 @@ export default defineConfig({
     '@ai-sdk/provider',
     '@trpc/server',
     '@orpc/server',
+    'better-auth',
+    'better-auth/api',
   ],
   inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })

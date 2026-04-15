@@ -252,6 +252,42 @@ describe('createRequestLogger', () => {
     expect(context.cart).toEqual({ items: ['item1'], total: 50 })
   })
 
+  it('concatenates arrays on the same key with set()', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ array: [1, 2] })
+    logger.set({ array: [3] })
+
+    expect(logger.getContext().array).toEqual([1, 2, 3])
+  })
+
+  it('concatenates nested arrays on the same key with set()', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ job: { steps: ['a'] } })
+    logger.set({ job: { steps: ['b', 'c'] } })
+
+    expect(logger.getContext().job).toEqual({ steps: ['a', 'b', 'c'] })
+  })
+
+  it('replaces array with non-array on the same key with set()', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ tags: ['a', 'b'] })
+    logger.set({ tags: 'done' })
+
+    expect(logger.getContext().tags).toBe('done')
+  })
+
+  it('does not drop prior array elements when appending an empty array', () => {
+    const logger = createRequestLogger({})
+
+    logger.set({ ids: [1, 2] })
+    logger.set({ ids: [] })
+
+    expect(logger.getContext().ids).toEqual([1, 2])
+  })
+
   it('records error with error()', () => {
     const logger = createRequestLogger({})
     const error = new Error('Payment failed')

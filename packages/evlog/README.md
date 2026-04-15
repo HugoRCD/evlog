@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/HugoRCD/evlog/main/assets/evlog-banner.gif" width="100%" alt="evlog — Digging through logs is not observability. It's hope" />
+</p>
+
 # evlog
 
 [![npm version](https://img.shields.io/npm/v/evlog?color=black)](https://npmjs.com/package/evlog)

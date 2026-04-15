@@ -13,8 +13,13 @@
   },
   "dependencies": {
     "@nuxt/ui": "^4.6.1",
+    "better-auth": "^1.6.2",
+    "better-sqlite3": "^12.8.0",
     "evlog": "workspace:*",
     "nuxt": "^4.4.2",
     "tailwindcss": "^4.2.2"
+  },
+  "devDependencies": {
+    "@types/better-sqlite3": "^7.6.13"
   }
 }

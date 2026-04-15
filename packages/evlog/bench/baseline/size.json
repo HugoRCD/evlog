@@ -3,12 +3,12 @@
     {
       "entry": "framework/nitro",
       "raw": 18760,
-      "gzip": 6988
+      "gzip": 6982
     },
     {
       "entry": "framework/next",
       "raw": 12226,
-      "gzip": 4228
+      "gzip": 4229
     },
     {
       "entry": "framework/ai",
@@ -83,7 +83,7 @@
     {
       "entry": "framework/nestjs",
       "raw": 2872,
-      "gzip": 1237
+      "gzip": 1235
     },
     {
       "entry": "adapter/hyperdx",
@@ -98,12 +98,12 @@
     {
       "entry": "framework/elysia",
       "raw": 2540,
-      "gzip": 1073
+      "gzip": 1072
     },
     {
       "entry": "framework/fastify",
       "raw": 2344,
-      "gzip": 1010
+      "gzip": 1008
     },
     {
       "entry": "workers",
@@ -113,12 +113,12 @@
     {
       "entry": "framework/express",
       "raw": 1322,
-      "gzip": 702
+      "gzip": 700
     },
     {
       "entry": "framework/hono",
       "raw": 1098,
-      "gzip": 595
+      "gzip": 593
     },
     {
       "entry": "browser",
@@ -138,7 +138,7 @@
     {
       "entry": "logger",
       "raw": 380,
-      "gzip": 207
+      "gzip": 208
     },
     {
       "entry": "client",
@@ -153,6 +153,6 @@
   ],
   "total": {
     "raw": 129880,
-    "gzip": 47526
+    "gzip": 47513
   }
 }

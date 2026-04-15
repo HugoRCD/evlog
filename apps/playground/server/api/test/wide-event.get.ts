@@ -2,26 +2,30 @@ export default defineEventHandler(async (event) => {
   const logger = useLogger(event)
 
   await new Promise(resolve => setTimeout(resolve, 100))
-  logger.set({
-    user: {
-      id: 'user_789',
-      email: 'demo@example.com',
-      plan: 'enterprise',
-      accountAge: '2 years',
-      role: 'admin',
-      mfaEnabled: true,
-      lastLogin: '2024-01-15T10:30:00Z',
-    },
-    session: {
-      id: 'sess_abc123',
-      device: 'desktop',
-      browser: 'Chrome 120',
-      os: 'macOS 14.2',
-      ip: '192.168.1.42',
-      country: 'FR',
-      city: 'Paris',
-    },
-  })
+
+  const ctx = logger.getContext()
+  if (!ctx.userId) {
+    logger.set({
+      user: {
+        id: 'user_789',
+        email: 'demo@example.com',
+        plan: 'enterprise',
+        accountAge: '2 years',
+        role: 'admin',
+        mfaEnabled: true,
+        lastLogin: '2024-01-15T10:30:00Z',
+      },
+      session: {
+        id: 'sess_abc123',
+        device: 'desktop',
+        browser: 'Chrome 120',
+        os: 'macOS 14.2',
+        ip: '192.168.1.42',
+        country: 'FR',
+        city: 'Paris',
+      },
+    })
+  }
 
   await new Promise(resolve => setTimeout(resolve, 100))
   logger.set({
