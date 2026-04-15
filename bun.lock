@@ -329,6 +329,7 @@
       "peerDependencies": {
         "@nestjs/common": ">=11.1.18",
         "@nuxt/kit": "^4.4.2",
+        "@orpc/server": ">=0.0.1",
         "@tanstack/start-client-core": "^1.167.9",
         "@trpc/server": ">=11.0.0",
         "ai": ">=6.0.154",
@@ -348,6 +349,7 @@
       "optionalPeers": [
         "@nestjs/common",
         "@nuxt/kit",
+        "@orpc/server",
         "@tanstack/start-client-core",
         "@trpc/server",
         "ai",

@@ -50,6 +50,7 @@ export default defineConfig({
     'toolkit': 'src/shared/index.ts',
     'ai/index': 'src/ai/index.ts',
     'trpc/index': 'src/trpc/index.ts',
+    'orpc/index': 'src/orpc/index.ts',
   },
   format: 'esm',
   dts: true,
@@ -88,6 +89,7 @@ export default defineConfig({
     'ai',
     '@ai-sdk/provider',
     '@trpc/server',
+    '@orpc/server',
   ],
   inlineOnly: ['ufo', 'magic-string', '@jridgewell/sourcemap-codec']
 })

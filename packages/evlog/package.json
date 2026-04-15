@@ -194,6 +194,11 @@
       "types": "./dist/trpc/index.d.mts",
       "import": "./dist/trpc/index.mjs",
       "default": "./dist/trpc/index.mjs"
+    },
+    "./orpc": {
+      "types": "./dist/orpc/index.d.mts",
+      "import": "./dist/orpc/index.mjs",
+      "default": "./dist/orpc/index.mjs"
     }
   },
   "main": "./dist/index.mjs",
@@ -295,6 +300,9 @@
       ],
       "trpc": [
         "./dist/trpc/index.d.mts"
+      ],
+      "orpc": [
+        "./dist/orpc/index.d.mts"
       ]
     }
   },
@@ -365,7 +373,8 @@
     "vite": "^7.0.0 || ^8.0.0",
     "ai": ">=6.0.154",
     "@tanstack/start-client-core": "^1.167.9",
-    "@trpc/server": ">=11.0.0"
+    "@trpc/server": ">=11.0.0",
+    "@orpc/server": ">=0.0.1"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -417,6 +426,9 @@
       "optional": true
     },
     "@trpc/server": {
+      "optional": true
+    },
+    "@orpc/server": {
       "optional": true
     }
   }
