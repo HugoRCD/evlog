@@ -23,7 +23,6 @@ export { useLogger }
  * ```
  */
 export function createEvlogMiddleware() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (opts: any, input: unknown, output: any): Promise<any> => {
     const log: RequestLogger | undefined = opts.context?.log
     if (!log) {
@@ -57,7 +56,7 @@ export function createEvlogMiddleware() {
  * ```
  */
 export function createEvlogContext<TBase extends object>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   req: any,
   baseContext: TBase,
 ): TBase & { log: RequestLogger } {

@@ -25,7 +25,6 @@ export { useLogger }
  * ```
  */
 export function createEvlogMiddleware() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (opts: any): Promise<any> => {
     const log: RequestLogger | undefined = opts.ctx?.log
     if (!log) {
@@ -100,10 +99,9 @@ export function createEvlogMiddleware() {
  * ```
  */
 export function createEvlogTRPCContext<TBase extends object>(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+   
   factory: (opts: any) => Promise<TBase> | TBase,
 ) {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return async (opts: any): Promise<TBase & { log: RequestLogger }> => {
     const base = await factory(opts)
 

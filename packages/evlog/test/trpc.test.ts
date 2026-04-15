@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { RequestLogger } from '../src/types'
 
+import { createEvlogMiddleware, createEvlogTRPCContext } from '../src/trpc/index'
+
 const mockStorageRun = vi.hoisted(() => vi.fn())
 const mockCreateRequestLogger = vi.hoisted(() => vi.fn())
 const mockFormatDuration = vi.hoisted(() => vi.fn((ms: number) => `${ms}ms`))
@@ -20,13 +22,13 @@ vi.mock('../src/utils', () => ({
   formatDuration: mockFormatDuration,
 }))
 
-import { createEvlogMiddleware, createEvlogTRPCContext } from '../src/trpc/index'
-
 // Logger HTTP mock — rastrea su contexto acumulado para simular set() real
 function makeHttpLog(path = '/trpc/user.getById') {
   const ctx: Record<string, unknown> = { path }
   return {
-    set: vi.fn((data: Record<string, unknown>) => { Object.assign(ctx, data) }),
+    set: vi.fn((data: Record<string, unknown>) => {
+      Object.assign(ctx, data) 
+    }),
     error: vi.fn(),
     getContext: vi.fn(() => ({ ...ctx })),
   } as unknown as RequestLogger
@@ -36,7 +38,9 @@ function makeHttpLog(path = '/trpc/user.getById') {
 function makeProcedureLog() {
   const ctx: Record<string, unknown> = {}
   return {
-    set: vi.fn((data: Record<string, unknown>) => { Object.assign(ctx, data) }),
+    set: vi.fn((data: Record<string, unknown>) => {
+      Object.assign(ctx, data) 
+    }),
     error: vi.fn(),
     emit: vi.fn(),
     getContext: vi.fn(() => ({ ...ctx })),
@@ -59,7 +63,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         expect(mockLog.set).toHaveBeenCalledWith({ procedure: 'user.getById', type: 'query' })
@@ -75,7 +79,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         expect(mockLog.set).toHaveBeenCalledWith({ ok: true, duration: expect.any(String) })
@@ -91,14 +95,14 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: false, error }),
+          next: () => ({ ok: false, error }),
         })
 
         expect(mockLog.error).toHaveBeenCalledWith(error, { procedure: 'user.getById' })
         expect(mockLog.set).toHaveBeenCalledWith({ ok: false, duration: expect.any(String) })
       })
 
-      it('captura panic throw síncrono/asíncrono en opts.next() devolviendo error a evlog y haciendo re-throw', async () => {
+      it('captures synchronous/asynchronous panic throws in opts.next() returning the error to evlog and re-throwing', async () => {
         const mockLog = makeHttpLog()
         mockStorageRun.mockImplementation((_log: unknown, fn: () => unknown) => fn())
         mockFormatDuration.mockReturnValue('2ms')
@@ -111,7 +115,9 @@ describe('evlog/trpc', () => {
             ctx: { log: mockLog },
             path: 'user.getById',
             type: 'query',
-            next: async () => { throw fatalError },
+            next: () => {
+              throw fatalError 
+            },
           })
         ).rejects.toThrow('tRPC panic')
 
@@ -128,7 +134,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         expect(mockStorageRun).toHaveBeenCalledWith(mockLog, expect.any(Function))
@@ -147,7 +153,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         expect(mockCreateRequestLogger).toHaveBeenCalledWith(
@@ -157,7 +163,7 @@ describe('evlog/trpc', () => {
         expect(mockStorageRun).toHaveBeenCalledWith(procedureLog, expect.any(Function))
       })
 
-      it('acumula el contexto del procedure en procedures{} del HTTP logger, keyed por nombre', async () => {
+      it('accumulates the procedure context in the HTTP logger procedures{} object, keyed by name', async () => {
         const procedureLog = makeProcedureLog()
         mockCreateRequestLogger.mockReturnValue(procedureLog)
         const mockLog = makeHttpLog('/trpc/user.getById,health.check')
@@ -168,7 +174,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         const setCall = (mockLog.set as any).mock.calls.find(
@@ -180,7 +186,7 @@ describe('evlog/trpc', () => {
         expect(procedures['user.getById']).toMatchObject({ procedure: 'user.getById', type: 'query', ok: true })
       })
 
-      it('dos procedures no se pisan — cada uno keyed por su nombre en procedures{}', async () => {
+      it('two procedures do not overwrite each other — each keyed by its name in procedures{}', async () => {
         const procedureLog1 = makeProcedureLog()
         const procedureLog2 = makeProcedureLog()
         mockCreateRequestLogger
@@ -196,7 +202,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => {
+          next: () => {
             procedureLog1.set({ userId: 'usr_123' })
             return { ok: true }
           },
@@ -206,7 +212,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'health.check',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         const lastSet = (mockLog.set as any).mock.calls.at(-1)![0] as { procedures: Record<string, unknown> }
@@ -216,7 +222,7 @@ describe('evlog/trpc', () => {
         expect(lastSet.procedures['health.check']).not.toHaveProperty('userId')
       })
 
-      it('error en procedure batch — ok: false en su entry, no afecta el HTTP logger', async () => {
+      it('error in batch procedure — ok: false in its entry, does not affect the HTTP logger', async () => {
         const procedureLog = makeProcedureLog()
         mockCreateRequestLogger.mockReturnValue(procedureLog)
         const mockLog = makeHttpLog('/trpc/user.getById,health.check')
@@ -228,7 +234,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: false, error }),
+          next: () => ({ ok: false, error }),
         })
 
         expect(procedureLog.error).toHaveBeenCalledWith(error, { procedure: 'user.getById' })
@@ -240,7 +246,7 @@ describe('evlog/trpc', () => {
         expect(procedures['user.getById']).toMatchObject({ ok: false })
       })
 
-      it('captura panic throw síncrono/asíncrono en batch devolviendo error a evlog y hace merge al main log', async () => {
+      it('captures synchronous/asynchronous panic throws in batch returning the error to evlog and merges it into the main log', async () => {
         const procedureLog = makeProcedureLog()
         mockCreateRequestLogger.mockReturnValue(procedureLog)
         mockFormatDuration.mockReturnValue('3ms')
@@ -255,7 +261,9 @@ describe('evlog/trpc', () => {
             ctx: { log: mockLog },
             path: 'user.getById',
             type: 'query',
-            next: async () => { throw fatalError },
+            next: () => {
+              throw fatalError 
+            },
           })
         ).rejects.toThrow('tRPC batch panic')
 
@@ -270,7 +278,7 @@ describe('evlog/trpc', () => {
         expect(procedures['user.getById']).toMatchObject({ ok: false, duration: '3ms' })
       })
 
-      it('incluye duration por procedure', async () => {
+      it('includes duration per procedure', async () => {
         const procedureLog = makeProcedureLog()
         mockCreateRequestLogger.mockReturnValue(procedureLog)
         mockFormatDuration.mockReturnValue('5ms')
@@ -282,7 +290,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         })
 
         const setCall = (mockLog.set as any).mock.calls.find(
@@ -292,7 +300,7 @@ describe('evlog/trpc', () => {
         expect(procedures['user.getById']!.duration).toBe('5ms')
       })
 
-      it('procedure con el mismo nombre en batch sobrescribe la entry anterior', async () => {
+      it('procedure with the same name in batch overwrites the previous entry', async () => {
         const procedureLog1 = makeProcedureLog()
         const procedureLog2 = makeProcedureLog()
         mockCreateRequestLogger
@@ -308,7 +316,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => {
+          next: () => {
             procedureLog1.set({ attempt: 1 })
             return { ok: true }
           },
@@ -317,7 +325,7 @@ describe('evlog/trpc', () => {
           ctx: { log: mockLog },
           path: 'user.getById',
           type: 'query',
-          next: async () => {
+          next: () => {
             procedureLog2.set({ attempt: 2 })
             return { ok: false, error: new Error('retry failed') }
           },
@@ -337,7 +345,7 @@ describe('evlog/trpc', () => {
           ctx: {},
           path: 'user.getById',
           type: 'query',
-          next: async () => ({ ok: true }),
+          next: () => ({ ok: true }),
         }),
       ).rejects.toThrow('[evlog/trpc]')
     })
@@ -354,7 +362,7 @@ describe('evlog/trpc', () => {
       expect(result).toEqual({ user: 'test', log: mockLog })
     })
 
-    it('sin HTTP adapter — lanza error que incluye [evlog/trpc]', async () => {
+    it('without HTTP adapter — throws error that includes [evlog/trpc]', async () => {
       const createContext = createEvlogTRPCContext(() => ({}))
       await expect(createContext({ req: {} })).rejects.toThrow('[evlog/trpc]')
     })
