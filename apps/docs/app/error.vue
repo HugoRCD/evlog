@@ -7,40 +7,55 @@ const props = defineProps<{
   error: NuxtError
 }>()
 
-const route = useRoute()
+const { forced: forcedColorMode } = useDocusColorMode()
+const { locale, locales, isEnabled, t, switchLocalePath } = useDocusI18n()
 
-route.meta.layout = 'docs'
-
-const nuxtUiLocale = nuxtUiLocales.en
+const nuxtUiLocale = computed(() => nuxtUiLocales[locale.value as keyof typeof nuxtUiLocales] || nuxtUiLocales.en)
+const lang = computed(() => nuxtUiLocale.value.code)
+const dir = computed(() => nuxtUiLocale.value.dir)
 
 useHead({
   htmlAttrs: {
-    lang: nuxtUiLocale.code,
-    dir: nuxtUiLocale.dir,
+    lang,
+    dir,
   },
 })
 
-const is404 = computed(() => props.error?.statusCode === 404)
+const localizedError = computed(() => {
+  return {
+    ...props.error,
+    statusMessage: t('common.error.title'),
+    message: t('common.error.description'),
+  }
+})
 
 useSeoMeta({
-  title: () => is404.value ? 'Page not found' : 'Something went wrong',
-  description: () => is404.value
-    ? 'The page you are looking for does not exist.'
-    : 'An unexpected error occurred.',
+  title: () => t('common.error.title'),
+  description: () => t('common.error.description'),
 })
 
-const { data: navigation } = await useAsyncData('navigation_error', () => queryCollectionNavigation('docs' as keyof PageCollections), {
-  transform: (data: ContentNavigationItem[]) => data,
+if (isEnabled.value) {
+  const route = useRoute()
+  const defaultLocale = useRuntimeConfig().public.i18n.defaultLocale!
+  onMounted(() => {
+    const currentLocale = route.path.split('/')[1]
+    if (!locales.some(locale => locale.code === currentLocale)) {
+      return navigateTo(switchLocalePath(defaultLocale) as string)
+    }
+  })
+}
+
+const collectionName = computed(() => isEnabled.value ? `docs_${locale.value}` : 'docs')
+
+const { data: navigation } = await useAsyncData(`navigation_${collectionName.value}`, () => queryCollectionNavigation(collectionName.value as keyof PageCollections), {
+  transform: (data: ContentNavigationItem[]) => transformNavigation(data, isEnabled.value, locale.value),
+  watch: [locale],
 })
-const { data: files } = useLazyAsyncData('search_error', () => queryCollectionSearchSections('docs' as keyof PageCollections), {
+const { data: files } = useLazyAsyncData(`search_${collectionName.value}`, () => queryCollectionSearchSections(collectionName.value as keyof PageCollections), {
   server: false,
 })
 
 provide('navigation', navigation)
-
-function handleError() {
-  clearError({ redirect: '/' })
-}
 </script>
 
 <template>
@@ -48,43 +63,7 @@ function handleError() {
     <div class="docus-sub-header">
       <AppHeader />
 
-    <UMain class="flex items-center">
-      <UContainer>
-        <section class="flex flex-col items-center justify-center text-center py-24 lg:py-32">
-          <p class="font-mono text-xs uppercase tracking-[0.2em] text-primary mb-6">
-            Error {{ error?.statusCode || 500 }}
-          </p>
-          <h1 class="text-5xl sm:text-6xl lg:text-7xl font-bold tracking-tight text-highlighted mb-5">
-            {{ is404 ? 'Page not found' : 'Something went wrong' }}
-          </h1>
-          <p class="text-base sm:text-lg text-muted max-w-xl mb-10">
-            {{ is404
-              ? 'The page you are looking for does not exist or has been moved.'
-              : 'An unexpected error occurred. Please try again or head back home.' }}
-          </p>
-          <div class="flex flex-wrap items-center justify-center gap-3">
-            <UButton
-              size="lg"
-              color="primary"
-              icon="i-lucide-arrow-left"
-              @click="handleError"
-            >
-              Back to home
-            </UButton>
-            <UButton
-              size="lg"
-              color="neutral"
-              variant="subtle"
-              to="/getting-started/introduction"
-              icon="i-lucide-book-open"
-              trailing
-            >
-              Read the docs
-            </UButton>
-          </div>
-        </section>
-      </UContainer>
-    </UMain>
+      <UError :error="localizedError" />
 
       <AppFooter />
     </div>
@@ -93,6 +72,7 @@ function handleError() {
       <LazyUContentSearch
         :files="files"
         :navigation="navigation"
+        :color-mode="!forcedColorMode"
       />
     </ClientOnly>
   </UApp>
@@ -105,5 +85,3 @@ function handleError() {
   }
 }
 </style>
-
-
