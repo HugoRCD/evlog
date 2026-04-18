@@ -29,7 +29,7 @@ export function createEvlogMiddleware() {
       throw new Error(CONTEXT_ERROR)
     }
 
-    log.set({ procedure: opts.path.join('.'), input })
+    log.set({ procedure: opts.path.join('.') })
 
     try {
       return await storage.run(log, () => opts.next())
