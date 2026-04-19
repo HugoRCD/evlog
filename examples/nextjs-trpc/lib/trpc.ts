@@ -31,7 +31,7 @@ export const appRouter = t.router({
     process: loggedProcedure
       .input(z.object({ amount: z.number(), apiKey: z.string() }))
       .mutation(({ input, ctx }) => {
-        ctx.log.set({ paymentAmount: input.amount, apiKey: input.apiKey })
+        ctx.log.set({ paymentAmount: input.amount, apiKey: input.apiKey, message: 'Processing payment' })
         if (input.amount > 1000) {
           throw new TRPCError({ code: 'PAYLOAD_TOO_LARGE', message: 'Amount exceeds maximum limit' })
         }
@@ -40,6 +40,27 @@ export const appRouter = t.router({
   }),
   health: t.router({
     check: loggedProcedure.query(() => ({ ok: true })),
+  }),
+  post: t.router({
+    create: loggedProcedure
+      .input(z.object({ title: z.string(), body: z.string() }))
+      .mutation(({ input, ctx }) => {
+        const randomError = Math.random() < 0.5
+        if (randomError) {
+          throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Random failure occurred' })
+        }
+        ctx.log.set({ postTitle: input.title, postBodyLength: input.body.length })
+        return { id: Math.random().toString(36).substr(2, 9), title: input.title, body: input.body }
+      }),
+  }),
+  batch: t.router({
+    test: loggedProcedure
+      .input(z.object({ count: z.number().min(1).max(10) }))
+      .query(({ input }) => {
+        const log = useLogger()
+        log.set({ batchCount: input.count })
+        return Array.from({ length: input.count }, (_, i) => ({ id: i + 1, value: `item-${i + 1}` }))
+      }),
   }),
 })
 
