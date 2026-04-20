@@ -11,6 +11,8 @@
  *   createMiddlewareLogger,
  *   extractSafeHeaders,
  *   createLoggerStorage,
+ *   attachForkToLogger,
+ *   forkBackgroundLogger,
  *   type BaseEvlogOptions,
  * } from 'evlog/toolkit'
  * ```
@@ -18,6 +20,7 @@
  * @see https://evlog.dev/frameworks/custom-integration
  */
 export * from './errors'
+export * from './fork'
 export * from './headers'
 export * from './middleware'
 export * from './routes'

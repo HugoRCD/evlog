@@ -1,5 +1,6 @@
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
 import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } from '../nitro'
@@ -73,18 +74,20 @@ interface AppError {
  */
 export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
   return async ({ event, resolve }) => {
-    const { logger, finish, skipped } = createMiddlewareLogger({
+    const middlewareOpts = {
       method: event.request.method,
       path: event.url.pathname,
       requestId: event.request.headers.get('x-request-id') || crypto.randomUUID(),
       headers: extractSafeHeaders(event.request.headers),
       ...options,
-    })
+    }
+    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       return await resolve(event)
     }
 
+    attachForkToLogger(storage, logger, middlewareOpts)
     event.locals.log = logger
 
     return storage.run(logger, async () => {

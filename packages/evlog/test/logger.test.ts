@@ -589,6 +589,43 @@ describe('createRequestLogger', () => {
     expect(result).toBeNull()
     randomSpy.mockRestore()
   })
+
+  it('seals logger after emit so set() warns and does not mutate context', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({ method: 'GET', path: '/x', requestId: 'r1' })
+    logger.set({ before: true })
+    logger.emit()
+    logger.set({ after: true })
+    expect(warnSpy).toHaveBeenCalled()
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('log.set()')
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('after')
+    expect(logger.getContext().after).toBeUndefined()
+    warnSpy.mockRestore()
+  })
+
+  it('seals logger when emit returns null due to sampling', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    initLogger({
+      pretty: false,
+      sampling: { rates: { info: 0 } },
+    })
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    expect(logger.emit()).toBeNull()
+    logger.set({ lost: true })
+    expect(warnSpy).toHaveBeenCalled()
+    expect(logger.getContext().lost).toBeUndefined()
+    warnSpy.mockRestore()
+  })
+
+  it('warns on second emit()', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({ method: 'GET', path: '/x' })
+    logger.emit()
+    expect(logger.emit()).toBeNull()
+    expect(warnSpy).toHaveBeenCalled()
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('log.emit()')
+    warnSpy.mockRestore()
+  })
 })
 
 describe('createLogger', () => {

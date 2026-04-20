@@ -1,6 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeNodeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
 
@@ -38,19 +39,21 @@ declare module 'express-serve-static-core' {
  */
 export function evlog(options: EvlogExpressOptions = {}): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { logger, finish, skipped } = createMiddlewareLogger({
+    const middlewareOpts = {
       method: req.method,
       path: new URL(req.originalUrl || req.url || '/', 'http://localhost').pathname,
       requestId: req.get('x-request-id') || crypto.randomUUID(),
       headers: extractSafeNodeHeaders(req.headers),
       ...options,
-    })
+    }
+    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       next()
       return
     }
 
+    attachForkToLogger(storage, logger, middlewareOpts)
     req.log = logger
 
     res.on('finish', () => {

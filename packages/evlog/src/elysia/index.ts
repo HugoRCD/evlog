@@ -2,6 +2,7 @@ import { AsyncLocalStorage } from 'node:async_hooks'
 import { Elysia } from 'elysia'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeHeaders } from '../shared/headers'
 import { filterSafeHeaders } from '../utils'
 
@@ -79,7 +80,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
 
   return new Elysia({ name: 'evlog' })
     .derive({ as: 'global' }, ({ request, path, headers }) => {
-      const { logger, finish, skipped } = createMiddlewareLogger({
+      const middlewareOpts = {
         method: request.method,
         path,
         requestId: headers['x-request-id'] || crypto.randomUUID(),
@@ -87,9 +88,20 @@ export function evlog(options: EvlogElysiaOptions = {}) {
         // because Elysia has fast path for getting headers on Bun
         headers: filterSafeHeaders(headers as Record<string, string>),
         ...options,
-      })
+      }
+      const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
-      if (!skipped) activeLoggers.add(logger)
+      if (!skipped) {
+        attachForkToLogger(storage, logger, middlewareOpts, {
+          onChildEnter: (child) => {
+            activeLoggers.add(child)
+          },
+          onChildExit: (child) => {
+            activeLoggers.delete(child)
+          },
+        })
+        activeLoggers.add(logger)
+      }
       storage.enterWith(logger)
       requestState.set(request, { finish, skipped, logger })
 

@@ -418,6 +418,10 @@ export interface InternalFields {
   status?: number
   service?: string
   requestLogs?: RequestLogEntry[]
+  /** Label for a forked background wide event (child operation name). */
+  operation?: string
+  /** Parent request's `requestId` when this event was produced by `log.fork()`. */
+  _parentRequestId?: string
 }
 
 /**
@@ -440,6 +444,15 @@ export type FieldContext<T extends object = Record<string, unknown>> =
 
 /**
  * Request-scoped logger for building wide events
+ *
+ * After {@link RequestLogger.emit} runs (including when head sampling drops the event),
+ * the logger is **sealed**: further `set`, `error`, `info`, and `warn` calls log a
+ * console warning and do not mutate the wide event. A second `emit` is ignored with
+ * a warning. Use {@link RequestLogger.fork} on supported integrations for intentional
+ * background work that needs its own wide event.
+ *
+ * `fork` is only present on request loggers from integrations that attach it (not on
+ * standalone `createLogger()` instances).
  *
  * @example
  * ```ts
@@ -470,27 +483,38 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
    * When both the existing and incoming values for a key are arrays, elements are
    * concatenated (existing order preserved, new elements appended). Otherwise the
    * new value replaces the old one (including when only one side is an array).
+   *
+   * No-ops with a console warning after the wide event has been emitted.
    */
   set: (context: FieldContext<T>) => void
 
   /**
-   * Log an error and capture its details
+   * Log an error and capture its details.
+   *
+   * No-ops with a console warning after the wide event has been emitted.
    */
   error: (error: Error | string, context?: FieldContext<T>) => void
 
   /**
    * Capture an informational message inside the request wide event.
+   *
+   * No-ops with a console warning after the wide event has been emitted.
    */
   info: (message: string, context?: FieldContext<T>) => void
 
   /**
    * Capture a warning message inside the request wide event.
+   *
+   * No-ops with a console warning after the wide event has been emitted.
    */
   warn: (message: string, context?: FieldContext<T>) => void
 
   /**
    * Emit the final wide event with all accumulated context.
    * Returns the emitted WideEvent, or null if the log was sampled out.
+   *
+   * Seals the logger: after this returns (including when the return value is `null`
+   * due to sampling), further mutations are ignored with warnings.
    */
   emit: (overrides?: FieldContext<T> & { _forceKeep?: boolean }) => WideEvent | null
 
@@ -498,6 +522,27 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
    * Get the current accumulated context
    */
   getContext: () => FieldContext<T> & Record<string, unknown>
+
+  /**
+   * Run async (or sync) work in a **child** request logger scope so `useLogger()`
+   * resolves to the child logger while `fn` runs. The child emits its own wide event
+   * when `fn` settles, with `operation` and `_parentRequestId` set for correlation.
+   * Only available on integrations that attach this method (Express, Fastify, NestJS,
+   * SvelteKit, React Router, Next.js `withEvlog`, Elysia — see docs).
+   *
+   * @param label - Value stored as `operation` on the child wide event.
+   * @param fn - Function to run; may return a Promise. Errors are captured on the
+   *   child logger and emitted.
+   *
+   * @example
+   * ```ts
+   * log.fork('process_order', async () => {
+   *   const log = useLogger()
+   *   log.set({ step: 'charged' })
+   * })
+   * ```
+   */
+  fork?: (label: string, fn: () => void | Promise<void>) => void
 }
 
 /**

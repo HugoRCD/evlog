@@ -3,6 +3,7 @@ import type { Request } from 'express'
 import type { DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common'
 import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { attachForkToLogger } from '../shared/fork'
 import { extractSafeNodeHeaders } from '../shared/headers'
 import { createLoggerStorage } from '../shared/storage'
 
@@ -41,19 +42,21 @@ function createEvlogMiddleware(getOptions: () => EvlogNestJSOptions) {
     const headers = extractSafeNodeHeaders(req.headers)
     const url = new URL(req.originalUrl || req.url || '/', 'http://localhost')
 
-    const { logger, finish, skipped } = createMiddlewareLogger({
+    const middlewareOpts = {
       method: req.method || 'GET',
       path: url.pathname,
       requestId: headers['x-request-id'] || crypto.randomUUID(),
       headers,
       ...options,
-    })
+    }
+    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       next()
       return
     }
 
+    attachForkToLogger(storage, logger, middlewareOpts)
     req.log = logger
 
     res.on('finish', () => {

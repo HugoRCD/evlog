@@ -1,7 +1,9 @@
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
 import { createRequestLogger, getGlobalDrain, initLogger, isEnabled, isLoggerLocked } from '../logger'
-import { filterSafeHeaders } from '../utils'
+import { attachForkToLogger } from '../shared/fork'
+import type { MiddlewareLoggerOptions } from '../shared/middleware'
 import { shouldLog, getServiceForPath } from '../shared/routes'
+import { filterSafeHeaders } from '../utils'
 import { EvlogError } from '../error'
 import type { NextEvlogOptions } from './types'
 import { evlogStorage } from './storage'
@@ -163,6 +165,21 @@ export function createWithEvlog(options: NextEvlogOptions) {
       }
 
       const logger = createRequestLogger({ method, path, requestId }, { _deferDrain: true })
+
+      const middlewareOpts: MiddlewareLoggerOptions = {
+        method,
+        path,
+        requestId,
+        headers,
+        include: state.options.include,
+        exclude: state.options.exclude,
+        routes: state.options.routes,
+        drain: state.options.drain,
+        enrich: state.options.enrich,
+        keep: state.options.keep,
+        redact: state.options.redact,
+      }
+      attachForkToLogger(evlogStorage, logger, middlewareOpts)
 
       // Apply route-based service configuration
       const routeService = getServiceForPath(path, state.options.routes)

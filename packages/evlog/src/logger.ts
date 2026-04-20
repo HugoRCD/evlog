@@ -12,6 +12,16 @@ function isoNow(): string {
   return _tsDate.toISOString()
 }
 
+/** Shown after post-emit warnings so users can fix fire-and-forget / ALS continuations. */
+const POST_EMIT_FORK_HINT =
+  'For intentional background work tied to this request, use log.fork(\'label\', fn) when your integration supports it (see https://evlog.dev).'
+
+function warnPostEmit(method: string, detail: string): void {
+  console.warn(
+    `[evlog] ${method} called after the wide event was emitted — ${detail} This data will not appear in observability. ${POST_EMIT_FORK_HINT}`,
+  )
+}
+
 function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
   for (const key in source) {
     const sourceVal = source[key]
@@ -533,6 +543,10 @@ interface CreateLoggerInternalOptions {
  * Create a scoped logger for building wide events.
  * Use this for any context: workflows, jobs, scripts, queues, etc.
  *
+ * After `emit()` (including when sampling returns `null`), the logger is sealed and
+ * further mutations log `[evlog]` warnings. Standalone loggers do not have `fork`;
+ * that method is only attached by supported framework integrations.
+ *
  * @example
  * ```ts
  * const log = createLogger({ jobId: job.id, queue: 'emails' })
@@ -548,6 +562,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
   const context: Record<string, unknown> = { ...initialContext }
   let hasError = false
   let hasWarn = false
+  let emitted = false
 
   function addLog(level: 'info' | 'warn', message: string): void {
     if (!Array.isArray(context.requestLogs)) {
@@ -562,10 +577,22 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
 
   return {
     set(data: FieldContext<T>): void {
+      if (emitted) {
+        const keys = Object.keys(data as Record<string, unknown>)
+        warnPostEmit('log.set()', `Keys dropped: ${keys.length ? keys.join(', ') : '(empty)'}.`)
+        return
+      }
       mergeInto(context, data as Record<string, unknown>)
     },
 
     error(error: Error | string, errorContext?: FieldContext<T>): void {
+      if (emitted) {
+        const keys = errorContext
+          ? [...Object.keys(errorContext as Record<string, unknown>), 'error']
+          : ['error']
+        warnPostEmit('log.error()', `Keys dropped: ${keys.join(', ')}.`)
+        return
+      }
       hasError = true
       const err = typeof error === 'string' ? new Error(error) : error
 
@@ -591,6 +618,13 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     },
 
     info(message: string, infoContext?: FieldContext<T>): void {
+      if (emitted) {
+        const keys = infoContext
+          ? ['message', ...Object.keys(infoContext as Record<string, unknown>).filter(k => k !== 'requestLogs')]
+          : ['message']
+        warnPostEmit('log.info()', `Keys dropped: ${keys.join(', ')}.`)
+        return
+      }
       addLog('info', message)
       if (infoContext) {
         const { requestLogs: _, ...rest } = infoContext as Record<string, unknown>
@@ -599,6 +633,13 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     },
 
     warn(message: string, warnContext?: FieldContext<T>): void {
+      if (emitted) {
+        const keys = warnContext
+          ? ['message', ...Object.keys(warnContext as Record<string, unknown>).filter(k => k !== 'requestLogs')]
+          : ['message']
+        warnPostEmit('log.warn()', `Keys dropped: ${keys.join(', ')}.`)
+        return
+      }
       hasWarn = true
       addLog('warn', message)
       if (warnContext) {
@@ -608,6 +649,11 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     },
 
     emit(overrides?: FieldContext<T> & { _forceKeep?: boolean }): WideEvent | null {
+      if (emitted) {
+        warnPostEmit('log.emit()', 'Ignoring duplicate emit.')
+        return null
+      }
+
       const durationMs = Date.now() - startTime
       const level: LogLevel = hasError ? 'error' : hasWarn ? 'warn' : 'info'
 
@@ -626,6 +672,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       }
 
       if (!forceKeep && !shouldSample(level)) {
+        emitted = true
         return null
       }
 
@@ -637,7 +684,9 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       }
       context.duration = formatDuration(durationMs)
 
-      return emitWideEvent(level, context, deferDrain, true)
+      const wide = emitWideEvent(level, context, deferDrain, true)
+      emitted = true
+      return wide
     },
 
     getContext(): FieldContext<T> & Record<string, unknown> {
