@@ -77,7 +77,7 @@
   ],
   "overrides": {
     "vue": "3.5.32",
-    "@noble/hashes": "^1.7.2"
+    "@noble/hashes": "^2.2.0"
   },
   "patchedDependencies": {
     "vaul-vue@0.4.1": "patches/vaul-vue@0.4.1.patch"
