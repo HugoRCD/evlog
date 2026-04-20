@@ -3,17 +3,17 @@
     {
       "entry": "framework/nitro",
       "raw": 18760,
-      "gzip": 6982
-    },
-    {
-      "entry": "framework/next",
-      "raw": 12226,
-      "gzip": 4229
+      "gzip": 6983
     },
     {
       "entry": "framework/ai",
-      "raw": 15214,
-      "gzip": 4138
+      "raw": 15899,
+      "gzip": 4334
+    },
+    {
+      "entry": "framework/next",
+      "raw": 12628,
+      "gzip": 4323
     },
     {
       "entry": "adapter/datadog",
@@ -42,8 +42,8 @@
     },
     {
       "entry": "framework/sveltekit",
-      "raw": 4960,
-      "gzip": 1578
+      "raw": 5165,
+      "gzip": 1635
     },
     {
       "entry": "utils",
@@ -76,14 +76,14 @@
       "gzip": 1354
     },
     {
+      "entry": "framework/nestjs",
+      "raw": 3077,
+      "gzip": 1298
+    },
+    {
       "entry": "http",
       "raw": 2980,
       "gzip": 1259
-    },
-    {
-      "entry": "framework/nestjs",
-      "raw": 2872,
-      "gzip": 1235
     },
     {
       "entry": "adapter/hyperdx",
@@ -91,34 +91,39 @@
       "gzip": 1220
     },
     {
+      "entry": "framework/elysia",
+      "raw": 2860,
+      "gzip": 1171
+    },
+    {
       "entry": "adapter/better-stack",
       "raw": 2742,
       "gzip": 1121
     },
     {
-      "entry": "framework/elysia",
-      "raw": 2540,
-      "gzip": 1072
-    },
-    {
       "entry": "framework/fastify",
-      "raw": 2344,
-      "gzip": 1008
+      "raw": 2549,
+      "gzip": 1076
     },
     {
       "entry": "workers",
       "raw": 2145,
-      "gzip": 977
+      "gzip": 974
     },
     {
       "entry": "framework/express",
-      "raw": 1322,
-      "gzip": 700
+      "raw": 1527,
+      "gzip": 767
     },
     {
       "entry": "framework/hono",
-      "raw": 1098,
-      "gzip": 593
+      "raw": 1143,
+      "gzip": 611
+    },
+    {
+      "entry": "toolkit",
+      "raw": 705,
+      "gzip": 310
     },
     {
       "entry": "browser",
@@ -128,17 +133,12 @@
     {
       "entry": "core (index)",
       "raw": 596,
-      "gzip": 254
-    },
-    {
-      "entry": "toolkit",
-      "raw": 486,
-      "gzip": 242
+      "gzip": 252
     },
     {
       "entry": "logger",
       "raw": 380,
-      "gzip": 208
+      "gzip": 205
     },
     {
       "entry": "client",
@@ -152,7 +152,7 @@
     }
   ],
   "total": {
-    "raw": 129880,
-    "gzip": 47513
+    "raw": 132371,
+    "gzip": 48236
   }
 }
