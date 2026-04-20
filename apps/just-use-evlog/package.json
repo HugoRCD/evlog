@@ -23,7 +23,7 @@
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.1",
     "typescript": "^6.0.2",
     "vue-tsc": "^3.2.6"
   }

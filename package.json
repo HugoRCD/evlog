@@ -55,7 +55,7 @@
     "ai": "^6.0.154",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
-    "eslint": "^9.39.4",
+    "eslint": "^10.2.1",
     "evlog": "workspace:*",
     "turbo": "^2.9.5",
     "typescript": "^6.0.2",

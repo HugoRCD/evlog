@@ -27,6 +27,6 @@
     "zod-to-json-schema": "^3.25.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.4"
+    "eslint": "^10.2.1"
   }
 }
