@@ -1550,4 +1550,387 @@ describe('createAILogger', () => {
       expect(aiData.tools).toBeUndefined()
     })
   })
+
+  describe('public metadata API', () => {
+    describe('getMetadata', () => {
+      it('returns an empty snapshot before any activity', () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+
+        const metadata = ai.getMetadata()
+        expect(metadata).toEqual({
+          calls: 0,
+          inputTokens: 0,
+          outputTokens: 0,
+          totalTokens: 0,
+        })
+        expect(metadata.model).toBeUndefined()
+        expect(metadata.provider).toBeUndefined()
+      })
+
+      it('returns the same shape as the wide event data', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log, {
+          cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+        })
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{}' }],
+          finishReason: createFinishReason('tool-calls'),
+          usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
+          response: { modelId: 'claude-sonnet-4.6', id: 'msg_abc' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+
+        const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+        const metadata = ai.getMetadata()
+
+        expect(metadata).toEqual(aiData)
+        expect(metadata.calls).toBe(1)
+        expect(metadata.model).toBe('claude-sonnet-4.6')
+        expect(metadata.provider).toBe('anthropic')
+        expect(metadata.inputTokens).toBe(1_000_000)
+        expect(metadata.outputTokens).toBe(500_000)
+        expect(metadata.totalTokens).toBe(1_500_000)
+        expect(metadata.estimatedCost).toBe(10.5)
+        expect(metadata.responseId).toBe('msg_abc')
+        expect(metadata.toolCalls).toEqual(['search'])
+        expect(metadata.finishReason).toBe('tool-calls')
+      })
+
+      it('returns a fresh copy that does not mutate underlying state', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{}' }],
+          finishReason: createFinishReason('tool-calls'),
+          usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+
+        const first = ai.getMetadata()
+        ;(first.toolCalls as string[]).push('mutated')
+        first.calls = 999
+
+        const second = ai.getMetadata()
+        expect(second.calls).toBe(1)
+        expect(second.toolCalls).toEqual(['search'])
+      })
+
+      it('updates after each step in a multi-step run', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>)
+          .mockResolvedValueOnce({
+            content: [],
+            finishReason: createFinishReason(),
+            usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+            response: { modelId: 'claude-sonnet-4.6' },
+          })
+          .mockResolvedValueOnce({
+            content: [],
+            finishReason: createFinishReason(),
+            usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
+            response: { modelId: 'claude-sonnet-4.6' },
+          })
+
+        await wrappedModel.doGenerate({} as any)
+        const afterStep1 = ai.getMetadata()
+        expect(afterStep1.calls).toBe(1)
+        expect(afterStep1.totalTokens).toBe(150)
+
+        await wrappedModel.doGenerate({} as any)
+        const afterStep2 = ai.getMetadata()
+        expect(afterStep2.calls).toBe(2)
+        expect(afterStep2.totalTokens).toBe(450)
+      })
+
+      it('reflects embedding capture', () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+
+        ai.captureEmbed({ usage: { tokens: 500 }, model: 'text-embedding-3-small', dimensions: 1536 })
+
+        const metadata = ai.getMetadata()
+        expect(metadata.calls).toBe(1)
+        expect(metadata.inputTokens).toBe(500)
+        expect(metadata.embedding).toEqual({
+          tokens: 500,
+          model: 'text-embedding-3-small',
+          dimensions: 1536,
+        })
+      })
+
+      it('reflects errors from a failed generation', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('quota exceeded'))
+
+        await expect(wrappedModel.doGenerate({} as any)).rejects.toThrow('quota exceeded')
+
+        const metadata = ai.getMetadata()
+        expect(metadata.error).toBe('quota exceeded')
+        expect(metadata.finishReason).toBe('error')
+      })
+    })
+
+    describe('getEstimatedCost', () => {
+      it('returns undefined without a cost map', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [],
+          finishReason: createFinishReason(),
+          usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+        expect(ai.getEstimatedCost()).toBeUndefined()
+      })
+
+      it('returns the same value as metadata.estimatedCost', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log, {
+          cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+        })
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [],
+          finishReason: createFinishReason(),
+          usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+
+        expect(ai.getEstimatedCost()).toBe(10.5)
+        expect(ai.getEstimatedCost()).toBe(ai.getMetadata().estimatedCost)
+      })
+
+      it('returns undefined for an unpriced model', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log, { cost: { 'gpt-4o': { input: 2.5, output: 10 } } })
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [],
+          finishReason: createFinishReason(),
+          usage: createMockUsage(),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+        expect(ai.getEstimatedCost()).toBeUndefined()
+      })
+    })
+
+    describe('onUpdate', () => {
+      it('fires the callback on each step with a metadata snapshot', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        const updates: Array<ReturnType<typeof ai.getMetadata>> = []
+        ai.onUpdate((metadata) => {
+          updates.push(metadata)
+        })
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>)
+          .mockResolvedValueOnce({
+            content: [],
+            finishReason: createFinishReason(),
+            usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
+            response: { modelId: 'claude-sonnet-4.6' },
+          })
+          .mockResolvedValueOnce({
+            content: [],
+            finishReason: createFinishReason(),
+            usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
+            response: { modelId: 'claude-sonnet-4.6' },
+          })
+
+        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate({} as any)
+
+        expect(updates).toHaveLength(2)
+        expect(updates[0].calls).toBe(1)
+        expect(updates[0].totalTokens).toBe(150)
+        expect(updates[1].calls).toBe(2)
+        expect(updates[1].totalTokens).toBe(450)
+      })
+
+      it('fires on captureEmbed', () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+
+        const updates: Array<ReturnType<typeof ai.getMetadata>> = []
+        ai.onUpdate(metadata => updates.push(metadata))
+
+        ai.captureEmbed({ usage: { tokens: 42 } })
+
+        expect(updates).toHaveLength(1)
+        expect(updates[0].embedding).toEqual({ tokens: 42 })
+      })
+
+      it('fires on errors', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        const updates: Array<ReturnType<typeof ai.getMetadata>> = []
+        ai.onUpdate(metadata => updates.push(metadata))
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'))
+        await expect(wrappedModel.doGenerate({} as any)).rejects.toThrow('boom')
+
+        expect(updates).toHaveLength(1)
+        expect(updates[0].error).toBe('boom')
+        expect(updates[0].finishReason).toBe('error')
+      })
+
+      it('fires on createEvlogIntegration onFinish when sharing state', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const integration = createEvlogIntegration(ai)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        const updates: Array<ReturnType<typeof ai.getMetadata>> = []
+        ai.onUpdate(metadata => updates.push(metadata))
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'getWeather', input: '{}' }],
+          finishReason: createFinishReason('tool-calls'),
+          usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        integration.onStart!({} as any)
+        await wrappedModel.doGenerate({} as any)
+        integration.onToolCallFinish!({
+          toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+          durationMs: 50,
+          success: true,
+          output: {},
+        } as any)
+        integration.onFinish!({} as any)
+
+        expect(updates.length).toBeGreaterThanOrEqual(2)
+        const last = updates[updates.length - 1]
+        expect(last.tools).toHaveLength(1)
+        expect(last.totalDurationMs).toBeTypeOf('number')
+      })
+
+      it('returns an unsubscribe function', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        let count = 0
+        const off = ai.onUpdate(() => {
+          count++ 
+        })
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [],
+          finishReason: createFinishReason(),
+          usage: createMockUsage(),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await wrappedModel.doGenerate({} as any)
+        expect(count).toBe(1)
+
+        off()
+
+        await wrappedModel.doGenerate({} as any)
+        expect(count).toBe(1)
+      })
+
+      it('supports multiple subscribers', () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+
+        let a = 0
+        let b = 0
+        ai.onUpdate(() => {
+          a++ 
+        })
+        ai.onUpdate(() => {
+          b++ 
+        })
+
+        ai.captureEmbed({ usage: { tokens: 10 } })
+        ai.captureEmbed({ usage: { tokens: 20 } })
+
+        expect(a).toBe(2)
+        expect(b).toBe(2)
+      })
+
+      it('isolates subscriber errors so the AI flow continues', async () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+        const model = createMockModel()
+        const wrappedModel = ai.wrap(model)
+
+        ai.onUpdate(() => {
+          throw new Error('listener crashed')
+        })
+        let calls = 0
+        ai.onUpdate(() => {
+          calls++ 
+        })
+
+        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+          content: [],
+          finishReason: createFinishReason(),
+          usage: createMockUsage(),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+
+        await expect(wrappedModel.doGenerate({} as any)).resolves.toBeDefined()
+        expect(calls).toBe(1)
+      })
+
+      it('delivers an immutable snapshot to listeners', () => {
+        const log = createMockLogger()
+        const ai = createAILogger(log)
+
+        const seen: Array<ReturnType<typeof ai.getMetadata>> = []
+        ai.onUpdate((metadata) => {
+          seen.push(metadata) 
+        })
+
+        ai.captureEmbed({ usage: { tokens: 10 } })
+        seen[0].calls = 999
+
+        ai.captureEmbed({ usage: { tokens: 20 } })
+        expect(seen[1].calls).toBe(2)
+      })
+    })
+  })
 })

@@ -70,6 +70,17 @@ export default defineEventHandler(async (event) => {
     },
   })
 
+  ai.onUpdate((metadata) => {
+    logger.set({
+      aiLive: {
+        step: metadata.calls,
+        totalTokens: metadata.totalTokens,
+        estimatedCost: metadata.estimatedCost,
+        finishReason: metadata.finishReason,
+      },
+    })
+  })
+
   try {
     const agent = new ToolLoopAgent({
       model: ai.wrap('google/gemini-3-flash'),
@@ -84,6 +95,23 @@ export default defineEventHandler(async (event) => {
     return createAgentUIStreamResponse({
       agent,
       uiMessages: messages,
+      messageMetadata: ({ part }) => {
+        if (part.type === 'finish-step' || part.type === 'finish') {
+          const snapshot = ai.getMetadata()
+          return {
+            calls: snapshot.calls,
+            totalTokens: snapshot.totalTokens,
+            estimatedCost: snapshot.estimatedCost,
+            finishReason: snapshot.finishReason,
+          }
+        }
+      },
+      onFinish: () => {
+        logger.set({
+          aiFinalMetadata: ai.getMetadata(),
+          aiFinalCost: ai.getEstimatedCost(),
+        })
+      },
     })
   } catch (error) {
     throw createError({

@@ -719,6 +719,23 @@ The middleware captures: `inputTokens`, `outputTokens`, `cacheReadTokens`, `reas
 
 For embeddings: `ai.captureEmbed({ usage })`.
 
+The same metadata is also exposed as a public API for custom analytics, billing, or user-facing dashboards:
+
+```typescript
+const ai = createAILogger(log, {
+  cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+})
+
+await generateText({ model: ai.wrap('anthropic/claude-sonnet-4.6'), prompt })
+
+const metadata = ai.getMetadata()       // structured snapshot (AIMetadata)
+const cost = ai.getEstimatedCost()      // dollars, or undefined
+
+ai.onUpdate((metadata) => {             // incremental updates per step
+  pushToClient({ tokens: metadata.totalTokens, cost: metadata.estimatedCost })
+})
+```
+
 ## Adapters
 
 Send your logs to external observability platforms with built-in adapters.

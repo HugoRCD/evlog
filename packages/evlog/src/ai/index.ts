@@ -92,13 +92,18 @@ export interface AIEmbeddingData {
 }
 
 /**
- * Shape of the `ai` field written to the wide event.
+ * Shape of the `ai` field written to the wide event, and the public
+ * snapshot returned by `AILogger.getMetadata()`.
+ *
+ * `model` and `provider` are populated after the first model call.
+ * They may be undefined when only `captureEmbed` has been called or
+ * before any AI activity has happened.
  */
 export interface AIEventData {
   calls: number
-  model: string
+  model?: string
   models?: string[]
-  provider: string
+  provider?: string
   inputTokens: number
   outputTokens: number
   totalTokens: number
@@ -119,6 +124,20 @@ export interface AIEventData {
   embedding?: AIEmbeddingData
   estimatedCost?: number
 }
+
+/**
+ * Public alias for the metadata snapshot returned by `AILogger.getMetadata()`.
+ *
+ * Mirrors the shape of the `ai` field on the wide event, so the same object
+ * can be persisted, surfaced to end-users, or compared across runs.
+ */
+export type AIMetadata = AIEventData
+
+/**
+ * Callback fired on every metadata update (per step, per embed, on error,
+ * and on integration completion). Receives a structured snapshot.
+ */
+export type AIMetadataListener = (metadata: AIMetadata) => void
 
 export interface AILogger {
   /**
@@ -166,6 +185,92 @@ export interface AILogger {
     dimensions?: number
     count?: number
   }) => void
+
+  /**
+   * Get a snapshot of the current AI execution metadata.
+   *
+   * Returns the same structured object that is written to the `ai` field
+   * of the wide event. Safe to call at any time — including inside the
+   * AI SDK's `onFinish` callback, after `await generateText()`, or while a
+   * stream is in progress.
+   *
+   * The returned snapshot is a fresh copy: mutating it does not affect
+   * subsequent calls or the underlying state.
+   *
+   * @example Persist execution history after a run
+   * ```ts
+   * const ai = createAILogger(log, { cost: { ... } })
+   *
+   * await generateText({ model: ai.wrap('anthropic/claude-sonnet-4.6'), prompt })
+   *
+   * const metadata = ai.getMetadata()
+   * await db.insert('ai_runs', metadata)
+   * ```
+   *
+   * @example Surface usage to end-users in a streaming response
+   * ```ts
+   * const result = streamText({
+   *   model: ai.wrap('anthropic/claude-sonnet-4.6'),
+   *   messages,
+   *   onFinish: () => {
+   *     const { totalTokens, estimatedCost } = ai.getMetadata()
+   *     trackUsage(userId, { totalTokens, estimatedCost })
+   *   },
+   * })
+   * ```
+   */
+  getMetadata: () => AIMetadata
+
+  /**
+   * Get the current estimated cost in dollars.
+   *
+   * Returns `undefined` if no `cost` map was provided to `createAILogger`,
+   * or if the model is not in the pricing map.
+   *
+   * Convenience for `getMetadata().estimatedCost`.
+   *
+   * @example
+   * ```ts
+   * const ai = createAILogger(log, {
+   *   cost: { 'claude-sonnet-4.6': { input: 3, output: 15 } },
+   * })
+   *
+   * await generateText({ model: ai.wrap('anthropic/claude-sonnet-4.6'), prompt })
+   *
+   * console.log(`Cost: $${ai.getEstimatedCost()?.toFixed(4)}`)
+   * ```
+   */
+  getEstimatedCost: () => number | undefined
+
+  /**
+   * Subscribe to metadata updates.
+   *
+   * The callback fires every time the underlying state flushes — once per
+   * step (in multi-step agent runs), once per `captureEmbed` call, on
+   * model errors, and once on `createEvlogIntegration`'s `onFinish`.
+   *
+   * Each invocation receives a fresh snapshot (same shape as `getMetadata`).
+   * Returns an unsubscribe function.
+   *
+   * @example Stream incremental usage updates to the client
+   * ```ts
+   * const ai = createAILogger(log)
+   *
+   * ai.onUpdate((metadata) => {
+   *   pushToClient({ type: 'ai-progress', metadata })
+   * })
+   *
+   * const result = streamText({ model: ai.wrap('...'), messages })
+   * ```
+   *
+   * @example Cleanup
+   * ```ts
+   * const off = ai.onUpdate((metadata) => { ... })
+   * // later
+   * off()
+   * ```
+   */
+  onUpdate: (callback: AIMetadataListener) => () => void
 
   /**
    * Internal accumulator state exposed for `createEvlogIntegration` to share.
@@ -294,6 +399,17 @@ export function createAILogger(log: RequestLogger, options?: AILoggerOptions): A
       flushState(log, state)
     },
 
+    getMetadata: () => buildMetadata(state),
+
+    getEstimatedCost: () => computeEstimatedCost(state),
+
+    onUpdate: (callback: AIMetadataListener) => {
+      state.subscribers.add(callback)
+      return () => {
+        state.subscribers.delete(callback)
+      }
+    },
+
     _state: state,
   }
 }
@@ -319,6 +435,7 @@ interface AccumulatorState {
   totalDurationMs: number | undefined
   embedding: AIEmbeddingData | undefined
   costMap: Record<string, ModelCost> | undefined
+  subscribers: Set<AIMetadataListener>
   /** @internal Logger reference for integration flush */
   _log?: RequestLogger
 }
@@ -372,6 +489,7 @@ function createAccumulatorState(options?: AILoggerOptions): AccumulatorState {
     totalDurationMs: undefined,
     embedding: undefined,
     costMap: options?.cost,
+    subscribers: new Set(),
   }
 }
 
@@ -387,11 +505,11 @@ function computeEstimatedCost(state: AccumulatorState): number | undefined {
   return total > 0 ? Math.round(total * 1_000_000) / 1_000_000 : undefined
 }
 
-function flushState(log: RequestLogger, state: AccumulatorState): void {
+function buildMetadata(state: AccumulatorState): AIMetadata {
   const uniqueModels = [...new Set(state.models)]
   const lastModel = state.models[state.models.length - 1]
 
-  const data: Partial<AIEventData> & { calls: number, inputTokens: number, outputTokens: number, totalTokens: number } = {
+  const data: AIMetadata = {
     calls: state.calls,
     inputTokens: state.usage.inputTokens,
     outputTokens: state.usage.outputTokens,
@@ -406,14 +524,14 @@ function flushState(log: RequestLogger, state: AccumulatorState): void {
   if (state.usage.reasoningTokens > 0) data.reasoningTokens = state.usage.reasoningTokens
   if (state.lastFinishReason) data.finishReason = state.lastFinishReason
   if (state.toolInputs && state.allToolCallInputs.length > 0) {
-    data.toolCalls = [...state.allToolCallInputs]
+    data.toolCalls = state.allToolCallInputs.map(t => ({ ...t }))
   } else if (state.allToolCalls.length > 0) {
     data.toolCalls = [...state.allToolCalls]
   }
   if (state.lastResponseId) data.responseId = state.lastResponseId
   if (state.steps > 1) {
     data.steps = state.steps
-    data.stepsUsage = [...state.stepsUsage]
+    data.stepsUsage = state.stepsUsage.map(s => ({ ...s, ...(s.toolCalls ? { toolCalls: [...s.toolCalls] } : {}) }))
   }
   if (state.lastMsToFirstChunk !== undefined) data.msToFirstChunk = state.lastMsToFirstChunk
   if (state.lastMsToFinish !== undefined) {
@@ -423,13 +541,30 @@ function flushState(log: RequestLogger, state: AccumulatorState): void {
     }
   }
   if (state.lastError) data.error = state.lastError
-  if (state.toolExecutions.length > 0) data.tools = [...state.toolExecutions]
+  if (state.toolExecutions.length > 0) data.tools = state.toolExecutions.map(t => ({ ...t }))
   if (state.totalDurationMs !== undefined) data.totalDurationMs = state.totalDurationMs
   if (state.embedding) data.embedding = { ...state.embedding }
   const cost = computeEstimatedCost(state)
   if (cost !== undefined) data.estimatedCost = cost
 
+  return data
+}
+
+function notifySubscribers(state: AccumulatorState, metadata: AIMetadata): void {
+  if (state.subscribers.size === 0) return
+  for (const subscriber of state.subscribers) {
+    try {
+      subscriber(metadata)
+    } catch {
+      // Subscribers must not break the AI flow.
+    }
+  }
+}
+
+function flushState(log: RequestLogger, state: AccumulatorState): void {
+  const data = buildMetadata(state)
   log.set({ ai: data } as Record<string, unknown>)
+  notifySubscribers(state, data)
 }
 
 function recordModel(state: AccumulatorState, provider: string, modelId: string, responseModelId?: string): void {

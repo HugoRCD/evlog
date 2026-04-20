@@ -48,6 +48,25 @@ function getToolInput(part: any): { query?: string } {
 function getToolOutput(part: any): { count?: number, error?: string } | undefined {
   return part.output
 }
+
+interface AiMessageMetadata {
+  calls?: number
+  totalTokens?: number
+  estimatedCost?: number
+  finishReason?: string
+}
+
+function getAiMetadata(message: any): AiMessageMetadata | undefined {
+  const meta = message?.metadata as AiMessageMetadata | undefined
+  if (!meta || (meta.calls === undefined && meta.totalTokens === undefined)) return undefined
+  return meta
+}
+
+function formatCost(cost: number | undefined): string {
+  if (cost === undefined) return '—'
+  if (cost === 0) return '$0'
+  return `$${cost.toFixed(6)}`
+}
 </script>
 
 <template>
@@ -74,6 +93,18 @@ function getToolOutput(part: any): { count?: number, error?: string } | undefine
       </div>
 
       <template v-for="(message, index) in chat.messages" :key="message.id">
+        <div
+          v-if="message.role === 'assistant' && getAiMetadata(message)"
+          style="flex-shrink: 0; align-self: flex-start; max-width: 85%; padding: 0.3rem 0.55rem; border-radius: 6px; font-size: 0.7rem; color: #4a5568; background: #edf2f7; border: 1px solid #e2e8f0; font-family: monospace; display: inline-flex; gap: 0.5rem; flex-wrap: wrap;"
+        >
+          <span>step {{ getAiMetadata(message)!.calls }}</span>
+          <span>·</span>
+          <span>{{ getAiMetadata(message)!.totalTokens }} tokens</span>
+          <span>·</span>
+          <span>{{ formatCost(getAiMetadata(message)!.estimatedCost) }}</span>
+          <span v-if="getAiMetadata(message)!.finishReason">·</span>
+          <span v-if="getAiMetadata(message)!.finishReason">{{ getAiMetadata(message)!.finishReason }}</span>
+        </div>
         <template v-for="(part, pi) in message.parts" :key="`${message.id}-${part.type}-${pi}`">
           <!-- User text -->
           <div
