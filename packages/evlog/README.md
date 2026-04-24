@@ -693,6 +693,62 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
+## Audit Logs
+
+Audit logs are not a parallel system: they are a typed `audit` field on the wide event plus a few helpers. Add 1 enricher + 1 drain wrapper + `log.audit()` and you get tamper-evident, redact-aware, force-kept audit events through the same pipeline.
+
+```typescript
+// server/plugins/evlog.ts
+import { auditEnricher, auditOnly, signed } from 'evlog'
+import { createAxiomDrain } from 'evlog/axiom'
+import { createFsDrain } from 'evlog/fs'
+
+export default defineNitroPlugin((nitroApp) => {
+  const enrich = [auditEnricher({ tenantId: ctx => ctx.headers?.['x-tenant-id'] })]
+  const audits = auditOnly(signed(createFsDrain({ path: '.audit/' }), { strategy: 'hash-chain' }), { await: true })
+  const main = createAxiomDrain()
+
+  nitroApp.hooks.hook('evlog:enrich', async ctx => { for (const e of enrich) await e(ctx) })
+  nitroApp.hooks.hook('evlog:drain', async ctx => { await Promise.all([main(ctx), audits(ctx)]) })
+})
+```
+
+```typescript
+// server/api/invoice/[id]/refund.post.ts
+import { auditDiff } from 'evlog'
+
+export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
+  const before = await db.invoice.get(id)
+  const after = await db.invoice.refund(id)
+
+  log.audit?.({
+    action: 'invoice.refund',
+    actor: { type: 'user', id: user.id, email: user.email },
+    target: { type: 'invoice', id: after.id },
+    outcome: 'success',
+    changes: auditDiff(before, after),
+  })
+})
+```
+
+| Symbol | Kind | Purpose |
+|--------|------|---------|
+| `log.audit(fields)` / `log.audit.deny(reason, fields)` | method | Sugar over `log.set({ audit })` + force-keep |
+| `audit(fields)` | function | Standalone for jobs / scripts |
+| `withAudit({ action, target })(fn)` | wrapper | Auto-emit success / failure / denied |
+| `defineAuditAction(name, opts?)` | factory | Typed action registry |
+| `auditDiff(before, after)` | helper | Redact-aware JSON Patch for `changes` |
+| `mockAudit()` | test util | Capture and assert audits in tests |
+| `auditEnricher({ tenantId? })` | enricher | Auto-fill `req`/`trace`/`ip`/`ua`/`tenantId` context |
+| `auditOnly(drain, { await? })` | wrapper | Routes only events with `event.audit` |
+| `signed(drain, { strategy: 'hmac' \| 'hash-chain', ... })` | wrapper | Tamper-evident integrity |
+| `auditRedactPreset` | preset | Strict PII for audit events |
+
+`AuditFields` is exported and merges with `BaseWideEvent` — augment it with `declare module` if you need extra typed fields. Audit events are always force-kept by tail sampling and get a deterministic `idempotencyKey` so retries are safe across drains.
+
+See [the Audit Logs guide](https://evlog.dev/logging/audit) for compliance, GDPR, and recipe details.
+
 ## AI SDK Integration
 
 Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Requires `ai >= 6.0.0`.

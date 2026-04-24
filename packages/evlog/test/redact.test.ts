@@ -594,13 +594,13 @@ describe('built-in smart masking', () => {
     expect(event.zero).toBe('0.0.0.0')
   })
 
-  it('masks international phone numbers keeping last 4 digits', () => {
+  it('masks international phone numbers keeping last 2 digits', () => {
     const event: Record<string, unknown> = {
       us: '+1 (555) 123-4567',
       fr: '+33 6 12 34 56 78',
       uk: '+44 7911 123456',
       de: '+49 170 1234567',
-      local: '06 12 34 56 78',
+      parens: '(555) 123-4567',
       safe: 'no phone here',
     }
     redactEvent(event, resolveRedactConfig({ builtins: ['phone'] })!)
@@ -608,7 +608,26 @@ describe('built-in smart masking', () => {
     expect(event.us).not.toContain('555')
     expect(event.fr).not.toContain('12 34')
     expect(event.de).not.toContain('1234567')
+    expect(event.parens).not.toContain('555')
     expect(event.safe).toBe('no phone here')
+  })
+
+  it('does not mask digit-rich identifiers (UUIDs, hex hashes, ids)', () => {
+    const event: Record<string, unknown> = {
+      uuid: '12345642-f647-42bb-9fda-742d2b4f41fa',
+      requestId: '00000000-1111-2222-3333-444444444444',
+      idempotencyKey: '961da3f34097bb096902b5457ae02687',
+      orderId: 'ord_1234567890',
+      bareDigits: '0612345678',
+      localPhone: '06 12 34 56 78',
+    }
+    redactEvent(event, resolveRedactConfig({ builtins: ['phone'] })!)
+    expect(event.uuid).toBe('12345642-f647-42bb-9fda-742d2b4f41fa')
+    expect(event.requestId).toBe('00000000-1111-2222-3333-444444444444')
+    expect(event.idempotencyKey).toBe('961da3f34097bb096902b5457ae02687')
+    expect(event.orderId).toBe('ord_1234567890')
+    expect(event.bareDigits).toBe('0612345678')
+    expect(event.localPhone).toBe('06 12 34 56 78')
   })
 
   it('masks JWT tokens keeping prefix', () => {

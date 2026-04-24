@@ -1,4 +1,6 @@
+import type { AuditableLogger, AuditInput, AuditMethod } from './audit'
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { redactEvent, resolveRedactConfig } from './redact'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, isLevelEnabled, matchesPattern } from './utils'
 
@@ -188,6 +190,8 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDra
       ...event,
     }
   }
+
+  finalizeAudit(formatted)
 
   if (globalRedact) {
     redactEvent(formatted, globalRedact)
@@ -515,7 +519,8 @@ const _log: Log = {
 
 export { _log as log }
 
-const noopLogger: RequestLogger = {
+const noopAudit = Object.assign(() => {}, { deny: () => {} }) as AuditMethod
+const noopLogger: AuditableLogger = {
   set() {},
   error() {},
   info() {},
@@ -526,6 +531,7 @@ const noopLogger: RequestLogger = {
   getContext() {
     return {}
   },
+  audit: noopAudit,
 }
 
 /**
@@ -554,8 +560,8 @@ interface CreateLoggerInternalOptions {
  * log.emit()
  * ```
  */
-export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}, internalOptions?: CreateLoggerInternalOptions): RequestLogger<T> {
-  if (!globalEnabled) return noopLogger as RequestLogger<T>
+export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}, internalOptions?: CreateLoggerInternalOptions): AuditableLogger<T> {
+  if (!globalEnabled) return noopLogger as unknown as AuditableLogger<T>
 
   const deferDrain = internalOptions?._deferDrain ?? false
   const startTime = Date.now()
@@ -575,7 +581,26 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     })
   }
 
+  const auditMethod = function audit(input: AuditInput): void {
+    if (emitted) {
+      warnPostEmit('log.audit()', `Audit dropped: action=${input.action}.`)
+      return
+    }
+    const fields = buildAuditFields(input)
+    if (!isPlainObject(context.audit)) {
+      context.audit = fields as unknown as Record<string, unknown>
+    } else {
+      mergeInto(context.audit as Record<string, unknown>, fields as unknown as Record<string, unknown>)
+    }
+    context._auditForceKeep = true
+  } as AuditMethod<T>
+
+  auditMethod.deny = function deny(reason: string, input: Omit<AuditInput, 'outcome' | 'reason'>): void {
+    auditMethod({ ...input, outcome: 'denied', reason })
+  }
+
   return {
+    audit: auditMethod,
     set(data: FieldContext<T>): void {
       if (emitted) {
         const keys = Object.keys(data as Record<string, unknown>)
@@ -660,6 +685,8 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       let forceKeep = false
       if (overrides?._forceKeep) {
         forceKeep = true
+      } else if (consumeAuditForceKeep(context)) {
+        forceKeep = true
       } else if (globalSampling.keep?.length) {
         const status = (overrides as Record<string, unknown> | undefined)?.status ?? context.status
         forceKeep = shouldKeep({
@@ -707,7 +734,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
  * log.emit()
  * ```
  */
-export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}, internalOptions?: CreateLoggerInternalOptions): RequestLogger<T> {
+export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}, internalOptions?: CreateLoggerInternalOptions): AuditableLogger<T> {
   const initial: Record<string, unknown> = {}
   if (options.method !== undefined) initial.method = options.method
   if (options.path !== undefined) initial.path = options.path

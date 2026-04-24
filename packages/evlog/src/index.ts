@@ -1,3 +1,35 @@
+export {
+  AUDIT_SCHEMA_VERSION,
+  AuditDeniedError,
+  audit,
+  auditDiff,
+  auditEnricher,
+  auditOnly,
+  auditRedactPreset,
+  buildAuditFields,
+  defineAuditAction,
+  mockAudit,
+  signed,
+  withAudit,
+  withAuditMethods,
+} from './audit'
+export type {
+  AuditDiffOptions,
+  AuditEnricherOptions,
+  AuditInput,
+  AuditMatcher,
+  AuditMethod,
+  AuditOnlyOptions,
+  AuditPatchOp,
+  AuditableLogger,
+  DefinedAuditAction,
+  DrainFn,
+  MockAudit,
+  SignedChainState,
+  SignedOptions,
+  WithAuditContext,
+  WithAuditOptions,
+} from './audit'
 export { EvlogError, createError, createEvlogError } from './error'
 export { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log, shouldKeep } from './logger'
 export { isLevelEnabled } from './utils'
@@ -5,6 +37,10 @@ export { useLogger } from './runtime/server/useLogger'
 export { parseError } from './runtime/utils/parseError'
 
 export type {
+  AuditActor,
+  AuditFields,
+  AuditLoggerMethod,
+  AuditTarget,
   BaseWideEvent,
   DeepPartial,
   DrainContext,

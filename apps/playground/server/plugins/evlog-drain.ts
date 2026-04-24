@@ -2,35 +2,25 @@
 // import { createPostHogDrain } from 'evlog/posthog'
 // import { createSentryDrain } from 'evlog/sentry'
 // import { createBetterStackDrain } from 'evlog/better-stack'
+// import { createDatadogDrain } from 'evlog/datadog'
+import { auditOnly, signed } from 'evlog'
 import { createFsDrain } from 'evlog/fs'
-import { createDatadogDrain } from 'evlog/datadog'
 
 export default defineNitroPlugin((nitroApp) => {
-  nitroApp.hooks.hook('evlog:drain', (ctx) => {
-    // console.log('[DRAIN]', JSON.stringify({
-    //   event: ctx.event,
-    //   request: ctx.request,
-    //   headers: ctx.headers,
-    // }, null, 2))
+  // Main drain: every wide event lands here. In a real app this would be Axiom,
+  // Datadog, PostHog, etc. — observability storage with sampling and 30-90 day retention.
+  const main = createFsDrain()
 
-    // const axiomDrain = createAxiomDrain({
-    //   dataset: 'evlog',
-    // })
-    // axiomDrain(ctx)
+  // Audit sink: tamper-evident, append-only, only receives events that carry an
+  // `audit` field. `signed({ strategy: 'hash-chain' })` adds prevHash + hash so
+  // the sequence is verifiable. `await: true` blocks the request until the audit
+  // is flushed — you don't want to lose audits on crash.
+  const auditSink = auditOnly(
+    signed(createFsDrain({ dir: '.audit/' }), { strategy: 'hash-chain' }),
+    { await: true },
+  )
 
-    // const posthogDrain = createPostHogDrain()
-    // posthogDrain(ctx)
-
-    // const sentryDrain = createSentryDrain()
-    // sentryDrain(ctx)
-
-    // const betterStackDrain = createBetterStackDrain()
-    // betterStackDrain(ctx)
-
-    const datadogDrain = createDatadogDrain()
-    datadogDrain(ctx)
-
-    const fsDrain = createFsDrain()
-    fsDrain(ctx)
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.all([main(ctx), auditSink(ctx)])
   })
 })

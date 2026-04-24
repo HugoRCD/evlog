@@ -233,6 +233,109 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'audit',
+      label: 'Audit Logs',
+      icon: 'i-lucide-shield-check',
+      title: 'Audit Logs',
+      description: 'First-class audit trails composed on the same wide-event pipeline. Every event is force-kept (never sampled), enriched with request context (`auditEnricher`), and routed to a tamper-evident sink (`auditOnly(signed(fsDrain))` writing hash-chained NDJSON to .audit/). Trigger each scenario and inspect both the terminal wide event and the .audit/ directory.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'audit-refund-success',
+          label: 'log.audit() — success',
+          description: 'Manual log.audit() inside a handler. Records action=invoice.refund with auditDiff(before, after) and outcome=success.',
+          endpoint: '/api/audit/refund',
+          method: 'POST',
+          color: 'success',
+          showResult: true,
+          badge: {
+            label: 'POST /api/audit/refund',
+            color: 'green',
+          },
+          toastOnSuccess: {
+            title: 'Audit recorded',
+            description: 'Check the terminal wide event and .audit/ for the hash-chained entry',
+          },
+        },
+        {
+          id: 'audit-refund-deny',
+          label: 'log.audit.deny()',
+          description: 'Records a denied authorisation check (outcome=denied) and throws a 403 structured error. Auditors care most about denials.',
+          endpoint: '/api/audit/deny',
+          method: 'POST',
+          color: 'error',
+          badge: {
+            label: 'POST /api/audit/deny',
+            color: 'red',
+          },
+          toastOnError: {
+            title: 'Denial audited',
+            description: 'The 403 is expected — the audit event with outcome=denied was recorded before the throw',
+          },
+        },
+        {
+          id: 'audit-with-audit-success',
+          label: 'withAudit() — success',
+          description: 'Wraps an action with withAudit(). Outcome resolves automatically: returned value → success.',
+          color: 'success',
+          onClick: async () => {
+            await $fetch('/api/audit/with-audit', {
+              method: 'POST',
+              body: { scenario: 'success' },
+            })
+          },
+          badge: {
+            label: 'outcome: success',
+            color: 'green',
+          },
+          toastOnSuccess: {
+            title: 'withAudit() success',
+            description: 'Action returned cleanly → outcome=success was recorded automatically',
+          },
+        },
+        {
+          id: 'audit-with-audit-failure',
+          label: 'withAudit() — failure',
+          description: 'Same wrapper, but the action throws a non-403 error. Outcome resolves to failure and the error is re-thrown.',
+          color: 'warning',
+          onClick: async () => {
+            await $fetch('/api/audit/with-audit', {
+              method: 'POST',
+              body: { scenario: 'failure' },
+            })
+          },
+          badge: {
+            label: 'outcome: failure',
+            color: 'warning',
+          },
+          toastOnSuccess: {
+            title: 'withAudit() failure',
+            description: 'Action threw → outcome=failure recorded, error.message captured as reason',
+          },
+        },
+        {
+          id: 'audit-with-audit-denied',
+          label: 'withAudit() — denied',
+          description: 'Action throws AuditDeniedError. Outcome resolves to denied, error message becomes audit.reason.',
+          color: 'error',
+          onClick: async () => {
+            await $fetch('/api/audit/with-audit', {
+              method: 'POST',
+              body: { scenario: 'denied' },
+            })
+          },
+          badge: {
+            label: 'outcome: denied',
+            color: 'red',
+          },
+          toastOnSuccess: {
+            title: 'withAudit() denied',
+            description: 'AuditDeniedError → outcome=denied recorded with reason',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'structured-errors',
       label: 'Structured Errors',
       icon: 'i-lucide-shield-alert',

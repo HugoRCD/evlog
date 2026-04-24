@@ -29,9 +29,17 @@ export const builtinPatterns = {
     pattern: /\b(?!0\.0\.0\.0\b)(?!127\.0\.0\.1\b)\d{1,3}\.\d{1,3}\.\d{1,3}\.\d{1,3}\b/g,
     mask: (m: string) => `***.***.***.${m.split('.').pop()}`,
   },
-  /** International phone numbers → +33******78 (country code + last 2 digits) */
+  /**
+   * International phone numbers → `+33******78` (country code + last 2 digits).
+   *
+   * Requires an explicit phone signal (`+countryCode` prefix or `(areaCode)`
+   * parens) to avoid false positives on digit-rich identifiers (UUIDs,
+   * idempotency keys, order ids, hex hashes). Bare digit runs like `12345678`
+   * are intentionally not matched — opt in via custom `patterns` if your app
+   * stores phones in unformatted form.
+   */
   phone: {
-    pattern: /(?:\+\d{1,3}[\s.-]?)?\(?\d{1,4}\)?[\s.-]?\d{2,4}[\s.-]?\d{2,4}[\s.-]?\d{2,4}\b/g,
+    pattern: /(?:\+\d{1,3}[\s.-]?\(?\d{1,4}\)?|\(\d{1,4}\))(?:[\s.-]?\d{2,4}){2,4}\b/g,
     mask: (m: string) => {
       const digits = m.replace(/[^\d]/g, '')
       const hasPlus = m.startsWith('+')

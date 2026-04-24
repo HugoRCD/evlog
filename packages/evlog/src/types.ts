@@ -383,7 +383,97 @@ export interface LoggerConfig {
 }
 
 /**
- * Base structure for all wide events
+ * Audit actor — who initiated the action.
+ *
+ * `type` covers the most common actor families. `id` is required and should be
+ * a stable identifier (user id, service name, API key id, agent id). `model`,
+ * `tools`, `reason`, and `promptId` are filled when `type === 'agent'` and
+ * mirror the AI SDK fields already used by `evlog/ai`.
+ */
+export interface AuditActor {
+  type: 'user' | 'system' | 'api' | 'agent'
+  id: string
+  displayName?: string
+  email?: string
+  model?: string
+  tools?: string[]
+  reason?: string
+  promptId?: string
+}
+
+/**
+ * Audit target — the resource the action was performed on.
+ *
+ * `type` is a free-form string (e.g. `'invoice'`, `'user'`, `'subscription'`)
+ * narrowed by {@link defineAuditAction}. Additional fields are allowed for
+ * resource-specific metadata (e.g. `tenantId`, `path`, `previousOwnerId`).
+ */
+export interface AuditTarget {
+  type: string
+  id: string
+  [key: string]: unknown
+}
+
+/**
+ * Reserved audit fields on the wide event.
+ *
+ * Set via `log.audit({ ... })`, `log.set({ audit: { ... } })`, or the
+ * standalone `audit({ ... })` helper. Downstream filters on `audit IS NOT NULL`.
+ *
+ * - `outcome` — `'success' | 'failure' | 'denied'`. `'denied'` records an
+ *   AuthZ-denied action (often forgotten but exactly what auditors want).
+ * - `changes.before/after` — the diff for mutating actions. Use
+ *   {@link auditDiff} to produce a redact-aware compact JSON Patch.
+ * - `causationId` / `correlationId` — chain related actions (admin action →
+ *   system reactions). Set by callers, propagated by `auditEnricher` when
+ *   available on the request.
+ * - `signature` / `prevHash` — populated by the {@link signed} drain wrapper.
+ *   Never set by application code.
+ * - `idempotencyKey` — derived deterministically by `log.audit()` so retries
+ *   across drains are safe.
+ * - `context` — request/runtime context auto-populated by {@link auditEnricher}
+ *   (`requestId`, `traceId`, `ip`, `userAgent`, `tenantId`).
+ */
+export interface AuditFields {
+  /** Action name. Convention: `'<resource>.<verb>'`, e.g. `'invoice.refund'`. */
+  action: string
+  actor: AuditActor
+  target?: AuditTarget
+  outcome: 'success' | 'failure' | 'denied'
+  /** Human-readable explanation, especially required for `outcome: 'denied'`. */
+  reason?: string
+  /** Before/after snapshots for mutating actions. */
+  changes?: { before?: unknown, after?: unknown }
+  /** ID of the action that caused this one. */
+  causationId?: string
+  /** ID shared by every action in the same logical operation. */
+  correlationId?: string
+  /** Schema version of the audit envelope. Defaults to `1` when omitted by the caller. */
+  version?: number
+  /** Set by `log.audit()` as a stable hash for safe retries across drains. */
+  idempotencyKey?: string
+  /** Request/runtime context — populated by `auditEnricher`. */
+  context?: {
+    requestId?: string
+    traceId?: string
+    ip?: string
+    userAgent?: string
+    tenantId?: string
+    [key: string]: unknown
+  }
+  /** HMAC signature of the event when wrapped with `signed({ strategy: 'hmac' })`. */
+  signature?: string
+  /** Previous event hash when wrapped with `signed({ strategy: 'hash-chain' })`. */
+  prevHash?: string
+  /** Hash of the current event when wrapped with `signed({ strategy: 'hash-chain' })`. */
+  hash?: string
+}
+
+/**
+ * Base structure for all wide events.
+ *
+ * Augment via `declare module 'evlog'` to add app-specific top-level fields.
+ * `audit` is reserved for {@link AuditFields}.
  */
 export interface BaseWideEvent {
   timestamp: string
@@ -393,6 +483,7 @@ export interface BaseWideEvent {
   version?: string
   commitHash?: string
   region?: string
+  audit?: AuditFields
 }
 
 /**
@@ -543,6 +634,36 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
    * ```
    */
   fork?: (label: string, fn: () => void | Promise<void>) => void
+
+  /**
+   * Record an audit event on this wide event. Strictly equivalent to
+   * `log.set({ audit: { ... } })` plus tail-sample force-keep.
+   *
+   * Use `log.audit.deny(reason, fields)` for AuthZ-denied actions — most teams
+   * forget to log denials but they are exactly what auditors and security teams
+   * ask for.
+   *
+   * Available on every logger returned by `createLogger()` / `createRequestLogger()`
+   * and on framework loggers exposed via `useLogger()` / `c.get('log')` etc.
+   *
+   * @example
+   * ```ts
+   * log.audit({
+   *   action: 'invoice.refund',
+   *   actor: { type: 'user', id: user.id, email: user.email },
+   *   target: { type: 'invoice', id: 'inv_889' },
+   *   outcome: 'success',
+   *   reason: 'Customer requested refund',
+   * })
+   * ```
+   */
+  audit?: AuditLoggerMethod
+}
+
+/** @internal Forward-declaration to avoid a circular import with `audit.ts`. */
+export interface AuditLoggerMethod {
+  (input: import('./audit').AuditInput): void
+  deny: (reason: string, input: Omit<import('./audit').AuditInput, 'outcome' | 'reason'>) => void
 }
 
 /**
