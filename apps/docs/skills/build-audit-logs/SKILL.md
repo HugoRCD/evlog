@@ -1,11 +1,48 @@
 ---
 name: build-audit-logs
-description: Build audit logs / an audit trail in a TypeScript or JavaScript application using evlog. Use whenever the user mentions audit logs, audit trail, audit logging, compliance logging, SOC2 / HIPAA / GDPR / PCI logs, tamper-evident or append-only logs, "who did what" forensic trails, or per-tenant audit isolation in a SaaS — even if they don't explicitly mention evlog. Also use when wiring an audit sink (Postgres, S3, Axiom dataset, FS journal, ...), when replacing scattered `console.log('user.deleted', ...)` calls with a real audit pipeline, or when an existing app has audits but is missing denials, redaction, integrity, or retention. Covers the design decisions (sink, integrity, retention, multi-tenancy, framework wiring) and the end-to-end buildout (pipeline → call sites → tests → compliance review). For adding a single new audit call site to an already-wired app, use `create-audit-event` instead.
+description: Create or review an audit logging system in a TypeScript / JavaScript application using evlog. Use both for greenfield setups ("add audit logs to my app", "set up audit trail", "wire audit pipeline", "I need SOC2 / HIPAA / GDPR / PCI logs", "tamper-evident logs", "who-did-what forensic trail", "per-tenant audit isolation in a SaaS") and for review work ("review my audit setup", "audit my audit logs", "is my audit pipeline compliant", "are we missing denials", "audit coverage gaps", "is the redaction tight enough", "should we add hash-chain integrity"). Trigger even when the user does not mention evlog by name. Covers: design calls (sink choice, integrity, retention, multi-tenancy, GDPR), end-to-end buildout (pipeline → action vocabulary → call sites → denial coverage → redact → tests → compliance review), and a review checklist for grading an existing audit setup. Always operates on the user's own application — not on the evlog package itself.
 ---
 
-# Build Audit Logs with evlog
+# Build or Review an Audit System with evlog
 
-For **application developers** building an audit trail in their product. Walks through the design calls and the end-to-end implementation. For just adding one more `log.audit(...)` call in a wired-up app, use `create-audit-event` instead.
+For **application developers** who either need to add an audit trail to their product, or who already have one and want it reviewed. Walks through the design calls, the end-to-end implementation, and a review checklist for an existing setup.
+
+This skill assumes the audit lives in **your app**. To extend the evlog package itself (new audit helper, new drain wrapper), see the contributor skills under `.agents/skills/`.
+
+## Quick reference — call-site cheat sheet
+
+When you already know the system is wired and just need to remember the API:
+
+| Situation | Helper |
+|---|---|
+| Inside a request handler, action succeeded | `log.audit({ action, actor, target, outcome: 'success' })` |
+| Inside a request handler, AuthZ denial | `log.audit.deny('reason', { action, actor, target })` |
+| Standalone job / script / CLI (no request) | `audit({ action, actor, target, outcome })` |
+| Auto-record success / failure / denied for a function | `withAudit({ action, target }, fn)` |
+| Recording a state change | add `changes: auditDiff(before, after)` |
+| Centralised typed action vocabulary | `defineAuditAction('invoice.refund', { target: 'invoice' })` |
+| Asserting audits in tests | `mockAudit()` |
+
+`AuditFields` schema (always provide `action`, `actor`, `outcome`; `target` strongly recommended; the rest is filled in for you):
+
+```ts
+interface AuditFields {
+  action: string                                  // 'invoice.refund'
+  actor: { type: 'user' | 'system' | 'api' | 'agent', id: string, email?, displayName?, model?, tools?, reason?, promptId? }
+  outcome: 'success' | 'failure' | 'denied'
+  target?: { type: string, id: string, [k: string]: unknown }
+  reason?: string
+  changes?: { before?: unknown, after?: unknown } | AuditPatchOp[]
+  causationId?: string
+  correlationId?: string
+  version?: number                                // defaults to AUDIT_SCHEMA_VERSION
+  idempotencyKey?: string                         // auto-derived from action+actor+target+timestamp
+  context?: { requestId?, traceId?, ip?, userAgent?, tenantId?, ... }   // filled by auditEnricher
+  signature?: string                              // added by signed(drain, { strategy: 'hmac' })
+  prevHash?: string                               // added by signed(drain, { strategy: 'hash-chain' })
+  hash?: string                                   // added by signed(drain, { strategy: 'hash-chain' })
+}
+```
 
 ## What "audit logging" actually means
 
@@ -291,9 +328,9 @@ it('denies refund for non-owners and records the denial', async () => {
 })
 ```
 
-### Step 7 — Compliance review checklist
+### Step 7 — Production readiness checklist
 
-Walk through this with a security stakeholder before declaring the system production-ready:
+Walk through this with a security stakeholder before declaring the system production-ready (the same checklist powers the review mode below):
 
 - [ ] `auditEnricher` is registered on every framework integration.
 - [ ] Every authorisation check has a paired `log.audit.deny()` (greppable).
@@ -306,6 +343,79 @@ Walk through this with a security stakeholder before declaring the system produc
 - [ ] HMAC `secret` rotation procedure is documented; `keyId` is embedded in `AuditFields` (extend via `declare module`).
 - [ ] Tests include a denial path for every privileged action.
 - [ ] Audit dataset access is itself logged — meta-auditing matters.
+
+## Review an existing audit setup
+
+When the user already has an audit system and wants it reviewed, work through the four passes below in order. Each pass tells you exactly what to grep, what to look for, and what to flag.
+
+### Pass 1 — Pipeline wiring
+
+Find where the logger is initialised and where drains / enrichers are registered:
+
+```bash
+rg -n "initLogger|defineNitroPlugin|createLogger|evlog:enrich|evlog:drain" --type ts
+rg -n "auditEnricher|auditOnly|signed\(" --type ts
+```
+
+Flag if:
+- `auditEnricher()` is missing → `event.audit.context` is empty, no requestId / IP / tenant correlation.
+- An audit-only sink exists but is not wrapped in `auditOnly(...)` → main events leak into the audit dataset (privacy & cost incident).
+- Only one drain → no tamper-evident copy. Acceptable only if the single sink is WORM (S3 Object Lock, BigQuery append-only, Postgres immutable).
+- `signed()` is used without a persisted `state` while running multiple processes → hash-chain breaks across restarts / instances.
+- `await: true` is missing on the audit-only sink → events may be lost on crash.
+
+### Pass 2 — Coverage (call sites)
+
+Inventory every mutating action and every authorisation check:
+
+```bash
+rg -n "log\.audit\(|log\.audit\.deny\(|withAudit\(|^.*audit\(" --type ts
+rg -n "createError\(.*403|throw .*Forbidden|status:\s*403|statusCode:\s*403" --type ts
+rg -n "(?i)\b(delete|update|create|refund|grant|revoke|promote|demote|reset|impersonate)\b.*async\s+function|defineEventHandler" --type ts
+```
+
+For each match, check:
+- Mutating endpoint without a `log.audit()` or `withAudit()` → coverage gap.
+- `403` / `Forbidden` thrown without a paired `log.audit.deny()` → silent denial. This is the single most common gap.
+- `actor: { type: 'user', id: 'cron' }` or hard-coded actors in cron / queue handlers → wrong `actor.type`. Should be `'system'`, `'api'`, or `'agent'`.
+- `actor.id` set to a session id or token instead of the stable user id → forensic ambiguity.
+- `log.set({ audit: ... })` without using the helpers → bypasses force-keep, may be dropped by tail-sampling.
+- `withAudit()` action name in present tense (`invoice.refund`) is fine; manual `log.audit()` after the fact should use past tense (`invoice.refunded`).
+
+### Pass 3 — Redaction & integrity
+
+```bash
+rg -n "auditRedactPreset|RedactConfig|paths:\s*\[" --type ts
+rg -n "auditDiff\(" --type ts
+rg -n "strategy:\s*['\"](?:hmac|hash-chain)" --type ts
+```
+
+Flag if:
+- `auditRedactPreset` is not merged into the global redact config → `Authorization`, `Cookie`, `password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn` may leak through `audit.changes`.
+- `auditDiff()` is called on objects containing PII fields not listed in `redactPaths` → leak in the patch payload.
+- HMAC `secret` is hard-coded or read from `process.env.SECRET` without a rotation plan / `keyId` → events become unverifiable after rotation.
+- Hash-chain `state` is in-memory only → chain restarts each process boot, breaking continuity.
+
+### Pass 4 — Tests
+
+```bash
+rg -n "mockAudit\(|toIncludeAuditOf\(" --type ts
+```
+
+Flag if:
+- No tests use `mockAudit()` → audit pipeline silently drifts unnoticed.
+- Tests only assert success outcomes → denial paths can rot. Every privileged action should have at least one denied-outcome test.
+- Tests assert against `RegExp` actions broadly → typos in `audit.action` slip through (an action typo is a missing alert in production).
+
+### Reporting the findings
+
+Group findings by severity for the user:
+
+- **P0 (blocker)**: missing `auditOnly` wrap on an audit sink, missing `auditRedactPreset`, denials not logged, no tamper-evident sink in a regulated context.
+- **P1 (compliance gap)**: missing tenant isolation, hash-chain state not persisted, no HMAC rotation, no denial test coverage.
+- **P2 (hygiene)**: action naming inconsistency, in-line actor objects (should use `defineAuditAction`), missing `causationId` / `correlationId` on chained operations.
+
+Then map each finding to the relevant step in the buildout above (e.g. P0 → Step 5 redact, P1 → Step 7 checklist) so the fix is unambiguous.
 
 ## Common pitfalls
 
@@ -335,4 +445,3 @@ Walk through this with a security stakeholder before declaring the system produc
 - Docs page: [`apps/docs/content/2.logging/7.audit.md`](../../../apps/docs/content/2.logging/7.audit.md)
 - Source: [`packages/evlog/src/audit.ts`](../../../packages/evlog/src/audit.ts)
 - Tests: [`packages/evlog/test/audit.test.ts`](../../../packages/evlog/test/audit.test.ts)
-- Sister skill: [`create-audit-event/SKILL.md`](../create-audit-event/SKILL.md) — for adding a single new audit call site or extending the audit module inside the evlog package.
