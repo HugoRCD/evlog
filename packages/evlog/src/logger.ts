@@ -2,7 +2,7 @@ import type { AuditableLogger, AuditInput, AuditMethod } from './audit'
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { redactEvent, resolveRedactConfig } from './redact'
-import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isClient, isDev, isLevelEnabled, matchesPattern } from './utils'
+import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
@@ -227,7 +227,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
       return
     }
 
-    if (isClient()) {
+    if (isBrowser()) {
       const levelColor = getCssLevelColor(level)
       const timestamp = isoNow().slice(11, 23)
       console.log(
@@ -401,7 +401,7 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
   const { timestamp, level, service, environment, version, ...rest } = event
   const ts = (timestamp as string).slice(11, 23)
-  const browser = isClient()
+  const browser = isBrowser()
 
   const parts: string[] = []
   const styles: string[] = []

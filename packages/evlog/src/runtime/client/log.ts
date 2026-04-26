@@ -1,5 +1,5 @@
 import type { Log, LogLevel, TransportConfig } from '../../types'
-import { cssColors, escapeFormatString, getCssLevelColor, isLevelEnabled } from '../../utils'
+import { cssColors, escapeFormatString, getCssLevelColor, isBrowser, isLevelEnabled } from '../../utils'
 
 /**
  * Browser DevTools often hide or bucket `console.debug` under "Verbose" in a way that looks like
@@ -112,7 +112,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
 function createLogMethod(level: LogLevel) {
   return function logMethod(tagOrEvent: string | Record<string, unknown>, message?: string): void {
     // Call-time check: avoid relying on import.meta.client (can be false in some mixed bundles).
-    if (typeof window === 'undefined') {
+    if (!isBrowser()) {
       return
     }
 

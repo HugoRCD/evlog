@@ -1,5 +1,5 @@
-import { describe, expect, it, vi } from 'vitest'
-import { colors, formatDuration, getLevelColor, isClient, isDev, isLevelEnabled, isServer, matchesPattern } from '../src/utils'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { colors, formatDuration, getLevelColor, isBrowser, isClient, isDev, isLevelEnabled, isServer, matchesPattern } from '../src/utils'
 
 // Helper to test shouldLog logic (mirrors plugin.ts implementation)
 function shouldLog(path: string, include?: string[], exclude?: string[]): boolean {
@@ -42,6 +42,36 @@ describe('isServer', () => {
 describe('isClient', () => {
   it('returns false in Node.js environment', () => {
     expect(isClient()).toBe(false)
+  })
+})
+
+describe('isBrowser', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('returns false in Node.js environment', () => {
+    expect(isBrowser()).toBe(false)
+  })
+
+  it('returns true in real browsers (window + document + non-RN navigator)', () => {
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('document', {})
+    vi.stubGlobal('navigator', { product: 'Gecko' })
+    expect(isBrowser()).toBe(true)
+  })
+
+  it('returns false in React Native (window polyfilled, no document)', () => {
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('navigator', { product: 'ReactNative' })
+    expect(isBrowser()).toBe(false)
+  })
+
+  it('returns false in React Native even if document gets polyfilled', () => {
+    vi.stubGlobal('window', {})
+    vi.stubGlobal('document', {})
+    vi.stubGlobal('navigator', { product: 'ReactNative' })
+    expect(isBrowser()).toBe(false)
   })
 })
 

@@ -15,6 +15,13 @@ export function isClient(): boolean {
   return typeof window !== 'undefined'
 }
 
+export function isBrowser(): boolean {
+  if (typeof window === 'undefined') return false
+  if (typeof document === 'undefined') return false
+  if (typeof navigator !== 'undefined' && navigator.product === 'ReactNative') return false
+  return true
+}
+
 export function isDev(): boolean {
   if (typeof process !== 'undefined') {
     return process.env.NODE_ENV !== 'production'

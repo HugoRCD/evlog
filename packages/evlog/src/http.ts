@@ -1,6 +1,7 @@
 import type { DrainContext } from './types'
 import type { DrainPipelineOptions, PipelineDrainFn } from './pipeline'
 import { createDrainPipeline } from './pipeline'
+import { isBrowser } from './utils'
 
 export interface HttpDrainConfig {
   /** URL of the server ingest endpoint */
@@ -50,9 +51,8 @@ export function createHttpDrain(config: HttpDrainConfig): (batch: DrainContext[]
 
     if (
       useBeacon
-      && typeof document !== 'undefined'
+      && isBrowser()
       && document.visibilityState === 'hidden'
-      && typeof navigator !== 'undefined'
       && typeof navigator.sendBeacon === 'function'
     ) {
       const queued = navigator.sendBeacon(endpoint, new Blob([body], { type: 'application/json' }))
@@ -115,7 +115,7 @@ export function createHttpLogDrain(options: HttpLogDrainOptions): PipelineDrainF
 
   let onVisibilityChange: (() => void) | undefined
 
-  if (autoFlush && typeof document !== 'undefined') {
+  if (autoFlush && isBrowser()) {
     onVisibilityChange = () => {
       if (document.visibilityState === 'hidden') {
         drain.flush()

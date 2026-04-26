@@ -4,7 +4,7 @@ vi.mock('../src/utils', async (importOriginal) => {
   const original = await importOriginal<typeof import('../src/utils')>()
   return {
     ...original,
-    isClient: () => true,
+    isBrowser: () => true,
   }
 })
 
