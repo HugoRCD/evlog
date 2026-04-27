@@ -49,18 +49,18 @@
   "devDependencies": {
     "@ai-sdk/provider": "^3.0.8",
     "@changesets/changelog-github": "^0.6.0",
-    "@changesets/cli": "^2.30.0",
+    "@changesets/cli": "^2.31.0",
     "@hrcd/eslint-config": "^3.0.3",
     "@types/node": "latest",
-    "ai": "^6.0.154",
+    "ai": "^6.0.168",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "evlog": "workspace:*",
-    "turbo": "^2.9.5",
-    "typescript": "^6.0.2",
-    "vitest": "^4.1.4",
-    "vue-tsc": "^3.2.6"
+    "turbo": "^2.9.6",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5",
+    "vue-tsc": "^3.2.7"
   },
   "workspaces": [
     "apps/*",
@@ -76,8 +76,9 @@
     "vue-demi"
   ],
   "overrides": {
-    "vue": "3.5.32",
-    "@noble/hashes": "^1.7.2"
+    "vue": "3.5.33",
+    "@noble/hashes": "^1.8.0",
+    "@nuxt/content": "3.13.0"
   },
   "patchedDependencies": {
     "vaul-vue@0.4.1": "patches/vaul-vue@0.4.1.patch"

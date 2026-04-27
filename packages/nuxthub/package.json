@@ -42,10 +42,10 @@
   "devDependencies": {
     "@nuxt/module-builder": "^1.0.2",
     "evlog": "workspace:*",
-    "typescript": "^6.0.2"
+    "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "evlog": "^2.11.0",
+    "evlog": "^2.14.0",
     "@nuxthub/core": "^0.10.7",
     "drizzle-orm": ">=0.45.2"
   },

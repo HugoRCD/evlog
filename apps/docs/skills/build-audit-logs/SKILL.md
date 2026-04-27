@@ -1,6 +1,8 @@
 ---
 name: build-audit-logs
-description: Create or review an audit logging system in a TypeScript / JavaScript application using evlog. Use both for greenfield setups ("add audit logs to my app", "set up audit trail", "wire audit pipeline", "I need SOC2 / HIPAA / GDPR / PCI logs", "tamper-evident logs", "who-did-what forensic trail", "per-tenant audit isolation in a SaaS") and for review work ("review my audit setup", "audit my audit logs", "is my audit pipeline compliant", "are we missing denials", "audit coverage gaps", "is the redaction tight enough", "should we add hash-chain integrity"). Trigger even when the user does not mention evlog by name. Covers: design calls (sink choice, integrity, retention, multi-tenancy, GDPR), end-to-end buildout (pipeline → action vocabulary → call sites → denial coverage → redact → tests → compliance review), and a review checklist for grading an existing audit setup. Always operates on the user's own application — not on the evlog package itself.
+description: >-
+  Build or review audit trails in TypeScript/JavaScript apps using evlog (pipelines, typed actions,
+  denials, retention, compliance-style reviews). For application code, not for extending the evlog package.
 ---
 
 # Build or Review an Audit System with evlog
