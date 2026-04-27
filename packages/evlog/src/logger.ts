@@ -160,7 +160,18 @@ export function shouldKeep(ctx: TailSamplingContext): boolean {
   })
 }
 
-function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDrain = false, ownsEvent = false): WideEvent | null {
+interface EmitWideEventOptions {
+  deferDrain?: boolean
+  ownsEvent?: boolean
+  waitUntil?: (promise: Promise<unknown>) => void
+}
+
+function emitWideEvent(
+  level: LogLevel,
+  event: Record<string, unknown>,
+  options: EmitWideEventOptions = {},
+): WideEvent | null {
+  const { deferDrain = false, ownsEvent = false, waitUntil } = options
   if (!globalEnabled) return null
 
   if (!ownsEvent) {
@@ -208,9 +219,12 @@ function emitWideEvent(level: LogLevel, event: Record<string, unknown>, deferDra
   }
 
   if (globalDrain && !deferDrain) {
-    Promise.resolve(globalDrain({ event: formatted })).catch((err) => {
+    const drainPromise = Promise.resolve(globalDrain({ event: formatted })).catch((err) => {
       console.error('[evlog] drain failed:', err)
     })
+    if (waitUntil) {
+      waitUntil(drainPromise)
+    }
   }
 
   return formatted
@@ -543,6 +557,10 @@ interface CreateLoggerInternalOptions {
    * Used by framework middleware that runs its own enrich+drain pipeline.
    */
   _deferDrain?: boolean
+  /**
+   * @see {@link RequestLoggerOptions.waitUntil}
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 /**
@@ -564,6 +582,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
   if (!globalEnabled) return noopLogger as unknown as AuditableLogger<T>
 
   const deferDrain = internalOptions?._deferDrain ?? false
+  const waitUntil = internalOptions?.waitUntil
   const startTime = Date.now()
   const context: Record<string, unknown> = { ...initialContext }
   let hasError = false
@@ -711,7 +730,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       }
       context.duration = formatDuration(durationMs)
 
-      const wide = emitWideEvent(level, context, deferDrain, true)
+      const wide = emitWideEvent(level, context, { deferDrain, ownsEvent: true, waitUntil })
       emitted = true
       return wide
     },
@@ -733,13 +752,32 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
  * log.set({ cart: { items: 3 } })
  * log.emit()
  * ```
+ *
+ * @example Cloudflare Workers — pass `waitUntil` so `initLogger({ drain })` completes after the response:
+ * ```ts
+ * export default {
+ *   async fetch(request, env, ctx) {
+ *     const log = createRequestLogger({
+ *       method: request.method,
+ *       path: new URL(request.url).pathname,
+ *       waitUntil: ctx.waitUntil.bind(ctx),
+ *     })
+ *     log.emit()
+ *     return new Response('ok')
+ *   },
+ * }
+ * ```
  */
 export function createRequestLogger<T extends object = Record<string, unknown>>(options: RequestLoggerOptions = {}, internalOptions?: CreateLoggerInternalOptions): AuditableLogger<T> {
+  const { method, path, requestId, waitUntil: optionsWaitUntil } = options
   const initial: Record<string, unknown> = {}
-  if (options.method !== undefined) initial.method = options.method
-  if (options.path !== undefined) initial.path = options.path
-  if (options.requestId !== undefined) initial.requestId = options.requestId
-  return createLogger<T>(initial, internalOptions)
+  if (method !== undefined) initial.method = method
+  if (path !== undefined) initial.path = path
+  if (requestId !== undefined) initial.requestId = requestId
+  return createLogger<T>(initial, {
+    ...internalOptions,
+    waitUntil: internalOptions?.waitUntil ?? optionsWaitUntil,
+  })
 }
 
 /**

@@ -744,6 +744,16 @@ export interface RequestLoggerOptions {
   method?: string
   path?: string
   requestId?: string
+  /**
+   * Registers async drain work with the host runtime so it can finish after the
+   * HTTP response is returned. Required on **Cloudflare Workers** (and similar
+   * edge runtimes): without this, `initLogger({ drain })` + `log.emit()` may
+   * never complete outbound HTTP to observability backends.
+   *
+   * Pass the same function you would pass to `ExecutionContext#waitUntil`, e.g.
+   * `context.waitUntil.bind(context)` from a Workers `fetch` handler.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 /**

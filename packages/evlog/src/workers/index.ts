@@ -2,6 +2,14 @@ import { initLogger, createRequestLogger } from '../logger'
 import type { LoggerConfig, RequestLogger } from '../types'
 
 /**
+ * Minimal Cloudflare Workers execution context (`fetch` third argument).
+ * Matches Cloudflare `ExecutionContext` without requiring `@cloudflare/workers-types`.
+ */
+export interface WorkerExecutionContext {
+  waitUntil(promise: Promise<unknown>): void
+}
+
+/**
  * Options for createWorkersLogger
  */
 export interface WorkersLoggerOptions {
@@ -9,6 +17,21 @@ export interface WorkersLoggerOptions {
   requestId?: string
   /** Headers to include in logs (default: none) */
   headers?: string[]
+  /**
+   * Cloudflare Workers `ExecutionContext` from the `fetch` handler
+   * (`async fetch(request, env, ctx)`). When set, async `initLogger({ drain })`
+   * work from `log.emit()` is registered with `ctx.waitUntil` so drains (HTTP to
+   * Axiom, PostHog, etc.) complete after the response is returned.
+   *
+   * Prefer {@link defineWorkerFetch} when you want this wired automatically.
+   */
+  executionCtx?: WorkerExecutionContext
+  /**
+   * Lower-level alternative to `executionCtx`: same function Cloudflare assigns to
+   * `ExecutionContext#waitUntil` (must be bound if you extract the method), e.g.
+   * `waitUntil: ctx.waitUntil.bind(ctx)`.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -49,6 +72,43 @@ export function initWorkersLogger(options: LoggerConfig = {}): void {
   })
 }
 
+/**
+ * Wraps a Workers `fetch` handler so {@link createWorkersLogger} receives
+ * `executionCtx` automatically for async drains (`initWorkersLogger({ drain })`).
+ *
+ * Cloudflare does not expose `ExecutionContext` globally — only as the third
+ * `fetch` argument — so evlog cannot discover it without either this helper or
+ * an explicit `{ executionCtx: ctx }` / `waitUntil` option.
+ *
+ * @example
+ * ```ts
+ * initWorkersLogger({ env: { service: 'my-api' }, drain: myDrain })
+ *
+ * export default defineWorkerFetch(async (request, env, ctx, log) => {
+ *   log.set({ route: '/health' })
+ *   log.emit({ status: 200 })
+ *   return new Response('ok')
+ * })
+ * ```
+ */
+export function defineWorkerFetch<TEnv = unknown>(
+  handler: (
+    request: Request,
+    env: TEnv,
+    ctx: WorkerExecutionContext,
+    log: RequestLogger,
+  ) => Response | Promise<Response>,
+): {
+  fetch: (request: Request, env: TEnv, ctx: WorkerExecutionContext) => Promise<Response>
+} {
+  return {
+    fetch(request, env, ctx) {
+      const log = createWorkersLogger(request, { executionCtx: ctx })
+      return Promise.resolve(handler(request, env, ctx, log))
+    },
+  }
+}
+
 function pickCfContext(request: Request): Record<string, unknown> {
   const cf = Reflect.get(request, 'cf')
   if (!isRecord(cf)) return {}
@@ -67,8 +127,8 @@ function pickCfContext(request: Request): Record<string, unknown> {
  * @example
  * ```ts
  * export default {
- *   async fetch(request: Request) {
- *     const log = createWorkersLogger(request)
+ *   async fetch(request: Request, env: Env, ctx: ExecutionContext) {
+ *     const log = createWorkersLogger(request, { executionCtx: ctx })
  *
  *     log.set({ user: { id: '123' } })
  *     log.emit({ status: 200 })
@@ -83,10 +143,17 @@ export function createWorkersLogger<T extends object = Record<string, unknown>>(
   const cfRay = request.headers.get('cf-ray') ?? undefined
   const traceparent = request.headers.get('traceparent') ?? undefined
 
+  const waitUntil =
+    options.waitUntil
+    ?? (options.executionCtx
+      ? options.executionCtx.waitUntil.bind(options.executionCtx)
+      : undefined)
+
   const log = createRequestLogger<T>({
     method: request.method,
     path: url.pathname,
     requestId: options.requestId ?? cfRay,
+    waitUntil,
   })
 
   // Cast needed: CF-specific enrichment fields (cfRay, traceparent, etc.) aren't in user's T

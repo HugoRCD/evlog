@@ -336,30 +336,40 @@ async function processSyncJob(job: Job) {
 
 ## Cloudflare Workers
 
-Use the Workers adapter for structured logs and correct platform severity.
+Use the Workers adapter for structured logs and correct platform severity. With `initWorkersLogger({ drain })`, use **`defineWorkerFetch`** so async drains are registered with `waitUntil` automatically (Cloudflare only passes `ExecutionContext` as the third `fetch` argument — there is no global).
 
 ```typescript
 // src/index.ts
-import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'
+import { defineWorkerFetch, initWorkersLogger } from 'evlog/workers'
 
 initWorkersLogger({
   env: { service: 'edge-api' },
 })
 
-export default {
-  async fetch(request: Request) {
-    const log = createWorkersLogger(request)
+export default defineWorkerFetch(async (request, _env, _ctx, log) => {
+  try {
+    log.set({ route: 'health' })
+    const response = new Response('ok', { status: 200 })
+    log.emit({ status: response.status })
+    return response
+  } catch (error) {
+    log.error(error as Error)
+    log.emit({ status: 500 })
+    throw error
+  }
+})
+```
 
-    try {
-      log.set({ route: 'health' })
-      const response = new Response('ok', { status: 200 })
-      log.emit({ status: response.status })
-      return response
-    } catch (error) {
-      log.error(error as Error)
-      log.emit({ status: 500 })
-      throw error
-    }
+If you keep a raw `export default { fetch }`, pass `{ executionCtx: ctx }` to `createWorkersLogger` or `waitUntil` on `createRequestLogger`.
+
+```typescript
+// Lower-level (equivalent)
+import { createWorkersLogger } from 'evlog/workers'
+
+export default {
+  async fetch(request: Request, _env: unknown, ctx: ExecutionContext) {
+    const log = createWorkersLogger(request, { executionCtx: ctx })
+    // ...
   },
 }
 ```
@@ -373,6 +383,7 @@ invocation_logs = false
 ```
 
 Notes:
+- Prefer **`defineWorkerFetch`** so you do not have to pass `executionCtx` yourself when using a drain
 - `requestId` defaults to `cf-ray` when available
 - `request.cf` is included (colo, country, asn) unless disabled
 - Use `headerAllowlist` to avoid logging sensitive headers
@@ -1185,6 +1196,21 @@ initWorkersLogger({
 })
 ```
 
+### `defineWorkerFetch(handler)`
+
+Recommended for Workers when using **`initWorkersLogger({ drain })`**. Wraps your handler so `createWorkersLogger` always receives `executionCtx` — you do not pass `ctx` into the factory yourself. Cloudflare does not expose `ExecutionContext` globally (only as `fetch`’s third argument), so this is the “automatic” option for plain Workers scripts.
+
+```typescript
+import { defineWorkerFetch, initWorkersLogger } from 'evlog/workers'
+
+initWorkersLogger({ env: { service: 'edge-api' }, drain })
+
+export default defineWorkerFetch(async (request, env, ctx, log) => {
+  log.emit({ status: 200 })
+  return new Response('ok')
+})
+```
+
 ### `createWorkersLogger(request, options?)`
 
 Create a request-scoped logger for Workers. Auto-extracts `cf-ray`, `request.cf`, method, and path.
@@ -1192,10 +1218,14 @@ Create a request-scoped logger for Workers. Auto-extracts `cf-ray`, `request.cf`
 ```typescript
 import { createWorkersLogger } from 'evlog/workers'
 
+// ctx is the third argument to fetch(request, env, ctx)
 const log = createWorkersLogger(request, {
   requestId: 'custom-id',      // Override cf-ray (default: cf-ray header)
   headers: ['x-request-id'],   // Headers to include (default: none)
+  executionCtx: ctx,           // With initWorkersLogger({ drain }), registers async drain via waitUntil
 })
+
+// Or pass waitUntil directly: waitUntil: ctx.waitUntil.bind(ctx)
 
 log.set({ user: { id: '123' } })
 log.emit({ status: 200 })

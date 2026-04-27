@@ -858,6 +858,45 @@ describe('drain callback', () => {
     expect(ctx.event.userId).toBe('123')
   })
 
+  it('registers emit drain promise with waitUntil when provided', async () => {
+    const drain = vi.fn().mockResolvedValue(undefined)
+    const waitUntil = vi.fn()
+    initLogger({ pretty: false, drain })
+
+    const logger = createRequestLogger({
+      method: 'GET',
+      path: '/workers',
+      waitUntil,
+    })
+    logger.emit()
+
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+    expect(waitUntil).toHaveBeenCalledTimes(1)
+    const [[scheduled]] = waitUntil.mock.calls
+    expect(scheduled).toBeInstanceOf(Promise)
+    await scheduled
+  })
+
+  it('does not call waitUntil when emit is sampled out', () => {
+    const drain = vi.fn()
+    const waitUntil = vi.fn()
+    initLogger({
+      pretty: false,
+      drain,
+      sampling: { rates: { info: 0 } },
+    })
+
+    const logger = createRequestLogger({
+      method: 'GET',
+      path: '/x',
+      waitUntil,
+    })
+    logger.emit()
+
+    expect(drain).not.toHaveBeenCalled()
+    expect(waitUntil).not.toHaveBeenCalled()
+  })
+
   it('does not call drain when event is sampled out', () => {
     const drain = vi.fn()
     initLogger({
