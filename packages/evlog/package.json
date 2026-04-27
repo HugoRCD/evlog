@@ -364,8 +364,7 @@
     "react-router": ">=7.14.2",
     "vite": "^7.0.0 || ^8.0.0",
     "ai": ">=6.0.168",
-    "@tanstack/start-client-core": "^1.167.20",
-    "better-auth": ">=1.6.9"
+    "@tanstack/start-client-core": "^1.167.20"
   },
   "peerDependenciesMeta": {
     "@nuxt/kit": {
@@ -414,9 +413,6 @@
       "optional": true
     },
     "@tanstack/start-client-core": {
-      "optional": true
-    },
-    "better-auth": {
       "optional": true
     }
   }
