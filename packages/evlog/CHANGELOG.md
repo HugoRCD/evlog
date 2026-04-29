@@ -1,5 +1,15 @@
 # evlog
 
+## 2.14.1
+
+### Patch Changes
+
+- [#309](https://github.com/HugoRCD/evlog/pull/309) [`3cc3308`](https://github.com/HugoRCD/evlog/commit/3cc33080ab2e18dbe33b5ac67830b2fc7b1d3a07) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Remove `better-auth` from `peerDependencies`. Optional peers still led npm to resolve Better Auth’s peer graph (including `@sveltejs/kit` / Vite), causing `ERESOLVE` for apps that do not use Better Auth ([#299](https://github.com/HugoRCD/evlog/issues/299)). Users of `evlog/better-auth` should keep `better-auth` as a direct dependency (see docs).
+
+- [#298](https://github.com/HugoRCD/evlog/pull/298) [`02c4c03`](https://github.com/HugoRCD/evlog/commit/02c4c033afff95a8b7ce2d6f1e2ee85c5d0234b2) Thanks [@M-Hassan-Raza](https://github.com/M-Hassan-Raza)! - Avoid unnecessary Nitro runtime-config probes when drain adapter overrides or env vars already satisfy the env-backed config fields.
+
+- [#306](https://github.com/HugoRCD/evlog/pull/306) [`570d675`](https://github.com/HugoRCD/evlog/commit/570d675ed70d472ba108cfa9143dcc23e347081c) Thanks [@shubh73](https://github.com/shubh73)! - Detect browser environments for `%c` console styling using `isBrowser()` (window, document, and non–React Native `navigator.product`) so React Native / Metro no longer prints format strings and CSS arguments as literal text when `window` is polyfilled. `isClient()` / `isServer()` are unchanged for existing consumers.
+
 ## 2.14.0
 
 ### Minor Changes
