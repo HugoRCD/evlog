@@ -90,7 +90,7 @@ You don't build that JSON by hand. You call `log.set()` as your code runs, addin
 
 TypeScript-first logger that works everywhere. Framework hooks auto-create and auto-emit the logger at request boundaries. For scripts, jobs, and workflows, you create a logger, accumulate context, emit when done.
 
-It's also a drop-in replacement for `console.log`, `pino`, or `consola` in **any** TypeScript context — CLI tools, one-shot migrations, published libraries, BullMQ / Inngest jobs, Cloudflare Workers, AWS Lambda, Astro endpoints, monorepo shared packages. The same `log.info` / `log.error` API runs everywhere, with the same drains, the same redaction, and the same types. You don't pick "evlog for HTTP, something else for the rest" — it's the one logger you ship with.
+It's also a drop-in replacement for `console.log`, `pino`, or `consola` in **any** TypeScript context — CLI tools, one-shot migrations, published libraries, BullMQ / Inngest jobs, Cloudflare Workers, AWS Lambda, and Astro endpoints. The same `log.info` / `log.error` API runs everywhere, with the same drains, the same redaction, and the same types. You don't pick "evlog for HTTP, something else for the rest" — it's the one logger you ship with.
 
 ::code-group
 

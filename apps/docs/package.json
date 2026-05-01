@@ -18,7 +18,7 @@
     "better-sqlite3": "^12.9.0",
     "docus": "^5.10.0",
     "motion-v": "^2.2.1",
-    "nuxt": "^4.4.2",
+    "nuxt": "^4.4.4",
     "nuxt-studio": "^1.6.1",
     "shaders": "^2.5.109",
     "vaul-vue": "0.4.1"
