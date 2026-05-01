@@ -90,6 +90,8 @@ You don't build that JSON by hand. You call `log.set()` as your code runs, addin
 
 TypeScript-first logger that works everywhere. Framework hooks auto-create and auto-emit the logger at request boundaries. For scripts, jobs, and workflows, you create a logger, accumulate context, emit when done.
 
+It's also a drop-in replacement for `console.log`, `pino`, or `consola` in **any** TypeScript context — CLI tools, one-shot migrations, published libraries, BullMQ / Inngest jobs, Cloudflare Workers, AWS Lambda, Astro endpoints, monorepo shared packages. The same `log.info` / `log.error` API runs everywhere, with the same drains, the same redaction, and the same types. You don't pick "evlog for HTTP, something else for the rest" — it's the one logger you ship with.
+
 ::code-group
 
 ```ts [Nuxt]
@@ -224,6 +226,10 @@ Same code pattern, same output, every framework. Human-readable in dev, structur
 ---
 
 ## Why it's fucking great
+
+### One API, two shapes
+
+Fire single structured events like pino or consola when you just need a log line. Accumulate one wide event per operation when you want the full story. Same drains, same redaction, same types — pick per call. Wide events aren't a separate mode you opt into; they live inside the same logger you'd use for `console.log`.
 
 ### 0 transitive dependencies
 

@@ -91,6 +91,8 @@ A task is complete when **all** of the following pass:
 
 ## When Stuck
 
+- Docs dev wrong app → `bun run docs` runs **evlog-docs**; `bun run dev` runs the **playground** only (both default to port 3000).
+- Docs / Vite **Maximum call stack size exceeded** during transform after many file changes → stop the dev server, remove `apps/docs/.nuxt`, `apps/docs/.data`, and `apps/docs/node_modules/.cache`, then `bun run docs` again.
 - Docs site SSR / duplicate Vue (`vaul-vue`, `renderSlot` / `.ce`) → `patches/README.md` (Bun `patchedDependencies`)
 - Tests fail after 3 attempts → stop, report the failing test with full output
 - Missing dependency → check `package.json` first, then ask

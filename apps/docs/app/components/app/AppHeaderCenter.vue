@@ -77,43 +77,43 @@ const landingItems = [
         label: 'Axiom',
         icon: 'i-custom-axiom',
         description: 'Send logs to Axiom',
-        to: '/adapters/axiom'
+        to: '/adapters/cloud/axiom'
       },
       {
         label: 'OpenTelemetry',
         icon: 'i-simple-icons-opentelemetry',
         description: 'Export via OTLP protocol',
-        to: '/adapters/otlp'
+        to: '/adapters/cloud/otlp'
       },
       {
         label: 'HyperDX',
         icon: 'i-custom-hyperdx',
         description: 'Send logs to HyperDX via OTLP',
-        to: '/adapters/hyperdx'
+        to: '/adapters/cloud/hyperdx'
       },
       {
         label: 'PostHog',
         icon: 'i-simple-icons-posthog',
         description: 'Send logs to PostHog',
-        to: '/adapters/posthog'
+        to: '/adapters/cloud/posthog'
       },
       {
         label: 'Sentry',
         icon: 'i-simple-icons-sentry',
         description: 'Report errors to Sentry',
-        to: '/adapters/sentry'
+        to: '/adapters/cloud/sentry'
       },
       {
         label: 'Better Stack',
         icon: 'i-simple-icons-betterstack',
         description: 'Stream logs to Better Stack',
-        to: '/adapters/better-stack'
+        to: '/adapters/cloud/better-stack'
       },
       {
         label: 'Datadog',
         icon: 'i-simple-icons-datadog',
         description: 'Send logs to Datadog',
-        to: '/adapters/datadog'
+        to: '/adapters/cloud/datadog'
       }
     ]
   },
