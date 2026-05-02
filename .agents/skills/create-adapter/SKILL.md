@@ -145,6 +145,6 @@ After completing all steps, run:
 
 ```bash
 cd packages/evlog
-bun run build    # Verify build succeeds with new entry
-bun run test     # Verify tests pass
+pnpm run build    # Verify build succeeds with new entry
+pnpm run test     # Verify tests pass
 ```

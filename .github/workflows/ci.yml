@@ -14,80 +14,94 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
       - name: Prepare
-        run: bun run dev:prepare
+        run: pnpm run dev:prepare
       - name: Build package
-        run: bun run build:package
+        run: pnpm run build:package
 
   lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
       - name: Prepare
-        run: bun run dev:prepare
-      - name: Build package
-        run: bun run build:package
+        run: pnpm run dev:prepare
       - name: Lint
-        run: bun run lint
+        run: pnpm run lint
 
   typecheck:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
       - name: Prepare
-        run: bun run dev:prepare
-      - name: Build package
-        run: bun run build:package
+        run: pnpm run dev:prepare
       - name: Typecheck
-        run: bun run typecheck
+        run: pnpm run typecheck
 
   test:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
       - name: Prepare
-        run: bun run dev:prepare
-      - name: Build package
-        run: bun run build:package
-      - name: Run tests
-        run: bun run test
+        run: pnpm run dev:prepare
+      - name: Test
+        run: pnpm run test
 
   publish:
     runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch'
+    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
     needs: [build, lint, typecheck, test]
     steps:
       - uses: actions/checkout@v6
         with:
           fetch-depth: 0
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
       - name: Prepare
-        run: bun run dev:prepare
+        run: pnpm run dev:prepare
       - name: Build package
-        run: bun run build:package
-      - name: Publish preview
-        run: bunx pkg-pr-new publish --compact --no-template './packages/evlog' './packages/nuxthub'
+        run: pnpm run build:package
+      - name: Publish
+        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub'

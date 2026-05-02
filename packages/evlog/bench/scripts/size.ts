@@ -5,13 +5,15 @@
  * a JSON report for tracking and comparison.
  *
  * Usage:
- *   bun bench/size.ts                    # print table
- *   bun bench/size.ts --json             # output JSON
- *   bun bench/size.ts --json > size.json # save to file
+ *   tsx bench/size.ts                    # print table
+ *   tsx bench/size.ts --json             # output JSON
+ *   tsx bench/size.ts --json > size.json # save to file
  */
 
+import { readFile } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
 import { gzipSync } from 'node:zlib'
-import { Glob } from 'bun'
+import { glob } from 'tinyglobby'
 
 interface EntrySize {
   entry: string
@@ -50,17 +52,15 @@ function formatBytes(bytes: number): string {
 }
 
 async function measureFile(path: string): Promise<{ raw: number, gzip: number }> {
-  const file = Bun.file(path)
-  const content = await file.arrayBuffer()
+  const content = await readFile(path)
   const raw = content.byteLength
-  const gzip = gzipSync(new Uint8Array(content)).byteLength
+  const gzip = gzipSync(content).byteLength
   return { raw, gzip }
 }
 
 async function measureEntry(name: string, relativePath: string): Promise<EntrySize | null> {
   const fullPath = `${DIST_DIR}${relativePath}`
-  const file = Bun.file(fullPath)
-  if (!await file.exists()) return null
+  if (!existsSync(fullPath)) return null
 
   const { raw, gzip } = await measureFile(fullPath)
   return { entry: name, raw, gzip }
@@ -68,9 +68,9 @@ async function measureEntry(name: string, relativePath: string): Promise<EntrySi
 
 async function collectAdapters(): Promise<EntrySize[]> {
   const entries: EntrySize[] = []
-  const glob = new Glob(ADAPTER_GLOB)
+  const paths = await glob(ADAPTER_GLOB, { cwd: DIST_DIR })
 
-  for await (const path of glob.scan({ cwd: DIST_DIR })) {
+  for (const path of paths) {
     const name = path.replace('adapters/', '').replace('.mjs', '')
     if (name.startsWith('_')) continue
     const result = await measureEntry(`adapter/${name}`, path)
@@ -84,12 +84,12 @@ async function collectFrameworks(): Promise<EntrySize[]> {
   const entries: EntrySize[] = []
 
   for (const dir of FRAMEWORK_DIRS) {
-    const glob = new Glob(`${dir}/**/*.mjs`)
+    const paths = await glob(`${dir}/**/*.mjs`, { cwd: DIST_DIR })
     let totalRaw = 0
     let totalGzip = 0
     let found = false
 
-    for await (const path of glob.scan({ cwd: DIST_DIR })) {
+    for (const path of paths) {
       if (path.includes('/_') || path.endsWith('.d.mts')) continue
       const { raw, gzip } = await measureFile(`${DIST_DIR}${path}`)
       totalRaw += raw

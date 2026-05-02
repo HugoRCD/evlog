@@ -282,7 +282,7 @@ links:
 7. **Tail Sampling** — `keep` callback
 8. **Route Filtering** — `include` / `exclude` / `routes`
 9. **Client-Side Logging** — HTTP drain (`evlog/http`) (only if framework has a client-side story)
-10. **Run Locally** — clone + `bun run example:{framework}`
+10. **Run Locally** — clone + `pnpm run example:{framework}`
 11. **Card group** linking to GitHub source
 
 ## Step 6: Overview & Installation Cards
@@ -457,9 +457,9 @@ After completing all steps, run from the repo root:
 
 ```bash
 cd packages/evlog
-bun run build    # Verify build succeeds with new entry
-bun run test     # Verify unit tests pass
-bun run lint     # Verify no lint errors
+pnpm run build    # Verify build succeeds with new entry
+pnpm run test     # Verify unit tests pass
+pnpm run lint     # Verify no lint errors
 ```
 
 Then type-check the example:

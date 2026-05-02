@@ -5,12 +5,14 @@
  * a unified markdown report for PR comments.
  *
  * Usage:
- *   bun bench/compare.ts --bench <baseline.json> <current.json>
- *   bun bench/compare.ts --size <baseline.json> <current.json>
- *   bun bench/compare.ts --bench <base> <curr> --size <base> <curr>
+ *   tsx bench/compare.ts --bench <baseline.json> <current.json>
+ *   tsx bench/compare.ts --size <baseline.json> <current.json>
+ *   tsx bench/compare.ts --bench <base> <curr> --size <base> <curr>
  *
  * Exits with code 1 if any benchmark regressed by more than the threshold.
  */
+
+import { readFile } from 'node:fs/promises'
 
 // --- Types ---
 
@@ -56,7 +58,7 @@ const SIZE_THRESHOLD = 5
 // --- Helpers ---
 
 async function loadJSON<T>(path: string): Promise<T> {
-  const raw = await Bun.file(path).text()
+  const raw = await readFile(path, 'utf8')
   return JSON.parse(raw) as T
 }
 
@@ -333,9 +335,9 @@ const parsed = parseArgs()
 
 if (!parsed.benchBase && !parsed.sizeBase) {
   console.error('Usage:')
-  console.error('  bun bench/compare.ts --bench <baseline.json> <current.json>')
-  console.error('  bun bench/compare.ts --size <baseline.json> <current.json>')
-  console.error('  bun bench/compare.ts --bench <base> <curr> --size <base> <curr>')
+  console.error('  tsx bench/compare.ts --bench <baseline.json> <current.json>')
+  console.error('  tsx bench/compare.ts --size <baseline.json> <current.json>')
+  console.error('  tsx bench/compare.ts --bench <base> <curr> --size <base> <curr>')
   process.exit(1)
 }
 

@@ -1,20 +1,22 @@
 # evlog
 
-TypeScript logging library focused on wide events and structured error handling. Bun monorepo.
+TypeScript logging library focused on wide events and structured error handling. pnpm monorepo (managed with Corepack).
 
 ## Commands
 
 ```bash
-bun install                        # install deps
-bun run dev                        # start playground
-bun run dev:prepare                # generate types
-bun run build:package              # build the package
-bun run test                       # run tests (vitest)
-bun run lint                       # lint all packages
-bun run typecheck                  # type-check all packages
-bun run docs                       # start docs site
-cd packages/evlog && bun run release  # publish
+pnpm install                       # install deps
+pnpm run dev                       # start playground
+pnpm run dev:prepare               # generate types
+pnpm run build:package             # build the package
+pnpm run test                      # run tests (vitest)
+pnpm run lint                      # lint all packages
+pnpm run typecheck                 # type-check all packages
+pnpm run dev:docs                  # start docs site
+cd packages/evlog && pnpm run release  # publish
 ```
+
+> Use `corepack enable` once so the `packageManager` field in `package.json` pins the right pnpm version automatically.
 
 ## Monorepo Structure
 
@@ -54,8 +56,8 @@ packages/evlog/            Main package
 Tests live in `packages/evlog/test/` and use Vitest.
 
 ```bash
-bun run test                          # full suite
-bunx vitest run test/path/to/file     # single test file
+pnpm run test                                          # full suite
+pnpm --filter evlog exec vitest run test/path/to/file  # single test file
 ```
 
 Write tests for all new functionality. Run tests before considering any task done.
@@ -64,9 +66,9 @@ Write tests for all new functionality. Run tests before considering any task don
 
 A task is complete when **all** of the following pass:
 
-1. `bun run lint` exits 0
-2. `bun run typecheck` exits 0
-3. `bun run test` exits 0
+1. `pnpm run lint` exits 0
+2. `pnpm run typecheck` exits 0
+3. `pnpm run test` exits 0
 4. New public APIs have JSDoc
 5. New exports are registered in `package.json` and `tsdown.config.ts`
 6. If adapter/enricher/integration: the corresponding SKILL.md was followed
@@ -91,9 +93,11 @@ A task is complete when **all** of the following pass:
 
 ## When Stuck
 
-- Docs dev wrong app → `bun run docs` runs **evlog-docs**; `bun run dev` runs the **playground** only (both default to port 3000).
-- Docs / Vite **Maximum call stack size exceeded** during transform after many file changes → stop the dev server, remove `apps/docs/.nuxt`, `apps/docs/.data`, and `apps/docs/node_modules/.cache`, then `bun run docs` again.
-- Docs site SSR / duplicate Vue (`vaul-vue`, `renderSlot` / `.ce`) → `patches/README.md` (Bun `patchedDependencies`)
+- Docs dev wrong app or blank landing → `pnpm run dev:docs` is **evlog-docs** at **http://localhost:3000**; `pnpm run dev` is the **playground** on port **3000** as well, so don't run them at the same time.
+- Nitro error **`component-meta.mjs` ENOENT** after `.nuxt/dist` was deleted mid-dev → stop the dev server, run `pnpm --filter evlog-docs exec nuxt prepare`, then `pnpm --filter evlog-docs exec nuxt dev` again.
+- Docs / Vite **Maximum call stack size exceeded** during transform after many file changes → stop the dev server, remove `apps/docs/.nuxt`, `apps/docs/.data`, and `apps/docs/node_modules/.cache`, then `pnpm run dev:docs` again.
+- Docs site SSR / duplicate Vue (`vaul-vue`, `renderSlot` / `.ce`) → `patches/README.md` (pnpm `patchedDependencies`).
+- Dev server crashes with **`EMFILE: too many open files, watch`** → macOS launchd defaults the file-descriptor limit to 256; run `ulimit -n 65536` in the same shell before `pnpm run dev:docs`, or persist it via your shell rc / `launchctl limit maxfiles 65536 524288`.
 - Tests fail after 3 attempts → stop, report the failing test with full output
 - Missing dependency → check `package.json` first, then ask
 - Unsure about architecture → read the relevant SKILL.md or ask
@@ -106,6 +110,6 @@ A task is complete when **all** of the following pass:
 **Submit feedback mid-work.** Don't wait until the task is done or for the user to ask.
 
 **Update this file** when you encounter:
-- A recurring mistake or easy-to-get-wrong pattern (e.g. Bun `patch` that removes a line from `package.json` must not leave a **trailing comma** in the `dependencies` object — strict JSON parsers used by Vite/Rollup will fail the build)
+- A recurring mistake or easy-to-get-wrong pattern
 - Explicit guidance from the maintainer
 - A new convention that should be applied consistently

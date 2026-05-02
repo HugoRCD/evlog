@@ -7,6 +7,7 @@ export default defineNuxtConfig({
     '/adapters': { redirect: { to: '/adapters/overview', statusCode: 301 } },
     '/core-concepts': { redirect: { to: '/core-concepts/lifecycle', statusCode: 301 } },
     '/enrichers': { redirect: { to: '/enrichers/overview', statusCode: 301 } },
+    '/use-cases': { redirect: { to: '/use-cases/cli-and-scripts', statusCode: 301 } },
     '/nuxthub': { redirect: { to: '/adapters/self-hosted/nuxthub', statusCode: 301 } },
     '/nuxthub/overview': { redirect: { to: '/adapters/self-hosted/nuxthub', statusCode: 301 } },
     '/nuxthub/retention': { redirect: { to: '/adapters/self-hosted/nuxthub#retention', statusCode: 301 } },

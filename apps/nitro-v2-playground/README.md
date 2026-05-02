@@ -5,12 +5,12 @@ Demonstrates evlog integration with **Nitro v2** (`nitropack` + `h3`) using the 
 ## Getting started
 
 ```bash
-bun install
-bun run dev
+pnpm install
+pnpm run dev
 ```
 
 ## Deploying
 
 ```bash
-bun run build
+pnpm run build
 ```

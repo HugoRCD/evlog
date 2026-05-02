@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Generate .github/snippets/package-stats.md from the built dist/
-# Usage: bun run build && bash scripts/package-stats.sh
+# Usage: pnpm run build && bash scripts/package-stats.sh
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "$0")/.." && pwd)"
@@ -9,7 +9,7 @@ DIST="$PKG/dist"
 OUT="$ROOT/.github/snippets/package-stats.md"
 
 if [ ! -d "$DIST" ]; then
-  echo "Error: dist/ not found. Run 'bun run build' first." >&2
+  echo "Error: dist/ not found. Run 'pnpm run build' first." >&2
   exit 1
 fi
 

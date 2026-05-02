@@ -8,43 +8,44 @@ on:
 
 concurrency: ${{ github.workflow }}-${{ github.ref }}
 
-permissions:
-  contents: write
-  pull-requests: write
-  id-token: write
+permissions: {}
 
 jobs:
   release:
+    permissions:
+      contents: write
+      pull-requests: write
+      id-token: write
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
       - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - run: corepack enable
 
       - uses: actions/setup-node@v6
         with:
-          node-version: "22"
-          registry-url: "https://registry.npmjs.org"
-
-      - uses: oven-sh/setup-bun@v2
-        with:
-          bun-version: "1.3.13"
+          node-version: latest
+          registry-url: https://registry.npmjs.org
 
       - name: Install dependencies
-        run: bun install
+        run: pnpm install
 
       - name: Prepare
-        run: bun run dev:prepare
+        run: pnpm dev:prepare
 
-      - name: Build packages
-        run: bun run build:package
+      - name: Build package
+        run: pnpm build:package
 
       - name: Create Release PR or Publish
         id: changesets
         uses: changesets/action@v1
         with:
           title: "chore(repo): version packages"
-          version: bun run version
-          publish: bun run release
+          version: pnpm run version
+          publish: pnpm run release
           createGithubReleases: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

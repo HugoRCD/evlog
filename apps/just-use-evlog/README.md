@@ -27,11 +27,11 @@ On **evlog-docs**, set `NUXT_PUBLIC_JUST_USE_EVLOG_URL` to this app’s producti
 From the monorepo root:
 
 ```bash
-bun run dev:just-use-evlog
+pnpm run dev:just-use-evlog
 ```
 
 Or from this directory:
 
 ```bash
-bun run dev
+pnpm run dev
 ```

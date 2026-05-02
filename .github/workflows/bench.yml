@@ -27,19 +27,27 @@ jobs:
         with:
           fetch-depth: 0
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare
+        run: pnpm run dev:prepare
 
       - name: Build evlog package
-        run: bunx turbo run build --filter=evlog
+        run: pnpm run build:package
 
       - name: Measure current bundle size
         working-directory: packages/evlog
-        run: bun bench/scripts/size.ts --json > /tmp/size-current.json
+        run: pnpm exec tsx bench/scripts/size.ts --json > /tmp/size-current.json
 
       - name: Get baseline from main
         run: |
@@ -50,7 +58,7 @@ jobs:
         working-directory: packages/evlog
         run: |
           set +e
-          REPORT=$(bun bench/scripts/compare.ts \
+          REPORT=$(pnpm exec tsx bench/scripts/compare.ts \
             --size /tmp/size-baseline.json /tmp/size-current.json)
           EXIT_CODE=$?
           echo "exit_code=$EXIT_CODE" >> "$GITHUB_OUTPUT"
@@ -101,21 +109,29 @@ jobs:
     steps:
       - uses: actions/checkout@v6
 
-      - uses: oven-sh/setup-bun@v2
+      - uses: pnpm/action-setup@v6
         with:
-          bun-version: "1.3.13"
+          version: 10.33.2
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
 
       - name: Install dependencies
-        run: bun install
+        run: pnpm install --frozen-lockfile
+
+      - name: Prepare
+        run: pnpm run dev:prepare
 
       - name: Build evlog package
-        run: bunx turbo run build --filter=evlog
+        run: pnpm run build:package
 
       - name: Measure bundle size
         working-directory: packages/evlog
         run: |
           mkdir -p bench/baseline
-          bun bench/scripts/size.ts --json > bench/baseline/size.json
+          pnpm exec tsx bench/scripts/size.ts --json > bench/baseline/size.json
 
       - name: Create baseline PR
         uses: peter-evans/create-pull-request@v8

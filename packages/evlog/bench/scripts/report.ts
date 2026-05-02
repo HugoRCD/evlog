@@ -2,11 +2,13 @@
  * Generate a human-readable markdown report from benchmark baseline JSON files.
  *
  * Usage:
- *   bun bench/scripts/report.ts
+ *   tsx bench/scripts/report.ts
  *
  * Reads from bench/baseline/{bench,comparison,size}.json
  * Writes to bench/RESULTS.md
  */
+
+import { readFile, writeFile } from 'node:fs/promises'
 
 // --- Types ---
 
@@ -69,7 +71,7 @@ function formatBytes(bytes: number): string {
 
 async function loadJSON<T>(path: string): Promise<T | null> {
   try {
-    const raw = await Bun.file(path).text()
+    const raw = await readFile(path, 'utf8')
     return JSON.parse(raw) as T
   } catch {
     return null
@@ -190,5 +192,5 @@ if (bench) {
 const output = sections.join('\n')
 const outPath = new URL('../RESULTS.md', import.meta.url).pathname
 
-await Bun.write(outPath, output)
+await writeFile(outPath, output)
 console.log(`Report written to bench/RESULTS.md`)
