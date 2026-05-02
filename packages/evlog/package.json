@@ -1,7 +1,7 @@
 {
   "name": "evlog",
   "version": "2.14.1",
-  "description": "Wide event logging library with structured error handling. Inspired by LoggingSucks.",
+  "description": "Modern TypeScript logger — simple logs, wide events, structured errors. Built for scripts, libraries, jobs, edge, and HTTP. One drain pipeline everywhere.",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
   "repository": {

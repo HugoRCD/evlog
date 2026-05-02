@@ -11,11 +11,11 @@
 [![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev)
 [![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
-**Your logs are lying to you.**
+**Digging through logs is not observability. It's hope.**
 
-A single request generates 10+ log lines. When production breaks at 3am, you're grep-ing through noise, praying you'll find signal. Your errors say "Something went wrong" -- thanks, very helpful.
+A single request generates 10+ log lines. When production breaks at 3am, you're sifting scattered lines for a needle of signal. Your errors say "Something went wrong" — thanks, very helpful.
 
-**evlog fixes this.** One log per request. All context included. Errors that explain themselves.
+**evlog is different.** One wide event per operation. All the context. Errors that explain *why* and what to do next.
 
 ## Why evlog?
 
