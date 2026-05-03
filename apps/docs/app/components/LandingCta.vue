@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Shader, Aurora } from 'shaders/vue'
 import { Motion } from 'motion-v'
 
 const { public: pub } = useRuntimeConfig()
@@ -41,26 +40,6 @@ onMounted(() => {
       class="absolute inset-0"
       style="background: linear-gradient(180deg, #09090b 0%, #000711 6%, #001133 14%, #002266 22%, #0044CC 32%, #0055FF 42%, #0077FF 52%, #0099FF 62%, #44BBFF 72%, #88D4FF 80%, #BBE6FF 88%, #E0F3FF 94%, #FFFFFF 100%)"
     />
-
-    <ClientOnly>
-      <div class="absolute inset-0 mix-blend-screen opacity-30">
-        <div class="size-full">
-          <Shader>
-            <Aurora
-              color-a="#0044CC"
-              color-b="#0088FF"
-              color-c="#66BBFF"
-              :speed="2"
-              :intensity="50"
-              :curtain-count="3"
-              :waviness="35"
-              :ray-density="12"
-              :height="150"
-            />
-          </Shader>
-        </div>
-      </div>
-    </ClientOnly>
 
     <div class="relative z-10 pt-24 md:pt-32 text-center max-w-2xl mx-auto px-6">
       <Motion

@@ -12,7 +12,7 @@ pnpm run build:package             # build the package
 pnpm run test                      # run tests (vitest)
 pnpm run lint                      # lint all packages
 pnpm run typecheck                 # type-check all packages
-pnpm run dev:docs                  # start docs site
+pnpm run docs                      # start docs site (port 3000)
 cd packages/evlog && pnpm run release  # publish
 ```
 
@@ -92,14 +92,6 @@ A task is complete when **all** of the following pass:
 - Modify `node_modules/` or generated files
 
 ## When Stuck
-
-- Docs dev wrong app or blank landing → `pnpm run dev:docs` is **evlog-docs** at **http://localhost:3000**; `pnpm run dev` is the **playground** on port **3000** as well, so don't run them at the same time.
-- Nitro error **`component-meta.mjs` ENOENT** after `.nuxt/dist` was deleted mid-dev → stop the dev server, run `pnpm --filter evlog-docs exec nuxt prepare`, then `pnpm --filter evlog-docs exec nuxt dev` again.
-- Docs / Vite **Maximum call stack size exceeded** during transform after many file changes → stop the dev server, remove `apps/docs/.nuxt`, `apps/docs/.data`, and `apps/docs/node_modules/.cache`, then `pnpm run dev:docs` again.
-- Docs site SSR / duplicate Vue (`vaul-vue`, `renderSlot` / `.ce`) → `patches/README.md` (pnpm `patchedDependencies`).
-- Dev server crashes with **`EMFILE: too many open files, watch`** → macOS launchd defaults the file-descriptor limit to 256; run `ulimit -n 65536` in the same shell before `pnpm run dev:docs`, or persist it via your shell rc / `launchctl limit maxfiles 65536 524288`.
-- Tests fail after 3 attempts → stop, report the failing test with full output
-- Missing dependency → check `package.json` first, then ask
 - Unsure about architecture → read the relevant SKILL.md or ask
 - Unclear requirements → ask a clarifying question before making large speculative changes
 

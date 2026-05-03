@@ -142,4 +142,10 @@ export default defineNuxtConfig({
     },
     provider: 'iconify',
   },
+
+  vite: {
+    optimizeDeps: {
+      include: ['shaders/vue'],
+    },
+  },
 })

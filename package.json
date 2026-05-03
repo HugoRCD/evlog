@@ -57,6 +57,7 @@
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.4",
     "evlog": "workspace:*",
+    "h3": "^1.15.11",
     "turbo": "^2.9.6",
     "typescript": "^6.0.3",
     "vitest": "^4.1.5",
@@ -66,15 +67,5 @@
     "apps/*",
     "packages/*",
     "examples/*"
-  ],
-  "pnpm": {
-    "overrides": {
-      "vue": "3.5.33",
-      "@noble/hashes": "^1.8.0",
-      "minimark": "^1.0.0"
-    },
-    "patchedDependencies": {
-      "vaul-vue@0.4.1": "patches/vaul-vue@0.4.1.patch"
-    }
-  }
+  ]
 }
