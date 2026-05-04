@@ -1,10 +1,12 @@
 import { appendFile, mkdir, readdir, stat, unlink, writeFile } from 'node:fs/promises'
 import { join, sep } from 'node:path'
 import type { WideEvent } from '../types'
-import { defineDrain } from './_drain'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineDrain } from '../shared/drain'
 
 export interface FsConfig {
-  /** Directory for log files */
+  /** Directory for log files. Default: `.evlog/logs` */
   dir: string
   /** Max number of log files to keep (auto-deletes oldest when exceeded) */
   maxFiles?: number
@@ -13,6 +15,13 @@ export interface FsConfig {
   /** Pretty-print JSON instead of compact NDJSON */
   pretty: boolean
 }
+
+const FS_FIELDS: ConfigField<FsConfig>[] = [
+  { key: 'dir', env: ['NUXT_EVLOG_FS_DIR', 'EVLOG_FS_DIR'] },
+  { key: 'maxFiles' },
+  { key: 'maxSizePerFile' },
+  { key: 'pretty' },
+]
 
 const gitignoreWritten = new Set<string>()
 
@@ -127,12 +136,15 @@ export async function writeBatchToFs(events: WideEvent[], config: FsConfig): Pro
 export function createFsDrain(overrides?: Partial<FsConfig>) {
   return defineDrain<FsConfig>({
     name: 'fs',
-    resolve: () => ({
-      dir: overrides?.dir ?? '.evlog/logs',
-      pretty: overrides?.pretty ?? false,
-      maxFiles: overrides?.maxFiles,
-      maxSizePerFile: overrides?.maxSizePerFile,
-    }),
+    resolve: async () => {
+      const resolved = await resolveAdapterConfig<FsConfig>('fs', FS_FIELDS, overrides)
+      return {
+        dir: resolved.dir ?? '.evlog/logs',
+        pretty: resolved.pretty ?? false,
+        maxFiles: resolved.maxFiles,
+        maxSizePerFile: resolved.maxSizePerFile,
+      }
+    },
     send: writeBatchToFs,
   })
 }

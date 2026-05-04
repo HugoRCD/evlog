@@ -1,5 +1,6 @@
 import type { AuditActor, AuditFields, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
+import { getHeader as getSharedHeader } from './shared/headers'
 
 /**
  * Current version of the audit envelope. Bumped when `AuditFields` evolves
@@ -618,15 +619,10 @@ export function auditEnricher(options: AuditEnricherOptions = {}): (ctx: EnrichC
   }
 }
 
+// Re-imported here to avoid changing the long list of named imports at the top
+// of this file; identical semantics to `getHeader` exported from `evlog/toolkit`.
 function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
-  if (!headers) return undefined
-  if (headers[name] !== undefined) return headers[name]
-  const lower = name.toLowerCase()
-  if (headers[lower] !== undefined) return headers[lower]
-  for (const [k, v] of Object.entries(headers)) {
-    if (k.toLowerCase() === lower) return v
-  }
-  return undefined
+  return getSharedHeader(headers, name)
 }
 
 /** Options accepted by {@link auditOnly}. */

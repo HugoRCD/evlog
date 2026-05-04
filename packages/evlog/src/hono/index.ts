@@ -1,7 +1,7 @@
-import type { MiddlewareHandler } from 'hono'
+import type { Context, MiddlewareHandler } from 'hono'
 import type { RequestLogger } from '../types'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { extractSafeHeaders } from '../shared/headers'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 
 export type EvlogHonoOptions = BaseEvlogOptions
 
@@ -20,6 +20,19 @@ export type EvlogHonoOptions = BaseEvlogOptions
  * ```
  */
 export type EvlogVariables = { Variables: { log: RequestLogger } }
+
+const integration = defineFrameworkIntegration<Context>({
+  name: 'hono',
+  extractRequest: (c) => ({
+    method: c.req.method,
+    path: c.req.path,
+    headers: c.req.raw.headers,
+    requestId: c.req.header('x-request-id'),
+  }),
+  attachLogger: (c, logger) => {
+    c.set('log', logger)
+  },
+})
 
 /**
  * Create an evlog middleware for Hono.
@@ -41,21 +54,11 @@ export type EvlogVariables = { Variables: { log: RequestLogger } }
  */
 export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
   return async (c, next) => {
-    const { logger, finish, skipped } = createMiddlewareLogger({
-      method: c.req.method,
-      path: c.req.path,
-      requestId: c.req.header('x-request-id') || crypto.randomUUID(),
-      headers: extractSafeHeaders(c.req.raw.headers),
-      ...options,
-    })
-
+    const { skipped, finish } = integration.start(c, options)
     if (skipped) {
       await next()
       return
     }
-
-    c.set('log', logger)
-
     try {
       await next()
       await finish({ status: c.res.status })

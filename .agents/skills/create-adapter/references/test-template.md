@@ -105,7 +105,10 @@ describe('{name} adapter', () => {
       expect(body).toHaveLength(1)
     })
 
-    // --- 4. Error Handling ---
+    // --- 4. Error Handling (only the direct helper throws — the drain
+    //      itself swallows errors via `defineHttpDrain` so the request
+    //      pipeline is never interrupted; that contract is covered by
+    //      `test/toolkit.test.ts`).
     it('throws error on non-OK response', async () => {
       fetchSpy.mockResolvedValueOnce(
         new Response('Bad Request', { status: 400, statusText: 'Bad Request' }),

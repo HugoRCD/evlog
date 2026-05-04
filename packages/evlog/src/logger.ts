@@ -2,6 +2,8 @@ import type { AuditableLogger, AuditInput, AuditMethod } from './audit'
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { redactEvent, resolveRedactConfig } from './redact'
+import type { PluginRunner } from './shared/plugin'
+import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -54,6 +56,7 @@ let globalSilent = false
 /** Minimum level for the global `log` API only (`ownsEvent === false`). Default: all levels. */
 let globalMinLevel: LogLevel = 'debug'
 let _locked = false
+let globalPluginRunner: PluginRunner = getEmptyPluginRunner()
 
 /**
  * Initialize the logger with configuration.
@@ -78,10 +81,27 @@ export function initLogger(config: LoggerConfig = {}): void {
   globalRedact = resolveRedactConfig(config.redact ?? !isDev())
   globalSilent = config.silent ?? false
   globalMinLevel = config.minLevel ?? 'debug'
+  globalPluginRunner = config.plugins?.length
+    ? createPluginRunner(config.plugins)
+    : getEmptyPluginRunner()
 
-  if (globalSilent && !globalDrain && !config._suppressDrainWarning) {
+  if (globalPluginRunner.plugins.length > 0) {
+    void globalPluginRunner.runSetup({ env: { ...globalEnv } })
+  }
+
+  const hasAnyDrain = !!globalDrain || globalPluginRunner.hasDrain
+  if (globalSilent && !hasAnyDrain && !config._suppressDrainWarning) {
     console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
   }
+}
+
+/**
+ * @internal Get the globally registered plugin runner.
+ * Used by framework middleware so plugins also fire on routes that pre-date
+ * the middleware-level options.
+ */
+export function getGlobalPluginRunner(): PluginRunner {
+  return globalPluginRunner
 }
 
 /**
@@ -218,12 +238,24 @@ function emitWideEvent(
     }
   }
 
-  if (globalDrain && !deferDrain) {
-    const drainPromise = Promise.resolve(globalDrain({ event: formatted })).catch((err) => {
-      console.error('[evlog] drain failed:', err)
-    })
-    if (waitUntil) {
-      waitUntil(drainPromise)
+  if (!deferDrain) {
+    const drainPromises: Array<Promise<unknown>> = []
+    if (globalDrain) {
+      drainPromises.push(
+        (async () => {
+          try {
+            await globalDrain!({ event: formatted })
+          } catch (err) {
+            console.error('[evlog] drain failed:', err)
+          }
+        })(),
+      )
+    }
+    if (globalPluginRunner.hasDrain) {
+      drainPromises.push(globalPluginRunner.runDrain({ event: formatted }))
+    }
+    if (drainPromises.length > 0 && waitUntil) {
+      waitUntil(Promise.all(drainPromises))
     }
   }
 

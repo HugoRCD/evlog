@@ -1,7 +1,6 @@
-import type { FastifyPluginCallback } from 'fastify'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { attachForkToLogger } from '../shared/fork'
-import { extractSafeNodeHeaders } from '../shared/headers'
+import type { FastifyPluginCallback, FastifyRequest } from 'fastify'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
@@ -23,36 +22,32 @@ interface RequestState {
   finish: (opts?: { status?: number; error?: Error }) => Promise<unknown>
 }
 
+const integration = defineFrameworkIntegration<FastifyRequest>({
+  name: 'fastify',
+  extractRequest: (req) => ({
+    method: req.method,
+    path: new URL(req.url, 'http://localhost').pathname,
+    headers: req.headers,
+    requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined,
+  }),
+  attachLogger: (req, logger) => {
+    (req as any).log = logger
+  },
+  storage,
+})
+
 const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, options, done) => {
   const emitted = new WeakSet<object>()
   const requestState = new WeakMap<object, RequestState>()
 
-  fastify.addHook('onRequest', (request, _reply, done) => {
-    const headers = extractSafeNodeHeaders(request.headers)
-    const path = new URL(request.url, 'http://localhost').pathname
-
-    const middlewareOpts = {
-      method: request.method,
-      path,
-      requestId: headers['x-request-id'] || crypto.randomUUID(),
-      headers,
-      ...options,
-    }
-    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
-
+  fastify.addHook('onRequest', (request, _reply, next) => {
+    const { finish, skipped, runWith } = integration.start(request, options)
     if (skipped) {
-      done()
+      next()
       return
     }
-
-    attachForkToLogger(storage, logger, middlewareOpts)
-
-    // Shadow Fastify's built-in pino logger with evlog's request-scoped logger
-    const req = request as any
-    req.log = logger
     requestState.set(request, { finish })
-
-    storage.run(logger, () => done())
+    void runWith(() => next())
   })
 
   fastify.addHook('onResponse', async (request, reply) => {
@@ -75,8 +70,6 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
   done()
 }
 
-// Break Fastify plugin encapsulation without a runtime dependency on fastify-plugin.
-// This is the same mechanism fastify-plugin uses internally.
 const plugin = evlogPlugin as any
 plugin[Symbol.for('skip-override')] = true
 plugin[Symbol.for('fastify.display-name')] = 'evlog'

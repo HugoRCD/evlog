@@ -1,8 +1,7 @@
 import type { Request, Response, NextFunction, RequestHandler } from 'express'
 import type { RequestLogger } from '../types'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { attachForkToLogger } from '../shared/fork'
-import { extractSafeNodeHeaders } from '../shared/headers'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
@@ -18,6 +17,20 @@ declare module 'express-serve-static-core' {
     log: RequestLogger
   }
 }
+
+const integration = defineFrameworkIntegration<Request>({
+  name: 'express',
+  extractRequest: (req) => ({
+    method: req.method,
+    path: new URL(req.originalUrl || req.url || '/', 'http://localhost').pathname,
+    headers: req.headers,
+    requestId: req.get('x-request-id'),
+  }),
+  attachLogger: (req, logger) => {
+    req.log = logger
+  },
+  storage,
+})
 
 /**
  * Create an evlog middleware for Express.
@@ -39,27 +52,17 @@ declare module 'express-serve-static-core' {
  */
 export function evlog(options: EvlogExpressOptions = {}): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    const middlewareOpts = {
-      method: req.method,
-      path: new URL(req.originalUrl || req.url || '/', 'http://localhost').pathname,
-      requestId: req.get('x-request-id') || crypto.randomUUID(),
-      headers: extractSafeNodeHeaders(req.headers),
-      ...options,
-    }
-    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
+    const { finish, skipped, runWith } = integration.start(req, options)
 
     if (skipped) {
       next()
       return
     }
 
-    attachForkToLogger(storage, logger, middlewareOpts)
-    req.log = logger
-
     res.on('finish', () => {
       finish({ status: res.statusCode }).catch(() => {})
     })
 
-    storage.run(logger, () => next())
+    void runWith(() => next())
   }
 }

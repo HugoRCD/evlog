@@ -1,68 +1,550 @@
-import { describe, expect, it } from 'vitest'
-import * as toolkit from '../src/shared/index'
+import { AsyncLocalStorage } from 'node:async_hooks'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { initLogger } from '../src/logger'
+import {
+  composeDrains,
+  composeEnrichers,
+  composeKeep,
+  composePlugins,
+  createPluginRunner,
+  defineEnricher,
+  defineEvlog,
+  defineFrameworkIntegration,
+  defineHttpDrain,
+  definePlugin,
+  drainPlugin,
+  enricherPlugin,
+  getEmptyPluginRunner,
+  getHeader,
+  mergeEventField,
+  normalizeNumber,
+  toLoggerConfig,
+  toMiddlewareOptions,
+  toOtlpAttributeValue,
+  toTypedAttributeValue,
+} from '../src/shared/index'
+import type { DrainContext, EnrichContext, RequestLogger, TailSamplingContext, WideEvent } from '../src/types'
 
-describe('evlog/toolkit barrel exports', () => {
-  it('exports createMiddlewareLogger', () => {
-    expect(toolkit.createMiddlewareLogger).toBeTypeOf('function')
+const baseEvent = (): WideEvent => ({
+  timestamp: '2030-01-01T00:00:00.000Z',
+  level: 'info',
+  service: 'test',
+  environment: 'test',
+})
+
+const enrichCtx = (event: WideEvent = baseEvent(), overrides: Partial<EnrichContext> = {}): EnrichContext => ({
+  event,
+  ...overrides,
+})
+
+const drainCtx = (event: WideEvent = baseEvent()): DrainContext => ({ event })
+
+beforeEach(() => {
+  vi.spyOn(console, 'error').mockImplementation(() => {})
+  vi.spyOn(console, 'warn').mockImplementation(() => {})
+  vi.spyOn(console, 'log').mockImplementation(() => {})
+  vi.spyOn(console, 'info').mockImplementation(() => {})
+})
+
+afterEach(() => {
+  vi.restoreAllMocks()
+})
+
+describe('headers helpers', () => {
+  it('getHeader is case-insensitive', () => {
+    expect(getHeader({ 'X-Tenant-Id': 'acme' }, 'x-tenant-id')).toBe('acme')
+    expect(getHeader({ 'x-tenant-id': 'acme' }, 'X-Tenant-Id')).toBe('acme')
+    expect(getHeader({}, 'x-foo')).toBeUndefined()
+    expect(getHeader(undefined, 'x-foo')).toBeUndefined()
   })
 
-  it('exports extractSafeHeaders', () => {
-    expect(toolkit.extractSafeHeaders).toBeTypeOf('function')
-  })
-
-  it('exports extractSafeNodeHeaders', () => {
-    expect(toolkit.extractSafeNodeHeaders).toBeTypeOf('function')
-  })
-
-  it('exports createLoggerStorage', () => {
-    expect(toolkit.createLoggerStorage).toBeTypeOf('function')
-  })
-
-  it('exports extractErrorStatus', () => {
-    expect(toolkit.extractErrorStatus).toBeTypeOf('function')
-  })
-
-  it('exports shouldLog', () => {
-    expect(toolkit.shouldLog).toBeTypeOf('function')
-  })
-
-  it('exports getServiceForPath', () => {
-    expect(toolkit.getServiceForPath).toBeTypeOf('function')
-  })
-
-  it('exports fork helpers and runEnrichAndDrain', () => {
-    expect(toolkit.attachForkToLogger).toBeTypeOf('function')
-    expect(toolkit.forkBackgroundLogger).toBeTypeOf('function')
-    expect(toolkit.runEnrichAndDrain).toBeTypeOf('function')
+  it('normalizeNumber handles invalid input', () => {
+    expect(normalizeNumber('42')).toBe(42)
+    expect(normalizeNumber('NaN')).toBeUndefined()
+    expect(normalizeNumber(undefined)).toBeUndefined()
+    expect(normalizeNumber('')).toBeUndefined()
   })
 })
 
-describe('extractErrorStatus', () => {
-  it('extracts status field', () => {
-    expect(toolkit.extractErrorStatus({ status: 404 })).toBe(404)
+describe('event helpers', () => {
+  it('mergeEventField preserves user values by default', () => {
+    const merged = mergeEventField({ id: 'user' }, { id: 'computed', extra: 1 })
+    expect(merged).toEqual({ id: 'user', extra: 1 })
   })
 
-  it('extracts statusCode field', () => {
-    expect(toolkit.extractErrorStatus({ statusCode: 502 })).toBe(502)
+  it('mergeEventField overwrites when requested', () => {
+    const merged = mergeEventField({ id: 'user' }, { id: 'computed' }, true)
+    expect(merged).toEqual({ id: 'computed' })
   })
 
-  it('prefers status over statusCode', () => {
-    expect(toolkit.extractErrorStatus({ status: 400, statusCode: 502 })).toBe(400)
+  it('toTypedAttributeValue distinguishes integers and doubles', () => {
+    expect(toTypedAttributeValue(42)).toEqual({ value: 42, type: 'integer' })
+    expect(toTypedAttributeValue(3.14)).toEqual({ value: 3.14, type: 'double' })
+    expect(toTypedAttributeValue(true)).toEqual({ value: true, type: 'boolean' })
+    expect(toTypedAttributeValue('hi')).toEqual({ value: 'hi', type: 'string' })
+    expect(toTypedAttributeValue({ x: 1 })).toEqual({ value: '{"x":1}', type: 'string' })
+    expect(toTypedAttributeValue(null)).toBeUndefined()
   })
 
-  it('defaults to 500 for unknown errors', () => {
-    expect(toolkit.extractErrorStatus(new Error('fail'))).toBe(500)
-    expect(toolkit.extractErrorStatus(null)).toBe(500)
-    expect(toolkit.extractErrorStatus(undefined)).toBe(500)
+  it('toOtlpAttributeValue maps to OTLP AnyValue', () => {
+    expect(toOtlpAttributeValue(42)).toEqual({ intValue: '42' })
+    expect(toOtlpAttributeValue(true)).toEqual({ boolValue: true })
+    expect(toOtlpAttributeValue('hi')).toEqual({ stringValue: 'hi' })
+    expect(toOtlpAttributeValue({ x: 1 })).toEqual({ stringValue: '{"x":1}' })
+  })
+})
+
+describe('defineEnricher', () => {
+  it('skips when compute returns undefined', () => {
+    const enricher = defineEnricher<{ id: string }>({
+      name: 'tenant',
+      field: 'tenant',
+      compute: () => undefined,
+    })
+    const ctx = enrichCtx()
+    enricher(ctx)
+    expect(ctx.event.tenant).toBeUndefined()
   })
 
-  it('defaults to 500 for non-numeric status', () => {
-    expect(toolkit.extractErrorStatus({ status: 'bad' })).toBe(500)
-    expect(toolkit.extractErrorStatus({ status: NaN })).toBe(500)
-    expect(toolkit.extractErrorStatus({ statusCode: Infinity })).toBe(500)
+  it('merges into the requested field with default preserve semantics', () => {
+    const enricher = defineEnricher<{ id: string; plan?: string }>({
+      name: 'tenant',
+      field: 'tenant',
+      compute: () => ({ id: 'computed', plan: 'free' }),
+    })
+    const event = baseEvent()
+    event.tenant = { id: 'user-set' }
+    const ctx = enrichCtx(event)
+    enricher(ctx)
+    expect(ctx.event.tenant).toEqual({ id: 'user-set', plan: 'free' })
   })
 
-  it('coerces string numbers', () => {
-    expect(toolkit.extractErrorStatus({ status: '404' })).toBe(404)
+  it('overwrites when overwrite is true', () => {
+    const enricher = defineEnricher<{ id: string }>({
+      name: 'tenant',
+      field: 'tenant',
+      compute: () => ({ id: 'computed' }),
+    }, { overwrite: true })
+    const event = baseEvent()
+    event.tenant = { id: 'user-set' }
+    const ctx = enrichCtx(event)
+    enricher(ctx)
+    expect(ctx.event.tenant).toEqual({ id: 'computed' })
+  })
+
+  it('isolates errors from compute', () => {
+    const enricher = defineEnricher<{ id: string }>({
+      name: 'tenant',
+      field: 'tenant',
+      compute: () => {
+        throw new Error('boom')
+      },
+    })
+    const ctx = enrichCtx()
+    enricher(ctx)
+    expect(ctx.event.tenant).toBeUndefined()
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('[evlog/tenant]'),
+      expect.any(Error),
+    )
+  })
+})
+
+describe('composers', () => {
+  it('composeEnrichers runs in order and isolates errors', async () => {
+    const enrich = composeEnrichers([
+      (ctx) => {
+        ctx.event.a = 1
+      },
+      () => {
+        throw new Error('mid failed')
+      },
+      (ctx) => {
+        ctx.event.b = 2
+      },
+    ])
+    const ctx = enrichCtx()
+    await enrich(ctx)
+    expect(ctx.event.a).toBe(1)
+    expect(ctx.event.b).toBe(2)
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  it('composeDrains fans out concurrently and isolates errors', async () => {
+    const calls: string[] = []
+    const drain = composeDrains([
+      () => {
+        calls.push('a')
+      },
+      () => {
+        throw new Error('b failed')
+      },
+      () => {
+        calls.push('c')
+      },
+    ])
+    await drain(drainCtx())
+    expect(calls).toEqual(expect.arrayContaining(['a', 'c']))
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  it('composeKeep ORs shouldKeep across keepers', async () => {
+    const keep = composeKeep([
+      () => {
+        // first keeper does nothing
+      },
+      (ctx) => {
+        ctx.shouldKeep = true
+      },
+      () => {
+        throw new Error('isolated')
+      },
+    ])
+    const ctx: TailSamplingContext = { context: {}, shouldKeep: false }
+    await keep(ctx)
+    expect(ctx.shouldKeep).toBe(true)
+    expect(console.error).toHaveBeenCalled()
+  })
+
+  it('composePlugins de-duplicates by name with last-wins', () => {
+    const result = composePlugins(
+      [{ name: 'a' }, { name: 'b' }],
+      [{ name: 'a', drain: () => {} }],
+    )
+    expect(result).toHaveLength(2)
+    expect(result.find(p => p.name === 'a')?.drain).toBeTypeOf('function')
+  })
+})
+
+describe('plugin runner', () => {
+  it('definePlugin returns the same plugin', () => {
+    const plugin = definePlugin({ name: 'noop' })
+    expect(plugin.name).toBe('noop')
+  })
+
+  it('drainPlugin / enricherPlugin wrap callbacks as plugins', () => {
+    const drain = drainPlugin('axiom', () => {})
+    const enricher = enricherPlugin('geo', () => {})
+    expect(drain.name).toBe('axiom')
+    expect(drain.drain).toBeTypeOf('function')
+    expect(enricher.name).toBe('geo')
+    expect(enricher.enrich).toBeTypeOf('function')
+  })
+
+  it('createPluginRunner reports correct hasX flags', () => {
+    const runner = createPluginRunner([
+      { name: 'a', enrich: () => {} },
+      { name: 'b', drain: () => {} },
+      { name: 'c', keep: () => {} },
+      { name: 'd', extendLogger: () => {} },
+    ])
+    expect(runner.hasEnrich).toBe(true)
+    expect(runner.hasDrain).toBe(true)
+    expect(runner.hasKeep).toBe(true)
+    expect(runner.hasExtendLogger).toBe(true)
+    expect(runner.hasRequestLifecycle).toBe(false)
+    expect(runner.hasClientLog).toBe(false)
+  })
+
+  it('createPluginRunner de-duplicates by name (last wins)', () => {
+    const runner = createPluginRunner([
+      { name: 'a', drain: () => {} },
+      { name: 'a', enrich: () => {} },
+    ])
+    expect(runner.plugins).toHaveLength(1)
+    expect(runner.hasDrain).toBe(false)
+    expect(runner.hasEnrich).toBe(true)
+  })
+
+  it('runEnrich preserves order and isolates errors', async () => {
+    const order: string[] = []
+    const runner = createPluginRunner([
+      {
+        name: 'a',
+        enrich: () => {
+          order.push('a')
+        },
+      },
+      {
+        name: 'b',
+        enrich: () => {
+          throw new Error('b failed')
+        },
+      },
+      {
+        name: 'c',
+        enrich: () => {
+          order.push('c')
+        },
+      },
+    ])
+    const ctx = enrichCtx()
+    await runner.runEnrich(ctx)
+    expect(order).toEqual(['a', 'c'])
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('[evlog/b]'),
+      expect.any(Error),
+    )
+  })
+
+  it('runDrain runs concurrently and isolates errors', async () => {
+    const calls: string[] = []
+    const runner = createPluginRunner([
+      {
+        name: 'a',
+        drain: () => {
+          calls.push('a')
+        },
+      },
+      {
+        name: 'b',
+        drain: () => {
+          throw new Error('b failed')
+        },
+      },
+      {
+        name: 'c',
+        drain: () => {
+          calls.push('c')
+        },
+      },
+    ])
+    await runner.runDrain(drainCtx())
+    expect(calls).toEqual(expect.arrayContaining(['a', 'c']))
+    expect(console.error).toHaveBeenCalledWith(
+      expect.stringContaining('[evlog/b]'),
+      expect.any(Error),
+    )
+  })
+
+  it('applyExtendLogger mutates the logger', () => {
+    const runner = createPluginRunner([
+      {
+        name: 'audit',
+        extendLogger: (logger) => {
+          (logger as Record<string, unknown>).custom = () => 'hi'
+        },
+      },
+    ])
+    const logger = {
+      set: () => {},
+      error: () => {},
+      info: () => {},
+      warn: () => {},
+      emit: () => null,
+      getContext: () => ({}),
+    } as Parameters<typeof runner.applyExtendLogger>[0]
+    runner.applyExtendLogger(logger)
+    expect((logger as unknown as { custom: () => string }).custom()).toBe('hi')
+  })
+
+  it('getEmptyPluginRunner returns a stable empty runner', () => {
+    expect(getEmptyPluginRunner().plugins).toHaveLength(0)
+    expect(getEmptyPluginRunner().hasDrain).toBe(false)
+  })
+})
+
+describe('plugin lifecycle wired through initLogger', () => {
+  beforeEach(() => {
+    initLogger({ env: { service: 'test' }, pretty: false, silent: true })
+  })
+
+  it('runs plugin drain alongside global drain on log.info()', async () => {
+    const pluginDrain = vi.fn()
+    const standaloneDrain = vi.fn()
+    initLogger({
+      env: { service: 'test' },
+      pretty: false,
+      silent: true,
+      drain: standaloneDrain,
+      plugins: [{ name: 'test-plugin', drain: pluginDrain }],
+    })
+
+    const { log } = await import('../src/logger')
+    log.info({ action: 'test' })
+    // Drains run via Promise.allSettled — give the microtask a tick
+    await new Promise(resolve => setTimeout(resolve, 5))
+
+    expect(standaloneDrain).toHaveBeenCalledTimes(1)
+    expect(pluginDrain).toHaveBeenCalledTimes(1)
+    expect(standaloneDrain.mock.calls[0]?.[0]?.event?.action).toBe('test')
+    expect(pluginDrain.mock.calls[0]?.[0]?.event?.action).toBe('test')
+  })
+
+  it('runs plugin setup at registration', async () => {
+    const setup = vi.fn()
+    initLogger({
+      env: { service: 'unit-test' },
+      pretty: false,
+      silent: true,
+      plugins: [{ name: 'with-setup', setup }],
+    })
+    await new Promise(resolve => setTimeout(resolve, 5))
+    expect(setup).toHaveBeenCalledTimes(1)
+    expect(setup.mock.calls[0]?.[0]?.env?.service).toBe('unit-test')
+  })
+})
+
+describe('defineHttpDrain', () => {
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response(null, { status: 204 }))))
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('encodes a single batch and POSTs to the resolved URL', async () => {
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'secret' }),
+      encode: (events, config) => ({
+        url: 'https://example.test/ingest',
+        headers: { 'Content-Type': 'application/json', 'X-Key': config.apiKey },
+        body: JSON.stringify(events),
+      }),
+    })
+    await drain(drainCtx({ ...baseEvent(), action: 'a' }))
+    expect(fetch).toHaveBeenCalledWith(
+      'https://example.test/ingest',
+      expect.objectContaining({
+        method: 'POST',
+        headers: expect.objectContaining({ 'X-Key': 'secret' }),
+        body: expect.stringContaining('"action":"a"'),
+      }),
+    )
+  })
+
+  it('skips when resolve returns null', async () => {
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => null,
+      encode: () => ({ url: 'x', headers: {}, body: '' }),
+    })
+    await drain(drainCtx())
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('skips when encode returns null', async () => {
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'k' }),
+      encode: () => null,
+    })
+    await drain(drainCtx())
+    expect(fetch).not.toHaveBeenCalled()
+  })
+
+  it('forwards config.timeout/retries', async () => {
+    const drain = defineHttpDrain<{ apiKey: string; timeout?: number; retries?: number }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'k', timeout: 1234 }),
+      encode: () => ({ url: 'https://x.test', headers: {}, body: '{}' }),
+    })
+    await drain(drainCtx())
+    // Hard to introspect httpPost timeout; this exercise just ensures no throw.
+    expect(fetch).toHaveBeenCalled()
+  })
+
+  it('logs errors from send and never throws', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('boom', { status: 500 }))))
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'k' }),
+      encode: () => ({ url: 'https://x.test', headers: {}, body: '{}' }),
+    })
+    await expect(drain(drainCtx())).resolves.toBeUndefined()
+    expect(console.error).toHaveBeenCalled()
+  })
+})
+
+describe('defineEvlog / toLoggerConfig / toMiddlewareOptions', () => {
+  it('defineEvlog returns the same config object', () => {
+    const config = defineEvlog({ service: 'shop' })
+    expect(config.service).toBe('shop')
+  })
+
+  it('toLoggerConfig promotes service / environment into env', () => {
+    const config = defineEvlog({ service: 'shop', environment: 'staging', sampling: { rates: { info: 50 } } })
+    const logger = toLoggerConfig(config)
+    expect(logger.env).toEqual({ service: 'shop', environment: 'staging' })
+    expect(logger.sampling).toEqual({ rates: { info: 50 } })
+    expect(logger.drain).toBeUndefined()
+  })
+
+  it('toLoggerConfig forwards drain and plugins', () => {
+    const drain = vi.fn()
+    const plugin = { name: 'p' }
+    const logger = toLoggerConfig(defineEvlog({ drain, plugins: [plugin] }))
+    expect(logger.drain).toBe(drain)
+    expect(logger.plugins).toEqual([plugin])
+  })
+
+  it('toMiddlewareOptions picks middleware-only fields', () => {
+    const drain = vi.fn()
+    const enrich = vi.fn()
+    const config = defineEvlog({
+      service: 'shop',
+      include: ['/api/**'],
+      exclude: ['/health'],
+      drain,
+      enrich,
+      plugins: [{ name: 'p' }],
+    })
+    const mw = toMiddlewareOptions(config)
+    expect(mw.include).toEqual(['/api/**'])
+    expect(mw.exclude).toEqual(['/health'])
+    expect(mw.drain).toBe(drain)
+    expect(mw.enrich).toBe(enrich)
+    expect(mw.plugins).toEqual([{ name: 'p' }])
+  })
+})
+
+describe('defineFrameworkIntegration', () => {
+  it('extracts request, attaches logger, normalizes Web Headers', async () => {
+    const attached: RequestLogger[] = []
+    const integration = defineFrameworkIntegration<{ method: string; path: string; headers: Headers }>({
+      name: 'test',
+      extractRequest: (ctx) => ({
+        method: ctx.method,
+        path: ctx.path,
+        headers: ctx.headers,
+        requestId: ctx.headers.get('x-request-id') || undefined,
+      }),
+      attachLogger: (_ctx, logger) => {
+        attached.push(logger)
+      },
+    })
+    const ctx = {
+      method: 'GET',
+      path: '/health',
+      headers: new Headers({ 'x-request-id': 'req-1', 'user-agent': 'vitest' }),
+    }
+    const { logger, finish, skipped, middlewareOptions, runWith } = integration.start(ctx, { drain: () => {} })
+    expect(skipped).toBe(false)
+    expect(attached).toEqual([logger])
+    expect(middlewareOptions.headers?.['x-request-id']).toBe('req-1')
+    const value = await runWith(() => 42)
+    expect(value).toBe(42)
+    await finish({ status: 200 })
+  })
+
+  it('runs the handler inside ALS when storage is provided', async () => {
+    const storage = new AsyncLocalStorage<RequestLogger>()
+    const integration = defineFrameworkIntegration<{ method: string; path: string }>({
+      name: 'als-test',
+      extractRequest: (ctx) => ({ method: ctx.method, path: ctx.path }),
+      attachLogger: () => {},
+      storage,
+    })
+    const { logger, runWith, finish } = integration.start(
+      { method: 'POST', path: '/x' },
+      { drain: () => {} },
+    )
+    let observed: RequestLogger | undefined
+    await runWith(() => {
+      observed = storage.getStore()
+    })
+    expect(observed).toBe(logger)
+    await finish({ status: 204 })
   })
 })

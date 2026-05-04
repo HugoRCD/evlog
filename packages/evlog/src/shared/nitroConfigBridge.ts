@@ -19,7 +19,9 @@
  * Not exported from `evlog/toolkit` — package-internal only.
  */
 
-import type { EvlogConfig } from '../nitro'
+import type { NitroPluginEvlogConfig } from '../nitro'
+
+type EvlogConfig = NitroPluginEvlogConfig
 
 const EVLOG_NITRO_ENV = '__EVLOG_CONFIG' as const
 

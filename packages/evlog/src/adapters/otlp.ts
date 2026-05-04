@@ -1,9 +1,10 @@
 import type { WideEvent } from '../types'
-import type { ConfigField } from './_config'
-import { resolveAdapterConfig } from './_config'
-import { defineDrain } from './_drain'
-import { httpPost } from './_http'
-import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from './_severity'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineHttpDrain } from '../shared/drain'
+import { toOtlpAttributeValue } from '../shared/event'
+import { httpPost } from '../shared/http'
+import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from '../shared/severity'
 
 export interface OTLPConfig {
   /** OTLP HTTP endpoint (e.g., http://localhost:4318) */
@@ -68,22 +69,9 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
   { key: 'retries' },
 ]
 
-/**
- * Convert a value to OTLP attribute value format.
- */
-function toAttributeValue(value: unknown): { stringValue?: string, intValue?: string, boolValue?: boolean } {
-  if (typeof value === 'boolean') {
-    return { boolValue: value }
-  }
-  if (typeof value === 'number' && Number.isInteger(value)) {
-    return { intValue: String(value) }
-  }
-  if (typeof value === 'string') {
-    return { stringValue: value }
-  }
-  // For complex types, serialize to JSON string
-  return { stringValue: JSON.stringify(value) }
-}
+// Re-exposed under a local name to keep call-sites tight while delegating to
+// the shared OTLP attribute encoder in `evlog/toolkit`.
+const toAttributeValue = toOtlpAttributeValue
 
 /**
  * Convert an evlog WideEvent to an OTLP LogRecord.
@@ -243,7 +231,7 @@ function getHeadersFromEnv(): Record<string, string> | undefined {
  * ```
  */
 export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
-  return defineDrain<OTLPConfig>({
+  return defineHttpDrain<OTLPConfig>({
     name: 'otlp',
     resolve: async () => {
       const config = await resolveAdapterConfig<OTLPConfig>('otlp', OTLP_FIELDS, overrides)
@@ -259,8 +247,39 @@ export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
       }
       return config as OTLPConfig
     },
-    send: sendBatchToOTLP,
+    encode: (events, config) => {
+      if (events.length === 0) return null
+      return {
+        url: `${config.endpoint.replace(/\/$/, '')}/v1/logs`,
+        headers: {
+          'Content-Type': 'application/json',
+          ...config.headers,
+        },
+        body: JSON.stringify(buildOTLPPayload(events, config)),
+      }
+    },
   })
+}
+
+function buildOTLPPayload(events: WideEvent[], config: OTLPConfig): ExportLogsServiceRequest {
+  const grouped = new Map<string, WideEvent[]>()
+  for (const event of events) {
+    const key = `${event.service}::${event.environment}`
+    const group = grouped.get(key)
+    if (group) group.push(event)
+    else grouped.set(key, [event])
+  }
+  return {
+    resourceLogs: Array.from(grouped.values()).map(groupEvents => ({
+      resource: { attributes: buildResourceAttributes(groupEvents[0]!, config) },
+      scopeLogs: [
+        {
+          scope: { name: 'evlog', version: '1.0.0' },
+          logRecords: groupEvents.map(toOTLPLogRecord),
+        },
+      ],
+    })),
+  }
 }
 
 /**
@@ -291,30 +310,7 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
   if (events.length === 0) return
 
   const url = `${config.endpoint.replace(/\/$/, '')}/v1/logs`
-
-  // Group events by (service, environment) so each gets correct OTLP resource attributes
-  const grouped = new Map<string, WideEvent[]>()
-  for (const event of events) {
-    const key = `${event.service}::${event.environment}`
-    const group = grouped.get(key)
-    if (group) {
-      group.push(event)
-    } else {
-      grouped.set(key, [event])
-    }
-  }
-
-  const payload: ExportLogsServiceRequest = {
-    resourceLogs: Array.from(grouped.values()).map((groupEvents) => ({
-      resource: { attributes: buildResourceAttributes(groupEvents[0]!, config) },
-      scopeLogs: [
-        {
-          scope: { name: 'evlog', version: '1.0.0' },
-          logRecords: groupEvents.map(toOTLPLogRecord),
-        },
-      ],
-    })),
-  }
+  const payload = buildOTLPPayload(events, config)
 
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',

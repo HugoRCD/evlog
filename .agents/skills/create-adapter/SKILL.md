@@ -5,7 +5,7 @@ description: Create a new built-in evlog adapter to send wide events to an exter
 
 # Create evlog Adapter
 
-Add a new built-in adapter to evlog. Every adapter follows the same architecture. This skill walks through all 8 touchpoints. **Every single touchpoint is mandatory** -- do not skip any.
+Add a new built-in adapter to evlog. Every adapter follows the same architecture and is built on the public toolkit primitives in `evlog/toolkit` — so a community adapter has the same shape as a built-in one.
 
 ## PR Title
 
@@ -21,12 +21,12 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 
 | # | File | Action |
 |---|------|--------|
-| 1 | `packages/evlog/src/adapters/{name}.ts` | Create adapter source |
+| 1 | `packages/evlog/src/adapters/{name}.ts` | Create adapter source (built on `defineHttpDrain` from `../shared/drain`) |
 | 2 | `packages/evlog/tsdown.config.ts` | Add build entry |
 | 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` entries |
 | 4 | `packages/evlog/test/adapters/{name}.test.ts` | Create tests |
-| 5 | `apps/docs/content/5.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
-| 6 | `apps/docs/content/5.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
+| 5 | `apps/docs/content/4.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
+| 6 | `apps/docs/content/4.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
 | 7 | `skills/review-logging-patterns/SKILL.md` | Add adapter row in the Drain Adapters table |
 | 8 | Renumber `custom.md` | Ensure `custom.md` stays last after the new adapter |
 
@@ -42,26 +42,32 @@ Use these placeholders consistently:
 | `{Name}` | `Datadog` | PascalCase in function/interface names |
 | `{NAME}` | `DATADOG` | SCREAMING_CASE in env var prefixes |
 
-## Step 1: Adapter Source
+Standard option naming (use these exact names):
 
-Create `packages/evlog/src/adapters/{name}.ts`.
+| Concept | Standard option name |
+|---------|---------------------|
+| Bearer-style API secret | `apiKey` |
+| Base URL of the ingest API | `endpoint` |
+| Service identifier | `serviceName` |
+| Request timeout (ms) | `timeout` |
 
-Read [references/adapter-template.md](references/adapter-template.md) for the full annotated template.
+If a service historically used a different name (`token`, `sourceToken`, …) keep it as a deprecated alias — see Axiom and Better Stack for the pattern.
 
-Key architecture rules:
+## Step 1: Adapter Source — built on `defineHttpDrain`
 
-1. **Config interface** -- service-specific fields (API key, endpoint, etc.) plus optional `timeout?: number`
-2. **`getRuntimeConfig()`** -- import from `./_utils` (shared helper, do NOT redefine locally)
-3. **Config priority** (highest to lowest):
-   - Overrides passed to `create{Name}Drain()`
-   - `runtimeConfig.evlog.{name}`
-   - `runtimeConfig.{name}`
-   - Environment variables: `NUXT_{NAME}_*` then `{NAME}_*`
-4. **Factory function** -- `create{Name}Drain(overrides?: Partial<Config>)` returns `(ctx: DrainContext) => Promise<void>`
-5. **Exported send functions** -- `sendTo{Name}(event, config)` and `sendBatchTo{Name}(events, config)` for direct use and testability
-6. **Error handling** -- try/catch with `console.error('[evlog/{name}] ...')`, never throw from the drain
-7. **Timeout** -- `AbortController` with 5000ms default, configurable via `config.timeout`
-8. **Event transformation** -- if the service needs a specific format, export a `to{Name}Event()` converter
+Create `packages/evlog/src/adapters/{name}.ts`. Read [references/adapter-template.md](references/adapter-template.md) for the full annotated template.
+
+The contract is now `defineHttpDrain<TConfig>({ resolve, encode })`. You only ship two pieces of logic:
+
+1. **`resolve()`** — produce a fully-resolved config or `null` to skip. Use `resolveAdapterConfig` for the standard precedence (overrides → `runtimeConfig.evlog.{name}` → `runtimeConfig.{name}` → `NUXT_{NAME}_*` → `{NAME}_*`).
+2. **`encode(events, config)`** — produce `{ url, headers, body }` for a batch of events (or `null` to skip). HTTP transport, retries, timeout, and error logging are handled by `defineHttpDrain`.
+
+Key rules:
+
+- **Single factory.** Export one `create{Name}Drain(overrides?: Partial<{Name}Config>)`. No dual-API factories: if a service has multiple ingest modes (logs vs events), expose them via a `mode` option (see PostHog).
+- **No HTTP code in the adapter.** Don't call `fetch` directly — let `defineHttpDrain` do it. If your service truly needs custom transport (e.g. binary envelopes), use `defineDrain` and call `httpPost` from `evlog/toolkit`.
+- **No bespoke config resolution.** Always go through `resolveAdapterConfig`. If you need to support a deprecated alias (`token` → `apiKey`), include both in the `ConfigField[]` and fall through in `resolve()`.
+- **Exported converters.** If the service needs a specific event shape, export a `to{Name}Event()` (or `buildPayload()`) helper so it can be tested independently.
 
 ## Step 2: Build Config
 
@@ -105,15 +111,15 @@ Required test categories:
 1. URL construction (default + custom endpoint)
 2. Headers (auth, content-type, service-specific)
 3. Request body format (JSON structure matches service API)
-4. Error handling (non-OK responses throw with status)
-5. Batch operations (`sendBatchTo{Name}`)
-6. Timeout handling (default 5000ms + custom)
+4. Skip behavior when `apiKey` (or required field) is missing
+5. Batch operations
+6. Deprecated alias still works (when applicable)
 
 ## Step 5: Adapter Documentation Page
 
 Create `apps/docs/content/4.adapters/{n}.{name}.md` where `{n}` is the next number before `custom.md` (custom should always be last).
 
-Use the existing Axiom adapter page (`apps/docs/content/5.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
+Use the existing Axiom adapter page (`apps/docs/content/4.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
 
 **Important: multi-framework examples.** The Quick Start section must include a `::code-group` with tabs for all supported frameworks (Nuxt/Nitro, Hono, Express, Fastify, Elysia, NestJS, Standalone). Do not only show Nitro examples. See any existing adapter page for the pattern.
 
@@ -121,19 +127,19 @@ Use the existing Axiom adapter page (`apps/docs/content/5.adapters/2.axiom.md`) 
 
 Edit `apps/docs/content/4.adapters/1.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
 
-1. **Frontmatter `links` array** -- add a link entry with icon and path
-2. **`::card-group` section** -- add a card block before the Custom card
-3. **Zero-Config Setup `.env` example** -- add the adapter's env vars
+1. **Frontmatter `links` array** — add a link entry with icon and path
+2. **`::card-group` section** — add a card block before the Custom card
+3. **Zero-Config Setup `.env` example** — add the adapter's env vars
 
 ## Step 7: Update `skills/review-logging-patterns/SKILL.md`
 
 In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to users), find the **Drain Adapters** table and add a new row:
 
 ```markdown
-| {Name} | `evlog/{name}` | `{NAME}_TOKEN`, `{NAME}_DATASET` (or equivalent) |
+| {Name} | `evlog/{name}` | `{NAME}_API_KEY`, `{NAME}_DATASET` (or equivalent) |
 ```
 
-Follow the pattern of the existing rows (Axiom, OTLP, PostHog, Sentry, Better Stack). No additional usage example block is needed — the table entry is sufficient.
+Follow the pattern of the existing rows (Axiom, OTLP, PostHog, Sentry, Better Stack).
 
 ## Step 8: Renumber `custom.md`
 
@@ -145,6 +151,8 @@ After completing all steps, run:
 
 ```bash
 cd packages/evlog
-pnpm run build    # Verify build succeeds with new entry
-pnpm run test     # Verify tests pass
+pnpm run lint
+pnpm run typecheck
+pnpm run test
+pnpm run build
 ```

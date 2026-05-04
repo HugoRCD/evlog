@@ -1,7 +1,7 @@
 import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost, readBody, setResponseStatus } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
-import { getEnvironment } from '../../../../logger'
+import { getEnvironment, getGlobalPluginRunner } from '../../../../logger'
 import { filterSafeHeaders } from '../../../../utils'
 
 const VALID_LEVELS = ['info', 'error', 'warn', 'debug'] as const
@@ -100,25 +100,45 @@ export default defineEventHandler(async (event) => {
 
   const headers = getSafeHeaders(event)
   const request = { method: 'POST' as const, path: event.path }
+  const runner = getGlobalPluginRunner()
 
-  try {
-    await nitroApp.hooks.callHook('evlog:enrich', {
-      event: wideEvent,
+  if (runner.hasClientLog) {
+    runner.runOnClientLog({
+      payload: payload as Record<string, unknown>,
       request,
       headers,
-      response: { status: 204 },
     })
-  } catch (err) {
-    console.error('[evlog] enrich failed:', err)
   }
 
-  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+  const enrichCtx = {
     event: wideEvent,
     request,
     headers,
-  }).catch((err) => {
-    console.error('[evlog] drain failed:', err)
-  })
+    response: { status: 204 },
+  }
+  try {
+    await nitroApp.hooks.callHook('evlog:enrich', enrichCtx)
+  } catch (err) {
+    console.error('[evlog] enrich failed:', err)
+  }
+  if (runner.hasEnrich) {
+    await runner.runEnrich(enrichCtx)
+  }
+
+  const drainCtx = {
+    event: wideEvent,
+    request,
+    headers,
+  }
+  const drainTasks: Array<Promise<unknown>> = [
+    nitroApp.hooks.callHook('evlog:drain', drainCtx).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    }),
+  ]
+  if (runner.hasDrain) {
+    drainTasks.push(runner.runDrain(drainCtx))
+  }
+  const drainPromise = Promise.all(drainTasks)
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
   // Otherwise, await the drain to prevent lost logs in serverless environments

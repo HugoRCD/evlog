@@ -5,7 +5,14 @@ description: Create a new evlog framework integration to add automatic wide-even
 
 # Create evlog Framework Integration
 
-Add a new framework integration to evlog. Every integration follows the same architecture built on the shared `createMiddlewareLogger` utility. This skill walks through all touchpoints. **Every single touchpoint is mandatory** -- do not skip any.
+Add a new framework integration to evlog. The recommended path is the **manifest mode** built on `defineFrameworkIntegration` from `evlog/toolkit` — for any framework with a request/response middleware shape (Hono, Express, Elysia, Fastify, …). For frameworks with a fundamentally different lifecycle (NestJS interceptors, SvelteKit handle hooks, Next.js App Router) you'll fall back to the lower-level `createMiddlewareLogger`.
+
+## Two paths
+
+- **Manifest mode** (preferred, ~30 lines of glue) — call `defineFrameworkIntegration({ name, extractRequest, attachLogger, storage? })` once at module level, then write a tiny middleware that calls `integration.start(ctx, options)` and runs the framework's `next()` inside `runWith`. Reference implementations: `packages/evlog/src/{hono,express,elysia,fastify}/index.ts`.
+- **Custom mode** — use `createMiddlewareLogger` directly when the framework's lifecycle doesn't fit a standard middleware (NestJS, Next.js, SvelteKit). All current built-ins for those frameworks live under `packages/evlog/src/{nestjs,next,sveltekit}/`.
+
+Manifest mode covers ~80% of integrations and reduces glue from 50–80 lines to ~30. Use custom mode only when you can't extract a request synchronously at the start of the lifecycle.
 
 ## PR Title
 
@@ -53,12 +60,21 @@ All integrations share the same core utilities. **Never reimplement logic that e
 
 | Utility | Location | Purpose |
 |---------|----------|---------|
-| `createMiddlewareLogger` | `../shared/middleware` | Full lifecycle: logger creation, route filtering, tail sampling, emit, enrich, drain |
+| `defineFrameworkIntegration` | `../shared/integration` | Manifest factory — extract request, create logger, attach, run with ALS |
+| `createMiddlewareLogger` | `../shared/middleware` | Lower-level lifecycle (custom mode): logger creation, route filtering, tail sampling, emit, enrich, drain |
 | `extractSafeHeaders` | `../shared/headers` | Convert Web API `Headers` → filtered `Record<string, string>` (Hono, Elysia, etc.) |
 | `extractSafeNodeHeaders` | `../shared/headers` | Convert Node.js `IncomingHttpHeaders` → filtered `Record<string, string>` (Express, Fastify, NestJS) |
-| `BaseEvlogOptions` | `../shared/middleware` | Base user-facing options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes` |
+| `BaseEvlogOptions` | `../shared/middleware` | Base user-facing options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `plugins` |
 | `MiddlewareLoggerOptions` | `../shared/middleware` | Internal options type extending `BaseEvlogOptions` with `method`, `path`, `requestId`, `headers` |
 | `createLoggerStorage` | `../shared/storage` | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()` |
+
+`defineFrameworkIntegration` automatically:
+
+- normalizes both Web `Headers` and Node `IncomingHttpHeaders` (so you don't need to pick the right `extractSafeHeaders*`)
+- generates a `requestId` when none is present
+- calls `createMiddlewareLogger` and surfaces its `{ logger, finish, skipped, middlewareOptions }`
+- attaches `log.fork()` automatically when `storage` is provided
+- exposes `runWith(fn)` to run downstream handlers inside the integration's ALS
 
 ### Test Helpers
 
@@ -70,79 +86,92 @@ All integrations share the same core utilities. **Never reimplement logic that e
 | `assertSensitiveHeadersFiltered()` | `test/helpers/framework` | Validates sensitive headers are excluded |
 | `assertWideEventShape()` | `test/helpers/framework` | Validates standard wide event fields |
 
-## Step 1: Integration Source
+## Step 1: Integration Source — built on `defineFrameworkIntegration`
 
-Create `packages/evlog/src/{framework}/index.ts`.
+Create `packages/evlog/src/{framework}/index.ts`. In manifest mode the file is typically **30–50 lines** of framework glue — all pipeline logic (enrich, drain, keep, header filtering, ALS, fork) is handled by `defineFrameworkIntegration` + `createMiddlewareLogger`.
 
-The integration file should be **minimal** — typically 50-80 lines of framework-specific glue. All pipeline logic (enrich, drain, keep, header filtering) is handled by `createMiddlewareLogger`.
-
-### Template Structure
+### Template Structure (manifest mode)
 
 ```typescript
 import type { RequestLogger } from '../types'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { extractSafeHeaders } from '../shared/headers'       // for Web API Headers (Hono, Elysia)
-// OR
-import { extractSafeNodeHeaders } from '../shared/headers'    // for Node.js headers (Express, Fastify)
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 
+// Only needed when the framework wants `useLogger()` ALS-style access.
+// Hono/Elysia attach the logger to the framework's own context instead.
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure the evlog middleware is registered before your routes.',
 )
 
-export interface Evlog{Framework}Options extends BaseEvlogOptions {}
-
+export type Evlog{Framework}Options = BaseEvlogOptions
 export { useLogger }
 
-// Type augmentation for typed logger access (framework-specific)
-// For Express: declare module 'express-serve-static-core' { interface Request { log: RequestLogger } }
-// For Hono: export type EvlogVariables = { Variables: { log: RequestLogger } }
+// Type augmentation for typed logger access (framework-specific):
+// - Express: declare module 'express-serve-static-core' { interface Request { log: RequestLogger } }
+// - Hono: export type EvlogVariables = { Variables: { log: RequestLogger } }
+
+const integration = defineFrameworkIntegration<{Framework}Context>({
+  name: '{framework}',
+  extractRequest: (ctx) => ({
+    method: /* ctx.method */,
+    path: /* ctx.path */,
+    headers: /* Web Headers OR Node headers OR plain object */,
+    requestId: /* x-request-id header or undefined → auto-generated */,
+  }),
+  attachLogger: (ctx, logger) => {
+    // Store in framework-idiomatic location:
+    // - Hono:    c.set('log', logger)
+    // - Express: req.log = logger
+    // - Fastify: (req as any).log = logger
+  },
+  storage, // optional — only when using ALS-based useLogger()
+})
 
 export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddleware {
-  return async (frameworkContext, next) => {
-    const { logger, finish, skipped } = createMiddlewareLogger({
-      method: /* extract from framework context */,
-      path: /* extract from framework context */,
-      requestId: /* extract x-request-id or crypto.randomUUID() */,
-      headers: extractSafeHeaders(/* framework request Headers object */),
-      ...options,
-    })
-
+  return async (ctx, next) => {
+    const { skipped, finish, runWith } = integration.start(ctx, options)
     if (skipped) {
       await next()
       return
     }
-
-    // Store logger in framework-specific context
-    // e.g., c.set('log', logger) for Hono
-    // e.g., req.log = logger for Express
-
-    // Wrap next() in AsyncLocalStorage.run() for useLogger() support
-    // Express: storage.run(logger, () => next())
-    // Hono: await storage.run(logger, () => next())
+    try {
+      await runWith(() => next())
+      await finish({ status: /* extract status from ctx */ })
+    } catch (error) {
+      await finish({ error: error as Error })
+      throw error
+    }
   }
 }
 ```
 
 ### Reference Implementations
 
-- **Hono** (~40 lines): `packages/evlog/src/hono/index.ts` — Web API Headers, `c.set('log', logger)`, wraps `next()` in try/catch
-- **Express** (~80 lines): `packages/evlog/src/express/index.ts` — Node.js headers, `req.log`, `res.on('finish')`, `AsyncLocalStorage` for `useLogger()`
-- **Elysia** (~70 lines): `packages/evlog/src/elysia/index.ts` — Web API Headers, `derive()` plugin, `onAfterHandle`/`onError`, `AsyncLocalStorage` for `useLogger()`
+- **Hono** (~50 lines): `packages/evlog/src/hono/index.ts` — `c.set('log', logger)`, no ALS storage
+- **Express** (~50 lines): `packages/evlog/src/express/index.ts` — `req.log`, ALS storage, `res.on('finish')` for terminal status
+- **Fastify** (~70 lines): `packages/evlog/src/fastify/index.ts` — Fastify hooks (`onRequest` / `onResponse` / `onError`), ALS storage
+- **Elysia** (~80 lines): `packages/evlog/src/elysia/index.ts` — manifest extracts request, custom storage handling for `enterWith`-style ALS
 
 ### Key Architecture Rules
 
-1. **Use `createMiddlewareLogger`** — never call `createRequestLogger` directly
-2. **Use the right header extractor** — `extractSafeHeaders` for Web API `Headers`, `extractSafeNodeHeaders` for Node.js `IncomingHttpHeaders`
-3. **Spread user options into `createMiddlewareLogger`** — `drain`, `enrich`, `keep` are handled automatically by `finish()`
-4. **Store logger** in the framework's idiomatic context (e.g., `c.set()` for Hono, `req.log` for Express, `.derive()` for Elysia)
-5. **Export `useLogger()`** — backed by `AsyncLocalStorage` so the logger is accessible from anywhere in the call stack
-6. **Call `finish()`** in both success and error paths — it handles emit + enrich + drain
-7. **Re-throw errors** after `finish()` so framework error handlers still work
-8. **Export options interface** with drain/enrich/keep for feature parity across all frameworks
-9. **Export type helpers** for typed context access (e.g., `EvlogVariables` for Hono)
-10. **Framework SDK is a peer dependency** — never bundle it
-11. **Never duplicate pipeline logic** — `callEnrichAndDrain` is internal to `createMiddlewareLogger`
+1. **Prefer `defineFrameworkIntegration`** for any standard middleware shape — it handles header normalization, request-id generation, ALS, and fork attachment.
+2. **Header normalization is automatic** — pass either Web `Headers` or Node `IncomingHttpHeaders` from `extractRequest`; the manifest picks the right extractor.
+3. **`storage` triggers ALS + fork** — when you provide a `storage`, `defineFrameworkIntegration` automatically attaches `log.fork()` and `runWith` runs the handler inside `storage.run`.
+4. **Status / error reporting stays framework-side** — call `finish({ status })` on success and `finish({ error })` on failure. `finish` is what runs emit + enrich + drain + plugin hooks.
+5. **Re-throw errors** after `finish({ error })` so the framework's own error handler still runs.
+6. **Export options interface** as `BaseEvlogOptions` (or a framework-specific extension) for feature parity.
+7. **Export type helpers** for typed context access (e.g., `EvlogVariables` for Hono).
+8. **Framework SDK is a peer dependency** — never bundle it.
+9. **Never duplicate pipeline logic** — `runEnrichAndDrain` is internal to `createMiddlewareLogger`/`finish`.
+
+### When to fall back to custom mode
+
+Use `createMiddlewareLogger` directly (skipping `defineFrameworkIntegration`) when:
+
+- The framework's middleware doesn't have a clear "request entry / response exit" pair (NestJS observable interceptor, Next.js App Router server actions).
+- You need to defer the logger creation across multiple lifecycle phases (SvelteKit `handle` hook + load functions).
+- The framework's status is not knowable until after the response stream completes and you need bespoke wiring.
 
 ### Framework-Specific Patterns
 

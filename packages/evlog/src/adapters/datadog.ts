@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
-import type { ConfigField } from './_config'
-import { resolveAdapterConfig } from './_config'
-import { defineDrain } from './_drain'
-import { httpPost } from './_http'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineHttpDrain } from '../shared/drain'
+import { httpPost } from '../shared/http'
 
 export interface DatadogConfig {
   /** Datadog API key with Logs intake permission */
@@ -156,7 +156,7 @@ export function resolveDatadogIntakeUrl(config: Pick<DatadogConfig, 'site' | 'in
  * ```
  */
 export function createDatadogDrain(overrides?: Partial<DatadogConfig>) {
-  return defineDrain<DatadogConfig>({
+  return defineHttpDrain<DatadogConfig>({
     name: 'datadog',
     resolve: async () => {
       const config = await resolveAdapterConfig<DatadogConfig>('datadog', DATADOG_FIELDS, overrides)
@@ -166,7 +166,14 @@ export function createDatadogDrain(overrides?: Partial<DatadogConfig>) {
       }
       return config as DatadogConfig
     },
-    send: sendBatchToDatadog,
+    encode: (events, config) => ({
+      url: resolveDatadogIntakeUrl(config),
+      headers: {
+        'Content-Type': 'application/json',
+        'DD-API-KEY': config.apiKey,
+      },
+      body: JSON.stringify(events.map(toDatadogLog)),
+    }),
   })
 }
 

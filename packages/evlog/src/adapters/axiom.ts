@@ -1,15 +1,24 @@
 import type { WideEvent } from '../types'
-import type { ConfigField } from './_config'
-import { resolveAdapterConfig } from './_config'
-import { defineDrain } from './_drain'
-import { httpPost } from './_http'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineHttpDrain } from '../shared/drain'
+import { httpPost } from '../shared/http'
 
 interface BaseAxiomConfig {
-  /** Axiom dataset name */
+  /** Axiom dataset name. */
   dataset: string
-  /** Axiom API token */
-  token: string
-  /** Organization ID (required for Personal Access Tokens) */
+  /**
+   * Axiom API key.
+   *
+   * @example `xaat-...`
+   */
+  apiKey: string
+  /**
+   * @deprecated Renamed to {@link BaseAxiomConfig.apiKey}. Will be removed in
+   * the next major version. Pass `apiKey` instead.
+   */
+  token?: string
+  /** Organization ID (required for Personal Access Tokens). */
   orgId?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
@@ -44,6 +53,8 @@ type ResolvedAxiomConfig = BaseAxiomConfig & {
 
 const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
   { key: 'dataset', env: ['NUXT_AXIOM_DATASET', 'AXIOM_DATASET'] },
+  { key: 'apiKey', env: ['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY'] },
+  // Deprecated env var names — resolved as a fallback for `apiKey` below.
   { key: 'token', env: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'] },
   { key: 'orgId', env: ['NUXT_AXIOM_ORG_ID', 'AXIOM_ORG_ID'] },
   { key: 'edgeUrl', env: ['NUXT_AXIOM_EDGE_URL', 'AXIOM_EDGE_URL'] },
@@ -52,6 +63,19 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
   { key: 'retries' },
 ]
 
+let warnedAboutToken = false
+
+function applyApiKeyAlias(config: ResolvedAxiomConfig): ResolvedAxiomConfig {
+  if (!config.apiKey && config.token) {
+    if (!warnedAboutToken) {
+      warnedAboutToken = true
+      console.warn('[evlog/axiom] `token` is deprecated, use `apiKey` instead. (Env: NUXT_AXIOM_TOKEN/AXIOM_TOKEN → NUXT_AXIOM_API_KEY/AXIOM_API_KEY.)')
+    }
+    config.apiKey = config.token
+  }
+  return config
+}
+
 /**
  * Create a drain function for sending logs to Axiom.
  *
@@ -59,54 +83,51 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
  * 1. Overrides passed to createAxiomDrain()
  * 2. runtimeConfig.evlog.axiom
  * 3. runtimeConfig.axiom
- * 4. Environment variables: NUXT_AXIOM_*, AXIOM_*
+ * 4. Environment variables: NUXT_AXIOM_API_KEY, AXIOM_API_KEY (or legacy `*_TOKEN`)
  *
  * @example
  * ```ts
- * // Zero config - just set NUXT_AXIOM_TOKEN and NUXT_AXIOM_DATASET env vars
- * nitroApp.hooks.hook('evlog:drain', createAxiomDrain())
+ * // Zero config — set NUXT_AXIOM_API_KEY and NUXT_AXIOM_DATASET
+ * initLogger({ drain: createAxiomDrain() })
  *
  * // With overrides
- * nitroApp.hooks.hook('evlog:drain', createAxiomDrain({
- *   dataset: 'my-dataset',
- * }))
+ * initLogger({ drain: createAxiomDrain({ dataset: 'my-dataset' }) })
  * ```
  */
 export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
-  return defineDrain<AxiomConfig>({
+  return defineHttpDrain<AxiomConfig>({
     name: 'axiom',
     resolve: async () => {
-      const config = await resolveAdapterConfig<ResolvedAxiomConfig>(
+      const resolved = await resolveAdapterConfig<ResolvedAxiomConfig>(
         'axiom',
         AXIOM_FIELDS,
         overrides as Partial<ResolvedAxiomConfig>,
       )
-      if (!config.dataset || !config.token) {
-        console.error('[evlog/axiom] Missing dataset or token. Set NUXT_AXIOM_TOKEN/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
+      const config = applyApiKeyAlias(resolved)
+      if (!config.dataset || !config.apiKey) {
+        console.error('[evlog/axiom] Missing dataset or apiKey. Set NUXT_AXIOM_API_KEY/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
         return null
       }
-
       if (config.edgeUrl && config.baseUrl) {
         console.warn('[evlog/axiom] Both edgeUrl and baseUrl are set. edgeUrl takes precedence for ingest.')
         delete config.baseUrl
       }
-
       return config as AxiomConfig
     },
-    send: sendBatchToAxiom,
+    encode: (events, config) => {
+      const url = resolveIngestUrl(config)
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${config.apiKey}`,
+      }
+      if (config.orgId) headers['X-Axiom-Org-Id'] = config.orgId
+      return { url, headers, body: JSON.stringify(events) }
+    },
   })
 }
 
 /**
  * Send a single event to Axiom.
- *
- * @example
- * ```ts
- * await sendToAxiom(event, {
- *   dataset: 'my-logs',
- *   token: process.env.AXIOM_TOKEN!,
- * })
- * ```
  */
 export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promise<void> {
   await sendBatchToAxiom([event], config)
@@ -114,27 +135,18 @@ export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promis
 
 /**
  * Send a batch of events to Axiom.
- *
- * @example
- * ```ts
- * await sendBatchToAxiom(events, {
- *   dataset: 'my-logs',
- *   token: process.env.AXIOM_TOKEN!,
- * })
- * ```
  */
 export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig): Promise<void> {
+  const apiKey = config.apiKey ?? config.token
+  if (!apiKey) {
+    throw new Error('[evlog/axiom] Missing apiKey')
+  }
   const url = resolveIngestUrl(config)
-
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
-    'Authorization': `Bearer ${config.token}`,
+    'Authorization': `Bearer ${apiKey}`,
   }
-
-  if (config.orgId) {
-    headers['X-Axiom-Org-Id'] = config.orgId
-  }
-
+  if (config.orgId) headers['X-Axiom-Org-Id'] = config.orgId
   await httpPost({
     url,
     headers,
@@ -155,12 +167,10 @@ function resolveIngestUrl(config: AxiomConfig): string {
 
   try {
     const parsed = new URL(config.edgeUrl)
-
     if (parsed.pathname === '' || parsed.pathname === '/') {
       parsed.pathname = `/v1/ingest/${encodedDataset}`
       return parsed.toString()
     }
-
     parsed.pathname = parsed.pathname.replace(/\/+$/, '')
     return parsed.toString()
   } catch {

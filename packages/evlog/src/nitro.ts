@@ -68,7 +68,15 @@ export interface NitroModuleOptions {
   redact?: boolean | RedactConfig
 }
 
-export interface EvlogConfig {
+/**
+ * JSON-friendly subset of evlog Nitro plugin options consumed by the Nitro/Nuxt
+ * runtime (read from `runtimeConfig.evlog` or the `__EVLOG_CONFIG` env bridge).
+ *
+ * @internal Internal Nitro contract — do not use from application code. Use
+ * {@link import('./shared/define').EvlogConfig} for the canonical user-facing
+ * config shape.
+ */
+export interface NitroPluginEvlogConfig {
   enabled?: boolean
   env?: Record<string, unknown>
   pretty?: boolean
@@ -80,6 +88,9 @@ export interface EvlogConfig {
   minLevel?: LogLevel
   redact?: boolean | RedactConfig | Record<string, unknown>
 }
+
+/** @deprecated Renamed to {@link NitroPluginEvlogConfig}. Kept for backward compat. */
+export type EvlogConfig = NitroPluginEvlogConfig
 
 /**
  * Resolve an EvlogError from an error or its cause chain.

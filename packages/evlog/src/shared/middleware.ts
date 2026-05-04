@@ -1,7 +1,9 @@
 import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, getGlobalDrain, isEnabled, shouldKeep } from '../logger'
+import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, shouldKeep } from '../logger'
 import { redactEvent, resolveRedactConfig } from '../redact'
 import { extractErrorStatus } from './errors'
+import type { EvlogPlugin, PluginRunner } from './plugin'
+import { createPluginRunner, getEmptyPluginRunner } from './plugin'
 import { shouldLog, getServiceForPath } from './routes'
 
 /**
@@ -42,6 +44,17 @@ export interface BaseEvlogOptions {
    * when configured via `initLogger()`.
    */
   redact?: boolean | RedactConfig
+  /**
+   * Plugins registered for this middleware instance.
+   *
+   * Plugins are run in addition to the globally-registered ones from
+   * `initLogger({ plugins })`. They can opt into `enrich`, `drain`, `keep`,
+   * lifecycle hooks (`onRequestStart`, `onRequestFinish`), and per-request
+   * logger decoration via `extendLogger`.
+   *
+   * @beta Part of `evlog/toolkit`.
+   */
+  plugins?: EvlogPlugin[]
 }
 
 /**
@@ -81,48 +94,114 @@ const noopResult: MiddlewareLoggerResult = {
 }
 
 /**
+ * Per-`options.plugins` cache for the merged runner. Keyed on the local
+ * plugins array (stable across requests because it lives in the middleware
+ * factory closure) and invalidated whenever the global runner reference
+ * changes (i.e. someone called `initLogger` again).
+ *
+ * Without this cache, every request through `app.use(evlog({ plugins: [...] }))`
+ * would re-allocate a `Map`, copy global+local plugin lists, and rebuild a
+ * new `PluginRunner` (≈10 closures). At 100k req/s that's ≈1M short-lived
+ * allocations per second on the hot path. The cache makes the slow path
+ * O(1) after the first request.
+ */
+const runnerCache = new WeakMap<EvlogPlugin[], { global: PluginRunner; merged: PluginRunner }>()
+
+/**
+ * Resolve the effective plugin runner for a middleware invocation.
+ *
+ * Combines the middleware-level `plugins` with the globally-registered ones
+ * (`initLogger({ plugins })`), de-duplicating by plugin `name`. Returns the
+ * shared empty runner when no plugins are registered anywhere.
+ *
+ * The merged runner is cached per-`options.plugins` reference and invalidated
+ * when `initLogger` rebuilds the global runner, so frequent middleware
+ * invocations don't re-pay the merge cost.
+ *
+ * @beta Part of `evlog/toolkit`.
+ */
+export function resolveMiddlewarePluginRunner(options: { plugins?: EvlogPlugin[] }): PluginRunner {
+  const global = getGlobalPluginRunner()
+  const local = options.plugins
+  if (!local || local.length === 0) return global
+
+  const cached = runnerCache.get(local)
+  if (cached && cached.global === global) return cached.merged
+
+  const merged = new Map<string, EvlogPlugin>()
+  for (const plugin of global.plugins) merged.set(plugin.name, plugin)
+  for (const plugin of local) merged.set(plugin.name, plugin)
+  if (merged.size === 0) return getEmptyPluginRunner()
+
+  const runner = createPluginRunner(Array.from(merged.values()))
+  runnerCache.set(local, { global, merged: runner })
+  return runner
+}
+
+/**
  * Apply redact, enrich, and drain to an emitted wide event — same pipeline as
  * {@link createMiddlewareLogger}'s `finish`.
  *
  * @beta Part of `evlog/toolkit` — used by framework integrations and `fork()`.
  */
+// eslint-disable-next-line max-params
 export async function runEnrichAndDrain(
   emittedEvent: WideEvent,
   options: MiddlewareLoggerOptions,
   requestInfo: { method: string; path: string; requestId?: string },
   responseStatus?: number,
+  plugins?: PluginRunner,
 ): Promise<void> {
+  const runner = plugins ?? resolveMiddlewarePluginRunner(options)
   const resolvedRedact = resolveRedactConfig(options.redact)
   if (resolvedRedact) {
     redactEvent(emittedEvent, resolvedRedact)
   }
 
-  if (options.enrich) {
+  if (options.enrich || runner.hasEnrich) {
     const enrichCtx: EnrichContext = {
       event: emittedEvent,
       request: requestInfo,
       headers: options.headers,
       response: { status: responseStatus },
     }
-    try {
-      await options.enrich(enrichCtx)
-    } catch (err) {
-      console.error('[evlog] enrich failed:', err)
+    if (options.enrich) {
+      try {
+        await options.enrich(enrichCtx)
+      } catch (err) {
+        console.error('[evlog] enrich failed:', err)
+      }
+    }
+    if (runner.hasEnrich) {
+      await runner.runEnrich(enrichCtx)
     }
   }
 
   const drain = options.drain ?? getGlobalDrain()
-  if (drain) {
+  const hasUserDrain = !!drain
+  const hasPluginDrain = runner.hasDrain
+  if (hasUserDrain || hasPluginDrain) {
     const drainCtx: DrainContext = {
       event: emittedEvent,
       request: requestInfo,
       headers: options.headers,
     }
-    try {
-      await drain(drainCtx)
-    } catch (err) {
-      console.error('[evlog] drain failed:', err)
+    const tasks: Array<Promise<unknown>> = []
+    if (hasUserDrain) {
+      tasks.push(
+        (async () => {
+          try {
+            await drain!(drainCtx)
+          } catch (err) {
+            console.error('[evlog] drain failed:', err)
+          }
+        })(),
+      )
     }
+    if (hasPluginDrain) {
+      tasks.push(runner.runDrain(drainCtx))
+    }
+    await Promise.all(tasks)
   }
 }
 
@@ -164,8 +243,21 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     logger.set({ service: routeService })
   }
 
+  const pluginRunner = resolveMiddlewarePluginRunner(options)
+  if (pluginRunner.hasExtendLogger) {
+    pluginRunner.applyExtendLogger(logger)
+  }
+
   const startTime = Date.now()
   const requestInfo = { method, path, requestId: resolvedRequestId }
+
+  if (pluginRunner.hasRequestLifecycle) {
+    pluginRunner.runOnRequestStart({
+      logger,
+      request: requestInfo,
+      headers: options.headers,
+    })
+  }
 
   const finish = async (opts?: { status?: number; error?: Error }): Promise<WideEvent | null> => {
     const { status, error } = opts ?? {}
@@ -196,12 +288,30 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     if (keep) {
       await keep(tailCtx)
     }
+    if (pluginRunner.hasKeep) {
+      await pluginRunner.runKeep(tailCtx)
+    }
 
     const forceKeep = tailCtx.shouldKeep || shouldKeep(tailCtx)
     const emittedEvent = logger.emit({ _forceKeep: forceKeep })
 
-    if (emittedEvent && (options.enrich || options.drain || getGlobalDrain())) {
-      await runEnrichAndDrain(emittedEvent, options, requestInfo, resolvedStatus)
+    if (
+      emittedEvent
+      && (options.enrich || options.drain || pluginRunner.hasEnrich || pluginRunner.hasDrain || getGlobalDrain())
+    ) {
+      await runEnrichAndDrain(emittedEvent, options, requestInfo, resolvedStatus, pluginRunner)
+    }
+
+    if (pluginRunner.hasRequestLifecycle) {
+      pluginRunner.runOnRequestFinish({
+        logger,
+        request: requestInfo,
+        headers: options.headers,
+        event: emittedEvent,
+        status: resolvedStatus,
+        durationMs,
+        error,
+      })
     }
 
     return emittedEvent

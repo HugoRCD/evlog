@@ -1,12 +1,9 @@
 import type { EnrichContext } from '../types'
+import { composeEnrichers } from '../shared/compose'
+import { defineEnricher, type EnricherOptions } from '../shared/enricher'
+import { getHeader, normalizeNumber } from '../shared/headers'
 
-export interface EnricherOptions {
-  /**
-   * When true, overwrite any existing fields in the event.
-   * Defaults to false to preserve user-provided data.
-   */
-  overwrite?: boolean
-}
+export type { EnricherOptions }
 
 export interface UserAgentInfo {
   raw: string
@@ -34,17 +31,6 @@ export interface TraceContextInfo {
   tracestate?: string
   traceId?: string
   spanId?: string
-}
-
-function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
-  if (!headers) return undefined
-  if (headers[name] !== undefined) return headers[name]
-  const lowerName = name.toLowerCase()
-  if (headers[lowerName] !== undefined) return headers[lowerName]
-  for (const [key, value] of Object.entries(headers)) {
-    if (key.toLowerCase() === lowerName) return value
-  }
-  return undefined
 }
 
 function parseUserAgent(ua: string): UserAgentInfo {
@@ -108,34 +94,19 @@ function parseTraceparent(traceparent: string): Pick<TraceContextInfo, 'traceId'
   return { traceId: match[1], spanId: match[2] }
 }
 
-function mergeEventField<T extends object>(
-  existing: unknown,
-  computed: T,
-  overwrite?: boolean,
-): T {
-  if (overwrite || existing === undefined || existing === null || typeof existing !== 'object') {
-    return computed
-  }
-  return { ...computed, ...(existing as T) }
-}
-
-function normalizeNumber(value: string | undefined): number | undefined {
-  if (!value) return undefined
-  const parsed = Number(value)
-  return Number.isFinite(parsed) ? parsed : undefined
-}
-
 /**
  * Enrich events with parsed user agent data.
  * Sets `event.userAgent` with `UserAgentInfo` shape: `{ raw, browser?, os?, device? }`.
  */
 export function createUserAgentEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
-  return (ctx) => {
-    const ua = getHeader(ctx.headers, 'user-agent')
-    if (!ua) return
-    const info = parseUserAgent(ua)
-    ctx.event.userAgent = mergeEventField<UserAgentInfo>(ctx.event.userAgent, info, options.overwrite)
-  }
+  return defineEnricher<UserAgentInfo>({
+    name: 'userAgent',
+    field: 'userAgent',
+    compute: ({ headers }) => {
+      const ua = getHeader(headers, 'user-agent')
+      return ua ? parseUserAgent(ua) : undefined
+    },
+  }, options)
 }
 
 /**
@@ -151,22 +122,22 @@ export function createUserAgentEnricher(options: EnricherOptions = {}): (ctx: En
  * or use a Workers middleware to copy `cf` properties into custom headers.
  */
 export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
-  return (ctx) => {
-    const { headers } = ctx
-    if (!headers) return
-
-    const geo: GeoInfo = {
-      country: getHeader(headers, 'x-vercel-ip-country') ?? getHeader(headers, 'cf-ipcountry'),
-      region: getHeader(headers, 'x-vercel-ip-country-region') ?? getHeader(headers, 'cf-region'),
-      regionCode: getHeader(headers, 'x-vercel-ip-country-region-code') ?? getHeader(headers, 'cf-region-code'),
-      city: getHeader(headers, 'x-vercel-ip-city') ?? getHeader(headers, 'cf-city'),
-      latitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-latitude') ?? getHeader(headers, 'cf-latitude')),
-      longitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-longitude') ?? getHeader(headers, 'cf-longitude')),
-    }
-
-    if (Object.values(geo).every(value => value === undefined)) return
-    ctx.event.geo = mergeEventField<GeoInfo>(ctx.event.geo, geo, options.overwrite)
-  }
+  return defineEnricher<GeoInfo>({
+    name: 'geo',
+    field: 'geo',
+    compute: ({ headers }) => {
+      if (!headers) return undefined
+      const geo: GeoInfo = {
+        country: getHeader(headers, 'x-vercel-ip-country') ?? getHeader(headers, 'cf-ipcountry'),
+        region: getHeader(headers, 'x-vercel-ip-country-region') ?? getHeader(headers, 'cf-region'),
+        regionCode: getHeader(headers, 'x-vercel-ip-country-region-code') ?? getHeader(headers, 'cf-region-code'),
+        city: getHeader(headers, 'x-vercel-ip-city') ?? getHeader(headers, 'cf-city'),
+        latitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-latitude') ?? getHeader(headers, 'cf-latitude')),
+        longitude: normalizeNumber(getHeader(headers, 'x-vercel-ip-longitude') ?? getHeader(headers, 'cf-longitude')),
+      }
+      return Object.values(geo).every(value => value === undefined) ? undefined : geo
+    },
+  }, options)
 }
 
 /**
@@ -174,18 +145,16 @@ export function createGeoEnricher(options: EnricherOptions = {}): (ctx: EnrichCo
  * Sets `event.requestSize` with `RequestSizeInfo` shape: `{ requestBytes?, responseBytes? }`.
  */
 export function createRequestSizeEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
-  return (ctx) => {
-    const requestBytes = normalizeNumber(getHeader(ctx.headers, 'content-length'))
-    const responseBytes = normalizeNumber(getHeader(ctx.response?.headers, 'content-length'))
-
-    const sizes: RequestSizeInfo = {
-      requestBytes,
-      responseBytes,
-    }
-
-    if (requestBytes === undefined && responseBytes === undefined) return
-    ctx.event.requestSize = mergeEventField<RequestSizeInfo>(ctx.event.requestSize, sizes, options.overwrite)
-  }
+  return defineEnricher<RequestSizeInfo>({
+    name: 'requestSize',
+    field: 'requestSize',
+    compute: ({ headers, response }) => {
+      const requestBytes = normalizeNumber(getHeader(headers, 'content-length'))
+      const responseBytes = normalizeNumber(getHeader(response?.headers, 'content-length'))
+      if (requestBytes === undefined && responseBytes === undefined) return undefined
+      return { requestBytes, responseBytes }
+    },
+  }, options)
 }
 
 /**
@@ -194,31 +163,58 @@ export function createRequestSizeEnricher(options: EnricherOptions = {}): (ctx: 
  * Also sets `event.traceId` and `event.spanId` at the top level.
  */
 export function createTraceContextEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
+  const enricher = defineEnricher<TraceContextInfo>({
+    name: 'traceContext',
+    field: 'traceContext',
+    compute: ({ event, headers }) => {
+      const traceparent = getHeader(headers, 'traceparent')
+      const tracestate = getHeader(headers, 'tracestate')
+      if (!traceparent && !tracestate) return undefined
+      const parsed = traceparent ? parseTraceparent(traceparent) : undefined
+      return {
+        traceparent,
+        tracestate,
+        traceId: parsed?.traceId ?? (event.traceId as string | undefined),
+        spanId: parsed?.spanId ?? (event.spanId as string | undefined),
+      }
+    },
+  }, options)
+
+  // Trace context also pins traceId/spanId at the top level for transports that
+  // expect them outside the nested object.
   return (ctx) => {
-    const traceparent = getHeader(ctx.headers, 'traceparent')
-    const tracestate = getHeader(ctx.headers, 'tracestate')
-    if (!traceparent && !tracestate) return
-
-    const parsed = traceparent ? parseTraceparent(traceparent) : undefined
-    const incomingTraceContext: TraceContextInfo = {
-      traceparent,
-      tracestate,
-      traceId: parsed?.traceId ?? (ctx.event.traceId as string | undefined),
-      spanId: parsed?.spanId ?? (ctx.event.spanId as string | undefined),
+    enricher(ctx)
+    const merged = ctx.event.traceContext as TraceContextInfo | undefined
+    if (!merged) return
+    if (merged.traceId && (options.overwrite || ctx.event.traceId === undefined)) {
+      ctx.event.traceId = merged.traceId
     }
-
-    const mergedTraceContext = mergeEventField<TraceContextInfo>(
-      ctx.event.traceContext,
-      incomingTraceContext,
-      options.overwrite,
-    )
-    ctx.event.traceContext = mergedTraceContext
-
-    if (mergedTraceContext.traceId && (options.overwrite || ctx.event.traceId === undefined)) {
-      ctx.event.traceId = mergedTraceContext.traceId
-    }
-    if (mergedTraceContext.spanId && (options.overwrite || ctx.event.spanId === undefined)) {
-      ctx.event.spanId = mergedTraceContext.spanId
+    if (merged.spanId && (options.overwrite || ctx.event.spanId === undefined)) {
+      ctx.event.spanId = merged.spanId
     }
   }
+}
+
+/**
+ * Compose every built-in enricher into a single async enricher, in the order
+ * `userAgent → geo → requestSize → traceContext`.
+ *
+ * Drop-in shorthand for the most common middleware setup:
+ *
+ * ```ts
+ * import { createDefaultEnrichers } from 'evlog/enrichers'
+ *
+ * app.use(evlog({ enrich: createDefaultEnrichers() }))
+ * ```
+ */
+export function createDefaultEnrichers(options: EnricherOptions = {}): (ctx: EnrichContext) => Promise<void> {
+  return composeEnrichers(
+    [
+      createUserAgentEnricher(options),
+      createGeoEnricher(options),
+      createRequestSizeEnricher(options),
+      createTraceContextEnricher(options),
+    ],
+    { name: 'default-enrichers' },
+  )
 }

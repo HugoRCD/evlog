@@ -5,7 +5,7 @@ import type { NitroApp } from 'nitropack/types'
 // (nitropack dev loads plugins outside the bundle via Worker threads).
 import { defineNitroPlugin } from 'nitropack/runtime/internal/plugin'
 import { getHeaders } from 'h3'
-import { createRequestLogger, initLogger, isEnabled } from '../logger'
+import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } from '../logger'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
@@ -77,20 +77,32 @@ async function callEnrichAndDrain(
   if (!emittedEvent) return
 
   const hookContext = buildHookContext(event)
+  const enrichCtx: EnrichContext = { event: emittedEvent, ...hookContext }
+  const runner = getGlobalPluginRunner()
 
   try {
-    await nitroApp.hooks.callHook('evlog:enrich', { event: emittedEvent, ...hookContext })
+    await nitroApp.hooks.callHook('evlog:enrich', enrichCtx)
   } catch (err) {
     console.error('[evlog] enrich failed:', err)
   }
+  if (runner.hasEnrich) {
+    await runner.runEnrich(enrichCtx)
+  }
 
-  const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
+  const drainCtx = {
     event: emittedEvent,
     request: hookContext.request,
     headers: hookContext.headers,
-  }).catch((err) => {
-    console.error('[evlog] drain failed:', err)
-  })
+  }
+  const drainTasks: Array<Promise<unknown>> = [
+    nitroApp.hooks.callHook('evlog:drain', drainCtx).catch((err) => {
+      console.error('[evlog] drain failed:', err)
+    }),
+  ]
+  if (runner.hasDrain) {
+    drainTasks.push(runner.runDrain(drainCtx))
+  }
+  const drainPromise = Promise.all(drainTasks)
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge, etc.)
   // This keeps the runtime alive for background work without blocking the response
@@ -198,8 +210,10 @@ export default defineNitroPlugin(async (nitroApp) => {
         shouldKeep: false,
       }
 
-      // Call evlog:emit:keep hook
+      // Call evlog:emit:keep hook + plugin runner keep hook
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
+      const runner = getGlobalPluginRunner()
+      if (runner.hasKeep) await runner.runKeep(tailCtx)
 
       e.context._evlogEmitted = true
 
@@ -231,6 +245,8 @@ export default defineNitroPlugin(async (nitroApp) => {
       }
 
       await nitroApp.hooks.callHook('evlog:emit:keep', tailCtx)
+      const runner = getGlobalPluginRunner()
+      if (runner.hasKeep) await runner.runKeep(tailCtx)
 
       const emittedEvent = requestLog.emit({ _forceKeep: tailCtx.shouldKeep })
       await callEnrichAndDrain(nitroApp, emittedEvent, e)

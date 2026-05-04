@@ -1,7 +1,7 @@
 import type { WideEvent } from '../types'
-import type { ConfigField } from './_config'
-import { resolveAdapterConfig } from './_config'
-import { defineDrain } from './_drain'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineDrain } from '../shared/drain'
 import type { OTLPConfig } from './otlp'
 import { sendBatchToOTLP } from './otlp'
 

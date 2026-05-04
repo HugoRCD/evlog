@@ -1,9 +1,9 @@
 import type { WideEvent } from '../types'
-import type { ConfigField } from './_config'
-import { resolveAdapterConfig } from './_config'
-import { defineDrain } from './_drain'
-import { httpPost } from './_http'
-import { OTEL_SEVERITY_NUMBER } from './_severity'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineHttpDrain } from '../shared/drain'
+import { httpPost } from '../shared/http'
+import { OTEL_SEVERITY_NUMBER } from '../shared/severity'
 
 export interface SentryConfig {
   /** Sentry DSN */
@@ -222,7 +222,7 @@ function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
  * ```
  */
 export function createSentryDrain(overrides?: Partial<SentryConfig>) {
-  return defineDrain<SentryConfig>({
+  return defineHttpDrain<SentryConfig>({
     name: 'sentry',
     resolve: async () => {
       const config = await resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
@@ -232,7 +232,18 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>) {
       }
       return config as SentryConfig
     },
-    send: sendBatchToSentry,
+    encode: (events, config) => {
+      const { url, authHeader } = getSentryEnvelopeUrl(config.dsn)
+      const logs = events.map(event => toSentryLog(event, config))
+      return {
+        url,
+        headers: {
+          'Content-Type': 'application/x-sentry-envelope',
+          'X-Sentry-Auth': authHeader,
+        },
+        body: buildEnvelopeBody(logs, config.dsn),
+      }
+    },
   })
 }
 

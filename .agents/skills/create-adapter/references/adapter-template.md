@@ -1,18 +1,20 @@
 # Adapter Source Template
 
-Complete TypeScript template for `packages/evlog/src/adapters/{name}.ts`.
+Complete TypeScript template for `packages/evlog/src/adapters/{name}.ts` using the public toolkit primitives `defineHttpDrain` + `resolveAdapterConfig`.
 
 Replace `{Name}`, `{name}`, and `{NAME}` with the actual service name.
 
 ```typescript
-import type { DrainContext, WideEvent } from '../types'
-import { getRuntimeConfig } from './_utils'
+import type { WideEvent } from '../types'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
+import { defineHttpDrain } from '../shared/drain'
 
-// --- 1. Config Interface ---
-// Define all service-specific configuration fields.
-// Always include optional `timeout`.
+// --- 1. Config Interface -------------------------------------------------
+// Service-specific fields. Standard names: apiKey, endpoint, serviceName, timeout.
+
 export interface {Name}Config {
-  /** {Name} API key / token */
+  /** {Name} API key */
   apiKey: string
   /** {Name} API endpoint. Default: https://api.{name}.com */
   endpoint?: string
@@ -21,35 +23,75 @@ export interface {Name}Config {
   // Add service-specific fields here (dataset, project, region, etc.)
 }
 
-// --- 2. Event Transformation (optional) ---
-// Export a converter if the service needs a specific format.
-// This makes the transformation testable independently.
+// Field manifest — drives both resolveAdapterConfig and runtime-config-aware
+// drain initialization.
+const FIELDS: ConfigField<{Name}Config>[] = [
+  { key: 'apiKey', env: ['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'] },
+  { key: 'endpoint', env: ['NUXT_{NAME}_ENDPOINT', '{NAME}_ENDPOINT'] },
+  { key: 'timeout' },
+]
 
-/** {Name} event structure */
+// --- 2. Event Transformation (optional) ----------------------------------
+// If the service needs a specific shape, expose a converter so it's testable
+// independently. Otherwise pass `events` straight through in `encode`.
+
 export interface {Name}Event {
-  // Define the target service's event shape
   timestamp: string
   level: string
   data: Record<string, unknown>
 }
 
-/**
- * Convert a WideEvent to {Name}'s event format.
- */
+/** Convert a WideEvent to {Name}'s event format. */
 export function to{Name}Event(event: WideEvent): {Name}Event {
   const { timestamp, level, ...rest } = event
+  return { timestamp, level, data: rest }
+}
 
+// --- 3. Encode helper (pure, easy to test) -------------------------------
+function build{Name}Payload(events: WideEvent[], config: {Name}Config) {
+  const endpoint = (config.endpoint ?? 'https://api.{name}.com').replace(/\/$/, '')
   return {
-    timestamp,
-    level,
-    data: rest,
+    url: `${endpoint}/v1/ingest`,
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey}`,
+    },
+    body: JSON.stringify(events.map(to{Name}Event)),
   }
 }
 
-// --- 3. Factory Function ---
-// Returns a drain function that resolves config at call time.
-// Config priority: overrides > runtimeConfig.evlog.{name} > runtimeConfig.{name} > env vars
+// --- 4. Direct send helpers ----------------------------------------------
+// Exported for direct use and testability.
 
+/** Send a single event to {Name}. */
+export async function sendTo{Name}(event: WideEvent, config: {Name}Config): Promise<void> {
+  await sendBatchTo{Name}([event], config)
+}
+
+/** Send a batch of events to {Name}. */
+export async function sendBatchTo{Name}(
+  events: WideEvent[],
+  config: {Name}Config,
+): Promise<void> {
+  if (events.length === 0) return
+
+  const { url, headers, body } = build{Name}Payload(events, config)
+  const controller = new AbortController()
+  const timeoutId = setTimeout(() => controller.abort(), config.timeout ?? 5000)
+
+  try {
+    const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal })
+    if (!response.ok) {
+      const text = await response.text().catch(() => 'Unknown error')
+      const safe = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
+      throw new Error(`{Name} API error: ${response.status} ${response.statusText} - ${safe}`)
+    }
+  } finally {
+    clearTimeout(timeoutId)
+  }
+}
+
+// --- 5. Factory built on `defineHttpDrain` ------------------------------
 /**
  * Create a drain function for sending logs to {Name}.
  *
@@ -61,102 +103,36 @@ export function to{Name}Event(event: WideEvent): {Name}Event {
  *
  * @example
  * ```ts
- * // Zero config - set NUXT_{NAME}_API_KEY env var
- * nitroApp.hooks.hook('evlog:drain', create{Name}Drain())
+ * import { create{Name}Drain } from 'evlog/{name}'
+ *
+ * // Zero config — set NUXT_{NAME}_API_KEY env var
+ * defineEvlog({ drain: create{Name}Drain() })
  *
  * // With overrides
- * nitroApp.hooks.hook('evlog:drain', create{Name}Drain({
- *   apiKey: 'my-key',
- * }))
+ * defineEvlog({ drain: create{Name}Drain({ apiKey: 'my-key' }) })
  * ```
  */
-export function create{Name}Drain(overrides?: Partial<{Name}Config>): (ctx: DrainContext) => Promise<void> {
-  return async (ctx: DrainContext) => {
-    const runtimeConfig = getRuntimeConfig()
-    const evlogConfig = runtimeConfig?.evlog?.{name}
-    const rootConfig = runtimeConfig?.{name}
-
-    // Build config with fallbacks
-    const config: Partial<{Name}Config> = {
-      apiKey: overrides?.apiKey ?? evlogConfig?.apiKey ?? rootConfig?.apiKey
-        ?? process.env.NUXT_{NAME}_API_KEY ?? process.env.{NAME}_API_KEY,
-      endpoint: overrides?.endpoint ?? evlogConfig?.endpoint ?? rootConfig?.endpoint
-        ?? process.env.NUXT_{NAME}_ENDPOINT ?? process.env.{NAME}_ENDPOINT,
-      timeout: overrides?.timeout ?? evlogConfig?.timeout ?? rootConfig?.timeout,
-    }
-
-    // Validate required fields
-    if (!config.apiKey) {
-      console.error('[evlog/{name}] Missing apiKey. Set NUXT_{NAME}_API_KEY env var or pass to create{Name}Drain()')
-      return
-    }
-
-    try {
-      await sendTo{Name}(ctx.event, config as {Name}Config)
-    } catch (error) {
-      console.error('[evlog/{name}] Failed to send event:', error)
-    }
-  }
-}
-
-// --- 5. Send Functions ---
-// Exported for direct use and testability.
-// sendTo{Name} wraps sendBatchTo{Name} for single events.
-
-/**
- * Send a single event to {Name}.
- */
-export async function sendTo{Name}(event: WideEvent, config: {Name}Config): Promise<void> {
-  await sendBatchTo{Name}([event], config)
-}
-
-/**
- * Send a batch of events to {Name}.
- */
-export async function sendBatchTo{Name}(events: WideEvent[], config: {Name}Config): Promise<void> {
-  if (events.length === 0) return
-
-  const endpoint = (config.endpoint ?? 'https://api.{name}.com').replace(/\/$/, '')
-  const timeout = config.timeout ?? 5000
-  // Construct the full URL for the service's ingest API
-  const url = `${endpoint}/v1/ingest`
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${config.apiKey}`,
-    // Add service-specific headers here
-  }
-
-  // Transform events if the service needs a specific format
-  const payload = events.map(to{Name}Event)
-  // Or send raw: JSON.stringify(events)
-
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), timeout)
-
-  try {
-    const response = await fetch(url, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    })
-
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safeText = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`{Name} API error: ${response.status} ${response.statusText} - ${safeText}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
+export function create{Name}Drain(overrides?: Partial<{Name}Config>) {
+  return defineHttpDrain<{Name}Config>({
+    name: '{name}',
+    timeout: overrides?.timeout,
+    resolve: async () => {
+      const config = await resolveAdapterConfig<{Name}Config>('{name}', FIELDS, overrides)
+      if (!config.apiKey) {
+        console.error('[evlog/{name}] Missing apiKey. Set NUXT_{NAME}_API_KEY env var or pass to create{Name}Drain()')
+        return null
+      }
+      return config as {Name}Config
+    },
+    encode: (events, config) => build{Name}Payload(events, config),
+  })
 }
 ```
 
 ## Customization Notes
 
-- **Auth style**: Some services use `Authorization: Bearer`, others use a custom header like `X-API-Key`. Adjust the headers accordingly.
-- **Payload format**: Some services accept raw JSON arrays (Axiom), others need a wrapper object (PostHog `{ api_key, batch }`), others need a protocol-specific structure (OTLP). Adapt `sendBatchTo{Name}` to match.
-- **Event transformation**: If the service expects a specific schema, implement `to{Name}Event()`. If the service accepts arbitrary JSON, you can skip it and send `ctx.event` directly.
-- **URL construction**: Match the service's API endpoint pattern. Some use path-based routing (`/v1/datasets/{id}/ingest`), others use a flat endpoint (`/batch/`).
-- **Extra config fields**: Add service-specific fields to the config interface (e.g., `dataset` for Axiom, `orgId` for org-scoped APIs, `host` for region selection).
+- **Auth style**: Some services use `Authorization: Bearer`, others use a custom header like `X-API-Key`. Adjust `headers` in `build{Name}Payload`.
+- **Payload format**: Some services accept raw JSON arrays (Axiom), others need a wrapper object (PostHog `{ api_key, batch }`), others need a protocol-specific structure (OTLP). Adapt `build{Name}Payload`.
+- **Event transformation**: If the service expects a specific schema, implement `to{Name}Event()`. If it accepts arbitrary JSON, send `events` directly.
+- **Custom transport**: If the service truly cannot fit `defineHttpDrain` (e.g. binary envelopes, gRPC), fall back to `defineDrain` from `../shared/drain` and call `httpPost` (from `../shared/http`) explicitly.
+- **Deprecated aliases**: When renaming a config field (e.g. `token` → `apiKey`), keep both as `ConfigField` entries and fall through in `resolve()`. See `axiom.ts` and `better-stack.ts` for the pattern.

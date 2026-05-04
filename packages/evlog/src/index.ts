@@ -36,6 +36,20 @@ export { isLevelEnabled } from './utils'
 export { useLogger } from './runtime/server/useLogger'
 export { parseError } from './runtime/utils/parseError'
 
+// Building blocks promoted from `evlog/toolkit` for ergonomics on the canonical
+// entrypoint. The toolkit subpath remains the comprehensive one.
+export { definePlugin, drainPlugin, enricherPlugin } from './shared/plugin'
+export type {
+  ClientLogContext,
+  EvlogPlugin,
+  PluginRunner,
+  PluginSetupContext,
+  RequestFinishContext,
+  RequestLifecycleContext,
+} from './shared/plugin'
+export { defineEvlog, toLoggerConfig, toMiddlewareOptions } from './shared/define'
+export type { EvlogConfig } from './shared/define'
+
 export type {
   AuditActor,
   AuditFields,

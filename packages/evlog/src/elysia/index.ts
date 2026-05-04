@@ -1,17 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Elysia } from 'elysia'
 import type { RequestLogger } from '../types'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
-import { extractSafeHeaders } from '../shared/headers'
-import { filterSafeHeaders } from '../utils'
 
 const storage = new AsyncLocalStorage<RequestLogger>()
 
-// Tracks loggers that are currently active (within a live request).
-// Elysia uses storage.enterWith() which persists in the async context
-// even after the request ends, so we use this set to distinguish
-// an in-flight logger from a stale one.
 const activeLoggers = new WeakSet<RequestLogger>()
 
 export type EvlogElysiaOptions = BaseEvlogOptions
@@ -45,6 +40,43 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
   return logger as RequestLogger<T>
 }
 
+interface ElysiaContext {
+  request: Request
+  path: string
+  headers: Record<string, string>
+}
+
+const integration = defineFrameworkIntegration<ElysiaContext>({
+  name: 'elysia',
+  extractRequest: ({ request, path, headers }) => ({
+    method: request.method,
+    path,
+    headers,
+    requestId: headers['x-request-id'],
+  }),
+  attachLogger: ({ request, path, headers }, logger) => {
+    attachForkToLogger(storage, logger, {
+      method: request.method,
+      path,
+      requestId: headers['x-request-id'],
+    }, {
+      onChildEnter: (child) => {
+        activeLoggers.add(child)
+      },
+      onChildExit: (child) => {
+        activeLoggers.delete(child)
+      },
+    })
+    activeLoggers.add(logger)
+  },
+})
+
+interface RequestState {
+  finish: (opts?: { status?: number; error?: Error }) => Promise<unknown>
+  skipped: boolean
+  logger: RequestLogger
+}
+
 /**
  * Create an evlog plugin for Elysia.
  *
@@ -68,43 +100,16 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
  *   .listen(3000)
  * ```
  */
-interface RequestState {
-  finish: (opts?: { status?: number; error?: Error }) => Promise<unknown>
-  skipped: boolean
-  logger: RequestLogger
-}
-
 export function evlog(options: EvlogElysiaOptions = {}) {
   const emitted = new WeakSet<Request>()
   const requestState = new WeakMap<Request, RequestState>()
 
   return new Elysia({ name: 'evlog' })
     .derive({ as: 'global' }, ({ request, path, headers }) => {
-      const middlewareOpts = {
-        method: request.method,
-        path,
-        requestId: headers['x-request-id'] || crypto.randomUUID(),
-        // It's recommended to use context.headers instead of context.request.headers
-        // because Elysia has fast path for getting headers on Bun
-        headers: filterSafeHeaders(headers as Record<string, string>),
-        ...options,
-      }
-      const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
-
-      if (!skipped) {
-        attachForkToLogger(storage, logger, middlewareOpts, {
-          onChildEnter: (child) => {
-            activeLoggers.add(child)
-          },
-          onChildExit: (child) => {
-            activeLoggers.delete(child)
-          },
-        })
-        activeLoggers.add(logger)
-      }
+      const ctx: ElysiaContext = { request, path, headers: headers as Record<string, string> }
+      const { logger, finish, skipped } = integration.start(ctx, options)
       storage.enterWith(logger)
       requestState.set(request, { finish, skipped, logger })
-
       return { log: logger }
     })
     .onAfterResponse({ as: 'global' }, async ({ request, set }) => {

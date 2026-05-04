@@ -378,6 +378,31 @@ export interface LoggerConfig {
    * ```
    */
   drain?: (ctx: DrainContext) => void | Promise<void>
+  /**
+   * Plugins registered globally with the logger.
+   *
+   * Plugins are the canonical extension contract for evlog: they can opt into
+   * `enrich`, `drain`, `keep`, lifecycle hooks (`onRequestStart`, `onRequestFinish`),
+   * client-log observation, and per-request logger decoration. See
+   * {@link import('./shared/plugin').EvlogPlugin} for the full surface.
+   *
+   * Plugin drains run alongside the standalone `drain` callback (composed with
+   * `Promise.allSettled`), so you can mix one-off drains and plugin-shaped
+   * extensions safely.
+   *
+   * @example
+   * ```ts
+   * import { initLogger, definePlugin } from 'evlog'
+   * import { createAxiomDrain } from 'evlog/axiom'
+   *
+   * initLogger({
+   *   plugins: [
+   *     definePlugin({ name: 'axiom', drain: createAxiomDrain() }),
+   *   ],
+   * })
+   * ```
+   */
+  plugins?: Array<import('./shared/plugin').EvlogPlugin>
   /** @internal Suppress the "silent without drain" warning (used by hook-based frameworks like Nitro/Nuxt) */
   _suppressDrainWarning?: boolean
 }
