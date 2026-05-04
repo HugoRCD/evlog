@@ -1,5 +1,64 @@
 # evlog
 
+## 2.15.0
+
+### Minor Changes
+
+- [#315](https://github.com/HugoRCD/evlog/pull/315) [`9b3739b`](https://github.com/HugoRCD/evlog/commit/9b3739ba97a1723c56c3f276b1cbea052990a5e5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Refactor core & toolkit into composable building blocks (EVL-155). The internal helpers that powered every built-in adapter, enricher, and framework integration are now public under `evlog/toolkit`, alongside three new factories and a canonical config entry point.
+
+  **This release is fully backwards-compatible.** Every previously-working snippet keeps working — adapter renames ship with deprecated aliases, the dual PostHog factory is kept as a thin wrapper, and the new toolkit primitives are additive. Nothing to migrate.
+
+  ### What's new
+  - **`definePlugin()`** — single canonical extension contract. A plugin can opt into any subset of `setup`, `enrich`, `drain`, `keep`, `onRequestStart`, `onRequestFinish`, `onClientLog`, `extendLogger`. Drains and enrichers are now sugar over plugins (`drainPlugin`, `enricherPlugin`).
+  - **`defineHttpDrain()`** — adapter factory. Provide `resolve()` (config) and `encode()` (payload); retries, timeouts, batching, and error isolation are handled for you. All 8 built-in adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, FS) now use this internally.
+  - **`defineEnricher()`** — enricher factory. Provide `compute()`; merge, error isolation, and undefined skipping are handled for you. All 4 built-in enrichers (UserAgent, Geo, RequestSize, TraceContext) now use this internally.
+  - **`defineFrameworkIntegration()`** — manifest-mode framework integration. Provide `extractRequest`, `attachLogger`, and an optional `storage`; the helper handles header normalization, request-id generation, ALS, and `log.fork()` attachment. Hono, Express, Fastify, and Elysia now use this internally.
+  - **`defineEvlog()`** — canonical config object. One shape that works across `initLogger`, framework middlewares, the Nuxt module, and Workers via `toLoggerConfig` / `toMiddlewareOptions`.
+  - **Composers**: `composeEnrichers`, `composeDrains`, `composeKeep`, `composePlugins` for combining multiple extensions with built-in error isolation.
+  - **`evlog/toolkit`** is now the public entry point for all building blocks.
+  - **`createDefaultEnrichers()`** — shorthand for `composeEnrichers([userAgent, geo, requestSize, traceContext])`.
+
+  ### Standardized naming (additive, with deprecated aliases)
+
+  We've standardized on `apiKey` for any bearer-style secret. The previous names continue to work and emit a one-time deprecation warning:
+
+  | Adapter      | Recommended                       | Still works (deprecated)                    |
+  | ------------ | --------------------------------- | ------------------------------------------- |
+  | Axiom        | `apiKey` / `AXIOM_API_KEY`        | `token` / `AXIOM_TOKEN`                     |
+  | Better Stack | `apiKey` / `BETTER_STACK_API_KEY` | `sourceToken` / `BETTER_STACK_SOURCE_TOKEN` |
+
+  Sentry keeps `dsn` (genuinely different format).
+
+  PostHog's two factories are unified — but the old name is still exported:
+
+  ```ts
+  // Recommended
+  createPostHogDrain({ mode: "events" });
+
+  // Still works (deprecated, re-routes to the line above)
+  createPostHogEventsDrain();
+  ```
+
+  These deprecated aliases will be removed in the next **major** release.
+
+  ### Adoption
+
+  Existing code keeps working. To opt into the new primitives:
+
+  ```ts
+  import { defineEvlog, defineHttpDrain, definePlugin } from "evlog/toolkit";
+  ```
+
+  See [Toolkit Reference](https://evlog.dev/adapters/building-blocks/toolkit) for the complete public API.
+
+### Patch Changes
+
+- [#317](https://github.com/HugoRCD/evlog/pull/317) [`cda80e5`](https://github.com/HugoRCD/evlog/commit/cda80e5d4a99320814194d95e2c61ce6b26437ba) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add end-to-end adapter tests against the real Axiom, PostHog, Sentry, and Better Stack APIs (`pnpm run test:e2e`). They run nightly via a dedicated GitHub Actions workflow plus on PRs labelled `e2e`, so any breaking change on a destination platform is caught within 24 hours instead of in production.
+
+  The Axiom suite does a full round-trip — it ingests events tagged with a unique correlation ID, queries them back via APL, and asserts presence and shape. PostHog/Sentry/Better Stack are smoke-tested (their write APIs don't expose a read path).
+
+  Pure infra: no user-facing API change, no published code change.
+
 ## 2.14.1
 
 ### Patch Changes

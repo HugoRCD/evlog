@@ -1,6 +1,6 @@
 {
   "name": "evlog-community-enricher-skeleton",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "description": "Reference skeleton for a community evlog enricher built on defineEnricher.",
   "private": true,
   "type": "module",
