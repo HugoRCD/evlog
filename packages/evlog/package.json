@@ -316,6 +316,7 @@
     "test": "vitest run",
     "test:watch": "vitest watch",
     "test:coverage": "vitest run --coverage",
+    "test:e2e": "vitest run --config vitest.e2e.config.ts",
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "devDependencies": {

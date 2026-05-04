@@ -56,11 +56,14 @@ packages/evlog/            Main package
 Tests live in `packages/evlog/test/` and use Vitest.
 
 ```bash
-pnpm run test                                          # full suite
+pnpm run test                                          # full suite (mocked, fast)
 pnpm --filter evlog exec vitest run test/path/to/file  # single test file
+pnpm run test:e2e                                      # adapters vs real endpoints
 ```
 
 Write tests for all new functionality. Run tests before considering any task done.
+
+End-to-end adapter tests (`packages/evlog/test/e2e/*.e2e.ts`) hit the real Axiom/PostHog/Sentry/Better Stack APIs. They skip automatically when env vars aren't set. They run on a daily cron + on push to `main` + on PR labelled `e2e` (`.github/workflows/e2e.yml`).
 
 ## Definition of Done
 

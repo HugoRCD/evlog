@@ -1,0 +1,72 @@
+name: e2e
+
+# E2E tests against real observability platforms (Axiom, PostHog, Sentry,
+# Better Stack). They are NOT run on every PR because:
+#   - secrets are not exposed to fork PRs (security)
+#   - we don't want to spam the destinations on every push
+#   - they are slower than unit tests (real network, ingestion lag)
+#
+# Triggers:
+#   - daily cron (3:00 UTC) — daily health check
+#   - push to main — confirm a merge didn't break anything
+#   - workflow_dispatch — manual run from the Actions tab
+#   - PR labelled `e2e` — opt-in for adapter changes (only on PRs from
+#     the same repo, never on forks)
+
+on:
+  schedule:
+    - cron: '0 3 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'packages/evlog/src/adapters/**'
+      - 'packages/evlog/src/shared/drain.ts'
+      - 'packages/evlog/src/shared/http.ts'
+      - 'packages/evlog/test/e2e/**'
+      - '.github/workflows/e2e.yml'
+  pull_request:
+    types: [labeled, synchronize, opened]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: e2e-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  e2e:
+    # Skip PRs that aren't labelled `e2e` (or skip fork PRs even if labelled).
+    if: |
+      github.event_name != 'pull_request' || (
+        contains(github.event.pull_request.labels.*.name, 'e2e')
+        && github.event.pull_request.head.repo.full_name == github.repository
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Run e2e tests
+        run: pnpm run test:e2e
+        env:
+          AXIOM_TOKEN: ${{ secrets.AXIOM_TOKEN }}
+          AXIOM_DATASET: ${{ secrets.AXIOM_DATASET }}
+          AXIOM_ORG_ID: ${{ secrets.AXIOM_ORG_ID }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+          SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+          BETTER_STACK_SOURCE_TOKEN: ${{ secrets.BETTER_STACK_SOURCE_TOKEN }}
+          BETTER_STACK_ENDPOINT: ${{ secrets.BETTER_STACK_ENDPOINT }}

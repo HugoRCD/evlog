@@ -40,6 +40,7 @@
     "lint:fix": "turbo run lint:fix",
     "bench": "turbo run bench --filter='./packages/*'",
     "test": "turbo run test",
+    "test:e2e": "pnpm --filter evlog run test:e2e",
     "typecheck": "turbo run typecheck",
     "automd": "npx automd --config .github/automd.json",
     "changeset": "changeset",
