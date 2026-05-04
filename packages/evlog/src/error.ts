@@ -10,6 +10,7 @@ const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
  * @example
  * ```ts
  * throw new EvlogError({
+ *   code: 'GITHUB_RATE_LIMIT',
  *   message: 'Failed to sync repository',
  *   status: 503,
  *   why: 'GitHub API rate limit exceeded',
@@ -21,6 +22,8 @@ const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
  */
 export class EvlogError extends Error {
 
+  /** Stable, machine-readable identifier (e.g. `'PAYMENT_DECLINED'`). */
+  readonly code?: string
   /** HTTP status code */
   readonly status: number
   readonly why?: string
@@ -41,6 +44,7 @@ export class EvlogError extends Error {
     super(opts.message, { cause: opts.cause })
 
     this.name = 'EvlogError'
+    this.code = opts.code
     this.status = opts.status ?? 500
     this.why = opts.why
     this.fix = opts.fix
@@ -77,9 +81,9 @@ export class EvlogError extends Error {
   }
 
   /** Structured data for serialization */
-  get data(): { why?: string, fix?: string, link?: string } | undefined {
-    if (this.why || this.fix || this.link) {
-      return { why: this.why, fix: this.fix, link: this.link }
+  get data(): { code?: string, why?: string, fix?: string, link?: string } | undefined {
+    if (this.code || this.why || this.fix || this.link) {
+      return { code: this.code, why: this.why, fix: this.fix, link: this.link }
     }
     return undefined
   }
@@ -97,6 +101,10 @@ export class EvlogError extends Error {
     const lines: string[] = []
 
     lines.push(`${red}${bold}Error:${reset} ${this.message}`)
+
+    if (this.code) {
+      lines.push(`${dim}Code:${reset} ${this.code}`)
+    }
 
     if (this.why) {
       lines.push(`${yellow}Why:${reset} ${this.why}`)
@@ -145,6 +153,7 @@ export class EvlogError extends Error {
  *
  * // Structured error with context
  * throw createError({
+ *   code: 'PAYMENT_DECLINED',
  *   message: 'Payment failed',
  *   status: 402,
  *   why: 'Card declined by issuer',

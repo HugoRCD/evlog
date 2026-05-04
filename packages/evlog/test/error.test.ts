@@ -17,6 +17,7 @@ describe('EvlogError', () => {
 
   it('creates error with full options', () => {
     const error = new EvlogError({
+      code: 'PAYMENT_DECLINED',
       message: 'Payment failed',
       status: 402,
       why: 'Card declined by issuer',
@@ -24,11 +25,17 @@ describe('EvlogError', () => {
       link: 'https://docs.example.com/payments',
     })
 
+    expect(error.code).toBe('PAYMENT_DECLINED')
     expect(error.message).toBe('Payment failed')
     expect(error.status).toBe(402)
     expect(error.why).toBe('Card declined by issuer')
     expect(error.fix).toBe('Try a different payment method')
     expect(error.link).toBe('https://docs.example.com/payments')
+  })
+
+  it('leaves code undefined when not provided', () => {
+    const error = new EvlogError({ message: 'No code here' })
+    expect(error.code).toBeUndefined()
   })
 
   it('defaults to 500 status', () => {
@@ -73,6 +80,26 @@ describe('EvlogError', () => {
       const error = new EvlogError('Simple error')
 
       expect(error.data).toBeUndefined()
+    })
+
+    it('includes code in data getter', () => {
+      const error = new EvlogError({
+        code: 'PAYMENT_DECLINED',
+        message: 'Payment failed',
+        why: 'Card declined',
+      })
+
+      expect(error.data).toEqual({
+        code: 'PAYMENT_DECLINED',
+        why: 'Card declined',
+        fix: undefined,
+        link: undefined,
+      })
+    })
+
+    it('returns data when only code is set', () => {
+      const error = new EvlogError({ code: 'NO_CONTEXT', message: 'x' })
+      expect(error.data).toEqual({ code: 'NO_CONTEXT', why: undefined, fix: undefined, link: undefined })
     })
   })
 
@@ -121,6 +148,17 @@ describe('EvlogError', () => {
       const str = error.toString()
       expect(str).toContain('Simple error')
     })
+
+    it('renders code line when set', () => {
+      const error = new EvlogError({
+        code: 'PAYMENT_DECLINED',
+        message: 'Payment failed',
+      })
+      const str = error.toString()
+      expect(str).toContain('Payment failed')
+      expect(str).toContain('Code:')
+      expect(str).toContain('PAYMENT_DECLINED')
+    })
   })
 
   describe('toJSON()', () => {
@@ -162,6 +200,16 @@ describe('EvlogError', () => {
       const error = new EvlogError('No cause')
       const json = error.toJSON()
       expect(json.cause).toBeUndefined()
+    })
+
+    it('includes code under data', () => {
+      const error = new EvlogError({
+        code: 'PAYMENT_DECLINED',
+        message: 'Payment failed',
+        status: 402,
+      })
+      const json = error.toJSON()
+      expect((json.data as { code?: string }).code).toBe('PAYMENT_DECLINED')
     })
 
     it('never includes internal (client-safe JSON)', () => {
@@ -210,7 +258,7 @@ describe('EvlogError', () => {
       })
       const body = serializeEvlogErrorResponse(error, '/api/x')
       expect(body.internal).toBeUndefined()
-      expect(body.data).toEqual({ why: 'Reason', fix: undefined, link: undefined })
+      expect(body.data).toEqual({ code: undefined, why: 'Reason', fix: undefined, link: undefined })
     })
   })
 })
@@ -408,6 +456,71 @@ describe('parseError', () => {
       const parsed = parseError(error)
 
       expect(parsed.status).toBe(500)
+    })
+  })
+
+  describe('code extraction', () => {
+    it('extracts code from EvlogError JSON shape (nested data.data.code)', () => {
+      const fetchError = {
+        data: {
+          status: 402,
+          statusText: 'Payment failed',
+          data: { code: 'PAYMENT_DECLINED', why: 'Card declined' },
+        },
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.code).toBe('PAYMENT_DECLINED')
+    })
+
+    it('extracts code from h3-style top-level data.code', () => {
+      const fetchError = {
+        data: {
+          status: 400,
+          statusText: 'Bad request',
+          code: 'VALIDATION_FAILED',
+        },
+      }
+
+      const parsed = parseError(fetchError)
+
+      expect(parsed.code).toBe('VALIDATION_FAILED')
+    })
+
+    it('extracts code from a Node-style Error.code (e.g. ENOENT)', () => {
+      const error = Object.assign(new Error('No such file'), { code: 'ENOENT' })
+
+      const parsed = parseError(error)
+
+      expect(parsed.code).toBe('ENOENT')
+    })
+
+    it('leaves code undefined for plain Error', () => {
+      const parsed = parseError(new Error('boom'))
+      expect(parsed.code).toBeUndefined()
+    })
+
+    it('ignores non-string code values', () => {
+      const error = Object.assign(new Error('boom'), { code: 42 })
+      const parsed = parseError(error)
+      expect(parsed.code).toBeUndefined()
+    })
+
+    it('round-trips code through createError → toJSON → parseError', () => {
+      const thrown = createError({
+        code: 'PAYMENT_DECLINED',
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined',
+      })
+
+      const fetchError = { data: thrown.toJSON(), message: thrown.message, statusCode: thrown.status }
+      const parsed = parseError(fetchError)
+
+      expect(parsed.code).toBe('PAYMENT_DECLINED')
+      expect(parsed.status).toBe(402)
+      expect(parsed.why).toBe('Card declined')
     })
   })
 })

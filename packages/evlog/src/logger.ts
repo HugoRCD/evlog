@@ -682,7 +682,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         stack: err.stack,
       }
       const errRecord = err as unknown as Record<string, unknown>
-      for (const k of ['status', 'statusText', 'statusCode', 'statusMessage', 'data', 'cause', 'internal'] as const) {
+      for (const k of ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'cause', 'internal'] as const) {
         if (k in err) errorObj[k] = errRecord[k]
       }
 

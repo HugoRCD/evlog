@@ -745,6 +745,12 @@ export interface Log {
 export interface ErrorOptions {
   /** What actually happened */
   message: string
+  /**
+   * Stable, machine-readable identifier for this error (e.g. `'PAYMENT_DECLINED'`,
+   * `'auth/invalid-token'`). Surfaces in HTTP responses, `parseError`, and wide
+   * events so clients can branch on `err.code` and dashboards can group by code.
+   */
+  code?: string
   /** HTTP status code (default: 500) */
   status?: number
   /** Why this error occurred */
@@ -823,6 +829,11 @@ export interface ServerEvent {
 export interface ParsedError {
   message: string
   status: number
+  /**
+   * Stable, machine-readable identifier copied from `EvlogError.code`,
+   * h3-style `data.code`, or a Node-style `Error.code` (e.g. `'ENOENT'`).
+   */
+  code?: string
   why?: string
   fix?: string
   link?: string

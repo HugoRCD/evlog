@@ -427,6 +427,25 @@ describe('createRequestLogger', () => {
     })
   })
 
+  it('captures EvlogError code on wide-event error object', () => {
+    const logger = createRequestLogger({})
+    const error = createError({
+      code: 'PAYMENT_DECLINED',
+      message: 'Payment failed',
+      status: 402,
+    })
+
+    logger.error(error)
+
+    const context = logger.getContext()
+    expect(context.error).toMatchObject({
+      name: 'EvlogError',
+      message: 'Payment failed',
+      status: 402,
+      code: 'PAYMENT_DECLINED',
+    })
+  })
+
   it('captures status/statusText from new-style H3 errors (Nuxt v4.3+)', () => {
     const logger = createRequestLogger({})
     const error = Object.assign(new Error('Not Found'), {
