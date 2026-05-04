@@ -1,25 +1,11 @@
 import type { DrainContext, EnrichContext, EnvironmentContext, RequestLogger, TailSamplingContext, WideEvent } from '../types'
 
-/**
- * Setup context passed to {@link EvlogPlugin.setup}.
- *
- * Called once when the plugin is registered (typically via `initLogger` or
- * `defineEvlog`). Use for one-shot side effects (warming a connection, reading
- * an env var, etc.).
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Context passed to {@link EvlogPlugin.setup} when the plugin is registered. */
 export interface PluginSetupContext {
-  /** Resolved evlog environment context (service, environment, version, …). */
   env: EnvironmentContext
 }
 
-/**
- * Per-request lifecycle context passed to {@link EvlogPlugin.onRequestStart}
- * and {@link EvlogPlugin.onRequestFinish}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Per-request context for `onRequestStart` / `onRequestFinish`. */
 export interface RequestLifecycleContext {
   logger: RequestLogger
   request: {
@@ -31,29 +17,17 @@ export interface RequestLifecycleContext {
   headers?: Record<string, string>
 }
 
-/**
- * Per-request lifecycle context passed to {@link EvlogPlugin.onRequestFinish}.
- *
- * `event` is the emitted wide event (or `null` if it was sampled out / disabled).
- * `error` is set when the framework caught an exception.
- *
- * @beta Part of `evlog/toolkit`.
- */
 export interface RequestFinishContext extends RequestLifecycleContext {
+  /** `null` when the event was sampled out or disabled. */
   event: WideEvent | null
   status?: number
   durationMs: number
   error?: Error
 }
 
-/**
- * Context passed to {@link EvlogPlugin.onClientLog} when a wide event arrives
- * at the server-side ingest endpoint from a browser/edge client.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Context passed to {@link EvlogPlugin.onClientLog} for client-submitted events. */
 export interface ClientLogContext {
-  /** Raw client payload before being normalized to a wide event. */
+  /** Raw client payload, before normalization. */
   payload: Record<string, unknown>
   request?: {
     method?: string
@@ -63,28 +37,12 @@ export interface ClientLogContext {
 }
 
 /**
- * The canonical extension point for evlog.
- *
- * A plugin can opt into any subset of hooks:
- * - `setup` — one-off init when registered
- * - `enrich` / `drain` / `keep` — same semantics as the standalone callbacks but composable
- * - `onRequestStart` / `onRequestFinish` — per-request lifecycle (for tracing,
- *   metrics, request-scoped state)
- * - `onClientLog` — observe events submitted by browser/edge clients
- * - `extendLogger` — decorate the per-request logger with custom methods
- *
- * Drains and enrichers are special cases of plugins: a drain plugin only
- * implements `drain`, an enricher plugin only implements `enrich`. They can
- * also be wrapped with {@link drainPlugin} / {@link enricherPlugin} from a
- * standalone callback for composition.
- *
- * @beta Part of `evlog/toolkit` — the public extension contract for community
- * libraries built on top of evlog.
+ * Canonical extension point for evlog. A plugin can opt into any subset of
+ * hooks; drains and enrichers are special cases (see {@link drainPlugin} and
+ * {@link enricherPlugin}).
  *
  * @example
  * ```ts
- * import { definePlugin, useLogger } from 'evlog/toolkit'
- *
  * export const tenantPlugin = definePlugin({
  *   name: 'tenant',
  *   onRequestStart({ logger, headers }) {
@@ -98,70 +56,47 @@ export interface ClientLogContext {
  * ```
  */
 export interface EvlogPlugin {
-  /** Stable identifier. Surfaced in logs and used for plugin de-duplication. */
+  /** Stable identifier. Used for de-duplication and error messages. */
   name: string
-  /** Run-once setup when the plugin is registered. */
+  /** Run-once when the plugin is registered. */
   setup?: (ctx: PluginSetupContext) => void | Promise<void>
-  /** Per-event enrichment hook. Runs before drain. */
+  /** Runs before drain. */
   enrich?: (ctx: EnrichContext) => void | Promise<void>
-  /** Per-event drain hook. Called for every emitted event. */
+  /** Called for every emitted event. */
   drain?: (ctx: DrainContext) => void | Promise<void>
-  /** Tail sampling hook. Set `ctx.shouldKeep = true` to force-keep the event. */
+  /** Tail sampling hook. Set `ctx.shouldKeep = true` to force-keep. */
   keep?: (ctx: TailSamplingContext) => void | Promise<void>
-  /** Called when a request logger is created, before the handler runs. */
   onRequestStart?: (ctx: RequestLifecycleContext) => void
-  /** Called after a request finishes (event emitted, drain attempted). */
   onRequestFinish?: (ctx: RequestFinishContext) => void
-  /** Called when a client log arrives at the server-side ingest endpoint. */
+  /** Observe events submitted from browser/edge clients. */
   onClientLog?: (ctx: ClientLogContext) => void
   /**
-   * Decorate per-request loggers with extra methods (e.g. `log.metric`, `log.feature`).
-   *
-   * @remarks
-   * To get type-safe access to the new methods on `useLogger()`, augment
-   * `RequestLogger` via TypeScript module augmentation in your plugin's `.d.ts`.
+   * Decorate per-request loggers with extra methods. Augment `RequestLogger`
+   * in a `.d.ts` to expose them on `useLogger()`.
    */
   extendLogger?: (logger: RequestLogger) => void
 }
 
-/**
- * Identity helper for authoring evlog plugins with full type inference.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Identity helper preserving plugin type inference. */
 export function definePlugin(plugin: EvlogPlugin): EvlogPlugin {
   return plugin
 }
 
-/**
- * Wrap a standalone drain callback as an {@link EvlogPlugin} so it can be
- * registered via `defineEvlog({ plugins: [...] })` alongside other plugins.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Wrap a standalone drain callback as an {@link EvlogPlugin}. */
 export function drainPlugin(name: string, drain: NonNullable<EvlogPlugin['drain']>): EvlogPlugin {
   return { name, drain }
 }
 
-/**
- * Wrap a standalone enricher callback as an {@link EvlogPlugin}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Wrap a standalone enricher callback as an {@link EvlogPlugin}. */
 export function enricherPlugin(name: string, enrich: NonNullable<EvlogPlugin['enrich']>): EvlogPlugin {
   return { name, enrich }
 }
 
 /**
- * Compiled view of a plugin set, ready to be invoked by the runtime.
- *
- * Errors from individual plugin hooks are captured and logged to `console.error`
- * with the plugin name; they never break the request.
- *
- * @beta Part of `evlog/toolkit`.
+ * Compiled view of a plugin set. Errors from individual hooks are caught and
+ * logged to `console.error` with the plugin name — they never break the request.
  */
 export interface PluginRunner {
-  /** Plugins as registered. Useful for diagnostics. */
   readonly plugins: readonly EvlogPlugin[]
   /** `true` when at least one plugin implements the matching hook. */
   readonly hasEnrich: boolean
@@ -170,21 +105,14 @@ export interface PluginRunner {
   readonly hasRequestLifecycle: boolean
   readonly hasClientLog: boolean
   readonly hasExtendLogger: boolean
-  /** Apply every plugin's `extendLogger` to the given logger (mutates). */
   applyExtendLogger: (logger: RequestLogger) => void
-  /** Run every plugin's `onRequestStart` hook. */
   runOnRequestStart: (ctx: RequestLifecycleContext) => void
-  /** Run every plugin's `onRequestFinish` hook. */
   runOnRequestFinish: (ctx: RequestFinishContext) => void
-  /** Run every plugin's `enrich` hook in registration order. */
   runEnrich: (ctx: EnrichContext) => Promise<void>
-  /** Run every plugin's `drain` hook concurrently (allSettled). */
+  /** Drains run concurrently (`Promise.allSettled`). */
   runDrain: (ctx: DrainContext) => Promise<void>
-  /** Run every plugin's `keep` hook in registration order. */
   runKeep: (ctx: TailSamplingContext) => Promise<void>
-  /** Run every plugin's `onClientLog` hook. */
   runOnClientLog: (ctx: ClientLogContext) => void
-  /** Run every plugin's `setup` hook (idempotent, awaited). */
   runSetup: (ctx: PluginSetupContext) => Promise<void>
 }
 
@@ -192,12 +120,7 @@ function logPluginError(name: string, hook: string, err: unknown): void {
   console.error(`[evlog/${name}] ${hook} failed:`, err)
 }
 
-/**
- * Build a {@link PluginRunner} from a list of plugins. De-duplicates by `name`
- * (last registration wins for the same name).
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** De-duplicates by `name` — last registration wins. */
 export function createPluginRunner(plugins: EvlogPlugin[] = []): PluginRunner {
   const byName = new Map<string, EvlogPlugin>()
   for (const plugin of plugins) {
@@ -310,11 +233,7 @@ export function createPluginRunner(plugins: EvlogPlugin[] = []): PluginRunner {
 
 const emptyRunner = createPluginRunner([])
 
-/**
- * Shared no-op runner used when no plugins are registered.
- *
- * @beta Part of `evlog/toolkit` — internal optimization, exported for tests.
- */
+/** Shared no-op runner used when no plugins are registered. */
 export function getEmptyPluginRunner(): PluginRunner {
   return emptyRunner
 }

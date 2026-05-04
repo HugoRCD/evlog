@@ -1,19 +1,11 @@
 /**
  * Helpers for building / mutating wide events from inside enrichers and adapters.
- *
- * @beta Part of `evlog/toolkit`.
  */
 
 /**
- * Merge a computed value onto an existing event field, respecting an optional
- * `overwrite` flag. The default is "preserve user-provided data": if the
- * existing field is a non-empty object, computed properties fill in only the
- * missing keys; otherwise the computed value is set as-is.
- *
- * Used by every built-in enricher to keep `log.set({ geo: ... })` precedence
- * over an enricher's automatic detection.
- *
- * @beta Part of `evlog/toolkit`.
+ * Merge a computed value onto an existing event field. By default, existing
+ * object values win over computed ones — so `log.set({ geo: ... })` keeps
+ * precedence over an enricher's automatic detection.
  */
 export function mergeEventField<T extends object>(
   existing: unknown,
@@ -26,12 +18,7 @@ export function mergeEventField<T extends object>(
   return { ...computed, ...(existing as T) }
 }
 
-/**
- * Generic "JSON-friendly" attribute value used by OTLP, Sentry, Datadog, and
- * PostHog adapters when flattening a `WideEvent` into a list of typed attributes.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Typed attribute used when flattening events for OTLP/Sentry/Datadog/PostHog. */
 export type AttributeValueKind = 'string' | 'integer' | 'double' | 'boolean'
 
 export interface TypedAttributeValue {
@@ -39,12 +26,7 @@ export interface TypedAttributeValue {
   type: AttributeValueKind
 }
 
-/**
- * Convert an arbitrary JS value into a {@link TypedAttributeValue} for
- * downstream HTTP transport. Complex objects are JSON-serialized to a string.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Convert a JS value to a {@link TypedAttributeValue}. Objects are JSON-serialized. */
 export function toTypedAttributeValue(value: unknown): TypedAttributeValue | undefined {
   if (value === null || value === undefined) return undefined
   if (typeof value === 'string') return { value, type: 'string' }
@@ -56,12 +38,7 @@ export function toTypedAttributeValue(value: unknown): TypedAttributeValue | und
   return { value: JSON.stringify(value), type: 'string' }
 }
 
-/**
- * Convert a JS value into the OTLP `AnyValue` shape (a discriminated record
- * with `stringValue` / `intValue` / `boolValue`).
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Convert a JS value to the OTLP `AnyValue` shape (`stringValue` / `intValue` / `boolValue`). */
 export function toOtlpAttributeValue(value: unknown): {
   stringValue?: string
   intValue?: string

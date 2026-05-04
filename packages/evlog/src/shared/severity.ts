@@ -2,9 +2,7 @@ import type { LogLevel } from '../types'
 
 /**
  * OpenTelemetry severity numbers per evlog log level.
- * See https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-severitynumber
- *
- * @beta Part of `evlog/toolkit` — used by OTLP, Sentry, and PostHog adapters.
+ * @see https://opentelemetry.io/docs/specs/otel/logs/data-model/#field-severitynumber
  */
 export const OTEL_SEVERITY_NUMBER: Record<LogLevel, number> = {
   debug: 5,
@@ -13,11 +11,6 @@ export const OTEL_SEVERITY_NUMBER: Record<LogLevel, number> = {
   error: 17,
 }
 
-/**
- * OpenTelemetry severity texts per evlog log level.
- *
- * @beta Part of `evlog/toolkit`.
- */
 export const OTEL_SEVERITY_TEXT: Record<LogLevel, string> = {
   debug: 'DEBUG',
   info: 'INFO',

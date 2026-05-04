@@ -5,93 +5,49 @@ import { extractSafeHeaders, extractSafeNodeHeaders } from './headers'
 import type { BaseEvlogOptions, MiddlewareLoggerOptions, MiddlewareLoggerResult } from './middleware'
 import { createMiddlewareLogger } from './middleware'
 
-/**
- * Request shape extracted from a framework-native context by
- * {@link FrameworkIntegrationSpec.extractRequest}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Request shape extracted from a framework context. */
 export interface ExtractedRequest {
   method: string
   path: string
   /**
    * Either a Web `Headers` (Hono / Elysia / Fetch) or a Node-style
-   * `IncomingHttpHeaders` record (Express / Fastify / Node).
-   *
-   * Pass whichever is native to your framework — `defineFrameworkIntegration`
-   * filters it through {@link extractSafeHeaders} or {@link extractSafeNodeHeaders}.
+   * `IncomingHttpHeaders` record (Express / Fastify). Whichever is native
+   * to the framework — it gets filtered through the safe-header helpers.
    */
   headers?: Headers | Record<string, string | string[] | undefined>
-  /** Optional request-id (used as-is when present, otherwise auto-generated). */
+  /** Used as-is when present, otherwise auto-generated. */
   requestId?: string
 }
 
-/**
- * Manifest passed to {@link defineFrameworkIntegration}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Manifest passed to {@link defineFrameworkIntegration}. */
 export interface FrameworkIntegrationSpec<TCtx> {
-  /** Stable identifier (used in logs and storage error messages). */
+  /** Stable identifier used in error messages. */
   name: string
-  /** Extract method/path/requestId/headers from the framework context. */
   extractRequest: (ctx: TCtx) => ExtractedRequest
-  /** Attach the request logger to the framework context (e.g. `c.set('log', logger)`). */
+  /** Attach the request logger to the framework context (`c.set('log', logger)`). */
   attachLogger: (ctx: TCtx, logger: RequestLogger) => void
   /**
-   * AsyncLocalStorage instance for `useLogger()`. Pass the result of
-   * `createLoggerStorage(...)` for frameworks that need ALS-based access
-   * (Express, Fastify, NestJS). Omit for frameworks where the logger is
-   * accessed through the request context directly (Hono, Elysia).
-   *
-   * When provided, `defineFrameworkIntegration` automatically attaches
-   * `log.fork()` to the per-request logger so users can spawn correlated
-   * background work.
+   * AsyncLocalStorage instance backing `useLogger()`. Required for frameworks
+   * where the logger is accessed off the request context (Express, Fastify,
+   * NestJS). When set, `log.fork()` is auto-attached to the request logger.
    */
   storage?: AsyncLocalStorage<RequestLogger>
-  /**
-   * Optional fork lifecycle hooks (only used when `storage` is set). Useful
-   * for frameworks that track active loggers separately (e.g. Elysia's
-   * `enterWith()` scoping).
-   */
+  /** Fork lifecycle hooks (only used when `storage` is set). */
   forkLifecycle?: import('./fork').ForkLifecycle
 }
 
-/**
- * Result returned from {@link FrameworkIntegrationHelpers.start}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Result returned by {@link FrameworkIntegrationHelpers.start}. */
 export interface FrameworkRequestHandle extends MiddlewareLoggerResult {
-  /**
-   * Resolved middleware options used to create the logger. Useful when a host
-   * needs to call other toolkit helpers (e.g. `attachForkToLogger`) with the
-   * exact same options.
-   */
   middlewareOptions: MiddlewareLoggerOptions
   /**
-   * Run the framework's downstream handler inside the integration's storage
-   * (if any). When no storage is configured, the callback is invoked directly.
+   * Run the downstream handler inside the integration's storage. When no
+   * storage is configured, the callback is invoked directly.
    */
   runWith: <T>(fn: () => T | Promise<T>) => Promise<T>
 }
 
-/**
- * Helpers returned from {@link defineFrameworkIntegration}.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Helpers returned by {@link defineFrameworkIntegration}. */
 export interface FrameworkIntegrationHelpers<TCtx> {
-  /**
-   * Initialize the per-request middleware logger for a single framework
-   * context. Returns `{ logger, finish, skipped, runWith }`.
-   *
-   * Hosts typically:
-   * 1. Call `start(ctx, options)` at request entry
-   * 2. Bail out early when `skipped === true`
-   * 3. Run their handler inside `runWith(...)`
-   * 4. Call `finish({ status })` on success or `finish({ error })` on failure
-   */
   start: (ctx: TCtx, options?: BaseEvlogOptions) => FrameworkRequestHandle
 }
 
@@ -104,25 +60,14 @@ function normalizeHeaders(headers: ExtractedRequest['headers']): Record<string, 
 }
 
 /**
- * Build a manifest-driven framework integration.
- *
- * Captures the boilerplate every middleware shares:
- * - request extraction (method, path, requestId, safe headers)
- * - `createMiddlewareLogger` setup
- * - logger attachment
- * - optional `AsyncLocalStorage` wrapping for `useLogger()`
- *
- * Each framework still owns its own middleware function (because the wire
- * shape — `(c, next)`, `(req, res, next)`, derive plugin, …  — varies), but
- * it only has to specify *what* to extract, *where* to attach, and *how* to
- * provide ALS — not *how* to run the lifecycle.
- *
- * @beta Part of `evlog/toolkit`.
+ * Build a manifest-driven framework integration. Captures the boilerplate
+ * every middleware shares (request extraction, logger setup, attachment,
+ * optional AsyncLocalStorage wrapping). The framework still owns its own
+ * middleware function — it just declares *what* to extract and *where* to
+ * attach the logger.
  *
  * @example
  * ```ts
- * import { defineFrameworkIntegration } from 'evlog/toolkit'
- *
  * const integration = defineFrameworkIntegration<HonoContext>({
  *   name: 'hono',
  *   extractRequest: (c) => ({
@@ -174,13 +119,7 @@ export function defineFrameworkIntegration<TCtx>(
 
       const { storage } = spec
       const runWith = async <T>(fn: () => T | Promise<T>): Promise<T> => {
-        if (!storage || result.skipped) {
-          return await fn()
-        }
-        // `AsyncLocalStorage.run(store, fn)` returns whatever `fn` returns
-        // (including a Promise) and propagates the store to every async
-        // continuation that descends from `fn`. Awaiting that promise here
-        // is enough — no extra Promise/microtask wrapping required.
+        if (!storage || result.skipped) return await fn()
         return await storage.run(result.logger, fn)
       }
 

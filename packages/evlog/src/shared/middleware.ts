@@ -7,66 +7,37 @@ import { createPluginRunner, getEmptyPluginRunner } from './plugin'
 import { shouldLog, getServiceForPath } from './routes'
 
 /**
- * Base options shared by all framework integrations.
- *
- * Every framework-specific options interface (e.g. `EvlogExpressOptions`)
- * extends this type. If a framework needs extra fields it can add them
- * on top; otherwise the base is used as-is.
- *
- * @beta Part of `evlog/toolkit` — the public API for building custom integrations.
+ * Base options shared by every framework integration. Re-exported via
+ * `evlog/toolkit` so custom integrations can extend it.
  */
 export interface BaseEvlogOptions {
-  /** Route patterns to include in logging (glob). If not set, all routes are logged */
+  /** Route glob patterns to include. If unset, all routes are logged. */
   include?: string[]
-  /** Route patterns to exclude from logging. Exclusions take precedence over inclusions */
+  /** Route glob patterns to exclude. Takes precedence over `include`. */
   exclude?: string[]
-  /** Route-specific service configuration */
+  /** Per-route service overrides. */
   routes?: Record<string, RouteConfig>
-  /**
-   * Drain callback called with every emitted event.
-   * Use with drain adapters (Axiom, OTLP, Sentry, etc.) or custom endpoints.
-   */
+  /** Drain callback invoked with every emitted event. */
   drain?: (ctx: DrainContext) => void | Promise<void>
-  /**
-   * Enrich callback called after emit, before drain.
-   * Use to add derived context (geo, deployment info, user agent, etc.).
-   */
+  /** Enrich callback invoked after emit, before drain. */
   enrich?: (ctx: EnrichContext) => void | Promise<void>
-  /**
-   * Custom tail sampling callback.
-   * Set `ctx.shouldKeep = true` to force-keep the log regardless of head sampling.
-   */
+  /** Tail sampling callback. Set `ctx.shouldKeep = true` to force-keep. */
   keep?: (ctx: TailSamplingContext) => void | Promise<void>
   /**
-   * Auto-redaction configuration for PII protection.
-   * `true` enables all built-in PII patterns. Pass an object for fine-grained control.
-   * Applied before enrich/drain. Also applied at the core `emitWideEvent` level
-   * when configured via `initLogger()`.
+   * PII auto-redaction. `true` enables built-in patterns; pass an object for
+   * fine-grained control. Applied before enrich/drain.
    */
   redact?: boolean | RedactConfig
-  /**
-   * Plugins registered for this middleware instance.
-   *
-   * Plugins are run in addition to the globally-registered ones from
-   * `initLogger({ plugins })`. They can opt into `enrich`, `drain`, `keep`,
-   * lifecycle hooks (`onRequestStart`, `onRequestFinish`), and per-request
-   * logger decoration via `extendLogger`.
-   *
-   * @beta Part of `evlog/toolkit`.
-   */
+  /** Plugins for this middleware, merged with globally-registered ones. */
   plugins?: EvlogPlugin[]
 }
 
-/**
- * Internal options consumed by `createMiddlewareLogger`.
- * Extends `BaseEvlogOptions` with the request-specific fields
- * that framework adapters must provide.
- */
+/** Internal options accepted by `createMiddlewareLogger`. */
 export interface MiddlewareLoggerOptions extends BaseEvlogOptions {
   method: string
   path: string
   requestId?: string
-  /** Pre-filtered safe request headers (used for enrich/drain context) */
+  /** Pre-filtered safe request headers used for enrich/drain context. */
   headers?: Record<string, string>
 }
 
@@ -93,32 +64,14 @@ const noopResult: MiddlewareLoggerResult = {
   skipped: true,
 }
 
-/**
- * Per-`options.plugins` cache for the merged runner. Keyed on the local
- * plugins array (stable across requests because it lives in the middleware
- * factory closure) and invalidated whenever the global runner reference
- * changes (i.e. someone called `initLogger` again).
- *
- * Without this cache, every request through `app.use(evlog({ plugins: [...] }))`
- * would re-allocate a `Map`, copy global+local plugin lists, and rebuild a
- * new `PluginRunner` (≈10 closures). At 100k req/s that's ≈1M short-lived
- * allocations per second on the hot path. The cache makes the slow path
- * O(1) after the first request.
- */
+// Memoizes the merged runner per local plugins array (stable across requests
+// because it lives in the middleware factory closure). Invalidated when
+// `initLogger` swaps the global runner, so the merge cost is paid once.
 const runnerCache = new WeakMap<EvlogPlugin[], { global: PluginRunner; merged: PluginRunner }>()
 
 /**
- * Resolve the effective plugin runner for a middleware invocation.
- *
- * Combines the middleware-level `plugins` with the globally-registered ones
- * (`initLogger({ plugins })`), de-duplicating by plugin `name`. Returns the
- * shared empty runner when no plugins are registered anywhere.
- *
- * The merged runner is cached per-`options.plugins` reference and invalidated
- * when `initLogger` rebuilds the global runner, so frequent middleware
- * invocations don't re-pay the merge cost.
- *
- * @beta Part of `evlog/toolkit`.
+ * Resolve the plugin runner for a middleware invocation by merging local
+ * plugins with the globally-registered ones (deduplicated by `name`).
  */
 export function resolveMiddlewarePluginRunner(options: { plugins?: EvlogPlugin[] }): PluginRunner {
   const global = getGlobalPluginRunner()
@@ -139,10 +92,8 @@ export function resolveMiddlewarePluginRunner(options: { plugins?: EvlogPlugin[]
 }
 
 /**
- * Apply redact, enrich, and drain to an emitted wide event — same pipeline as
- * {@link createMiddlewareLogger}'s `finish`.
- *
- * @beta Part of `evlog/toolkit` — used by framework integrations and `fork()`.
+ * Apply redact, enrich, and drain to an emitted wide event — the same
+ * pipeline used by {@link createMiddlewareLogger}'s `finish`.
  */
 // eslint-disable-next-line max-params
 export async function runEnrichAndDrain(
@@ -206,20 +157,12 @@ export async function runEnrichAndDrain(
 }
 
 /**
- * Create a middleware-aware request logger with full lifecycle management.
+ * Create a request logger with the full middleware pipeline: route filtering,
+ * service overrides, duration tracking, tail sampling, emit, enrich, drain.
  *
- * Handles the complete pipeline shared across all framework integrations:
- * route filtering, logger creation, service overrides, duration tracking,
- * tail sampling evaluation, event emission, enrichment, and draining.
- *
- * Framework adapters only need to:
- * 1. Extract method/path/requestId/headers from the framework request
- * 2. Call `createMiddlewareLogger()` with those + user options
- * 3. Check `skipped` — if true, skip to next middleware
- * 4. Store `logger` in framework-specific context (e.g., `c.set('log', logger)`)
- * 5. Call `finish({ status })` or `finish({ error })` at response end
- *
- * @beta Part of `evlog/toolkit` — the public API for building custom integrations.
+ * Framework adapters extract method/path/requestId/headers, call this once
+ * per request, and call `finish({ status | error })` when the response ends.
+ * If `skipped` is `true`, the route was filtered out — bypass logging.
  */
 export function createMiddlewareLogger(options: MiddlewareLoggerOptions): MiddlewareLoggerResult {
   if (!isEnabled()) return noopResult

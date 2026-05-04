@@ -1,61 +1,33 @@
 import type { EnrichContext, WideEvent } from '../types'
 import { mergeEventField } from './event'
 
-/**
- * Options accepted by every built-in enricher and any enricher built with
- * {@link defineEnricher}.
- *
- * @beta Part of `evlog/toolkit`.
- */
 export interface EnricherOptions {
   /**
-   * When `true`, replace any existing field on the event with the computed
-   * value. Defaults to `false` so user-provided context (e.g. via
-   * `log.set({ geo: ... })`) wins.
+   * Replace existing event fields with the computed value. Defaults to `false`
+   * so user-provided context (e.g. `log.set({ geo: ... })`) wins.
    */
   overwrite?: boolean
 }
 
-/**
- * Definition passed to {@link defineEnricher}.
- *
- * @beta Part of `evlog/toolkit`.
- */
 export interface EnricherDefinition<T extends object> {
   /** Stable identifier used in error logs. */
   name: string
   /**
-   * Top-level event field this enricher writes into. When provided, the value
-   * returned by `compute` is merged into `event[field]` using
-   * {@link mergeEventField}; pass `undefined` when the enricher writes
-   * multiple top-level fields and handles its own merging.
+   * Top-level event field to merge into. Omit when the enricher writes to
+   * multiple fields and handles its own merging inside `compute`.
    */
   field?: keyof WideEvent & string
-  /**
-   * Compute the value(s) to merge onto the event. Return `undefined` to
-   * skip enrichment for this event (e.g. required header missing).
-   *
-   * When `field` is set, the returned object is merged onto `event[field]`.
-   * When `field` is omitted, the enricher must mutate `ctx.event` directly
-   * inside the same callback (use `defineEnricher` only for the boilerplate
-   * removal in that case).
-   */
+  /** Return `undefined` to skip enrichment (e.g. when a required header is missing). */
   compute: (ctx: EnrichContext) => T | undefined
 }
 
 /**
- * Build an enricher with the canonical evlog conventions:
- *
- * - skips enrichment when `compute` returns `undefined`
- * - merges the result with {@link mergeEventField}, respecting `overwrite`
- * - isolates errors and logs them under `[evlog/{name}]`
- *
- * @beta Part of `evlog/toolkit` — recommended base for community enrichers.
+ * Build an enricher: skips when `compute` returns `undefined`, merges with
+ * {@link mergeEventField} respecting `overwrite`, and isolates errors under
+ * `[evlog/{name}]`.
  *
  * @example
  * ```ts
- * import { defineEnricher, getHeader } from 'evlog/toolkit'
- *
  * export const tenantEnricher = defineEnricher<{ id: string }>({
  *   name: 'tenant',
  *   field: 'tenant',

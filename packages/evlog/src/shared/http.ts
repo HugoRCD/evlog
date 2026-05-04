@@ -1,27 +1,20 @@
 /**
- * Minimal HTTP transport for drain adapters.
- *
- * Handles abort-based timeouts, exponential-backoff retries on `5xx`/`AbortError`/network errors,
- * and a sliced error message so secrets do not leak into logs.
- *
- * @beta Part of `evlog/toolkit` — used by every built-in HTTP drain. Community
- * adapters can use it directly via `defineHttpDrain` or call `httpPost` themselves.
+ * Minimal HTTP transport for drain adapters: abort-based timeouts, exponential
+ * backoff on `5xx` / network errors, response bodies truncated in error messages.
  */
 
 export interface HttpPostOptions {
-  /** Full URL to POST the body to. */
   url: string
-  /** Request headers (caller is responsible for `Content-Type`). */
+  /** Caller is responsible for `Content-Type`. */
   headers: Record<string, string>
   /** Pre-serialized request body. */
   body: string
   /** Abort the request after this many milliseconds. */
   timeout: number
-  /** Used in error messages and logs. */
+  /** Prefix used in error messages. */
   label: string
   /**
-   * Number of retry attempts for transient failures.
-   * Retries apply to network errors, aborts, and `5xx` responses with exponential backoff.
+   * Retries network errors, aborts, and `5xx` responses with exponential backoff.
    * @default 2
    */
   retries?: number
@@ -38,12 +31,8 @@ function isRetryable(error: unknown): boolean {
 }
 
 /**
- * POST a JSON-ish body to a URL with timeout + retry semantics.
- *
- * Throws on non-OK responses with a label-prefixed error including a truncated
- * response body. Safe to use from any drain `send()` function.
- *
- * @beta Part of `evlog/toolkit`.
+ * POST a body with timeout + retry. Throws label-prefixed errors with a
+ * truncated response body. Safe to call from any drain `send()`.
  */
 export async function httpPost({ url, headers, body, timeout, label, retries = 2 }: HttpPostOptions): Promise<void> {
   const normalizedRetries = Number.isFinite(retries) && retries >= 0 ? Math.floor(retries) : 2

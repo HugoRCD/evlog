@@ -27,13 +27,8 @@ export function extractSafeNodeHeaders(headers: Record<string, string | string[]
 }
 
 /**
- * Case-insensitive header lookup against a plain `Record<string, string>`.
- *
- * `headers` is the safe-filtered shape produced by {@link extractSafeHeaders}
- * or {@link extractSafeNodeHeaders}. Returns `undefined` when the header is
- * missing or `headers` itself is `undefined`.
- *
- * @beta Part of `evlog/toolkit` — used by every built-in enricher.
+ * Case-insensitive header lookup against the safe-filtered shape produced by
+ * {@link extractSafeHeaders} / {@link extractSafeNodeHeaders}.
  */
 export function getHeader(headers: Record<string, string> | undefined, name: string): string | undefined {
   if (!headers) return undefined
@@ -46,12 +41,7 @@ export function getHeader(headers: Record<string, string> | undefined, name: str
   return undefined
 }
 
-/**
- * Parse a header-derived numeric string into a finite number. Returns
- * `undefined` for empty/invalid inputs.
- *
- * @beta Part of `evlog/toolkit`.
- */
+/** Parse a header-derived numeric string. Returns `undefined` for empty/invalid input. */
 export function normalizeNumber(value: string | undefined): number | undefined {
   if (!value) return undefined
   const parsed = Number(value)
