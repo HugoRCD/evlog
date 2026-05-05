@@ -71,7 +71,8 @@
   ],
   "pnpm": {
     "overrides": {
-      "minimark": "0.2.0"
+      "minimark": "0.2.0",
+      "@nuxtjs/mcp-toolkit": "^0.16.1"
     }
   }
 }
