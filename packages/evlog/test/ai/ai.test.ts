@@ -2,13 +2,56 @@ import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LanguageModelV3, LanguageModelV3StreamPart } from '@ai-sdk/provider'
 import type { RequestLogger } from '../../src/types'
 import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
+import { createLogger } from '../../src/logger'
 
-function createMockLogger(): RequestLogger & { setCalls: Array<Record<string, unknown>> } {
+/**
+ * Mirrors evlog's `mergeInto` so the mock reflects what the wide event
+ * actually accumulates: arrays are concatenated, plain objects are merged
+ * recursively, scalars are replaced. Without this, a `log.set()` mock that
+ * just records each call would hide bugs whose impact only shows up on
+ * the assembled wide event (e.g. quadratic array growth).
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
+  for (const key in source) {
+    const sourceVal = source[key]
+    if (sourceVal === undefined || sourceVal === null) continue
+    const targetVal = target[key]
+    if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
+      mergeInto(targetVal, sourceVal)
+    } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
+      target[key] = [...targetVal, ...sourceVal]
+    } else {
+      target[key] = sourceVal
+    }
+  }
+}
+
+interface MockLogger extends RequestLogger {
+  setCalls: Array<Record<string, unknown>>
+  /**
+   * Cumulative state assembled from every `log.set()` payload using the
+   * same merge semantics as evlog's wide-event pipeline. Assert against
+   * this when verifying what consumers will see in the drain.
+   */
+  merged: Record<string, unknown>
+}
+
+function createMockLogger(): MockLogger {
   const setCalls: Array<Record<string, unknown>> = []
+  const merged: Record<string, unknown> = {}
   return {
     setCalls,
+    merged,
     set: vi.fn((data: Record<string, unknown>) => {
-      setCalls.push(structuredClone(data))
+      const cloned = structuredClone(data)
+      setCalls.push(cloned)
+      mergeInto(merged, structuredClone(data))
     }),
     error: vi.fn(),
     info: vi.fn(),
@@ -492,8 +535,41 @@ describe('createAILogger', () => {
       await wrappedModel.doGenerate({} as any)
       await wrappedModel.doGenerate({} as any)
 
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = log.merged.ai as Record<string, unknown>
       expect(aiData.toolCalls).toEqual(['search', 'calculate'])
+    })
+
+    it('does not grow array fields quadratically across multi-step runs', async () => {
+      const log = createMockLogger()
+      const ai = createAILogger(log)
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      const tools = ['list-pages', 'get-page', 'get-page', 'get-page', 'get-page', 'get-page']
+
+      const doGenerate = model.doGenerate as ReturnType<typeof vi.fn>
+      for (const toolName of tools) {
+        doGenerate.mockResolvedValueOnce({
+          content: [{ type: 'tool-call', toolCallId: `tc-${toolName}`, toolName, args: '{}' }],
+          finishReason: createFinishReason('tool-calls'),
+          usage: createMockUsage({ inputTotal: 100, outputTotal: 20 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+        await wrappedModel.doGenerate({} as any)
+      }
+
+      const merged = log.merged.ai as Record<string, unknown>
+      expect((merged.toolCalls as string[])).toEqual(tools)
+      expect((merged.stepsUsage as unknown[])).toHaveLength(tools.length)
+      expect(merged.steps).toBe(tools.length)
+
+      // Each flush should ship at most a single new tool call, not the full
+      // cumulative array — guarding against the quadratic regression.
+      const totalToolCallEntries = log.setCalls.reduce((sum, call) => {
+        const ai = call.ai as { toolCalls?: unknown[] } | undefined
+        return sum + (ai?.toolCalls?.length ?? 0)
+      }, 0)
+      expect(totalToolCallEntries).toBe(tools.length)
     })
   })
 
@@ -1931,6 +2007,67 @@ describe('createAILogger', () => {
         ai.captureEmbed({ usage: { tokens: 20 } })
         expect(seen[1].calls).toBe(2)
       })
+    })
+  })
+
+  describe('end-to-end with the real logger', () => {
+    it('produces a wide event with linear array growth across a multi-step run', async () => {
+      const log = createLogger()
+      const ai = createAILogger(log as unknown as RequestLogger)
+      const model = createMockModel()
+      const wrappedModel = ai.wrap(model)
+
+      const tools = ['list-pages', 'get-page', 'get-page', 'get-page', 'get-page', 'get-page']
+      const doGenerate = model.doGenerate as ReturnType<typeof vi.fn>
+      for (const toolName of tools) {
+        doGenerate.mockResolvedValueOnce({
+          content: [{ type: 'tool-call', toolCallId: `tc-${toolName}`, toolName, args: '{}' }],
+          finishReason: createFinishReason('tool-calls'),
+          usage: createMockUsage({ inputTotal: 100, outputTotal: 20 }),
+          response: { modelId: 'claude-sonnet-4.6' },
+        })
+        await wrappedModel.doGenerate({} as any)
+      }
+
+      const wide = log.emit({ _forceKeep: true } as any)
+      expect(wide).not.toBeNull()
+      const aiData = (wide as Record<string, unknown>).ai as Record<string, unknown>
+
+      expect((aiData.toolCalls as string[])).toEqual(tools)
+      expect((aiData.stepsUsage as unknown[])).toHaveLength(tools.length)
+      expect(aiData.steps).toBe(tools.length)
+      expect(aiData.calls).toBe(tools.length)
+      expect(aiData.inputTokens).toBe(100 * tools.length)
+      expect(aiData.outputTokens).toBe(20 * tools.length)
+    })
+
+    it('keeps `models` deduplicated across many flushes on the real wide event', async () => {
+      const log = createLogger()
+      const ai = createAILogger(log as unknown as RequestLogger)
+
+      const gemini = createMockModel({ provider: 'google', modelId: 'gemini-3-flash' })
+      const claude = createMockModel({ provider: 'anthropic', modelId: 'claude-sonnet-4.6' })
+      const wrappedGemini = ai.wrap(gemini)
+      const wrappedClaude = ai.wrap(claude)
+
+      const baseResult = (modelId: string) => ({
+        content: [],
+        finishReason: createFinishReason(),
+        usage: createMockUsage({ inputTotal: 50, outputTotal: 10 }),
+        response: { modelId },
+      })
+      ;(gemini.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(baseResult('gemini-3-flash'))
+      ;(claude.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(baseResult('claude-sonnet-4.6'))
+
+      // Alternate models so each `flushState` re-evaluates the unique set.
+      await wrappedGemini.doGenerate({} as any)
+      await wrappedClaude.doGenerate({} as any)
+      await wrappedGemini.doGenerate({} as any)
+      await wrappedClaude.doGenerate({} as any)
+
+      const wide = log.emit({ _forceKeep: true } as any)
+      const aiData = (wide as Record<string, unknown>).ai as Record<string, unknown>
+      expect(aiData.models).toEqual(['gemini-3-flash', 'claude-sonnet-4.6'])
     })
   })
 })
