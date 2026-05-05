@@ -25,8 +25,8 @@ function makeWrappedModel(steps: number) {
     provider: 'anthropic',
     modelId: 'claude-sonnet-4.6',
     defaultObjectGenerationMode: 'json',
-    doGenerate: async () => calls[i++],
-    doStream: async () => ({ stream: new ReadableStream() }),
+    doGenerate: () => Promise.resolve(calls[i++]),
+    doStream: () => Promise.resolve({ stream: new ReadableStream() }),
   } as unknown as LanguageModelV3
 }
 
