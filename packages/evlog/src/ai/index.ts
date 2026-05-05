@@ -414,6 +414,23 @@ export function createAILogger(log: RequestLogger, options?: AILoggerOptions): A
   }
 }
 
+/**
+ * Snapshot of how much of each cumulative array we've already sent to the
+ * wide event. `flushState` reads it to compute the delta and updates it in
+ * place; passing zero-watermarks to `buildMetadata` yields a full snapshot.
+ */
+interface Watermarks {
+  toolCalls: number
+  toolCallInputs: number
+  stepsUsage: number
+  toolExecutions: number
+  models: Set<string>
+}
+
+function freshWatermarks(): Watermarks {
+  return { toolCalls: 0, toolCallInputs: 0, stepsUsage: 0, toolExecutions: 0, models: new Set() }
+}
+
 interface AccumulatorState {
   calls: number
   steps: number
@@ -436,6 +453,8 @@ interface AccumulatorState {
   embedding: AIEmbeddingData | undefined
   costMap: Record<string, ModelCost> | undefined
   subscribers: Set<AIMetadataListener>
+  /** @internal What's already been written to the wide event. */
+  _flushed: Watermarks
   /** @internal Logger reference for integration flush */
   _log?: RequestLogger
 }
@@ -490,6 +509,7 @@ function createAccumulatorState(options?: AILoggerOptions): AccumulatorState {
     embedding: undefined,
     costMap: options?.cost,
     subscribers: new Set(),
+    _flushed: freshWatermarks(),
   }
 }
 
@@ -505,8 +525,15 @@ function computeEstimatedCost(state: AccumulatorState): number | undefined {
   return total > 0 ? Math.round(total * 1_000_000) / 1_000_000 : undefined
 }
 
-function buildMetadata(state: AccumulatorState): AIMetadata {
-  const uniqueModels = [...new Set(state.models)]
+/**
+ * Build the `ai.*` payload from the accumulator. Pass `since` to emit
+ * only the array entries appended after that watermark (used by
+ * `flushState` to avoid quadratic growth on the wide event, since evlog's
+ * `mergeInto` concatenates arrays). The default — fresh watermarks —
+ * yields the full cumulative snapshot used by `getMetadata()` and
+ * delivered to `onUpdate` subscribers.
+ */
+function buildMetadata(state: AccumulatorState, since: Watermarks = freshWatermarks()): AIMetadata {
   const lastModel = state.models[state.models.length - 1]
 
   const data: AIMetadata = {
@@ -518,21 +545,11 @@ function buildMetadata(state: AccumulatorState): AIMetadata {
 
   if (lastModel) data.model = lastModel
   if (state.lastProvider) data.provider = state.lastProvider
-  if (uniqueModels.length > 1) data.models = uniqueModels
   if (state.usage.cacheReadTokens > 0) data.cacheReadTokens = state.usage.cacheReadTokens
   if (state.usage.cacheWriteTokens > 0) data.cacheWriteTokens = state.usage.cacheWriteTokens
   if (state.usage.reasoningTokens > 0) data.reasoningTokens = state.usage.reasoningTokens
   if (state.lastFinishReason) data.finishReason = state.lastFinishReason
-  if (state.toolInputs && state.allToolCallInputs.length > 0) {
-    data.toolCalls = state.allToolCallInputs.map(t => ({ ...t }))
-  } else if (state.allToolCalls.length > 0) {
-    data.toolCalls = [...state.allToolCalls]
-  }
   if (state.lastResponseId) data.responseId = state.lastResponseId
-  if (state.steps > 1) {
-    data.steps = state.steps
-    data.stepsUsage = state.stepsUsage.map(s => ({ ...s, ...(s.toolCalls ? { toolCalls: [...s.toolCalls] } : {}) }))
-  }
   if (state.lastMsToFirstChunk !== undefined) data.msToFirstChunk = state.lastMsToFirstChunk
   if (state.lastMsToFinish !== undefined) {
     data.msToFinish = state.lastMsToFinish
@@ -541,11 +558,37 @@ function buildMetadata(state: AccumulatorState): AIMetadata {
     }
   }
   if (state.lastError) data.error = state.lastError
-  if (state.toolExecutions.length > 0) data.tools = state.toolExecutions.map(t => ({ ...t }))
   if (state.totalDurationMs !== undefined) data.totalDurationMs = state.totalDurationMs
   if (state.embedding) data.embedding = { ...state.embedding }
   const cost = computeEstimatedCost(state)
   if (cost !== undefined) data.estimatedCost = cost
+
+  if (state.toolInputs) {
+    if (state.allToolCallInputs.length > since.toolCallInputs) {
+      data.toolCalls = state.allToolCallInputs.slice(since.toolCallInputs).map(t => ({ ...t }))
+    }
+  } else if (state.allToolCalls.length > since.toolCalls) {
+    data.toolCalls = state.allToolCalls.slice(since.toolCalls)
+  }
+
+  if (state.steps > 1 && state.stepsUsage.length > since.stepsUsage) {
+    data.steps = state.steps
+    data.stepsUsage = state.stepsUsage
+      .slice(since.stepsUsage)
+      .map(s => ({ ...s, ...(s.toolCalls ? { toolCalls: [...s.toolCalls] } : {}) }))
+  }
+
+  if (state.toolExecutions.length > since.toolExecutions) {
+    data.tools = state.toolExecutions.slice(since.toolExecutions).map(t => ({ ...t }))
+  }
+
+  // `models` is only emitted once a second distinct model appears, then
+  // deduplicated across flushes so the merged wide event stays unique.
+  const uniqueModels = new Set(state.models)
+  if (uniqueModels.size > 1) {
+    const newModels = [...uniqueModels].filter(m => !since.models.has(m))
+    if (newModels.length > 0) data.models = newModels
+  }
 
   return data
 }
@@ -561,10 +604,25 @@ function notifySubscribers(state: AccumulatorState, metadata: AIMetadata): void 
   }
 }
 
+/**
+ * Push the accumulator's latest changes onto the wide event using delta
+ * semantics for arrays, then notify subscribers with the full snapshot.
+ */
 function flushState(log: RequestLogger, state: AccumulatorState): void {
-  const data = buildMetadata(state)
+  const flushed = state._flushed
+  const data = buildMetadata(state, flushed)
+
+  flushed.toolCalls = state.allToolCalls.length
+  flushed.toolCallInputs = state.allToolCallInputs.length
+  flushed.toolExecutions = state.toolExecutions.length
+  if (data.stepsUsage) flushed.stepsUsage = state.stepsUsage.length
+  if (data.models) for (const m of data.models) flushed.models.add(m)
+
   log.set({ ai: data } as Record<string, unknown>)
-  notifySubscribers(state, data)
+
+  if (state.subscribers.size > 0) {
+    notifySubscribers(state, buildMetadata(state))
+  }
 }
 
 function recordModel(state: AccumulatorState, provider: string, modelId: string, responseModelId?: string): void {
