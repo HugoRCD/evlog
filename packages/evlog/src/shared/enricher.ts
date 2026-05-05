@@ -9,7 +9,7 @@ export interface EnricherOptions {
   overwrite?: boolean
 }
 
-export interface EnricherDefinition<T extends object> {
+export interface EnricherDefinition<T> {
   /** Stable identifier used in error logs. */
   name: string
   /**
@@ -38,7 +38,7 @@ export interface EnricherDefinition<T extends object> {
  * })
  * ```
  */
-export function defineEnricher<T extends object>(
+export function defineEnricher<T>(
   def: EnricherDefinition<T>,
   options: EnricherOptions = {},
 ): (ctx: EnrichContext) => void {

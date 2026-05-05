@@ -7,12 +7,16 @@
  * object values win over computed ones — so `log.set({ geo: ... })` keeps
  * precedence over an enricher's automatic detection.
  */
-export function mergeEventField<T extends object>(
+export function mergeEventField<T>(
   existing: unknown,
   computed: T,
   overwrite?: boolean,
 ): T {
-  if (overwrite || existing === undefined || existing === null || typeof existing !== 'object') {
+  if (overwrite) return computed
+  if (typeof computed !== 'object' || computed === null) {
+    return existing === undefined || existing === null ? computed : existing as T
+  }
+  if (existing === undefined || existing === null || typeof existing !== 'object') {
     return computed
   }
   return { ...computed, ...(existing as T) }

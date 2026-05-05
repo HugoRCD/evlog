@@ -77,6 +77,24 @@ describe('event helpers', () => {
     expect(merged).toEqual({ id: 'computed' })
   })
 
+  it('mergeEventField writes primitive value when no existing value', () => {
+    expect(mergeEventField(undefined, 'fast')).toBe('fast')
+    expect(mergeEventField(null, 42)).toBe(42)
+  })
+
+  it('mergeEventField preserves primitive value over computed primitive', () => {
+    expect(mergeEventField('user', 'computed')).toBe('user')
+    expect(mergeEventField(50, 37)).toBe(50)
+  })
+
+  it('mergeEventField overwrites primitive value when requested', () => {
+    expect(mergeEventField('user', 'computed', true)).toBe('computed')
+  })
+
+  it('mergeEventField preserves user values when computed is primitive', () => {
+    expect(mergeEventField({ foo: 'bar' }, 'fast')).toEqual({ foo: 'bar' })
+  })
+
   it('toTypedAttributeValue distinguishes integers and doubles', () => {
     expect(toTypedAttributeValue(42)).toEqual({ value: 42, type: 'integer' })
     expect(toTypedAttributeValue(3.14)).toEqual({ value: 3.14, type: 'double' })
@@ -147,6 +165,51 @@ describe('defineEnricher', () => {
       expect.stringContaining('[evlog/tenant]'),
       expect.any(Error),
     )
+  })
+
+  it('writes primitive values to the event field', () => {
+    const enricher = defineEnricher<string>({
+      name: 'performance-tier',
+      field: 'performanceTier',
+      compute: ({ event }) => {
+        const duration = event.duration as number | undefined
+        if (duration === undefined) return undefined
+        if (duration < 100) return 'fast'
+        if (duration < 500) return 'normal'
+        return 'slow'
+      },
+    })
+    const event = baseEvent()
+    event.duration = 50
+    const ctx = enrichCtx(event)
+    enricher(ctx)
+    expect(ctx.event.performanceTier).toBe('fast')
+  })
+
+  it('preserves existing primitive value over enricher output', () => {
+    const enricher = defineEnricher<string>({
+      name: 'performance-tier',
+      field: 'performanceTier',
+      compute: () => 'fast',
+    })
+    const event = baseEvent()
+    event.performanceTier = 'user-set'
+    const ctx = enrichCtx(event)
+    enricher(ctx)
+    expect(ctx.event.performanceTier).toBe('user-set')
+  })
+
+  it('overwrites existing primitive when overwrite is true', () => {
+    const enricher = defineEnricher<string>({
+      name: 'performance-tier',
+      field: 'performanceTier',
+      compute: () => 'fast',
+    }, { overwrite: true })
+    const event = baseEvent()
+    event.performanceTier = 'user-set'
+    const ctx = enrichCtx(event)
+    enricher(ctx)
+    expect(ctx.event.performanceTier).toBe('fast')
   })
 })
 
