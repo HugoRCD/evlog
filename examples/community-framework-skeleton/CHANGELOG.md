@@ -1,5 +1,12 @@
 # evlog-community-framework-skeleton
 
+## 2.0.0
+
+### Patch Changes
+
+- Updated dependencies [[`8080662`](https://github.com/HugoRCD/evlog/commit/8080662e0ba2b3746aebf0aa1c5cf89756c3c44d)]:
+  - evlog@2.16.0
+
 ## 1.0.0
 
 ### Patch Changes
