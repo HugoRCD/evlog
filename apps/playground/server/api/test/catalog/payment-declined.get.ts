@@ -1,4 +1,3 @@
-import { createError } from 'evlog'
 import { billingErrors } from '~~/server/utils/errors'
 
 /**
@@ -10,12 +9,8 @@ import { billingErrors } from '~~/server/utils/errors'
  *   - data.why / data.fix / data.link: from the catalog entry
  */
 export default defineEventHandler(() => {
-  createError({
-    code: 'billing.PAYMENT_DECLINED',
-    message: 'Payment failed',
-    status: 402,
-    why: 'Card declined by issuer (insufficient funds on corporate card)',
-    fix: 'Use a different payment method or contact your finance department',
-    link: 'https://docs.example.com/errors/billing.payment_declined',
+  throw billingErrors.PAYMENT_DECLINED({
+    cause: new Error('stripe: card_declined (issuer code 05)'),
+    internal: { stripeRef: 'ch_demo_x123', userId: 'usr_demo_42' },
   })
 })
