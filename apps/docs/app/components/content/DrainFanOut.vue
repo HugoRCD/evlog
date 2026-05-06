@@ -250,7 +250,6 @@ function statusLabel(adapter: Adapter, s: AdapterState) {
                 <span class="relative inline-flex size-1.5 rounded-full bg-primary" />
               </span>
             </div>
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre class="font-mono text-[10px] leading-relaxed text-muted"><code>{
   level:    <span class="text-emerald-400">"info"</span>,
   method:   <span class="text-emerald-400">"POST"</span>,

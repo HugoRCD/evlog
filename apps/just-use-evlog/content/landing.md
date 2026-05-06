@@ -272,6 +272,24 @@ Drop 90% of `info` in prod, keep 100% of errors, force-keep anything slower than
 
 `createError({ why, fix, link })` on the server. `parseError()` on the client. Your error toast finally tells users *what went wrong* and *what to do about it*. Your on-call finally stops reverse-engineering stack traces.
 
+### Typed error & audit catalogs
+
+Stop scattering magic strings across your codebase. Group errors and audit actions into typed catalogs once, get autocomplete on `code` everywhere, refactor-safe comparisons in catch blocks, and one npm package per bounded context that ships its own type augmentation. Scales from a single `errors.ts` file to a multi-package monorepo without changing the API.
+
+```ts [errors/billing.ts]
+export const billingErrors = defineErrorCatalog('billing', {
+  PAYMENT_DECLINED: { status: 402, message: 'Card declined', why: '...', fix: '...' },
+  INSUFFICIENT_FUNDS: {
+    status: 402,
+    message: ({ available, required }: { available: number, required: number }) =>
+      `Insufficient funds: $${available}/$${required}`,
+  },
+})
+
+throw billingErrors.PAYMENT_DECLINED({ cause: stripeErr })
+throw billingErrors.INSUFFICIENT_FUNDS({ available: 5, required: 100 })
+```
+
 ### A filesystem drain for agents and scripts
 
 Write NDJSON to disk. Your AI agents, scripts, and teammates query structured events **without a Datadog subscription**. Wide events work for incidents and evals.

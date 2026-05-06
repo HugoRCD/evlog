@@ -122,7 +122,6 @@ const pills = [
           </div>
 
           <div class="px-5 pt-5 pb-4 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre><code><span class="text-violet-400">import</span> { createHttpLogDrain } <span class="text-violet-400">from</span> <span class="text-emerald-400">'evlog/http'</span>
 
 <span class="text-violet-400">const</span> drain = <span class="text-amber-400">createHttpLogDrain</span>({

@@ -174,7 +174,6 @@ const reachedRendered = computed(() => phase.value === 'rendered')
           </div>
 
           <div class="border border-muted bg-elevated/30 px-3.5 py-3 mb-3 min-h-[180px]">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre class="font-mono text-[10px] sm:text-[11px] leading-relaxed text-muted overflow-x-auto"><code><span class="text-violet-400">throw</span> <span class="text-amber-400">new</span> <span class="text-sky-400">Error</span>(<span class="text-emerald-400">"Payment failed"</span>)
 </code></pre>
             <div class="mt-3 pt-3 border-t border-default/30 transition-opacity duration-500" :class="reachedCaught ? 'opacity-100' : 'opacity-0'">
@@ -214,7 +213,6 @@ err.fix     <span class="text-dimmed">→</span> <span class="text-rose-400/80">
             class="border bg-elevated/30 px-3.5 py-3 mb-3 transition-colors duration-500 min-h-[180px]"
             :class="reachedRendered ? 'border-primary/25' : 'border-muted'"
           >
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre class="font-mono text-[10px] sm:text-[11px] leading-relaxed text-muted overflow-x-auto"><code><span class="text-violet-400">throw</span> <span class="text-sky-400">createError</span>({
 <template v-for="(field, i) in fields" :key="`f-${field.key}`"><span
   class="transition-all duration-500"

@@ -135,7 +135,6 @@ onMounted(() => {
           </div>
 
           <div class="px-5 pt-4 pb-3 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto border-b border-muted/50">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre><code>log.<span class="text-amber-400">audit</span>({
   <span class="text-sky-400">action</span>: <span class="text-emerald-400">'invoice.refund'</span>,
   <span class="text-sky-400">actor</span>: { <span class="text-sky-400">type</span>: <span class="text-emerald-400">'user'</span>, <span class="text-sky-400">id</span>: user.id },

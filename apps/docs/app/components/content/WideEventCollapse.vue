@@ -236,7 +236,7 @@ const collapsedCount = computed(() => lineCollapsed.value.filter(Boolean).length
             class="border bg-elevated/30 px-3.5 py-3 transition-colors duration-500 min-h-[180px]"
             :class="phase === 'wide' ? 'border-primary/25' : 'border-muted'"
           >
-            <!-- eslint-disable vue/multiline-html-element-content-newline, vue/html-self-closing -->
+            <!-- eslint-disable vue/html-self-closing -->
             <pre class="font-mono text-[10px] sm:text-[11px] leading-relaxed text-muted overflow-x-auto"><code>{
   <span class="text-sky-400">requestId</span>: <span class="text-emerald-400">"req_8a2c"</span>,
   <span class="text-sky-400">status</span>:    <span class="text-pink-400">200</span>,

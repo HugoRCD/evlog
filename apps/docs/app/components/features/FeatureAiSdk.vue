@@ -181,7 +181,6 @@ function setView(view: 'without' | 'with') {
           </div>
 
           <div class="px-5 pt-4 pb-3 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto border-b border-muted/50">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre><code><span class="text-violet-400">const</span> ai = <span class="text-amber-400">createAILogger</span>(log, {
   <span class="text-sky-400">cost</span>: { <span class="text-emerald-400">'claude-sonnet-4.6'</span>: { <span class="text-sky-400">input</span>: <span class="text-pink-400">3</span>, <span class="text-sky-400">output</span>: <span class="text-pink-400">15</span> } },
 })

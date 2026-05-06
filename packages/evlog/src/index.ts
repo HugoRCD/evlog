@@ -30,6 +30,23 @@ export type {
   WithAuditContext,
   WithAuditOptions,
 } from './audit'
+export {
+  defineAuditCatalog,
+  defineError,
+  defineErrorCatalog,
+} from './catalog'
+export type {
+  AuditCatalog,
+  AuditCatalogEntry,
+  AuditCatalogMap,
+  DefinedCatalogAudit,
+  DefinedError,
+  ErrorCatalog,
+  ErrorCatalogEntry,
+  ErrorCatalogMap,
+  ErrorFactoryOpts,
+  ErrorFactoryOverrides,
+} from './catalog'
 export { EvlogError, createError, createEvlogError } from './error'
 export { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log, shouldKeep } from './logger'
 export { isLevelEnabled } from './utils'
@@ -51,6 +68,7 @@ export { defineEvlog, toLoggerConfig, toMiddlewareOptions } from './shared/defin
 export type { EvlogConfig } from './shared/define'
 
 export type {
+  AuditAction,
   AuditActor,
   AuditFields,
   AuditLoggerMethod,
@@ -60,6 +78,7 @@ export type {
   DrainContext,
   EnrichContext,
   EnvironmentContext,
+  ErrorCode,
   ErrorOptions,
   FieldContext,
   H3EventContext,
@@ -70,6 +89,8 @@ export type {
   LogLevel,
   ParsedError,
   RedactConfig,
+  RegisteredAuditCatalogs,
+  RegisteredErrorCatalogs,
   RequestLogger,
   RequestLoggerOptions,
   SamplingConfig,

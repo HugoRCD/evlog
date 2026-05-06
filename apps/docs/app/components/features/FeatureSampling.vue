@@ -153,7 +153,6 @@ function getLevelColor(level: string): string {
             <span class="ml-3 font-mono text-xs text-dimmed">evlog.config.ts</span>
           </div>
           <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre><code><span class="text-amber-400">initLogger</span>({
   <span class="text-sky-400">sampling</span>: {
     <span class="text-dimmed">// Head: per-level rates</span>

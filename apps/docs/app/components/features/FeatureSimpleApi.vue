@@ -110,7 +110,6 @@ function setOutput(type: 'success' | 'error') {
             <span class="ml-3 font-mono text-xs text-dimmed">checkout.post.ts</span>
           </div>
           <div class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto">
-            <!-- eslint-disable vue/multiline-html-element-content-newline -->
             <pre><code><span class="text-violet-400">export default</span> <span class="text-amber-400">defineEventHandler</span>(<span class="text-violet-400">async</span> (event) => {
   <span class="text-violet-400">const</span> log = <span class="text-amber-400">useLogger</span>(event)
 

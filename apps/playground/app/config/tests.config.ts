@@ -336,6 +336,141 @@ export const testConfig = {
       ],
     } as TestSection,
     {
+      id: 'catalogs',
+      label: 'Catalogs',
+      icon: 'i-lucide-book-open',
+      title: 'Error & Audit Catalogs',
+      description: 'Typed error and audit catalogs declared once in `server/utils/{errors,audit}.ts` and consumed everywhere. Every test below shows the round-trip: factory call → wire `code` / `action` → parseError on the client. The catalog files include `declare module \'evlog\'` augmentation, so `parseError(err).code` is typed as the exact union of registered codes.',
+      layout: 'cards',
+      tests: [
+        {
+          id: 'catalog-payment-declined',
+          label: 'billingErrors.PAYMENT_DECLINED()',
+          description: 'Catalog factory with full fields + cause + internal override. Branches on the typed `code` to confirm the round-trip wire format.',
+          color: 'error',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/catalog/payment-declined')
+            } catch (err) {
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description:
+                  error.code === 'billing.PAYMENT_DECLINED'
+                    ? `Matched typed catalog code. Why: ${error.why}`
+                    : error.why,
+                color: 'error',
+                actions: error.link
+                  ? [{ label: 'Learn more', onClick: () => window.open(error.link, '_blank') }]
+                  : undefined,
+              })
+              if (error.fix) console.info(`💡 Fix: ${error.fix}`)
+              console.info(`[catalog] code = ${error.code}`)
+            }
+          },
+          badge: { label: 'GET /api/test/catalog/payment-declined', color: 'red' },
+        },
+        {
+          id: 'catalog-insufficient-funds',
+          label: 'billingErrors.INSUFFICIENT_FUNDS({ available, required })',
+          description: 'Templated message: server-side message function receives required typed params and the resulting wire message is fully interpolated.',
+          color: 'error',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/catalog/insufficient-funds')
+            } catch (err) {
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: error.fix,
+                color: 'error',
+              })
+              console.info(`[catalog] code = ${error.code} — message interpolated by the catalog template`)
+            }
+          },
+          badge: { label: 'Templated message', color: 'red' },
+        },
+        {
+          id: 'catalog-fraud-detected',
+          label: 'billingErrors.FRAUD_DETECTED()',
+          description: 'Catalog `internal` defaults (`category`, `riskBand`) merged with call-site `internal` (`mlScore`, `sessionId`). The merged object lands on the terminal wide event under `error.internal` but never appears in the HTTP body.',
+          color: 'warning',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/catalog/fraud-detected')
+            } catch (err) {
+              const { data } = err as { data?: Record<string, unknown> }
+              const serialized = JSON.stringify(data ?? {})
+              const leaked = serialized.includes('mlScore') || serialized.includes('riskBand')
+              if (leaked) {
+                console.error('[catalog] internal context leaked into HTTP body — bug', data)
+              } else {
+                console.info('[catalog] HTTP body has no internal secrets — OK. Check terminal wide event for error.internal.', data)
+              }
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: `${error.why ?? ''} See terminal for error.internal merging proof.`,
+                color: 'warning',
+              })
+            }
+          },
+          badge: { label: 'tags + internal defaults', color: 'orange' },
+        },
+        {
+          id: 'catalog-standalone',
+          label: 'RateLimited({ retryAfter })',
+          description: '`defineError` standalone factory (no catalog bundle) — same call-site shape, useful for one-off errors or per-file org. The factory exposes `.code` for refactor-safe comparisons.',
+          color: 'warning',
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/catalog/standalone')
+            } catch (err) {
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: `${error.why ?? ''} (code = ${error.code})`,
+                color: 'warning',
+              })
+            }
+          },
+          badge: { label: 'defineError', color: 'orange' },
+        },
+        {
+          id: 'catalog-audit-refund',
+          label: 'billingAudit.INVOICE_REFUND(...)',
+          description: 'Catalog audit emission. The wire `action` (`billing.INVOICE_REFUND`) and `target.type` (`invoice`) come from the catalog entry — no magic strings at the call site.',
+          endpoint: '/api/audit/catalog/invoice-refund',
+          method: 'POST',
+          color: 'success',
+          showResult: true,
+          badge: { label: 'POST /api/audit/catalog/invoice-refund', color: 'green' },
+          toastOnSuccess: {
+            title: 'Catalog audit recorded',
+            description: 'Check terminal wide event + .audit/ for action=billing.INVOICE_REFUND',
+          },
+        },
+        {
+          id: 'catalog-audit-subscription-cancel',
+          label: 'billingAudit.SUBSCRIPTION_CANCEL(...)',
+          description: 'Different entry, different `target.type` (`subscription`). Proves the type is fixed per entry, not per call site.',
+          endpoint: '/api/audit/catalog/subscription-cancel',
+          method: 'POST',
+          color: 'success',
+          showResult: true,
+          badge: { label: 'POST /api/audit/catalog/subscription-cancel', color: 'green' },
+          toastOnSuccess: {
+            title: 'Catalog audit recorded',
+            description: 'Check terminal wide event for action=billing.SUBSCRIPTION_CANCEL, target.type=subscription',
+          },
+        },
+      ],
+    } as TestSection,
+    {
       id: 'structured-errors',
       label: 'Structured Errors',
       icon: 'i-lucide-shield-alert',

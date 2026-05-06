@@ -740,6 +740,56 @@ export interface Log {
 }
 
 /**
+ * Module-augmentable registry of error catalogs.
+ *
+ * Augment via `declare module 'evlog'` so `createError({ code })`, `parseError(err).code`,
+ * and any other `code` field auto-completes the union of all registered codes
+ * (and still accepts ad-hoc strings via the `(string & {})` trick).
+ *
+ * @example
+ * ```ts
+ * import type { billingErrors } from '~/errors/billing'
+ *
+ * declare module 'evlog' {
+ *   interface RegisteredErrorCatalogs {
+ *     billing: typeof billingErrors
+ *   }
+ * }
+ * ```
+ */
+export interface RegisteredErrorCatalogs {}
+
+/**
+ * Module-augmentable registry of audit catalogs. Same opt-in pattern as
+ * {@link RegisteredErrorCatalogs}; augment to surface the union of all
+ * registered audit actions on the relevant typed APIs.
+ */
+export interface RegisteredAuditCatalogs {}
+
+/** @internal Extract the literal `_codes` union of a registered error catalog. */
+type ExtractCatalogCodes<T> = T extends { readonly _codes: ReadonlyArray<infer C extends string> } ? C : never
+
+/** @internal Extract the literal `_actions` union of a registered audit catalog. */
+type ExtractCatalogActions<T> = T extends { readonly _actions: ReadonlyArray<infer A extends string> } ? A : never
+
+/**
+ * Union of every error code across the catalogs registered via
+ * {@link RegisteredErrorCatalogs}. Resolves to `never` when no catalog is
+ * registered, in which case `ErrorCode | (string & {})` collapses to `string`.
+ */
+export type ErrorCode = {
+  [K in keyof RegisteredErrorCatalogs]: ExtractCatalogCodes<RegisteredErrorCatalogs[K]>
+}[keyof RegisteredErrorCatalogs]
+
+/**
+ * Union of every audit action across the catalogs registered via
+ * {@link RegisteredAuditCatalogs}. Same fallback semantics as {@link ErrorCode}.
+ */
+export type AuditAction = {
+  [K in keyof RegisteredAuditCatalogs]: ExtractCatalogActions<RegisteredAuditCatalogs[K]>
+}[keyof RegisteredAuditCatalogs]
+
+/**
  * Error options for creating structured errors
  */
 export interface ErrorOptions {
@@ -749,8 +799,12 @@ export interface ErrorOptions {
    * Stable, machine-readable identifier for this error (e.g. `'PAYMENT_DECLINED'`,
    * `'auth/invalid-token'`). Surfaces in HTTP responses, `parseError`, and wide
    * events so clients can branch on `err.code` and dashboards can group by code.
+   *
+   * Auto-completes against {@link ErrorCode} when error catalogs are registered
+   * via `declare module 'evlog'` (see {@link RegisteredErrorCatalogs}); still
+   * accepts arbitrary strings for ad-hoc errors.
    */
-  code?: string
+  code?: ErrorCode | (string & {})
   /** HTTP status code (default: 500) */
   status?: number
   /** Why this error occurred */
@@ -832,8 +886,11 @@ export interface ParsedError {
   /**
    * Stable, machine-readable identifier copied from `EvlogError.code`,
    * h3-style `data.code`, or a Node-style `Error.code` (e.g. `'ENOENT'`).
+   *
+   * Auto-completes against {@link ErrorCode} when error catalogs are registered
+   * via `declare module 'evlog'`; still typed wide enough to accept any wire string.
    */
-  code?: string
+  code?: ErrorCode | (string & {})
   why?: string
   fix?: string
   link?: string
