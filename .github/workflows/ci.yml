@@ -79,6 +79,8 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prepare
         run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
       - name: Test
         run: pnpm run test
 
