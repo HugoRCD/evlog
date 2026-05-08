@@ -8,7 +8,6 @@ const distDir = join(dirname(fileURLToPath(import.meta.url)), '../dist')
 const distExists = existsSync(join(distDir, 'index.mjs'))
 
 if (!distExists) {
-  // eslint-disable-next-line no-console -- one-time CI hint, never spammed at runtime.
   console.warn('[evlog test] Skipping dist import audit: dist/ not found. Run `pnpm --filter evlog run build` first.')
 }
 

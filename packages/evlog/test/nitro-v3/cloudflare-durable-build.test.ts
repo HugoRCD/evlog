@@ -7,7 +7,6 @@ const distEntry = resolve(__dirname, '../../dist/index.mjs')
 const distExists = existsSync(distEntry)
 
 if (!distExists) {
-  // eslint-disable-next-line no-console -- one-time CI hint, never spammed at runtime.
   console.warn('[evlog test] Skipping cloudflare-durable build: dist/ not found. Run `pnpm --filter evlog run build` first.')
 }
 
