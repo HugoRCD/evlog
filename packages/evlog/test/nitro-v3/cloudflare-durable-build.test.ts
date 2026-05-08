@@ -1,13 +1,22 @@
+import { existsSync } from 'node:fs'
 import { afterAll, describe, expect, it } from 'vitest'
 import { build, createNitro } from 'nitro/builder'
 import { resolve } from 'pathe'
+
+const distEntry = resolve(__dirname, '../../dist/index.mjs')
+const distExists = existsSync(distEntry)
+
+if (!distExists) {
+  // eslint-disable-next-line no-console -- one-time CI hint, never spammed at runtime.
+  console.warn('[evlog test] Skipping cloudflare-durable build: dist/ not found. Run `pnpm --filter evlog run build` first.')
+}
 
 /**
  * Regression: strict Worker presets bundle evlog into the server output.
  * Static or Rollup-resolvable `import("nitro/runtime-config")` from published
  * dist used to fail with "Cannot resolve ... externals are not allowed".
  */
-describe.sequential('Nitro cloudflare-durable build with evlog dist', () => {
+describe.sequential.skipIf(!distExists)('Nitro cloudflare-durable build with evlog dist', () => {
   let nitro: Awaited<ReturnType<typeof createNitro>>
 
   afterAll(async () => {
