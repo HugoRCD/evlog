@@ -14,6 +14,11 @@ export default defineNuxtConfig({
     transport: {
       enabled: true,
     },
+    // `stream` is auto-enabled in dev — boots a mini HTTP server on an
+    // ephemeral port and prints the URL at startup. Override with:
+    //   stream: true                          // enable in dev AND prod
+    //   stream: false                         // disable everywhere
+    //   stream: { port: 4317, token: '…' }    // explicit config
     redact: true,
     routes: {
       '/api/auth/**': { service: 'auth-service' },
