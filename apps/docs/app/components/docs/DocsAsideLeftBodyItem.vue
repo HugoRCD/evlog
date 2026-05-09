@@ -53,7 +53,7 @@ const headerClasses = 'text-default font-medium hover:text-primary'
     >
       <DocsAsideLeftBodyItem
         v-for="(child, index) in item.children"
-        :key="index"
+        :key="(child as ContentNavigationItem).path ?? `${item.path}-${index}`"
         :item="(child as ContentNavigationItem)"
         :level="level + 1"
       />
