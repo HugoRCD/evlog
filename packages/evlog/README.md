@@ -571,7 +571,7 @@ When enabled:
 3. `evlog:drain` hook is called with `source: 'client'`
 4. External services receive the log
 
-For a **framework-agnostic** batched HTTP drain (e.g. vanilla JS or custom endpoints), use `createHttpLogDrain` from [`evlog/http`](https://www.evlog.dev/integrate/adapters/http). The legacy import path `evlog/browser` is deprecated and will be removed in the next major release.
+For a **framework-agnostic** batched HTTP drain (e.g. vanilla JS or custom endpoints), use `createHttpLogDrain` from [`evlog/http`](https://www.evlog.dev/extend/drain-pipeline#http-drain-browser-to-server). The legacy import path `evlog/browser` is deprecated and will be removed in the next major release.
 
 ## Structured Errors
 
@@ -955,7 +955,7 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-> See the [full documentation](https://evlog.hrcd.fr/integrate/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
+> See the [full documentation](https://www.evlog.dev/integrate/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
 
 ## Drain Pipeline
 

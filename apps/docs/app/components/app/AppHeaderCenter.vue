@@ -195,7 +195,7 @@ const landingItems = [
       },
       {
         label: 'NuxtHub',
-        icon: 'i-simple-icons-nuxt',
+        icon: 'i-simple-icons-nuxtdotjs',
         description: 'Persist logs in NuxtHub D1',
         to: '/integrate/adapters/self-hosted/nuxthub'
       },
