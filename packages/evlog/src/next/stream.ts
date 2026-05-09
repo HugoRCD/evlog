@@ -1,7 +1,7 @@
 /**
  * Next.js helper that wires the local stream server into the standard
- * `instrumentation.ts` pattern. Auto-starts the mini stream server in dev
- * and registers its drain so every wide event reaches subscribed clients.
+ * `instrumentation.ts` pattern. Strict opt-in: nothing starts unless
+ * `stream: true` (or a config object) is passed explicitly.
  *
  * @example
  * ```ts
@@ -10,6 +10,7 @@
  *
  * export const { register, onRequestError } = defineStreamedInstrumentation({
  *   service: 'my-app',
+ *   stream: true,            // opt in to the local SSE stream server
  * })
  * ```
  *
@@ -22,10 +23,9 @@
  * )
  * ```
  *
- * In dev: the mini server boots on first `register()` call and prints
- * `[evlog] Stream → http://127.0.0.1:<port>`. In production the helper
- * is a no-op unless `stream: true` (or a config object) is passed
- * explicitly.
+ * When enabled, the mini server boots on first `register()` call and prints
+ * `[evlog] Stream → http://127.0.0.1:<port>`. Without `stream`, this is a
+ * straight pass-through to `createInstrumentation()`.
  */
 
 import { startStreamServer, type StreamServerOptions } from '../stream'
@@ -36,10 +36,12 @@ export interface StreamedInstrumentationOptions extends InstrumentationOptions {
   /**
    * Live stream server.
    *
+   * Strict opt-in — nothing starts unless this is set explicitly.
+   *
    * - `true` — enable with defaults
-   * - `false` — explicit off
+   * - `false` — off (same as omitting)
    * - `StreamServerOptions` — full config (port, host, token, ...)
-   * - `undefined` (default) — auto-enabled when `process.env.NODE_ENV === 'development'`
+   * - `undefined` (default) — off
    */
   stream?: boolean | StreamServerOptions
 }
@@ -58,9 +60,8 @@ export function defineStreamedInstrumentation(options: StreamedInstrumentationOp
 
   function shouldStartServer(): boolean {
     if (streamOpt === true) return true
-    if (streamOpt === false) return false
     if (streamOpt && typeof streamOpt === 'object') return true
-    return process.env.NODE_ENV === 'development'
+    return false
   }
 
   const start: boolean = shouldStartServer()

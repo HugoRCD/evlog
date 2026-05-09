@@ -157,20 +157,19 @@ export interface ModuleOptions {
    * subscribe via Server-Sent Events. The URL is printed at startup and
    * written to `.evlog/stream.url`.
    *
-   * - `true` — enable with defaults (dev AND prod)
-   * - `false` — explicit off
+   * Strict opt-in — nothing starts unless this is set.
+   *
+   * - `true` — enable with defaults
+   * - `false` — off (same as omitting)
    * - `StreamServerOptions` — full config (port, host, token, ...)
-   * - `undefined` (default) — auto-enabled in dev, off in production
+   * - `undefined` (default) — off
    *
    * Local-only: binds to `127.0.0.1` and does not work on serverless
    * platforms (each invocation is isolated).
    *
    * @example
    * ```ts
-   * // Default — nothing to configure, on in dev only
-   * evlog: {}
-   *
-   * // Force-enable in production too
+   * // Enable with defaults
    * evlog: { stream: true }
    *
    * // Custom port + auth token
@@ -330,20 +329,18 @@ export default defineNuxtModule<ModuleOptions>({
     // ephemeral port (see `evlog/stream` → `startStreamServer`). It does
     // NOT register a route in the user's app.
     //
-    // Rules:
+    // Strict opt-in: nothing starts unless the user explicitly asks for it.
     //   - `stream === true`        → enabled with defaults
-    //   - `stream === false`       → off (explicit override)
+    //   - `stream === false`       → off (alias for undefined)
     //   - `stream: { ... }`        → enabled with user options
-    //   - `stream === undefined`   → auto-enable in dev only
+    //   - `stream === undefined`   → off
     const streamRaw = options.stream
     const normalizedStream
-      = streamRaw === false
-        ? false
-        : streamRaw === true
-          ? true
-          : streamRaw && typeof streamRaw === 'object'
-            ? streamRaw
-            : nuxt.options.dev
+      = streamRaw === true
+        ? true
+        : streamRaw && typeof streamRaw === 'object'
+          ? streamRaw
+          : false
     const streamEnabled = normalizedStream !== false
     options.stream = normalizedStream
 
