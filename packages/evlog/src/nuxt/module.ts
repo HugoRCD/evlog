@@ -152,6 +152,33 @@ export interface ModuleOptions {
   transport?: TransportConfig
 
   /**
+   * Live stream of wide events, exposed by a small local HTTP server on
+   * an ephemeral port. Any consumer (browser tab, CLI, devtool) can
+   * subscribe via Server-Sent Events. The URL is printed at startup and
+   * written to `.evlog/stream.url`.
+   *
+   * Strict opt-in — nothing starts unless this is set.
+   *
+   * - `true` — enable with defaults
+   * - `false` — off (same as omitting)
+   * - `StreamServerOptions` — full config (port, host, token, ...)
+   * - `undefined` (default) — off
+   *
+   * Local-only: binds to `127.0.0.1` and does not work on serverless
+   * platforms (each invocation is isolated).
+   *
+   * @example
+   * ```ts
+   * // Enable with defaults
+   * evlog: { stream: true }
+   *
+   * // Custom port + auth token
+   * evlog: { stream: { port: 4317, token: process.env.EVLOG_STREAM_TOKEN } }
+   * ```
+   */
+  stream?: boolean | import('../stream').StreamServerOptions
+
+  /**
    * Axiom adapter configuration.
    * When configured, use `createAxiomDrain()` from `evlog/axiom` to send logs.
    *
@@ -294,6 +321,29 @@ export default defineNuxtModule<ModuleOptions>({
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
     const transportCredentials = options.transport?.credentials ?? 'same-origin'
 
+    // Normalize `evlog.stream` into a single canonical shape so the Nitro
+    // plugin (which reads runtimeConfig.evlog at server boot) sees a
+    // consistent value.
+    //
+    // The stream is exposed by a separate mini HTTP server on its own
+    // ephemeral port (see `evlog/stream` → `startStreamServer`). It does
+    // NOT register a route in the user's app.
+    //
+    // Strict opt-in: nothing starts unless the user explicitly asks for it.
+    //   - `stream === true`        → enabled with defaults
+    //   - `stream === false`       → off (alias for undefined)
+    //   - `stream: { ... }`        → enabled with user options
+    //   - `stream === undefined`   → off
+    const streamRaw = options.stream
+    const normalizedStream
+      = streamRaw === true
+        ? true
+        : streamRaw && typeof streamRaw === 'object'
+          ? streamRaw
+          : false
+    const streamEnabled = normalizedStream !== false
+    options.stream = normalizedStream
+
     nuxt.options.runtimeConfig.evlog = options
 
     // Register custom error handler for proper EvlogError serialization
@@ -327,6 +377,19 @@ export default defineNuxtModule<ModuleOptions>({
         route: transportEndpoint,
         method: 'post',
         handler: resolver.resolve('../runtime/server/routes/_evlog/ingest.post'),
+      })
+    }
+
+    if (streamEnabled) {
+      // The stream itself is served by an out-of-band HTTP mini-server
+      // started in the Nitro plugin — see startStreamServer() in
+      // packages/evlog/src/stream.ts. Here we only register a discovery
+      // route so a browser tab on the user's app can find the mini-server
+      // URL without having to read `.evlog/stream.url` directly.
+      addServerHandler({
+        route: '/api/_evlog/stream-info',
+        method: 'get',
+        handler: resolver.resolve('../runtime/server/routes/_evlog/stream-info.get'),
       })
     }
 

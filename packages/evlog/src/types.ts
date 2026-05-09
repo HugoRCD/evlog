@@ -59,7 +59,7 @@ declare module 'nitro/types' {
 }
 
 /**
- * Transport configuration for sending client logs to the server
+ * Transport configuration for sending client logs to the server.
  */
 export interface TransportConfig {
   /**

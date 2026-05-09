@@ -9,6 +9,7 @@ import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } fro
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
+import { startStreamServer, type StreamServerOptions } from '../stream'
 import type { EnrichContext, RequestLogger, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -133,6 +134,21 @@ export default defineNitroPlugin(async (nitroApp) => {
     redact,
     _suppressDrainWarning: true,
   })
+
+  // When `evlog.stream` is set (or auto-on in dev), boot the mini stream
+  // server and hook every drained event into it. The server runs on its
+  // own ephemeral port — the user's API surface is untouched.
+  const streamSetting = (evlogConfig as { stream?: boolean | StreamServerOptions } | undefined)?.stream
+  if (streamSetting === true || (streamSetting && typeof streamSetting === 'object')) {
+    const streamOpts: StreamServerOptions = streamSetting === true ? {} : streamSetting
+    startStreamServer(streamOpts).then((server) => {
+      nitroApp.hooks.hook('evlog:drain', (ctx) => {
+        if (ctx?.event) server.drain(ctx)
+      })
+    }).catch((err) => {
+      console.error('[evlog] failed to start stream server:', err)
+    })
+  }
 
   // When globally disabled, createRequestLogger returns a no-op logger — still
   // attach it so handlers can call useLogger(event) without throwing.

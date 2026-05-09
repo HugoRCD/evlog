@@ -110,6 +110,11 @@
       "import": "./dist/pipeline.mjs",
       "default": "./dist/pipeline.mjs"
     },
+    "./stream": {
+      "types": "./dist/stream.d.mts",
+      "import": "./dist/stream.mjs",
+      "default": "./dist/stream.mjs"
+    },
     "./http": {
       "types": "./dist/http.d.mts",
       "import": "./dist/http.mjs",
@@ -134,6 +139,11 @@
       "types": "./dist/next/instrumentation.d.mts",
       "import": "./dist/next/instrumentation.mjs",
       "default": "./dist/next/instrumentation.mjs"
+    },
+    "./next/stream": {
+      "types": "./dist/next/stream.d.mts",
+      "import": "./dist/next/stream.mjs",
+      "default": "./dist/next/stream.mjs"
     },
     "./hono": {
       "types": "./dist/hono/index.d.mts",
@@ -245,6 +255,9 @@
       "pipeline": [
         "./dist/pipeline.d.mts"
       ],
+      "stream": [
+        "./dist/stream.d.mts"
+      ],
       "http": [
         "./dist/http.d.mts"
       ],
@@ -259,6 +272,9 @@
       ],
       "next/instrumentation": [
         "./dist/next/instrumentation.d.mts"
+      ],
+      "next/stream": [
+        "./dist/next/stream.d.mts"
       ],
       "hono": [
         "./dist/hono/index.d.mts"
