@@ -53,7 +53,7 @@ packages/evlog/            Main package
 
 ### Changesets
 
-**Every user-facing change must include a changeset.** Before opening a PR — especially for features, but also for bug fixes and breaking changes — run `pnpm changeset` and commit the generated `.changeset/*.md` file alongside the code.
+**Every user-facing change must include a changeset.** Before opening a PR for features, bug fixes, or breaking changes, run `pnpm changeset` and commit the generated `.changeset/*.md` file alongside the code.
 
 - **When to add a changeset:** any change that affects the public API, adds a feature, fixes a bug, or introduces a breaking change. If a consumer of evlog would notice the difference, it needs a changeset.
 - **When you can skip:** internal-only changes (CI config, docs typos, test refactors, devDeps bumps) that don't touch the published package.
