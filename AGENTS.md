@@ -51,6 +51,18 @@ packages/evlog/            Main package
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
 
+### Doc animation components (`apps/docs/app/components/content/`)
+
+MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) follow a strict set of rules:
+
+- **Fixed outer size, always.** The component must occupy the same height and width from t=0 to the end of the loop. Layout below the animation must not shift while the user reads the page.
+- **Pre-allocate every slot.** Lines, rows, frames, buffer cells must all exist in the DOM from the start. Animate `opacity`, `color`, `transform` — never `max-height: 0 → N`, never conditional `v-if` on structural elements.
+- **Use `useTimedSequence`** from `~/composables/useTimedSequence` for the timeline. Honor `prefers-reduced-motion` by snapping to the final state.
+- **Wrap in `<Motion>` from `motion-v`** with `not-prose my-8` and an `IntersectionObserver` so the animation starts when scrolled into view.
+- **Header bar** with status pill + play/pause + restart buttons (mirror `DrainFanOut.vue`).
+- **Compact by default**: `text-[10px]` for body, `text-[9px]` for footers/labels, `leading-tight` or `leading-snug`, `py-1.5` / `py-2` headers/footers, `space-y-0.5` or none, `gap-1.5` or smaller.
+- Use `<div>` (not `<ol>/<li>`) for repeating slots — list elements collide with grid layout in Docus.
+
 ## Testing
 
 Tests live in `packages/evlog/test/` and use Vitest.
