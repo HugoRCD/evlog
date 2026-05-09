@@ -67,7 +67,7 @@ onMounted(() => {
 
           <div class="flex flex-wrap items-center justify-center gap-4">
             <UButton
-              to="/getting-started/installation"
+              to="/start/installation"
               size="lg"
               class="bg-white hover:bg-white/90 text-black border-0"
             >

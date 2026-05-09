@@ -2,7 +2,7 @@
  * evlog Toolkit — building blocks for custom adapters, enrichers, plugins,
  * and framework integrations.
  *
- * @see https://evlog.dev/frameworks/custom-integration
+ * @see https://evlog.dev/extend/custom-framework
  */
 
 export * from './compose'
