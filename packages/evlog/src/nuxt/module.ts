@@ -293,6 +293,8 @@ export default defineNuxtModule<ModuleOptions>({
     const transportEnabled = options.transport?.enabled ?? false
     const transportEndpoint = options.transport?.endpoint ?? '/api/_evlog/ingest'
     const transportCredentials = options.transport?.credentials ?? 'same-origin'
+    const streamEnabled = options.transport?.stream?.enabled === true
+    const streamEndpoint = options.transport?.stream?.endpoint ?? '/api/_evlog/stream'
 
     nuxt.options.runtimeConfig.evlog = options
 
@@ -327,6 +329,14 @@ export default defineNuxtModule<ModuleOptions>({
         route: transportEndpoint,
         method: 'post',
         handler: resolver.resolve('../runtime/server/routes/_evlog/ingest.post'),
+      })
+    }
+
+    if (streamEnabled) {
+      addServerHandler({
+        route: streamEndpoint,
+        method: 'get',
+        handler: resolver.resolve('../runtime/server/routes/_evlog/stream.get'),
       })
     }
 

@@ -9,6 +9,7 @@ import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } fro
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
+import { getDefaultStream } from '../stream'
 import type { EnrichContext, RequestLogger, ServerEvent, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -133,6 +134,17 @@ export default defineNitroPlugin(async (nitroApp) => {
     redact,
     _suppressDrainWarning: true,
   })
+
+  // When `transport.stream.enabled`, hook the default in-process stream
+  // into `evlog:drain` so the SSE route (and any other in-process consumer)
+  // can subscribe to live events.
+  const streamConfig = (evlogConfig as { transport?: { stream?: { enabled?: boolean; buffer?: number } } } | undefined)?.transport?.stream
+  if (streamConfig?.enabled === true) {
+    const stream = getDefaultStream({ buffer: streamConfig.buffer })
+    nitroApp.hooks.hook('evlog:drain', (ctx) => {
+      if (ctx?.event) stream.drain(ctx)
+    })
+  }
 
   // When globally disabled, createRequestLogger returns a no-op logger — still
   // attach it so handlers can call useLogger(event) without throwing.

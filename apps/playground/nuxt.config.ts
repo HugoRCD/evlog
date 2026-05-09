@@ -13,6 +13,10 @@ export default defineNuxtConfig({
     },
     transport: {
       enabled: true,
+      stream: {
+        enabled: true,
+        heartbeatMs: 5000,
+      },
     },
     redact: true,
     routes: {

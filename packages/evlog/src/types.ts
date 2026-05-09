@@ -59,7 +59,52 @@ declare module 'nitro/types' {
 }
 
 /**
- * Transport configuration for sending client logs to the server
+ * Configuration for the evlog SSE stream bridge — exposes the in-process
+ * default {@link import('./stream').StreamDrain} as an HTTP endpoint that
+ * any local tool, dashboard, or browser tab can subscribe to.
+ *
+ * Designed for local development and long-lived self-hosted servers. Does
+ * not work on serverless platforms (Vercel Functions, Cloudflare Workers,
+ * Lambda) because each invocation is an isolated process and the
+ * subscriber will not see events emitted by other invocations.
+ */
+export interface TransportStreamConfig {
+  /**
+   * Enable the SSE stream endpoint.
+   * @default false
+   */
+  enabled?: boolean
+
+  /**
+   * SSE endpoint path.
+   * @default '/api/_evlog/stream'
+   */
+  endpoint?: string
+
+  /**
+   * Bearer token required to subscribe. When unset, the route still
+   * rejects requests whose `Origin` does not match the request host
+   * (mirrors the ingest endpoint policy).
+   */
+  token?: string
+
+  /**
+   * Heartbeat interval (ms) sent as `event: ping` to keep the connection
+   * alive through proxies and detect disconnects.
+   * @default 15000
+   */
+  heartbeatMs?: number
+
+  /**
+   * Ring buffer size kept for late-joining clients (replayed via
+   * `?since=<iso>`).
+   * @default 500
+   */
+  buffer?: number
+}
+
+/**
+ * Transport configuration for sending client logs to the server.
  */
 export interface TransportConfig {
   /**
@@ -79,6 +124,13 @@ export interface TransportConfig {
    * @default 'same-origin'
    */
   credentials?: RequestCredentials
+
+  /**
+   * Optional SSE stream that exposes the in-process
+   * {@link import('./stream').StreamDrain} over HTTP. Local development
+   * and self-hosted only — see {@link TransportStreamConfig}.
+   */
+  stream?: TransportStreamConfig
 }
 
 /**

@@ -17,6 +17,7 @@ export default defineConfig({
     'runtime/client/plugin': 'src/runtime/client/plugin.ts',
     'runtime/server/useLogger': 'src/runtime/server/useLogger.ts',
     'runtime/server/routes/_evlog/ingest.post': 'src/runtime/server/routes/_evlog/ingest.post.ts',
+    'runtime/server/routes/_evlog/stream.get': 'src/runtime/server/routes/_evlog/stream.get.ts',
     'runtime/utils/parseError': 'src/runtime/utils/parseError.ts',
     'error': 'src/error.ts',
     'logger': 'src/logger.ts',
