@@ -1,3 +1,5 @@
+import http from 'node:http'
+import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
@@ -411,6 +413,89 @@ describe('evlog/express', () => {
         typeof call[0] === 'string' && call[0].includes('"asyncWork":"done"'),
       )
       expect(lastCall).toBeDefined()
+    })
+  })
+
+  describe('client disconnect', () => {
+    /**
+     * Boot a real HTTP server, fire a request, abort it before the handler
+     * finishes, then wait for the listener to settle. Avoids supertest, which
+     * always lets the handler complete.
+     */
+    async function abortMidRequest(app: express.Express, path: string, abortAfterMs: number): Promise<void> {
+      const server = app.listen(0)
+      try {
+        const { port } = server.address() as AddressInfo
+        const req = http.request({ host: '127.0.0.1', port, path, method: 'GET' })
+        req.on('error', () => {})
+        req.end()
+        await new Promise(resolve => setTimeout(resolve, abortAfterMs))
+        req.destroy()
+        await new Promise(resolve => setTimeout(resolve, 60))
+      } finally {
+        await new Promise<void>(resolve => server.close(() => resolve()))
+      }
+    }
+
+    it('emits the wide event with connectionClosed=true when the client aborts mid-handler', async () => {
+      const app = express()
+      app.use(evlog())
+      app.get('/api/slow', async (req, res) => {
+        req.log.set({ step: 'before-sleep' })
+        await new Promise(resolve => setTimeout(resolve, 100))
+        req.log.set({ step: 'after-sleep' })
+        res.json({ ok: true })
+      })
+
+      const consoleSpy = vi.mocked(console.info)
+      await abortMidRequest(app, '/api/slow', 20)
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"path":"/api/slow"'),
+      )
+      expect(lastCall).toBeDefined()
+
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.connectionClosed).toBe(true)
+      expect(event.method).toBe('GET')
+      expect(event.path).toBe('/api/slow')
+      expect(event.step).toBe('before-sleep')
+    })
+
+    it('does not flag connectionClosed when the response completes normally', async () => {
+      const app = express()
+      app.use(evlog())
+      app.get('/api/fast', (_req, res) => res.json({ ok: true }))
+
+      const consoleSpy = vi.mocked(console.info)
+      await request(app).get('/api/fast')
+
+      const lastCall = consoleSpy.mock.calls.find(call =>
+        typeof call[0] === 'string' && call[0].includes('"path":"/api/fast"'),
+      )
+      expect(lastCall).toBeDefined()
+
+      const event = JSON.parse(lastCall![0] as string)
+      expect(event.connectionClosed).toBeUndefined()
+      expect(event.status).toBe(200)
+    })
+
+    it('runs drain exactly once when the client aborts mid-handler', async () => {
+      const { drain } = createPipelineSpies()
+
+      const app = express()
+      app.use(evlog({ drain }))
+      app.get('/api/slow', async (_req, res) => {
+        await new Promise(resolve => setTimeout(resolve, 100))
+        res.json({ ok: true })
+      })
+
+      await abortMidRequest(app, '/api/slow', 20)
+
+      expect(drain).toHaveBeenCalledTimes(1)
+      const [[ctx]] = drain.mock.calls
+      expect(ctx.event.connectionClosed).toBe(true)
+      expect(ctx.event.path).toBe('/api/slow')
     })
   })
 })

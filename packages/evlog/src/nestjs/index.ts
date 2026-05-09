@@ -5,6 +5,7 @@ import type { RequestLogger } from '../types'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 import { extractSafeNodeHeaders } from '../shared/headers'
+import { bindNodeResponseLifecycle } from '../shared/nodeResponse'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
@@ -59,9 +60,7 @@ function createEvlogMiddleware(getOptions: () => EvlogNestJSOptions) {
     attachForkToLogger(storage, logger, middlewareOpts)
     req.log = logger
 
-    res.on('finish', () => {
-      finish({ status: res.statusCode }).catch(() => {})
-    })
+    bindNodeResponseLifecycle(res, logger, finish)
 
     storage.run(logger, () => next())
   }

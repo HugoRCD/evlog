@@ -2,6 +2,7 @@ import type { Request, Response, NextFunction, RequestHandler } from 'express'
 import type { RequestLogger } from '../types'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
+import { bindNodeResponseLifecycle } from '../shared/nodeResponse'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
@@ -52,16 +53,14 @@ const integration = defineFrameworkIntegration<Request>({
  */
 export function evlog(options: EvlogExpressOptions = {}): RequestHandler {
   return (req: Request, res: Response, next: NextFunction) => {
-    const { finish, skipped, runWith } = integration.start(req, options)
+    const { logger, finish, skipped, runWith } = integration.start(req, options)
 
     if (skipped) {
       next()
       return
     }
 
-    res.on('finish', () => {
-      finish({ status: res.statusCode }).catch(() => {})
-    })
+    bindNodeResponseLifecycle(res, logger, finish)
 
     void runWith(() => next())
   }
