@@ -469,8 +469,13 @@ describe('evlog/nestjs', () => {
   describe('client disconnect', () => {
     async function abortMidRequest(app: express.Express, path: string, abortAfterMs: number): Promise<void> {
       const server = app.listen(0)
+      await new Promise<void>(resolve => server.once('listening', resolve))
       try {
-        const { port } = server.address() as AddressInfo
+        const address = server.address()
+        if (!address || typeof address === 'string') {
+          throw new Error('Failed to bind test server to an ephemeral port')
+        }
+        const { port } = address
         const req = http.request({ host: '127.0.0.1', port, path, method: 'GET' })
         req.on('error', () => {})
         req.end()
