@@ -245,6 +245,38 @@ describe('createAuthMiddleware', () => {
     expect(log.setCalls[0].userId).toBe('usr_123')
   })
 
+  it('normalizes record-style headers to a Headers instance', async () => {
+    const log = createMockLogger()
+    const auth = createMockAuth()
+    const identify = createAuthMiddleware(auth)
+
+    const result = await identify(log, {
+      cookie: 'session=abc',
+      'x-forwarded-for': ['1.2.3.4', '5.6.7.8'],
+      'x-empty': undefined,
+    })
+
+    expect(result).toBe(true)
+    expect(auth.api.getSession).toHaveBeenCalledOnce()
+    const passed = (auth.api.getSession.mock.calls[0]![0] as { headers: Headers }).headers
+    expect(passed).toBeInstanceOf(Headers)
+    expect(passed.get('cookie')).toBe('session=abc')
+    expect(passed.get('x-forwarded-for')).toBe('1.2.3.4, 5.6.7.8')
+    expect(passed.has('x-empty')).toBe(false)
+  })
+
+  it('passes through Headers instances unchanged', async () => {
+    const log = createMockLogger()
+    const auth = createMockAuth()
+    const identify = createAuthMiddleware(auth)
+
+    const headers = new Headers({ cookie: 'session=abc' })
+    await identify(log, headers)
+
+    const passed = (auth.api.getSession.mock.calls[0]![0] as { headers: Headers }).headers
+    expect(passed).toBe(headers)
+  })
+
   it('returns false when session is null', async () => {
     const log = createMockLogger()
     const auth = createMockAuth(null)

@@ -4,16 +4,41 @@ import { matchesPattern } from '../utils'
 /**
  * Minimal type for the Better Auth instance.
  * Only requires `api.getSession` — compatible with any Better Auth configuration.
+ *
+ * Headers are typed as `Headers` (not a wider union) so a real Better Auth
+ * instance is assignable. Record-style headers are normalized internally
+ * before being passed to `auth.api.getSession`.
  */
 export interface BetterAuthInstance {
   api: {
     getSession: (opts: {
-      headers: Headers | Record<string, string | string[] | undefined>
+      headers: Headers
     }) => Promise<{
       user: Record<string, unknown>
       session: Record<string, unknown>
     } | null>
   }
+}
+
+/**
+ * Headers in any shape commonly produced by HTTP frameworks.
+ * Normalized internally to a `Headers` instance before calling Better Auth.
+ */
+export type HeadersInput = Headers | Record<string, string | string[] | undefined>
+
+function toHeaders(input: HeadersInput): Headers {
+  if (input instanceof Headers) return input
+  const headers = new Headers()
+  for (const key in input) {
+    const value = input[key]
+    if (value === undefined) continue
+    if (Array.isArray(value)) {
+      for (const item of value) headers.append(key, item)
+    } else {
+      headers.set(key, value)
+    }
+  }
+  return headers
 }
 
 /**
@@ -280,13 +305,13 @@ function shouldResolve(path: string, options?: { exclude?: string[], include?: s
 export function createAuthMiddleware(
   auth: BetterAuthInstance,
   options?: AuthMiddlewareOptions,
-): (log: RequestLogger, headers: Headers | Record<string, string | string[] | undefined>, path?: string) => Promise<boolean> {
+): (log: RequestLogger, headers: HeadersInput, path?: string) => Promise<boolean> {
   return async (log, headers, path?) => {
     if (path && !shouldResolve(path, options)) return false
 
     const start = Date.now()
     try {
-      const session = await auth.api.getSession({ headers })
+      const session = await auth.api.getSession({ headers: toHeaders(headers) })
       const resolvedIn = Date.now() - start
 
       if (session) {
@@ -340,11 +365,11 @@ export function createAuthMiddleware(
 export function createAuthIdentifier(
   auth: BetterAuthInstance,
   options?: AuthIdentifierOptions,
-): (event: { path: string, headers: Headers | { get(name: string): string | null }, context: { log?: RequestLogger } }) => Promise<void> {
+): (event: { path: string, headers: HeadersInput, context: { log?: RequestLogger } }) => Promise<void> {
   const middleware = createAuthMiddleware(auth, options)
 
   return async (event) => {
     if (!event.context.log) return
-    await middleware(event.context.log, event.headers as Headers, event.path)
+    await middleware(event.context.log, event.headers, event.path)
   }
 }
