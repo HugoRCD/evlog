@@ -35,13 +35,14 @@ function resetState() {
   errorsConsumed.value = 0
 }
 
-const APPEND_INTERVAL = 500
-const READ_DELAY = 220
-const TAIL_HOLD = 2800
+const FIRST_APPEND_DELAY_MS = 200
+const LINE_APPEND_INTERVAL_MS = 500
+const APPEND_TO_CURSOR_MS = 220
+const TAIL_HOLD_MS = 2800
 
 function buildEvents(): TimedEvent[] {
   const events: TimedEvent[] = []
-  let t = 200
+  let t = FIRST_APPEND_DELAY_MS
 
   lines.forEach((line, i) => {
     events.push({
@@ -51,7 +52,7 @@ function buildEvents(): TimedEvent[] {
         if (line.file === 1) rotated.value = true
       },
     })
-    t += READ_DELAY
+    t += APPEND_TO_CURSOR_MS
     events.push({
       at: t,
       run: () => {
@@ -60,14 +61,14 @@ function buildEvents(): TimedEvent[] {
         if (line.level === 'error') errorsConsumed.value++
       },
     })
-    t += APPEND_INTERVAL - READ_DELAY
+    t += LINE_APPEND_INTERVAL_MS - APPEND_TO_CURSOR_MS
   })
 
   return events
 }
 
 const events = buildEvents()
-const totalDuration = 200 + lines.length * APPEND_INTERVAL + TAIL_HOLD
+const totalDuration = FIRST_APPEND_DELAY_MS + lines.length * LINE_APPEND_INTERVAL_MS + TAIL_HOLD_MS
 
 const { start, toggle, restart, paused, started } = useTimedSequence({
   events,
@@ -154,7 +155,7 @@ const progress = computed(() => cursor.value < 0 ? 0 : ((cursor.value + 1) / lin
         <div class="px-3 py-2.5 border-b border-default/30 sm:border-b-0 sm:border-r font-mono text-[10px] leading-snug">
           <div class="flex items-center gap-1.5 mb-1.5 text-dimmed">
             <UIcon name="i-lucide-file-text" class="size-2.5" />
-            <span class="text-[9px] tracking-wider truncate">.evlog/logs/2026-05-08.ndjson</span>
+            <span class="text-[9px] tracking-wider truncate">.evlog/logs/2026-05-08.jsonl</span>
             <span class="ml-auto text-[9px] tabular-nums whitespace-nowrap">{{ file0Visible }}/{{ file0Lines.length }}</span>
           </div>
           <div class="space-y-0.5">
@@ -172,9 +173,10 @@ const progress = computed(() => cursor.value < 0 ? 0 : ((cursor.value + 1) / lin
           <div class="mt-2 pt-2 border-t border-muted/30 transition-opacity duration-300" :class="rotated ? 'opacity-100' : 'opacity-50'">
             <div class="flex items-center gap-1.5 mb-1.5 text-dimmed">
               <UIcon name="i-lucide-file-plus" class="size-2.5" :class="rotated ? 'text-primary' : 'text-dimmed'" />
-              <span class="text-[9px] tracking-wider truncate">.evlog/logs/2026-05-09.ndjson</span>
-              <span v-if="rotated" class="ml-auto text-[9px] uppercase tracking-widest text-primary">rotated</span>
-              <span v-else class="ml-auto text-[9px] tracking-widest text-dimmed">…</span>
+              <span class="text-[9px] tracking-wider truncate">.evlog/logs/2026-05-09.jsonl</span>
+              <span class="ml-auto text-[9px] tabular-nums whitespace-nowrap" :class="rotated ? 'text-primary' : 'text-dimmed'">
+                {{ rotated ? `rotated · ${file1Visible}/${file1Lines.length}` : 'awaiting rotation' }}
+              </span>
             </div>
             <div class="space-y-0.5">
               <div

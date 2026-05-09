@@ -1,21 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createStreamDrain, getDefaultStream, setDefaultStream } from '../src/stream'
-import type { DrainContext, WideEvent } from '../src/types'
-
-function makeEvent(id: number, overrides?: Partial<WideEvent>): WideEvent {
-  return {
-    timestamp: '2024-01-01T00:00:00.000Z',
-    level: 'info',
-    service: 'test',
-    environment: 'test',
-    id,
-    ...overrides,
-  }
-}
-
-function makeContext(event: WideEvent): DrainContext {
-  return { event }
-}
+import type { WideEvent } from '../src/types'
+import { makeContext, makeEvent } from './helpers/events'
 
 describe('createStreamDrain', () => {
   describe('drain', () => {

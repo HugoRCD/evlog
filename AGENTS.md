@@ -60,8 +60,10 @@ MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) foll
 - **Use `useTimedSequence`** from `~/composables/useTimedSequence` for the timeline. Honor `prefers-reduced-motion` by snapping to the final state.
 - **Wrap in `<Motion>` from `motion-v`** with `not-prose my-8` and an `IntersectionObserver` so the animation starts when scrolled into view.
 - **Header bar** with status pill + play/pause + restart buttons (mirror `DrainFanOut.vue`).
-- **Compact by default**: `text-[10px]` for body, `text-[9px]` for footers/labels, `leading-tight` or `leading-snug`, `py-1.5` / `py-2` headers/footers, `space-y-0.5` or none, `gap-1.5` or smaller.
+- **Compact by default**: `text-[10px]` for body, `text-[9px]` for footers/labels, `leading-tight` or `leading-snug`, `py-1.5` / `py-2` headers/footers, `space-y-0.5` or none, `gap-1.5` or smaller. The doc page width (sidebar + TOC) is narrow; aim for a final height under ~280px.
 - Use `<div>` (not `<ol>/<li>`) for repeating slots — list elements collide with grid layout in Docus.
+- **No viewport-dependent layout shift.** Stick to a single column at any width or use `sm:` for the optional split — never `lg:` (the doc content area never reaches the `lg:` breakpoint).
+- Two visual families coexist: the older roomy style (`DrainFanOut`, `EnricherChain`, `LifecycleFlow` — `py-3`, `size-6`) and the dense stream family (`StreamBus`, `SseWire`, `NdjsonTail` — `py-2`, `size-5`). Pick one for new components instead of mixing.
 
 ## Testing
 

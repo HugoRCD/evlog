@@ -208,6 +208,14 @@ onBeforeUnmount(() => {
         <p class="text-[11px] text-muted mt-0.5">
           Local-only verification panel
         </p>
+        <a
+          href="https://www.evlog.dev/build-on-top/consumer-recipes"
+          target="_blank"
+          rel="noopener"
+          class="mt-2 inline-flex items-center gap-1 text-[10px] text-muted hover:text-default"
+        >
+          docs · build your own consumer →
+        </a>
       </div>
 
       <div class="px-4 pb-3 space-y-2 text-[11px] text-muted border-b border-default">

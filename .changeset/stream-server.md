@@ -4,7 +4,7 @@
 
 Add a local Server-Sent Events stream server so any consumer (browser tab, CLI, devtool) can subscribe to live wide events without going through your app's API surface. The server runs in the same Node process on its own ephemeral port; the URL is printed at startup and written to `.evlog/stream.url` for tools to discover.
 
-Strict opt-in — nothing starts unless you set `stream` explicitly.
+Strict opt-in for the framework integrations: the Nuxt module and the Next.js `defineStreamedInstrumentation` helper only boot the server when `stream: true` (or a config object) is passed. `startStreamServer()` itself is always an explicit call — call it from any standalone script or framework wiring that doesn't have a built-in evlog config.
 
 **Nuxt**
 

@@ -29,20 +29,21 @@ function resetState() {
   connected.value = false
 }
 
-const CONNECT_AT = 200
-const FRAME_INTERVAL = 550
-const TAIL_HOLD = 3500
+const CONNECT_AT_MS = 200
+const FIRST_FRAME_DELAY_MS = 200
+const FRAME_INTERVAL_MS = 550
+const TAIL_HOLD_MS = 3500
 
 function buildEvents(): TimedEvent[] {
   const events: TimedEvent[] = []
 
-  events.push({ at: CONNECT_AT, run: () => {
+  events.push({ at: CONNECT_AT_MS, run: () => {
     connected.value = true
   } })
 
   frames.forEach((_, i) => {
     events.push({
-      at: CONNECT_AT + 200 + i * FRAME_INTERVAL,
+      at: CONNECT_AT_MS + FIRST_FRAME_DELAY_MS + i * FRAME_INTERVAL_MS,
       run: () => {
         visible.value = visible.value.map((v, idx) => (idx === i ? true : v))
       },
@@ -53,8 +54,8 @@ function buildEvents(): TimedEvent[] {
 }
 
 const events = buildEvents()
-const lastFrameAt = CONNECT_AT + 200 + frames.length * FRAME_INTERVAL
-const totalDuration = lastFrameAt + TAIL_HOLD
+const lastFrameAt = CONNECT_AT_MS + FIRST_FRAME_DELAY_MS + frames.length * FRAME_INTERVAL_MS
+const totalDuration = lastFrameAt + TAIL_HOLD_MS
 
 const { start, toggle, restart, paused, started } = useTimedSequence({
   events,

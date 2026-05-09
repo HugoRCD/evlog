@@ -39,37 +39,45 @@ function fullReset() {
   totalEmitted.value = 0
 }
 
-const EMITS = 4
-const CYCLE = 1900
+const EMIT_COUNT = 4
+const CYCLE_MS = 1900
+const FIRST_EMIT_DELAY_MS = 200
+const EMIT_TO_BUS_MS = 300
+const BUS_TO_INFLIGHT_MS = 450
+const SYNC_DELIVERED_MS = 700
+const ITER_DELIVERED_MS = 850
+const RING_DELIVERED_MS = 1000
+const CYCLE_REST_MS = 1500
+const TAIL_HOLD_MS = 600
 
 function buildEvents(): TimedEvent[] {
   const events: TimedEvent[] = []
 
-  for (let n = 0; n < EMITS; n++) {
-    const base = 200 + n * CYCLE
+  for (let n = 0; n < EMIT_COUNT; n++) {
+    const base = FIRST_EMIT_DELAY_MS + n * CYCLE_MS
 
     events.push({ at: base, run: () => {
       resetCycle()
       eventSent.value = true
     } })
-    events.push({ at: base + 300, run: () => {
+    events.push({ at: base + EMIT_TO_BUS_MS, run: () => {
       onBus.value = true
       totalEmitted.value = n + 1
     } })
-    events.push({ at: base + 450, run: () => {
+    events.push({ at: base + BUS_TO_INFLIGHT_MS, run: () => {
       state.value = { sync: 'inflight', iter: 'inflight', ring: 'inflight' }
     } })
-    events.push({ at: base + 700, run: () => {
+    events.push({ at: base + SYNC_DELIVERED_MS, run: () => {
       state.value = { ...state.value, sync: 'delivered' }
     } })
-    events.push({ at: base + 850, run: () => {
+    events.push({ at: base + ITER_DELIVERED_MS, run: () => {
       state.value = { ...state.value, iter: 'delivered' }
     } })
-    events.push({ at: base + 1000, run: () => {
+    events.push({ at: base + RING_DELIVERED_MS, run: () => {
       state.value = { ...state.value, ring: 'delivered' }
       ringFill.value = Math.min(ringFill.value + 1, RING_MAX)
     } })
-    events.push({ at: base + 1500, run: () => {
+    events.push({ at: base + CYCLE_REST_MS, run: () => {
       eventSent.value = false
       onBus.value = false
     } })
@@ -79,7 +87,7 @@ function buildEvents(): TimedEvent[] {
 }
 
 const events = buildEvents()
-const totalDuration = 200 + EMITS * CYCLE + 600
+const totalDuration = FIRST_EMIT_DELAY_MS + EMIT_COUNT * CYCLE_MS + TAIL_HOLD_MS
 
 const { start, toggle, restart, paused, started } = useTimedSequence({
   events,

@@ -4,44 +4,89 @@ import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetStreamServerForTests, setDefaultStream, startStreamServer, type StreamServer } from '../src/stream'
 import type { WideEvent } from '../src/types'
-
-function makeEvent(id: number, overrides?: Partial<WideEvent>): WideEvent {
-  return {
-    timestamp: '2026-05-09T12:00:00.000Z',
-    level: 'info',
-    service: 'test',
-    environment: 'test',
-    id,
-    ...overrides,
-  }
-}
+import { makeEvent } from './helpers/events'
 
 async function readSSE(url: string, durationMs: number, headers: Record<string, string> = {}): Promise<string[]> {
+  const session = await openSSE(url, headers)
+  return session.collectFor(durationMs)
+}
+
+/**
+ * Open an SSE connection and split the lifecycle so callers can synchronize
+ * on the `hello` frame instead of polling with `setTimeout`. Used by tests
+ * that need to drain events only once subscribers are attached.
+ */
+async function openSSE(url: string, headers: Record<string, string> = {}): Promise<{
+  helloReceived: Promise<void>
+  collectFor: (durationMs: number) => Promise<string[]>
+}> {
   const res = await fetch(url, { headers })
   expect(res.ok).toBe(true)
   const reader = res.body!.getReader()
   const decoder = new TextDecoder()
   const frames: string[] = []
   let buffer = ''
+  let helloResolve!: () => void
+  let helloReject!: (err: Error) => void
+  const helloReceived = new Promise<void>((resolve, reject) => {
+    helloResolve = resolve
+    helloReject = reject
+  })
 
-  const timer = setTimeout(() => reader.cancel().catch(() => {}), durationMs)
+  let helloSeen = false
+  let stopped = false
 
-  try {
-    while (true) {
-      const { value, done } = await reader.read()
-      if (done) break
-      buffer += decoder.decode(value, { stream: true })
-
-      let idx
-      while ((idx = buffer.indexOf('\n\n')) !== -1) {
-        frames.push(buffer.slice(0, idx))
-        buffer = buffer.slice(idx + 2)
+  function processBuffer() {
+    let idx
+    while ((idx = buffer.indexOf('\n\n')) !== -1) {
+      const frame = buffer.slice(0, idx)
+      buffer = buffer.slice(idx + 2)
+      frames.push(frame)
+      if (helloSeen) continue
+      const dataLine = frame.split('\n').find(l => l.startsWith('data:'))
+      if (!dataLine) continue
+      try {
+        const env = JSON.parse(dataLine.slice(5).trim())
+        if (env?.type === 'hello') {
+          helloSeen = true
+          helloResolve()
+        }
+      } catch {
+        // skip malformed
       }
     }
-  } finally {
-    clearTimeout(timer)
   }
-  return frames
+
+  const pump = (async () => {
+    try {
+      while (!stopped) {
+        const { value, done } = await reader.read()
+        if (done) break
+        buffer += decoder.decode(value, { stream: true })
+        processBuffer()
+      }
+    } catch {
+      // reader cancelled — expected
+    } finally {
+      if (!helloSeen) helloReject(new Error('connection closed before hello'))
+    }
+  })()
+
+  return {
+    helloReceived,
+    async collectFor(durationMs: number): Promise<string[]> {
+      const timer = setTimeout(() => {
+        stopped = true
+        reader.cancel().catch(() => {})
+      }, durationMs)
+      try {
+        await pump
+      } finally {
+        clearTimeout(timer)
+      }
+      return frames
+    },
+  }
 }
 
 function parseDataFrames(frames: string[]) {
@@ -117,12 +162,12 @@ describe('startStreamServer', () => {
   it('forwards drained events as event frames', async () => {
     server = await startStreamServer({ urlFileDir: dir, banner: false, heartbeatMs: 60_000 })
 
-    const collect = readSSE(server.url, 300)
-    await new Promise(r => setTimeout(r, 30))
+    const session = await openSSE(server.url)
+    await session.helloReceived
     await server.drain({ event: makeEvent(1) })
     await server.drain({ event: makeEvent(2) })
 
-    const parsed = parseDataFrames(await collect)
+    const parsed = parseDataFrames(await session.collectFor(200))
     const events = parsed.filter(p => p.type === 'event')
 
     expect(events).toHaveLength(2)
