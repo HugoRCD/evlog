@@ -154,6 +154,7 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'Axiom',
+    source: 'axiom',
   })
 }
 

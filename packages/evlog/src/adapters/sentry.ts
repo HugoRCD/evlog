@@ -289,5 +289,6 @@ export async function sendBatchToSentry(events: WideEvent[], config: SentryConfi
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'Sentry',
+    source: 'sentry',
   })
 }

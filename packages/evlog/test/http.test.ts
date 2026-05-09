@@ -36,7 +36,7 @@ describe('createHttpDrain', () => {
     const [url, options] = vi.mocked(fetch).mock.calls[0]!
     expect(url).toBe('/api/logs')
     expect(options?.method).toBe('POST')
-    expect(options?.headers).toEqual({ 'Content-Type': 'application/json' })
+    expect(options?.headers).toEqual({ 'Content-Type': 'application/json', 'X-Evlog-Source': 'client' })
     expect(options?.body).toBe(JSON.stringify(batch))
     expect(options?.keepalive).toBe(true)
     expect(options?.credentials).toBe('same-origin')
@@ -53,6 +53,7 @@ describe('createHttpDrain', () => {
     const [, options] = vi.mocked(fetch).mock.calls[0]!
     expect(options?.headers).toEqual({
       'Content-Type': 'application/json',
+      'X-Evlog-Source': 'client',
       'Authorization': 'Bearer tok_123',
       'X-API-Key': 'key_456',
     })

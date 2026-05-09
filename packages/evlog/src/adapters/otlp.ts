@@ -324,5 +324,6 @@ export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): 
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'OTLP',
+    source: 'otlp',
   })
 }

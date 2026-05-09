@@ -115,5 +115,6 @@ export async function sendBatchToBetterStack(events: WideEvent[], config: Better
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'Better Stack',
+    source: 'better-stack',
   })
 }

@@ -202,5 +202,6 @@ export async function sendBatchToDatadog(events: WideEvent[], config: DatadogCon
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'Datadog',
+    source: 'datadog',
   })
 }

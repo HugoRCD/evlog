@@ -117,6 +117,7 @@ export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): (c
         timeout,
         retries,
         label: options.name,
+        source: options.name,
       })
     },
   })

@@ -1,7 +1,19 @@
 /**
  * Minimal HTTP transport for drain adapters: abort-based timeouts, exponential
  * backoff on `5xx` / network errors, response bodies truncated in error messages.
+ *
+ * Identifies every outgoing request as coming from evlog via:
+ * - `User-Agent: evlog/<version>` (Node / server runtimes only — browsers strip this)
+ * - `X-Evlog-Source: <source>` when {@link HttpPostOptions.source} is set
  */
+
+import { version as PKG_VERSION } from '../../package.json'
+
+/** Build-time evlog package version, e.g. `2.16.0`. */
+export const EVLOG_VERSION: string = PKG_VERSION
+
+/** Default `User-Agent` value injected into outgoing drain requests. */
+export const EVLOG_USER_AGENT = `evlog/${EVLOG_VERSION}`
 
 export interface HttpPostOptions {
   url: string
@@ -18,6 +30,47 @@ export interface HttpPostOptions {
    * @default 2
    */
   retries?: number
+  /**
+   * Override the default `User-Agent: evlog/<version>` header. Pass `false` or
+   * an empty string to suppress it entirely (e.g. when the underlying transport
+   * forbids overriding `User-Agent`).
+   */
+  userAgent?: string | false
+  /**
+   * When set, sends `X-Evlog-Source: <source>` so the receiving system can
+   * distinguish evlog traffic from other clients. Typically the adapter name
+   * (`axiom`, `datadog`, ...) or `client` for browser-originated drains.
+   */
+  source?: string
+}
+
+function hasHeader(headers: Record<string, string>, target: string): boolean {
+  const lower = target.toLowerCase()
+  for (const key of Object.keys(headers)) {
+    if (key.toLowerCase() === lower) return true
+  }
+  return false
+}
+
+/**
+ * Returns a copy of `headers` with evlog identity headers injected when
+ * absent. Caller-provided values always win.
+ *
+ * @internal Exposed for tests. Use {@link httpPost} from drains.
+ */
+export function withEvlogIdentityHeaders(
+  headers: Record<string, string>,
+  { userAgent, source }: { userAgent?: string | false; source?: string } = {},
+): Record<string, string> {
+  const out = { ...headers }
+  if (userAgent !== false && !hasHeader(out, 'user-agent')) {
+    const ua = typeof userAgent === 'string' && userAgent.length > 0 ? userAgent : EVLOG_USER_AGENT
+    out['User-Agent'] = ua
+  }
+  if (source && !hasHeader(out, 'x-evlog-source')) {
+    out['X-Evlog-Source'] = source
+  }
+  return out
 }
 
 function isRetryable(error: unknown): boolean {
@@ -34,8 +87,9 @@ function isRetryable(error: unknown): boolean {
  * POST a body with timeout + retry. Throws label-prefixed errors with a
  * truncated response body. Safe to call from any drain `send()`.
  */
-export async function httpPost({ url, headers, body, timeout, label, retries = 2 }: HttpPostOptions): Promise<void> {
+export async function httpPost({ url, headers, body, timeout, label, retries = 2, userAgent, source }: HttpPostOptions): Promise<void> {
   const normalizedRetries = Number.isFinite(retries) && retries >= 0 ? Math.floor(retries) : 2
+  const finalHeaders = withEvlogIdentityHeaders(headers, { userAgent, source })
 
   let lastError: Error | undefined
 
@@ -46,7 +100,7 @@ export async function httpPost({ url, headers, body, timeout, label, retries = 2
     try {
       const response = await fetch(url, {
         method: 'POST',
-        headers,
+        headers: finalHeaders,
         body,
         signal: controller.signal,
       })

@@ -206,5 +206,6 @@ export async function sendBatchToPostHogEvents(events: WideEvent[], config: Post
     timeout: config.timeout ?? 5000,
     retries: config.retries,
     label: 'PostHog',
+    source: 'posthog',
   })
 }

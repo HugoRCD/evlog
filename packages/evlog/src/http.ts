@@ -68,7 +68,7 @@ export function createHttpDrain(config: HttpDrainConfig): (batch: DrainContext[]
     try {
       const response = await fetch(endpoint, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...customHeaders },
+        headers: { 'Content-Type': 'application/json', 'X-Evlog-Source': 'client', ...customHeaders },
         body,
         signal: controller.signal,
         keepalive: true,
