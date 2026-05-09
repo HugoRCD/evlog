@@ -55,3 +55,32 @@
   margin-top: 0;
   margin-bottom: 0;
 }
+
+@layer base {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--ui-border) transparent;
+  }
+
+  *::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  *::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  *::-webkit-scrollbar-thumb {
+    background: var(--ui-border);
+    border-radius: 999px;
+  }
+
+  *::-webkit-scrollbar-thumb:hover {
+    background: var(--ui-border-accented);
+  }
+
+  *::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}

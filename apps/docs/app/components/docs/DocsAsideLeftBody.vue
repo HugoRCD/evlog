@@ -19,7 +19,7 @@ const { sidebarNavigation } = useSubNavigation()
     <ul class="flex flex-col">
       <DocsAsideLeftBodyItem
         v-for="(item, index) in sidebarNavigation"
-        :key="index"
+        :key="(item as ContentNavigationItem).path ?? `root-${index}`"
         :item="(item as ContentNavigationItem)"
         :level="0"
       />
