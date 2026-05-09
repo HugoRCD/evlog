@@ -1,5 +1,158 @@
 # evlog
 
+## 2.17.0
+
+### Minor Changes
+
+- [#332](https://github.com/HugoRCD/evlog/pull/332) [`ced6eda`](https://github.com/HugoRCD/evlog/commit/ced6eda8677719bde4c629d8d3692ed7b88a0616) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Tag every drain request with identity headers so receivers can recognize evlog traffic and the originating adapter without parsing the body.
+  - `User-Agent: evlog/<version>` on Node / server runtimes (browsers strip `User-Agent`).
+  - `X-Evlog-Source: <adapter>` (`axiom`, `datadog`, `otlp`, `posthog`, `sentry`, `better-stack`, `hyperdx`, `client` for browser-originated drains).
+  - `httpPost` gains `userAgent?: string | false` and `source?: string` options so custom drains can override or suppress the headers.
+  - New exports from `evlog/toolkit`: `EVLOG_VERSION`, `EVLOG_USER_AGENT`, `withEvlogIdentityHeaders`.
+
+  Adapters built with `defineHttpDrain()` automatically forward their `name` as `source`. The legacy `sendBatchTo*` helpers in `evlog/axiom`, `evlog/datadog`, `evlog/otlp`, `evlog/posthog`, `evlog/sentry`, and `evlog/better-stack` pass it explicitly.
+
+- [#325](https://github.com/HugoRCD/evlog/pull/325) [`6b06511`](https://github.com/HugoRCD/evlog/commit/6b06511504e6650b6691c41536d82c503fdbd65e) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add typed error and audit catalogs as a thin layer over `createError` and `defineAuditAction`. Three new primitives, zero runtime registration, zero init step. The whole feature is opt-in: existing `createError({ code, ... })` and `defineAuditAction(...)` call sites keep working unchanged, with no migration required.
+
+  ```ts
+  import { defineErrorCatalog, defineAuditCatalog } from "evlog";
+
+  export const billingErrors = defineErrorCatalog("billing", {
+    PAYMENT_DECLINED: {
+      status: 402,
+      message: "Card declined",
+      why: "...",
+      fix: "...",
+      link: "...",
+    },
+    INSUFFICIENT_FUNDS: {
+      status: 402,
+      message: ({
+        available,
+        required,
+      }: {
+        available: number;
+        required: number;
+      }) => `Insufficient funds: $${available}/$${required}`,
+    },
+  });
+
+  export const billingAudit = defineAuditCatalog("billing", {
+    INVOICE_REFUND: { target: "invoice" },
+    INVOICE_CREATE: { target: "invoice" },
+  });
+
+  throw billingErrors.PAYMENT_DECLINED({ cause: stripeErr });
+  throw billingErrors.INSUFFICIENT_FUNDS({ available: 5, required: 100 });
+  log.audit(billingAudit.INVOICE_REFUND({ actor, target: { id: "inv_889" } }));
+  ```
+
+  New API on the main `evlog` entrypoint:
+  - `defineError(code, options)` — single-error factory bound to a stable code. Accepts every existing `EvlogError` field plus a `tags` array and an `internal` defaults object. `message` can be either a string or a typed function whose params become required at the call site.
+  - `defineErrorCatalog(prefix, map)` — bundle a record of entries under a common prefix. The wire `code` for each entry is `${prefix}.${KEY}` (UPPER_SNAKE_CASE keys preserved). Catalog metadata (`_codes`, `_prefix`) exposed for introspection.
+  - `defineAuditCatalog(prefix, map)` — symmetric primitive for audit actions. Each entry produces a thin wrapper around `defineAuditAction` with the prefix and target type pre-applied. Exposes `_actions` and `_prefix`.
+
+  Type-level upgrade (opt-in, zero runtime cost):
+  - `RegisteredErrorCatalogs` and `RegisteredAuditCatalogs` interfaces (empty by default, augmentable via `declare module 'evlog'`).
+  - New `ErrorCode` and `AuditAction` types derived from registered catalogs.
+  - `ErrorOptions.code` and `ParsedError.code` now typed as `ErrorCode | (string & {})` — autocomplete on registered codes everywhere (`createError`, `parseError`, custom helpers) without breaking ad-hoc string usage.
+
+  Catalog factories return regular `EvlogError` instances and `AuditInput` objects respectively, so they integrate transparently with every existing evlog primitive (HTTP serializers, `parseError`, wide event capture, audit pipeline, drains). Catalogs are pure data — package them as npm libraries (one prefix per package), and the typing flows transitively to consumers via the published `.d.ts`. No global init, no proxy, no string-based dispatch helper.
+
+- [#332](https://github.com/HugoRCD/evlog/pull/332) [`ced6eda`](https://github.com/HugoRCD/evlog/commit/ced6eda8677719bde4c629d8d3692ed7b88a0616) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `readFsLogs()` and `tailFsLogs()` to `evlog/fs` so any external Node tool can replay or follow the local NDJSON drain without hooking into the running app. The `fs` adapter has been write-only until now; this closes the loop.
+
+  ```ts
+  import { readFsLogs, tailFsLogs } from "evlog/fs";
+
+  // Replay history (ends when the last file is read)
+  for await (const event of readFsLogs({
+    since: "2026-03-01",
+    level: "error",
+  })) {
+    // ...
+  }
+
+  // Live tail (yields existing then keeps yielding new ones — abort via AbortSignal)
+  const ac = new AbortController();
+  for await (const event of tailFsLogs({ signal: ac.signal })) {
+    // ...
+  }
+  ```
+
+  Both helpers accept `dir`, `since`, `until`, `level`, and a custom `filter` predicate. `tailFsLogs` additionally takes `pollIntervalMs`, `fromEnd`, and `signal`. Files outside the date window are skipped without being opened, malformed lines are silently skipped, and partial-write chunks are reassembled across polls.
+
+  Useful for post-incident triage scripts, Vitest e2e assertions on emitted wide events, replay-to-Axiom backfills, and `grep`-style CLIs that pipe filtered events into `jq`.
+
+- [#332](https://github.com/HugoRCD/evlog/pull/332) [`ced6eda`](https://github.com/HugoRCD/evlog/commit/ced6eda8677719bde4c629d8d3692ed7b88a0616) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add a local Server-Sent Events stream server so any consumer (browser tab, CLI, devtool) can subscribe to live wide events without going through your app's API surface. The server runs in the same Node process on its own ephemeral port; the URL is printed at startup and written to `.evlog/stream.url` for tools to discover.
+
+  Strict opt-in for the framework integrations: the Nuxt module and the Next.js `defineStreamedInstrumentation` helper only boot the server when `stream: true` (or a config object) is passed. `startStreamServer()` itself is always an explicit call — call it from any standalone script or framework wiring that doesn't have a built-in evlog config.
+
+  **Nuxt**
+
+  ```ts [nuxt.config.ts]
+  evlog: {
+    stream: true,
+    // or: stream: { port: 4317, token: process.env.EVLOG_STREAM_TOKEN }
+  }
+  ```
+
+  **Next.js** — new helper in `evlog/next/stream`:
+
+  ```ts [lib/evlog.ts]
+  import { defineStreamedInstrumentation } from "evlog/next/stream";
+
+  export const { register, onRequestError } = defineStreamedInstrumentation({
+    service: "my-app",
+    stream: true,
+  });
+  ```
+
+  **Standalone / any framework**:
+
+  ```ts
+  import { startStreamServer } from "evlog/stream";
+
+  const server = await startStreamServer();
+  // pass server.drain wherever you compose your evlog drain
+  ```
+
+  The Nuxt module also registers a tiny `/api/_evlog/stream-info` route that returns the mini-server URL so a same-origin browser tab can discover the ephemeral port.
+
+  API surface in `evlog/stream`:
+  - `startStreamServer(options): Promise<StreamServer>` — `node:http` server bound to `127.0.0.1` by default, idempotent, lazy-imports Node-only modules so `evlog/stream` stays edge-friendly for the in-process primitive.
+  - `StreamServerOptions`: `port`, `host`, `token`, `heartbeatMs`, `buffer`, `banner`, `urlFileDir`.
+  - `StreamServer`: `{ url, port, drain, stream, close }`.
+  - Cleans up `.evlog/stream.url` and listeners on `close()` + `SIGINT` / `SIGTERM` / `exit`.
+
+  Wire format is a versioned JSON envelope `{ evlog: "1", type, data }` with frames `hello`, `replay`, `event`, and `ping`.
+
+  **Local-only by design.** The server is in-process — on serverless platforms (Vercel Functions, Cloudflare Workers, AWS Lambda) each invocation is isolated, so a subscriber would only see events from its own isolate. Use a real broker for cross-instance fan-out in those environments.
+
+### Patch Changes
+
+- [#335](https://github.com/HugoRCD/evlog/pull/335) [`fd830a0`](https://github.com/HugoRCD/evlog/commit/fd830a014924863342e5d627c0011123027fc048) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Documentation site restructured into 6 audience-driven categories: **Start → Learn → Integrate → Use Cases → Extend → Reference**. The npm-shipped `README.md` and a single JSDoc `@see` URL have been updated to point to the new locations.
+
+  Old documentation URLs continue to work via 301 redirects defined in `apps/docs/config/redirects.ts`. No public API changed.
+
+  If you bookmarked specific documentation pages, the most common moves are:
+  - `/getting-started/*` → `/start/*`
+  - `/logging/{simple-logging,wide-events,structured-errors}` → `/learn/*`
+  - `/logging/{ai-sdk,better-auth,audit,client-logging}/*` → `/use-cases/*`
+  - `/core-concepts/{lifecycle,sampling,typed-fields,redaction}` → `/learn/*`
+  - `/core-concepts/{configuration,performance,vite-plugin,best-practices}` → `/reference/*`
+  - `/frameworks/*` → `/integrate/frameworks/*`
+  - `/adapters/*` → `/integrate/adapters/*`
+  - `/build-on-top/*` → `/extend/*`
+  - `/enrichers/*` → `/use-cases/enrichers` or `/extend/custom-enrichers`
+
+- [#336](https://github.com/HugoRCD/evlog/pull/336) [`872f150`](https://github.com/HugoRCD/evlog/commit/872f1509884017b8289a958fd5b65582b3d6337d) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix wide event never being emitted when the client disconnects mid-request in `evlog/express` and `evlog/nestjs`.
+
+  Both integrations now listen for the underlying socket `close` event in addition to `finish`. When the client aborts before `res.end()` resolves, the wide event is still emitted (with the same `status`, `duration`, and accumulated context) and tagged with `connectionClosed: true` so disconnects are observable in your drain. The first event to fire wins, so successful responses are unaffected.
+
+  For background work that must outlive the HTTP response (resumable streams, post-response usage accounting), continue to use `req.log.fork('label', fn)` — once the request logger has been emitted it is sealed.
+
+  Closes [#305](https://github.com/HugoRCD/evlog/issues/305).
+
 ## 2.16.0
 
 ### Minor Changes
