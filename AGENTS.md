@@ -51,6 +51,17 @@ packages/evlog/            Main package
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
 
+### Changesets
+
+**Every user-facing change must include a changeset.** Before opening a PR for features, bug fixes, or breaking changes, run `pnpm changeset` and commit the generated `.changeset/*.md` file alongside the code.
+
+- **When to add a changeset:** any change that affects the public API, adds a feature, fixes a bug, or introduces a breaking change. If a consumer of evlog would notice the difference, it needs a changeset.
+- **When you can skip:** internal-only changes (CI config, docs typos, test refactors, devDeps bumps) that don't touch the published package.
+- **Bump type:** `patch` for fixes, `minor` for features, `major` for breaking changes.
+- **Description:** write from the consumer's perspective — what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
+
+A PR without a changeset for a user-facing change will not be merged.
+
 ### Commits & PR titles
 
 PR titles and commits follow [Conventional Commits](https://conventionalcommits.org). The CI source of truth is `.github/workflows/semantic-pull-request.yml` (lints PR titles via `amannn/action-semantic-pull-request`); `.github/pull_request_template.md` mirrors the same lists for contributors.
@@ -97,6 +108,7 @@ A task is complete when **all** of the following pass:
 4. New public APIs have JSDoc
 5. New exports are registered in `package.json` and `tsdown.config.ts`
 6. If adapter/enricher/integration: the corresponding SKILL.md was followed
+7. A changeset is included for any user-facing change (`pnpm changeset`)
 
 ## Boundaries
 
@@ -104,6 +116,7 @@ A task is complete when **all** of the following pass:
 - Run lint, typecheck, and test before reporting done
 - Follow existing code patterns — read neighboring files before writing new ones
 - Use the skills at `.agents/skills/` for new adapters, enrichers, or integrations
+- Add a changeset (`pnpm changeset`) for every user-facing change — features, bug fixes, breaking changes
 
 **Ask first:**
 - Adding new dependencies
@@ -115,6 +128,7 @@ A task is complete when **all** of the following pass:
 - Skip tests or lint to "fix later"
 - Add HTML comments in Vue `<template>` blocks
 - Modify `node_modules/` or generated files
+- Open a PR for a user-facing change without a changeset
 
 ## Git & PRs — local OK, remote stays with the maintainer
 
