@@ -22,29 +22,38 @@ jobs:
         id: lint_pr_title
         with:
           scopes: |
-            docs
-            playground
-            evlog
-            core
-            bench
-            nuxthub
-            deps
-            repo
-            nuxt
-            nitro
-            next
-            tanstack-start
-            hono
-            express
-            elysia
-            fastify
-            nestjs
-            react-router
-            sveltekit
-            workers
-            fs
             ai
+            axiom
+            bench
+            better-auth
+            better-stack
+            core
+            datadog
+            deps
+            docs
             dx
+            elysia
+            express
+            fastify
+            fs
+            hono
+            hyperdx
+            nestjs
+            next
+            nitro
+            nuxt
+            otlp
+            playground
+            posthog
+            react-router
+            release
+            repo
+            sentry
+            stream
+            sveltekit
+            tanstack-start
+            vite
+            workers
           types: |
             breaking
             feat
