@@ -14,7 +14,7 @@ const columns = computed<FooterColumn[]>(() => [
     children: [
       {
         label: 'Documentation',
-        to: '/getting-started/introduction'
+        to: '/start/introduction'
       },
       ...(justUseEvlogUrl.value
         ? [

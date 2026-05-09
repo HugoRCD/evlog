@@ -571,7 +571,7 @@ When enabled:
 3. `evlog:drain` hook is called with `source: 'client'`
 4. External services receive the log
 
-For a **framework-agnostic** batched HTTP drain (e.g. vanilla JS or custom endpoints), use `createHttpLogDrain` from [`evlog/http`](https://www.evlog.dev/adapters/http). The legacy import path `evlog/browser` is deprecated and will be removed in the next major release.
+For a **framework-agnostic** batched HTTP drain (e.g. vanilla JS or custom endpoints), use `createHttpLogDrain` from [`evlog/http`](https://www.evlog.dev/extend/drain-pipeline#http-drain-browser-to-server). The legacy import path `evlog/browser` is deprecated and will be removed in the next major release.
 
 ## Structured Errors
 
@@ -758,7 +758,7 @@ export default defineEventHandler(async (event) => {
 
 `AuditFields` is exported and merges with `BaseWideEvent` — augment it with `declare module` if you need extra typed fields. Audit events are always force-kept by tail sampling and get a deterministic `idempotencyKey` so retries are safe across drains.
 
-See [the Audit Logs guide](https://evlog.dev/logging/audit/overview) for compliance, GDPR, and recipe details.
+See [the Audit Logs guide](https://evlog.dev/use-cases/audit/overview) for compliance, GDPR, and recipe details.
 
 ## AI SDK Integration
 
@@ -865,7 +865,7 @@ NUXT_DATADOG_SITE=datadoghq.eu
 
 You can also use standard Datadog names: `DD_API_KEY` and `DD_SITE`.
 
-Wide events are sent with a short **`message` line** (method, path, level) and full context under the **`evlog`** attribute (facets like `@evlog.path`). See the [Datadog adapter docs](https://www.evlog.dev/adapters/datadog).
+Wide events are sent with a short **`message` line** (method, path, level) and full context under the **`evlog`** attribute (facets like `@evlog.path`). See the [Datadog adapter docs](https://www.evlog.dev/integrate/adapters/datadog).
 
 ### PostHog
 
@@ -955,7 +955,7 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-> See the [full documentation](https://evlog.hrcd.fr/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
+> See the [full documentation](https://www.evlog.dev/integrate/adapters/overview) for adapter configuration options, troubleshooting, and advanced patterns.
 
 ## Drain Pipeline
 
@@ -1163,7 +1163,7 @@ The framework emits **one wide event per HTTP request** when the response finish
 | Express, Fastify, NestJS, SvelteKit, React Router, Elysia | Yes |
 | Next.js `withEvlog` | Yes |
 | Hono (`c.get('log')` only) | Not yet |
-| Nitro / Nuxt `useLogger(event)` | Not yet — use post-emit warnings; see [Wide events](https://evlog.dev/logging/wide-events) |
+| Nitro / Nuxt `useLogger(event)` | Not yet — use post-emit warnings; see [Wide events](https://evlog.dev/learn/wide-events) |
 
 ```typescript
 import { evlog, useLogger } from 'evlog/express'
@@ -1298,14 +1298,14 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
-| **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/frameworks/custom-integration)) |
+| **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
 
 ## Agent Skills
 
-evlog provides [Agent Skills](https://www.evlog.dev/getting-started/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
+evlog provides [Agent Skills](https://www.evlog.dev/reference/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.
 
 ### Installation
 

@@ -33,7 +33,7 @@ const frameworkRows = [
     { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 9 },
     { name: 'Elysia', icon: 'i-custom-elysia', tab: 10 },
     { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 11 },
-    { name: 'Vite', icon: 'i-custom-vite', link: '/core-concepts/vite-plugin' },
+    { name: 'Vite', icon: 'i-custom-vite', link: '/reference/vite-plugin' },
   ],
 ]
 </script>
