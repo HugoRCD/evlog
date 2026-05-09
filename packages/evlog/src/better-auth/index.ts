@@ -26,18 +26,21 @@ export interface BetterAuthInstance {
  */
 export type HeadersInput = Headers | Record<string, string | string[] | undefined>
 
-function toHeaders(input: HeadersInput): Headers {
-  if (input instanceof Headers) return input
-  const headers = new Headers()
-  for (const key in input) {
-    const value = input[key]
-    if (value === undefined) continue
-    if (Array.isArray(value)) {
-      for (const item of value) headers.append(key, item)
-    } else {
-      headers.set(key, value)
-    }
-  }
+ function toHeaders(input: HeadersInput): Headers {
+   if (input instanceof Headers) return input
+   const headers = new Headers()
+-  for (const key in input) {
+-    const value = input[key]
++  for (const [key, value] of Object.entries(input)) {
+     if (value === undefined) continue
+     if (Array.isArray(value)) {
+       for (const item of value) headers.append(key, item)
+     } else {
+       headers.set(key, value)
+     }
+   }
+   return headers
+ }
   return headers
 }
 
