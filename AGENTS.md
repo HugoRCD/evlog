@@ -136,9 +136,9 @@ A task is complete when **all** of the following pass:
 - Modify `node_modules/` or generated files
 - Open a PR for a user-facing change without a changeset
 
-## Git & PRs — local OK, remote stays with the maintainer
+## Git & PRs — local always OK, remote on explicit instruction
 
-The line is **the network**: anything that stays on the local clone is fine; anything that touches the remote or GitHub waits for the maintainer.
+Default: anything that stays on the local clone is fine, anything that touches the remote or GitHub requires an explicit instruction in the task at hand. Never act on assumption — if the maintainer didn't ask for a push or a PR, prepare the branch locally and stop there.
 
 **OK (local-only, no ask needed):**
 - `git branch`, `git checkout`, `git switch`, `git checkout -b` — create and move between branches freely
@@ -146,18 +146,18 @@ The line is **the network**: anything that stays on the local clone is fine; any
 - `git status`, `git diff`, `git log`, `git show`, `git stash`, `git restore`, `git reset` (local only) — read and rearrange the working tree
 - `gh pr view`, `gh pr list`, `gh pr diff`, `gh issue view`, `gh run view` — read-only GitHub queries
 
-**Never (no exceptions, even if it would be "helpful"):**
-- `git push`, `git push --force`, `git push --tags` — pushing to the remote is the maintainer's call, every time
-- `gh pr create`, `gh pr edit`, `gh pr merge`, `gh pr close`, `gh pr review`, `gh issue create`, `gh issue edit`, `gh release create`, or any other GitHub mutation
-- Write a PR description, PR body, changelog entry, or release note draft — even as a "suggestion in chat"
-- Write a commit message **body** (a single Conventional Commits subject line is fine; no multi-paragraph rationale unless explicitly asked)
+**OK when the maintainer explicitly asks (in the current task):**
+- `git push -u origin <feature-branch>` — push a feature branch you just prepared
+- `git push --force-with-lease origin <feature-branch>` — only on a feature branch you authored, after a clean rebase
+- `gh pr create --base main --head <feature-branch>` — open a PR
+- Write a **PR title** (Conventional Commits, see above) and a **PR body** — keep the body factual, mirror the changeset, reference the issue (`Closes #X`); no marketing copy
+
+**Never (no exceptions, even when asked):**
+- Push directly to `main` (or `master`) — protected, always goes through a PR
+- `git push --force` without `--with-lease`, `git push --tags`
+- `gh pr merge`, `gh pr close`, `gh pr review`, `gh issue create`, `gh issue edit`, `gh release create`
+- Write a changelog entry, release note, or commit message **body** with multi-paragraph narrative — the changeset is the source of truth; commit subjects stay single-line, PR bodies stay short
 - Add a `Co-authored-by`, `Signed-off-by`, "Generated with…", "🤖", or any signature/attribution that names an agent, model, or tool — **the work is the maintainer's, full stop**
-
-**The only narrative artifacts you may produce, and only when explicitly asked:**
-- A **PR title** (Conventional Commits, see above)
-- A **branch name**
-
-If a task seems to need a push, a PR, or a longer-form description, stop and ask. Don't pre-draft "in case it helps".
 
 ## When Stuck
 - Unsure about architecture → read the relevant SKILL.md or ask
