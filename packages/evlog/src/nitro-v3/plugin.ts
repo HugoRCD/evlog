@@ -5,7 +5,7 @@ import { parseURL } from 'ufo'
 import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } from '../logger'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
-import { resolveEvlogConfigForNitroPlugin } from '../shared/nitroConfigBridge'
+import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shared/nitroConfigBridge'
 import type { EnrichContext, RequestLogger, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -150,6 +150,7 @@ async function callEnrichAndDrain(
  * ```
  */
 export default definePlugin(async (nitroApp) => {
+  setActiveNitroRuntime('v3')
   const evlogConfig = await resolveEvlogConfigForNitroPlugin()
 
   const redact = normalizeRedactConfig(evlogConfig?.redact as boolean | Record<string, unknown> | undefined)
