@@ -13,8 +13,11 @@
  *    modules; preferred in production Workers builds).
  * 2. Computed module IDs — `['a','b'].join('/')` passed to `import()` so emitted
  *    JS does not contain a static `import("a/b")`.
- * 3. Plugin resolution tries Nitro v3 first, then nitropack internal config (v2).
- * 4. Adapter resolution keeps historical order: nitropack runtime barrel, then v3.
+ * 3. Plugins call {@link setActiveNitroRuntime} so adapters never probe modules
+ *    from the other major version (e.g. Bun on Vercel triggers a package-cache
+ *    write when probing a missing dynamic import — see issue #312).
+ * 4. When the active runtime is unknown (standalone use outside a Nitro
+ *    plugin), the bridge falls back to the historical probe order.
  *
  * Not exported from `evlog/toolkit` — package-internal only.
  */
@@ -24,6 +27,29 @@ import type { NitroPluginEvlogConfig } from '../nitro'
 type EvlogConfig = NitroPluginEvlogConfig
 
 const EVLOG_NITRO_ENV = '__EVLOG_CONFIG' as const
+
+type NitroMajor = 'v2' | 'v3'
+
+let activeNitroRuntime: NitroMajor | undefined
+
+/**
+ * Declare the active Nitro major version so adapters never probe the other
+ * version's modules at runtime. The evlog Nitro plugins call this in their
+ * first synchronous statement.
+ *
+ * Bun's auto-install behavior writes to `node_modules/.cache` whenever a
+ * dynamic import targets a missing package, which crashes on Vercel's
+ * read-only function filesystem. Restricting probes to the runtime that is
+ * actually installed avoids that path entirely.
+ */
+export function setActiveNitroRuntime(version: NitroMajor): void {
+  activeNitroRuntime = version
+}
+
+/** @internal Reset the active runtime declaration. Used by tests only. */
+export function resetActiveNitroRuntime(): void {
+  activeNitroRuntime = undefined
+}
 
 type NitroRuntimeConfigModule = {
   useRuntimeConfig: () => Record<string, any>
@@ -102,11 +128,35 @@ function evlogSlice(config: Record<string, any>): EvlogConfig | undefined {
 
 /**
  * Options for evlog Nitro plugins (nitropack v2 and Nitro v3).
- * Env bridge first; then Nitro v3 `runtime-config`; then nitropack internal config.
+ *
+ * Lookup order:
+ * 1. `process.env.__EVLOG_CONFIG`
+ * 2. The active runtime declared by {@link setActiveNitroRuntime} — either
+ *    Nitro v3 `runtime-config` or nitropack internal config, never both.
+ * 3. When no active runtime has been declared (standalone use): probe v3 then
+ *    nitropack v2 as a best-effort fallback.
  */
 export async function resolveEvlogConfigForNitroPlugin(): Promise<EvlogConfig | undefined> {
   const fromEnv = readEvlogConfigFromNitroEnv()
   if (fromEnv !== undefined) return fromEnv
+
+  if (activeNitroRuntime === 'v3') {
+    const v3 = await getNitroV3Runtime()
+    if (v3) {
+      const slice = evlogSlice(v3.useRuntimeConfig())
+      if (slice !== undefined) return slice
+    }
+    return undefined
+  }
+
+  if (activeNitroRuntime === 'v2') {
+    const internal = await getNitropackInternalRuntimeConfig()
+    if (internal) {
+      const slice = evlogSlice(internal.useRuntimeConfig())
+      if (slice !== undefined) return slice
+    }
+    return undefined
+  }
 
   const v3 = await getNitroV3Runtime()
   if (v3) {
@@ -124,9 +174,24 @@ export async function resolveEvlogConfigForNitroPlugin(): Promise<EvlogConfig | 
 }
 
 /**
- * Full `useRuntimeConfig()` object for drain adapters (nitropack first, then v3).
+ * Full `useRuntimeConfig()` object for drain adapters.
+ *
+ * Honors {@link setActiveNitroRuntime}: when a Nitro plugin has declared its
+ * version, only that version's runtime module is probed. When no version has
+ * been declared (standalone use outside Nitro), falls back to the historical
+ * order: nitropack v2 first, then Nitro v3.
  */
 export async function getNitroRuntimeConfigRecord(): Promise<Record<string, any> | undefined> {
+  if (activeNitroRuntime === 'v3') {
+    const v3 = await getNitroV3Runtime()
+    return v3 ? v3.useRuntimeConfig() : undefined
+  }
+
+  if (activeNitroRuntime === 'v2') {
+    const nitropack = await getNitropackRuntime()
+    return nitropack ? nitropack.useRuntimeConfig() : undefined
+  }
+
   const nitropack = await getNitropackRuntime()
   if (nitropack) return nitropack.useRuntimeConfig()
 
