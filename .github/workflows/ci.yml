@@ -10,7 +10,7 @@ on:
   workflow_dispatch:
 
 jobs:
-  prepare:
+  lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -25,40 +25,10 @@ jobs:
         run: pnpm install --frozen-lockfile
       - name: Prepare
         run: pnpm run dev:prepare
-      - name: Build package
-        run: pnpm run build:package
-      - name: Upload built dist
-        uses: actions/upload-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
-          if-no-files-found: error
-          retention-days: 1
-
-  lint:
-    needs: [prepare]
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.33.2
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Download built dist
-        uses: actions/download-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
       - name: Lint
         run: pnpm run lint
 
   typecheck:
-    needs: [prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -71,16 +41,12 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Download built dist
-        uses: actions/download-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
+      - name: Prepare
+        run: pnpm run dev:prepare
       - name: Typecheck
         run: pnpm run typecheck
 
   test:
-    needs: [prepare]
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -97,17 +63,15 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Download built dist
-        uses: actions/download-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
       - name: Test (shard ${{ matrix.shard }}/4)
         working-directory: packages/evlog
         run: pnpm exec vitest run --shard=${{ matrix.shard }}/4
 
   coverage:
-    needs: [prepare]
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -120,18 +84,17 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Download built dist
-        uses: actions/download-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
       - name: Coverage
         run: pnpm --filter evlog run test:coverage
 
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [prepare, lint, typecheck, test, coverage]
+    needs: [lint, typecheck, test, coverage]
     steps:
       - uses: actions/checkout@v6
         with:
@@ -145,10 +108,9 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Download built dist
-        uses: actions/download-artifact@v4
-        with:
-          name: evlog-dist
-          path: packages/evlog/dist
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
       - name: Publish
         run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub'
