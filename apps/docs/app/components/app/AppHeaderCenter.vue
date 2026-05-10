@@ -14,6 +14,12 @@ const landingItems = [
         to: '/start/introduction'
       },
       {
+        label: 'Why start with evlog',
+        icon: 'i-lucide-rocket',
+        description: 'The case for adopting evlog on day zero',
+        to: '/start/why-evlog'
+      },
+      {
         label: 'Installation',
         icon: 'i-lucide-download',
         description: 'Install evlog in your project',
