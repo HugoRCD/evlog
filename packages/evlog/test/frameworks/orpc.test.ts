@@ -5,6 +5,7 @@ import { RPCLink } from '@orpc/client/fetch'
 import { createORPCClient, isDefinedError } from '@orpc/client'
 import { initLogger } from '../../src/logger'
 import { defineErrorCatalog } from '../../src/catalog'
+import { createError } from '../../src/error'
 import {
   evlog,
   type EvlogOrpcContext,
@@ -62,6 +63,19 @@ function buildRouter(trace?: { sawLogger: boolean, fromUseLogger: boolean }) {
     }),
     pay: base.handler(() => {
       throw billingErrors.PAYMENT_DECLINED()
+    }),
+    payAdHoc: base.handler(() => {
+      throw createError({
+        message: 'Card declined',
+        code: 'PAYMENT_DECLINED',
+        status: 402,
+        why: 'Adhoc card declined',
+        fix: 'Adhoc fix',
+        link: 'https://example.com/adhoc',
+      })
+    }),
+    payNoCode: base.handler(() => {
+      throw createError({ message: 'Boom', status: 418, why: 'Just because' })
     }),
   }
 }
@@ -268,6 +282,36 @@ describe('evlog/orpc', () => {
       await waitForDrainCalls(drain)
       const event = findEventViaDrain(drain, e => e.path === '/rpc/fail')
       expect(event!.level).toBe('error')
+    })
+
+    it('bridges ad-hoc createError() the same way as a catalog factory', async () => {
+      const { drain } = createPipelineSpies()
+      const { client } = buildClient({ drain })
+
+      const result = await client.payAdHoc({}).catch(err => err)
+      expect(result.code).toBe('PAYMENT_DECLINED')
+      expect(result.status).toBe(402)
+      expect(result.message).toBe('Card declined')
+      expect(result.data).toEqual({
+        why: 'Adhoc card declined',
+        fix: 'Adhoc fix',
+        link: 'https://example.com/adhoc',
+      })
+
+      await waitForDrainCalls(drain)
+      const event = findEventViaDrain(drain, e => e.path === '/rpc/payAdHoc')
+      expect(event!.level).toBe('error')
+      expect(event!.status).toBe(402)
+    })
+
+    it('falls back to EVLOG_ERROR code when createError() omits code', async () => {
+      const { client } = buildClient()
+
+      const result = await client.payNoCode({}).catch(err => err)
+      expect(result.code).toBe('EVLOG_ERROR')
+      expect(result.status).toBe(418)
+      expect(result.message).toBe('Boom')
+      expect(result.data).toEqual({ why: 'Just because' })
     })
   })
 
