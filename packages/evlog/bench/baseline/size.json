@@ -3,12 +3,12 @@
     {
       "entry": "framework/nitro",
       "raw": 20269,
-      "gzip": 7335
+      "gzip": 7332
     },
     {
       "entry": "framework/next",
       "raw": 15035,
-      "gzip": 5328
+      "gzip": 5329
     },
     {
       "entry": "framework/ai",
@@ -23,7 +23,7 @@
     {
       "entry": "adapter/datadog",
       "raw": 6370,
-      "gzip": 2541
+      "gzip": 2544
     },
     {
       "entry": "adapter/sentry",
@@ -38,12 +38,12 @@
     {
       "entry": "core (index)",
       "raw": 6458,
-      "gzip": 2206
+      "gzip": 2208
     },
     {
       "entry": "adapter/otlp",
       "raw": 6047,
-      "gzip": 2189
+      "gzip": 2191
     },
     {
       "entry": "enrichers",
@@ -53,7 +53,7 @@
     {
       "entry": "framework/sveltekit",
       "raw": 5120,
-      "gzip": 1628
+      "gzip": 1629
     },
     {
       "entry": "utils",
@@ -68,12 +68,12 @@
     {
       "entry": "adapter/axiom",
       "raw": 4010,
-      "gzip": 1538
+      "gzip": 1540
     },
     {
       "entry": "adapter/posthog",
       "raw": 4497,
-      "gzip": 1505
+      "gzip": 1507
     },
     {
       "entry": "pipeline",
@@ -88,17 +88,17 @@
     {
       "entry": "workers",
       "raw": 3226,
-      "gzip": 1336
+      "gzip": 1337
     },
     {
       "entry": "adapter/better-stack",
       "raw": 3294,
-      "gzip": 1287
+      "gzip": 1290
     },
     {
       "entry": "framework/nestjs",
-      "raw": 3032,
-      "gzip": 1284
+      "raw": 3073,
+      "gzip": 1289
     },
     {
       "entry": "http",
@@ -108,27 +108,27 @@
     {
       "entry": "adapter/hyperdx",
       "raw": 2930,
-      "gzip": 1205
+      "gzip": 1206
     },
     {
       "entry": "framework/fastify",
       "raw": 2399,
-      "gzip": 1040
+      "gzip": 1042
     },
     {
       "entry": "toolkit",
       "raw": 2221,
-      "gzip": 781
+      "gzip": 783
     },
     {
       "entry": "framework/express",
-      "raw": 1378,
-      "gzip": 727
+      "raw": 1427,
+      "gzip": 739
     },
     {
       "entry": "framework/hono",
       "raw": 1146,
-      "gzip": 615
+      "gzip": 616
     },
     {
       "entry": "browser",
@@ -138,7 +138,7 @@
     {
       "entry": "logger",
       "raw": 430,
-      "gzip": 229
+      "gzip": 225
     },
     {
       "entry": "client",
@@ -152,7 +152,7 @@
     }
   ],
   "total": {
-    "raw": 155177,
-    "gzip": 55634
+    "raw": 155267,
+    "gzip": 55667
   }
 }
