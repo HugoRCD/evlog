@@ -1,5 +1,7 @@
-import type { Context, MiddlewareOptions, MiddlewareResult } from '@orpc/server'
+import { ORPCError, type Context, type MiddlewareOptions, type MiddlewareResult } from '@orpc/server'
 import type { RequestLogger } from '../types'
+import { EvlogError } from '../error'
+import { parseError } from '../runtime/utils/parseError'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
@@ -135,10 +137,24 @@ export function withEvlog<THandler extends OrpcFetchHandlerLike>(
   })
 }
 
+function isEvlogError(error: unknown): error is EvlogError {
+  return error instanceof EvlogError || (error instanceof Error && error.name === 'EvlogError')
+}
+
 /**
- * Procedure-level middleware. Adds `operation` (the procedure path joined by
- * `.`) to the wide event, so consumers can group events by procedure without
- * parsing URLs.
+ * Procedure-level middleware. Three responsibilities:
+ *
+ * 1. Adds `operation` (the procedure path joined by `.`) to the wide event,
+ *    so consumers can group events by procedure without parsing URLs.
+ * 2. Captures errors thrown by the procedure on the wide event so the level
+ *    is promoted to `error`.
+ * 3. Converts {@link EvlogError} (from `createError()` / `defineErrorCatalog`)
+ *    into a structurally-equivalent {@link ORPCError} before re-throwing, so
+ *    the wire response carries the catalog `code`, status, message, and the
+ *    `why` / `fix` / `link` guidance under `data` — instead of being wrapped
+ *    as `INTERNAL_SERVER_ERROR` by oRPC's default handler. The catalog and
+ *    `createError()` stay the canonical evlog way to author errors;
+ *    `evlog/orpc` is the bridge.
  *
  * Requires `withEvlog()` to be wrapped around the handler — the request
  * logger flows in via `context.log`. Declare {@link EvlogOrpcContext} on
@@ -171,7 +187,24 @@ export function evlog<TContext extends Partial<EvlogOrpcContext> & Context = Evl
       return await next()
     } catch (error) {
       if (log) log.error(error as Error)
+      if (isEvlogError(error)) {
+        throw toOrpcError(error)
+      }
       throw error
     }
   }
+}
+
+function toOrpcError(error: EvlogError): ORPCError<string, Record<string, unknown>> {
+  const parsed = parseError(error)
+  const data: Record<string, unknown> = {}
+  if (parsed.why !== undefined) data.why = parsed.why
+  if (parsed.fix !== undefined) data.fix = parsed.fix
+  if (parsed.link !== undefined) data.link = parsed.link
+  return new ORPCError(parsed.code ?? 'EVLOG_ERROR', {
+    status: parsed.status,
+    message: parsed.message,
+    data,
+    cause: error,
+  })
 }

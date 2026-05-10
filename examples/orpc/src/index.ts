@@ -1,7 +1,7 @@
 import { os } from '@orpc/server'
 import { OpenAPIHandler } from '@orpc/openapi/fetch'
 import { z } from 'zod'
-import { initLogger, type EnrichContext } from 'evlog'
+import { defineErrorCatalog, initLogger, type EnrichContext } from 'evlog'
 import { evlog, useLogger, withEvlog, type EvlogOrpcContext } from 'evlog/orpc'
 import { createPostHogDrain } from 'evlog/posthog'
 import { testUI } from './ui'
@@ -11,44 +11,31 @@ initLogger({
   pretty: true,
 })
 
-const errors = {
+const exampleErrors = defineErrorCatalog('example', {
   PAYMENT_DECLINED: {
     status: 402,
     message: 'Payment declined',
-    data: z.object({
-      reason: z.enum(['insufficient_funds', 'card_expired', 'fraud_suspected']),
-      retryable: z.boolean(),
-      why: z.string(),
-      fix: z.string(),
-      link: z.url(),
-    }),
+    why: 'The card issuer rejected the charge for insufficient funds',
+    fix: 'Ask the user to use a different card or top up the existing one',
+    link: 'https://docs.example.com/payments/declined',
   },
   USER_NOT_FOUND: {
     status: 404,
     message: 'User not found',
-    data: z.object({
-      userId: z.string(),
-      why: z.string(),
-      fix: z.string(),
-      link: z.url(),
-    }),
+    why: 'No active user matches that id in the demo dataset',
+    fix: 'Try /users/42 or /users/43',
+    link: 'https://docs.example.com/api/users#not-found',
   },
   FORBIDDEN: {
     status: 403,
     message: 'Forbidden',
-    data: z.object({
-      requiredRole: z.string(),
-      why: z.string(),
-      fix: z.string(),
-      link: z.url(),
-    }),
+    why: 'The current user role does not allow destructive admin actions',
+    fix: 'Have a superadmin promote your role or call this endpoint with a superadmin API key',
+    link: 'https://docs.example.com/api/admin#permissions',
   },
-} as const
+})
 
-const base = os
-  .$context<EvlogOrpcContext>()
-  .errors(errors)
-  .use(evlog())
+const base = os.$context<EvlogOrpcContext>().use(evlog())
 
 type Role = 'guest' | 'admin' | 'superadmin'
 
@@ -94,17 +81,10 @@ const usersRouter = {
   get: base
     .route({ method: 'GET', path: '/users/{id}', summary: 'Get user with input schema + masking' })
     .input(z.object({ id: z.string() }))
-    .handler(({ input, errors }) => {
+    .handler(({ input }) => {
       const user = findUser(input.id)
       if (!user) {
-        throw errors.USER_NOT_FOUND({
-          data: {
-            userId: input.id,
-            why: 'No active user matches that id in the demo dataset',
-            fix: 'Try /users/42 or /users/43',
-            link: 'https://docs.example.com/api/users#not-found',
-          },
-        })
+        throw exampleErrors.USER_NOT_FOUND()
       }
       const orders = [{ id: 'order_1', total: 4999 }, { id: 'order_2', total: 1299 }]
       const log = useLogger()
@@ -120,36 +100,23 @@ const usersRouter = {
 
 const paymentsRouter = {
   charge: base
-    .route({ method: 'POST', path: '/payments/charge', summary: 'Typed PAYMENT_DECLINED error' })
+    .route({ method: 'POST', path: '/payments/charge', summary: 'createError() catalog → ORPCError bridge' })
     .input(z.object({ amount: z.number().int().positive() }))
-    .handler(({ input, context, errors }) => {
+    .handler(({ input, context }) => {
       context.log.set({ payment: { amount: input.amount } })
-      throw errors.PAYMENT_DECLINED({
-        data: {
-          reason: 'insufficient_funds',
-          retryable: true,
-          why: 'The card issuer rejected the charge for insufficient funds',
-          fix: 'Ask the user to use a different card or top up the existing one',
-          link: 'https://docs.example.com/payments/declined',
-        },
+      throw exampleErrors.PAYMENT_DECLINED({
+        internal: { paymentRef: 'demo_pay_X', attemptedAmount: input.amount },
       })
     }),
 }
 
 const adminRouter = {
   delete: authed
-    .route({ method: 'DELETE', path: '/admin/danger/{id}', summary: 'Auth middleware injects context.user' })
+    .route({ method: 'DELETE', path: '/admin/danger/{id}', summary: 'Auth middleware + role check + catalog error' })
     .input(z.object({ id: z.string() }))
-    .handler(({ input, context, errors }) => {
+    .handler(({ input, context }) => {
       if (context.user.role !== 'superadmin') {
-        throw errors.FORBIDDEN({
-          data: {
-            requiredRole: 'superadmin',
-            why: `Role '${context.user.role}' cannot perform destructive admin actions`,
-            fix: 'Have a superadmin promote your role or call this endpoint with a superadmin API key',
-            link: 'https://docs.example.com/api/admin#permissions',
-          },
-        })
+        throw exampleErrors.FORBIDDEN()
       }
       context.log.set({ deletedId: input.id, by: context.user.id })
       return { ok: true }

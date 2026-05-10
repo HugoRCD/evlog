@@ -2,8 +2,9 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { os } from '@orpc/server'
 import { RPCHandler } from '@orpc/server/fetch'
 import { RPCLink } from '@orpc/client/fetch'
-import { createORPCClient } from '@orpc/client'
+import { createORPCClient, isDefinedError } from '@orpc/client'
 import { initLogger } from '../../src/logger'
+import { defineErrorCatalog } from '../../src/catalog'
 import {
   evlog,
   type EvlogOrpcContext,
@@ -24,6 +25,16 @@ import {
 interface ProcedureContext extends EvlogOrpcContext {
   pingTrace?: { sawLogger: boolean, fromUseLogger: boolean }
 }
+
+const billingErrors = defineErrorCatalog('billing', {
+  PAYMENT_DECLINED: {
+    status: 402,
+    message: 'Payment declined',
+    why: 'Issuer declined the charge',
+    fix: 'Try a different card',
+    link: 'https://docs.example.com/payments/declined',
+  },
+})
 
 function buildRouter(trace?: { sawLogger: boolean, fromUseLogger: boolean }) {
   const base = os.$context<ProcedureContext>().use(evlog())
@@ -48,6 +59,9 @@ function buildRouter(trace?: { sawLogger: boolean, fromUseLogger: boolean }) {
     profile: base.handler(({ context }) => {
       context.log.set({ user: { id: 'u-1', plan: 'pro' } })
       return { id: 'u-1' as const, plan: 'pro' as const }
+    }),
+    pay: base.handler(() => {
+      throw billingErrors.PAYMENT_DECLINED()
     }),
   }
 }
@@ -215,6 +229,45 @@ describe('evlog/orpc', () => {
         }),
       ).resolves.toBeDefined()
       expect(next).toHaveBeenCalledOnce()
+    })
+  })
+
+  describe('evlog error catalog → ORPCError bridge', () => {
+    it('preserves catalog code, status, message, and why/fix/link in data', async () => {
+      const { drain } = createPipelineSpies()
+      const { client } = buildClient({ drain })
+
+      const result = await client.pay({}).catch(err => err)
+      expect(result).toBeInstanceOf(Error)
+      expect(isDefinedError(result)).toBe(false)
+      expect(result.code).toBe('billing.PAYMENT_DECLINED')
+      expect(result.status).toBe(402)
+      expect(result.message).toBe('Payment declined')
+      expect(result.data).toEqual({
+        why: 'Issuer declined the charge',
+        fix: 'Try a different card',
+        link: 'https://docs.example.com/payments/declined',
+      })
+
+      await waitForDrainCalls(drain)
+      const event = findEventViaDrain(drain, e => e.path === '/rpc/pay')
+      expect(event).toBeDefined()
+      expect(event!.level).toBe('error')
+      expect(event!.status).toBe(402)
+      expect(event!.error).toMatchObject({ code: 'billing.PAYMENT_DECLINED' })
+    })
+
+    it('does not wrap non-EvlogError throws (lets oRPC handle them)', async () => {
+      const { drain } = createPipelineSpies()
+      const { client } = buildClient({ drain })
+
+      const result = await client.fail({}).catch(err => err)
+      // Generic Error becomes oRPC's INTERNAL_SERVER_ERROR
+      expect(result.code).toBe('INTERNAL_SERVER_ERROR')
+
+      await waitForDrainCalls(drain)
+      const event = findEventViaDrain(drain, e => e.path === '/rpc/fail')
+      expect(event!.level).toBe('error')
     })
   })
 
