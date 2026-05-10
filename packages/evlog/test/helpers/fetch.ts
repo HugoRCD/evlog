@@ -30,7 +30,12 @@ export function getFetchCall(
     throw new Error(`getFetchCall: no call at index ${index} (saw ${spy.mock.calls.length})`)
   }
   const [rawUrl, init = {}] = call
-  return { url: typeof rawUrl === 'string' ? rawUrl : rawUrl.toString(), init }
+  const url = typeof rawUrl === 'string'
+    ? rawUrl
+    : rawUrl instanceof Request
+      ? rawUrl.url
+      : rawUrl.toString()
+  return { url, init }
 }
 
 /**

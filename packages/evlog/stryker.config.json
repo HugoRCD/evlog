@@ -1,6 +1,7 @@
 {
   "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
   "_": "Mutation testing for evlog core. Slow (~minutes) — do not run in default CI; see .github/workflows/mutation.yml for the weekly cron.",
+  "_mutate_scope": "Only core modules listed in `mutate` are mutated (logger, pipeline, redact, error, catalog, audit, utils, shared/{routes,headers,middleware}). Framework integrations (express, hono, fastify, ...) and adapters (axiom, posthog, ...) are intentionally excluded — Stryker would re-boot each framework's runtime per mutant which is prohibitively expensive, and those modules are already covered by integration tests in test/frameworks/ and test/adapters/.",
   "packageManager": "pnpm",
   "testRunner": "vitest",
   "vitest": {

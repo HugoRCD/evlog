@@ -22,8 +22,10 @@ describe.sequential('Nitro v3 Server with evlog', () => {
   let nitro: Awaited<ReturnType<typeof createNitro>>
   let devServer: ReturnType<typeof createDevServer>
   let server: Awaited<ReturnType<ReturnType<typeof createDevServer>['listen']>>
+  let prevEvlogTestLog: string | undefined
 
   beforeAll(async () => {
+    prevEvlogTestLog = process.env.EVLOG_TEST_LOG
     process.env.EVLOG_TEST_LOG = '1'
     nitro = await createNitro({
       dev: true,
@@ -40,7 +42,8 @@ describe.sequential('Nitro v3 Server with evlog', () => {
   })
 
   afterAll(async () => {
-    delete process.env.EVLOG_TEST_LOG
+    if (prevEvlogTestLog === undefined) delete process.env.EVLOG_TEST_LOG
+    else process.env.EVLOG_TEST_LOG = prevEvlogTestLog
     await devServer?.close()
     await nitro?.close()
   })

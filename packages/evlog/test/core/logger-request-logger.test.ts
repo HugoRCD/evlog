@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from '../../src/error'
 import { createRequestLogger, initLogger } from '../../src/logger'
+import { withFakeTimers } from '../helpers/timers'
 
 describe('createRequestLogger', () => {
   let infoSpy: ReturnType<typeof vi.spyOn>
@@ -382,18 +383,15 @@ describe('createRequestLogger', () => {
     expect(output).toContain('"level":"error"')
   })
 
-  it('includes duration in emitted event', () => {
-    vi.useFakeTimers()
-    try {
+  it('includes duration in emitted event', async () => {
+    await withFakeTimers(() => {
       const logger = createRequestLogger({})
       vi.advanceTimersByTime(50)
       logger.emit()
 
       const [[output]] = infoSpy.mock.calls
       expect(output).toMatch(/"duration":"[0-9]+ms"/)
-    } finally {
-      vi.useRealTimers()
-    }
+    })
   })
 
   it('allows overrides on emit()', () => {

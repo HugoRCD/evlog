@@ -1,6 +1,8 @@
 import type { Reporter, TestModule } from 'vitest/node'
 
-const SLOW_TEST_BUDGET_MS = Number(process.env.EVLOG_SLOW_TEST_BUDGET_MS ?? 500)
+const DEFAULT_BUDGET_MS = 500
+const parsed = Number(process.env.EVLOG_SLOW_TEST_BUDGET_MS)
+const SLOW_TEST_BUDGET_MS = Number.isFinite(parsed) && parsed > 0 ? parsed : DEFAULT_BUDGET_MS
 
 interface SlowEntry {
   fullName: string

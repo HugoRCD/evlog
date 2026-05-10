@@ -58,7 +58,7 @@ the real-runtime version catches integration regressions.
 
 Layout mirrors `src/`. Pick the folder that matches the source area you're touching.
 
-```
+```text
 test/
   helpers/                 # always import from here, never re-roll
     events.ts              # makeEvent / makeWideEvent / makeContext / makeError
@@ -139,12 +139,26 @@ Decision tree:
 ## Running
 
 ```bash
-pnpm test                                  # full suite
-pnpm exec vitest run test/redact.test.ts   # one file
-pnpm test:coverage                         # with v8 coverage + thresholds
-pnpm test:e2e                              # real network (skipped without API keys)
-pnpm run mutate                            # Stryker (slow; weekly cron in CI)
+pnpm test                                       # full suite
+pnpm exec vitest run test/core/redact.test.ts   # one file
+pnpm test:coverage                              # with v8 coverage + thresholds
+pnpm test:e2e                                   # real network (skipped without API keys)
+pnpm run mutate                                 # Stryker (slow; weekly cron in CI)
 ```
+
+## Coverage thresholds
+
+The thresholds in [`packages/evlog/vitest.config.ts`](../vitest.config.ts) (`statements` / `branches` / `functions` / `lines`) are kept ~3 points below the measured baseline so a real regression fails CI but flaky-but-fast metrics don't generate false alarms.
+
+Bumping them up:
+
+1. Run `pnpm test:coverage` locally and capture the new percentages.
+2. Edit `vitest.config.ts` to set the new floor (still ~3 points below the new baseline).
+3. The PR must include the coverage output in the description so a reviewer can sanity-check before merging.
+
+Lowering them is a smell — every drop needs a comment explaining why and an issue / follow-up to restore.
+
+`vitest.config.ts` is the single source of truth for the numbers; this section is only the policy.
 
 ## Slow test budget
 

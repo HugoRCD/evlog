@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from '../../src/error'
 import { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../../src/logger'
+import { withFakeTimers } from '../helpers/timers'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -664,7 +665,7 @@ describe('tail sampling', () => {
     expect(infoSpy).toHaveBeenCalledTimes(0)
   })
 
-  it('keeps logs when duration meets threshold', () => {
+  it('keeps logs when duration meets threshold', async () => {
     initLogger({
       pretty: false,
       sampling: {
@@ -673,16 +674,13 @@ describe('tail sampling', () => {
       },
     })
 
-    vi.useFakeTimers()
-    try {
+    await withFakeTimers(() => {
       const logger = createRequestLogger({ method: 'GET', path: '/test' })
       vi.advanceTimersByTime(60)
       logger.emit()
 
       expect(infoSpy).toHaveBeenCalledTimes(1)
-    } finally {
-      vi.useRealTimers()
-    }
+    })
   })
 
   it('does not keep logs when duration is below threshold', () => {

@@ -1,24 +1,15 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { DrainContext } from '../../src/types'
 import { createHttpDrain, createHttpLogDrain } from '../../src/http'
+import { makeContext, makeEvent } from '../helpers/events'
+import { mockFetch } from '../helpers/fetch'
 
-function createTestContext(id: number): DrainContext {
-  return {
-    event: {
-      timestamp: '2024-01-01T00:00:00.000Z',
-      level: 'info',
-      service: 'test',
-      environment: 'test',
-      id,
-    },
-  }
-}
+const createTestContext = (id: number) => makeContext(makeEvent(id))
 
 describe('createHttpDrain', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+    mockFetch()
   })
 
   afterEach(() => {

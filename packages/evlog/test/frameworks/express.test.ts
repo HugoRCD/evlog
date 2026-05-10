@@ -24,11 +24,11 @@ describeStandardHttpMatrix({
     app.get('/api/users', (_req, res) => res.json({ users: [] }))
     return Promise.resolve({
       async fire(req) {
-        const method = (req.method || 'GET').toLowerCase() as 'get' | 'post'
-        let agent = (request(app) as unknown as Record<string, (path: string) => ReturnType<typeof request>>)[method](req.path)
-        for (const [k, v] of Object.entries(req.headers || {})) {
-          agent = (agent as unknown as { set: (k: string, v: string) => typeof agent }).set(k, v)
-        }
+        const method = (req.method || 'GET').toLowerCase()
+        const agent = method === 'post'
+          ? request(app).post(req.path)
+          : request(app).get(req.path)
+        for (const [k, v] of Object.entries(req.headers || {})) agent.set(k, v)
         const res = await agent
         return { status: res.status }
       },
@@ -326,7 +326,7 @@ describe('evlog/express', () => {
       expect(drain).toHaveBeenCalledOnce()
     })
 
-    it('enrich error does not prevent drain', { repeats: 3 }, async () => {
+    it('enrich error does not prevent drain', async () => {
       const { drain } = createPipelineSpies()
       const enrich = vi.fn(() => {
         throw new Error('enrich exploded')

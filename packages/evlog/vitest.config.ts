@@ -43,7 +43,8 @@ export default defineConfig({
       // Thresholds set ~3 points below the measured baseline (Statements
       // 85.9%, Branches 79.5%, Functions 87.3%, Lines 87.8%) so a regression
       // fails CI without false alarms on flaky-but-fast metrics. Bump again
-      // when adding meaningful coverage to a hot module.
+      // when adding meaningful coverage to a hot module — see the bump policy
+      // in `test/README.md` § "Coverage thresholds".
       thresholds: {
         statements: 83,
         branches: 76,

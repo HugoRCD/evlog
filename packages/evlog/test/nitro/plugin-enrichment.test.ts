@@ -161,10 +161,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     // Should not throw
     await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
 
-    // Wait for drain promise to settle
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    expect(consoleSpy).toHaveBeenCalledWith('[evlog] drain failed:', expect.any(Error))
+    await vi.waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('[evlog] drain failed:', expect.any(Error)))
     consoleSpy.mockRestore()
   })
 

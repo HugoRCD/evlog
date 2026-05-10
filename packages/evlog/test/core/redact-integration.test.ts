@@ -66,7 +66,7 @@ describe('initLogger + redact integration', () => {
   })
 
   it('redacts before drain callback', async () => {
-    const drainedEvents: Record<string, unknown>[] = []
+    const drain = vi.fn()
 
     initLogger({
       pretty: false,
@@ -74,9 +74,7 @@ describe('initLogger + redact integration', () => {
       redact: {
         paths: ['user.email'],
       },
-      drain: (ctx) => {
-        drainedEvents.push({ ...ctx.event })
-      },
+      drain,
     })
 
     const logger = createLogger({
@@ -85,10 +83,8 @@ describe('initLogger + redact integration', () => {
     })
     logger.emit()
 
-    await new Promise(resolve => setTimeout(resolve, 10))
-
-    expect(drainedEvents).toHaveLength(1)
-    const drained = drainedEvents[0]!
+    await vi.waitFor(() => expect(drain).toHaveBeenCalledTimes(1))
+    const drained = drain.mock.calls[0]![0].event
     expect((drained.user as Record<string, unknown>).email).toBe('[REDACTED]')
     expect(drained.note).toBe('Card ****1111')
   })
