@@ -14,11 +14,21 @@ const routes: Route[] = [
   { method: 'DELETE', path: '/admin/danger/x-42', description: 'Auth middleware injects context.user → FORBIDDEN' },
 ]
 
+function escapeAttr(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/"/g, '&quot;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+}
+
 export function testUI(): string {
   const routeButtons = routes.map(r => `
     <button
-      onclick="sendRequest('${r.method}', '${r.path}'${r.body ? `, ${JSON.stringify(r.body)}` : ''})"
-      class="route"
+      class="route js-route"
+      data-method="${escapeAttr(r.method)}"
+      data-path="${escapeAttr(r.path)}"
+      ${r.body ? `data-body="${escapeAttr(r.body)}"` : ''}
     >
       <span class="method method-${r.method.toLowerCase()}">${r.method}</span>
       <span class="path">${r.path}</span>
@@ -246,6 +256,15 @@ export function testUI(): string {
         el.body.textContent = 'Network error: ' + err.message
       }
     }
+
+    document.querySelectorAll('.js-route').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const method = btn.dataset.method
+        const path = btn.dataset.path
+        const body = btn.dataset.body
+        sendRequest(method, path, body)
+      })
+    })
   </script>
 </body>
 </html>`
