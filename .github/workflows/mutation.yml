@@ -1,0 +1,38 @@
+name: mutation
+
+on:
+  schedule:
+    # Run every Monday at 04:00 UTC. Stryker is slow (~5-15min on CI),
+    # so we keep it out of the default PR pipeline.
+    - cron: '0 4 * * 1'
+  workflow_dispatch:
+
+jobs:
+  mutate:
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
+      - name: Mutate
+        run: pnpm --filter evlog run mutate
+      - name: Upload Stryker report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: stryker-report
+          path: packages/evlog/reports/mutation
+          if-no-files-found: ignore
+          retention-days: 14

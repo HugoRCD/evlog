@@ -26,6 +26,11 @@ logs
 # Benchmarks
 bench/results.json
 
+# Test artefacts (coverage report, Stryker mutation report, Stryker scratch)
+coverage/
+reports/
+.stryker-tmp/
+
 # Turbo
 .turbo
 

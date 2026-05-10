@@ -3,6 +3,7 @@ import type { DrainContext } from '../../../../src/types'
 
 export default definePlugin((nitroApp) => {
   nitroApp.hooks.hook('evlog:drain', (ctx: DrainContext) => {
+    if (process.env.EVLOG_TEST_LOG !== '1') return
     console.log('[TEST:DRAIN]', JSON.stringify({
       eventLevel: ctx.event.level,
       hasHeaders: !!ctx.headers,
@@ -13,7 +14,7 @@ export default definePlugin((nitroApp) => {
       requestPath: ctx.request?.path,
       requestMethod: ctx.request?.method,
       hasEnrichment: 'customEnrichment' in ctx.event,
-      enrichmentValue: (ctx.event as any).customEnrichment,
+      enrichmentValue: (ctx.event as { customEnrichment?: unknown }).customEnrichment,
     }))
   })
 })

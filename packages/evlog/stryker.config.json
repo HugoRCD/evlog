@@ -1,0 +1,32 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_": "Mutation testing for evlog core. Slow (~minutes) — do not run in default CI; see .github/workflows/mutation.yml for the weekly cron.",
+  "_mutate_scope": "Only core modules listed in `mutate` are mutated (logger, pipeline, redact, error, catalog, audit, utils, shared/{routes,headers,middleware}). Framework integrations (express, hono, fastify, ...) and adapters (axiom, posthog, ...) are intentionally excluded — Stryker would re-boot each framework's runtime per mutant which is prohibitively expensive, and those modules are already covered by integration tests in test/frameworks/ and test/adapters/.",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+  "reporters": ["html", "clear-text", "progress"],
+  "concurrency": 4,
+  "timeoutMS": 30000,
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+  "mutate": [
+    "src/logger.ts",
+    "src/pipeline.ts",
+    "src/redact.ts",
+    "src/error.ts",
+    "src/catalog.ts",
+    "src/audit.ts",
+    "src/utils.ts",
+    "src/shared/routes.ts",
+    "src/shared/headers.ts",
+    "src/shared/middleware.ts"
+  ],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always"
+}

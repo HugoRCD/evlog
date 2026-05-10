@@ -86,28 +86,33 @@ MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) foll
 
 ## Testing
 
-Tests live in `packages/evlog/test/` and use Vitest.
+Tests live in `packages/evlog/test/` (mirrors `src/`) and use Vitest. **Read `packages/evlog/test/README.md` before writing or editing tests** — it has the file layout, the framework runtime fidelity matrix, and the helper decision table.
 
 ```bash
-pnpm run test                                          # full suite (mocked, fast)
+pnpm run test                                          # full suite (~1.5s)
 pnpm --filter evlog exec vitest run test/path/to/file  # single test file
-pnpm run test:e2e                                      # adapters vs real endpoints
+pnpm test:coverage                                     # with thresholds; :open for HTML
+pnpm api:snapshot                                      # diff public API surface; :update to accept
+pnpm mutate                                            # Stryker (slow; weekly cron in CI)
+pnpm test:e2e                                          # adapters vs real endpoints
 ```
 
-Write tests for all new functionality. Run tests before considering any task done.
-
-End-to-end adapter tests (`packages/evlog/test/e2e/*.e2e.ts`) hit the real Axiom/PostHog/Sentry/Better Stack APIs. They skip automatically when env vars aren't set. They run on a daily cron + on push to `main` + on PR labelled `e2e` (`.github/workflows/e2e.yml`).
+Rules:
+1. Every change has a matching test. Bug fixes require a *failing* regression test before the fix.
+2. Always import real source helpers, never re-implement them in tests.
+3. Use the helpers in `test/helpers/` (drain spies, fake timers, fetch mock, framework matrix). The full decision table is in `test/README.md`.
+4. Framework tests must use the framework's real request driver (supertest, `app.inject`, `app.handle`, `Test.createTestingModule`, ...) — see the fidelity matrix in `test/README.md`.
 
 ## Definition of Done
 
 A task is complete when **all** of the following pass:
 
-1. `pnpm run lint` exits 0
-2. `pnpm run typecheck` exits 0
-3. `pnpm run test` exits 0
+1. `pnpm run lint`, `pnpm run typecheck`, `pnpm run test` exit 0
+2. The change has a matching test (bug fix → failing regression first, then the fix)
+3. `pnpm test:coverage` stays above the configured thresholds; if you changed a public export, the `pnpm api:snapshot` diff was reviewed
 4. New public APIs have JSDoc
-5. New exports are registered in `package.json` and `tsdown.config.ts`
-6. If adapter/enricher/integration: the corresponding SKILL.md was followed
+5. New exports are registered in `package.json#exports`, `package.json#typesVersions`, and `tsdown.config.ts`
+6. If adapter/enricher/integration: the matching `.agents/skills/create-*/SKILL.md` was followed
 7. A changeset is included for any user-facing change (`pnpm changeset`)
 
 ## Boundaries
@@ -126,6 +131,7 @@ A task is complete when **all** of the following pass:
 **Never:**
 - Commit secrets, `.env` files, or API keys
 - Skip tests or lint to "fix later"
+- Ship a feature, bug fix, or refactor without a matching test
 - Add HTML comments in Vue `<template>` blocks
 - Modify `node_modules/` or generated files
 - Open a PR for a user-facing change without a changeset

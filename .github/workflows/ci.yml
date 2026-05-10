@@ -9,25 +9,10 @@ on:
       - main
   workflow_dispatch:
 
-jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-        with:
-          version: 10.33.2
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
-      - name: Build package
-        run: pnpm run build:package
+permissions:
+  contents: read
 
+jobs:
   lint:
     runs-on: ubuntu-latest
     steps:
@@ -66,6 +51,10 @@ jobs:
 
   test:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2, 3, 4]
     steps:
       - uses: actions/checkout@v6
       - uses: pnpm/action-setup@v6
@@ -81,13 +70,37 @@ jobs:
         run: pnpm run dev:prepare
       - name: Build package
         run: pnpm run build:package
-      - name: Test
-        run: pnpm run test
+      - name: Test (shard ${{ matrix.shard }}/4)
+        working-directory: packages/evlog
+        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 10.33.2
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Prepare
+        run: pnpm run dev:prepare
+      - name: Build package
+        run: pnpm run build:package
+      - name: Coverage
+        run: pnpm --filter evlog run test:coverage
 
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [build, lint, typecheck, test]
+    needs: [lint, typecheck, test, coverage]
+    permissions:
+      contents: read
+      pull-requests: write
     steps:
       - uses: actions/checkout@v6
         with:
