@@ -1,5 +1,22 @@
 # evlog
 
+## 2.18.0
+
+### Minor Changes
+
+- [#339](https://github.com/HugoRCD/evlog/pull/339) [`31b6b31`](https://github.com/HugoRCD/evlog/commit/31b6b310b1f0a9d0919888d49664927ad0f2f146) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `log.setLevel(level)` to promote the wide event level explicitly without touching the `error` context.
+
+  `log.error(err)` populates `error: { name, message, stack, ... }` from the thrown value. When you want to mark the event as `error` (or `warn`) while controlling the `error` field yourself — typed error codes, no stack, custom shapes — call `log.setLevel('error' | 'warn' | 'info' | 'debug')` and pair it with `log.set({ error: { code: 'PAYMENT_DECLINED' } })`. The explicit level wins over the level computed from `.error()` / `.warn()`.
+
+  ```ts
+  log.setLevel("error");
+  log.set({
+    error: { code: "PAYMENT_DECLINED", reason: "insufficient_funds" },
+  });
+  ```
+
+  Closes [#301](https://github.com/HugoRCD/evlog/issues/301).
+
 ## 2.17.0
 
 ### Minor Changes
