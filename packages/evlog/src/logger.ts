@@ -568,6 +568,7 @@ export { _log as log }
 const noopAudit = Object.assign(() => {}, { deny: () => {} }) as AuditMethod
 const noopLogger: AuditableLogger = {
   set() {},
+  setLevel() {},
   error() {},
   info() {},
   warn() {},
@@ -619,6 +620,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
   const context: Record<string, unknown> = { ...initialContext }
   let hasError = false
   let hasWarn = false
+  let manualLevel: LogLevel | undefined
   let emitted = false
 
   function addLog(level: 'info' | 'warn', message: string): void {
@@ -659,6 +661,14 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         return
       }
       mergeInto(context, data as Record<string, unknown>)
+    },
+
+    setLevel(level: LogLevel): void {
+      if (emitted) {
+        warnPostEmit('log.setLevel()', `Level dropped: ${level}.`)
+        return
+      }
+      manualLevel = level
     },
 
     error(error: Error | string, errorContext?: FieldContext<T>): void {
@@ -731,7 +741,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       }
 
       const durationMs = Date.now() - startTime
-      const level: LogLevel = hasError ? 'error' : hasWarn ? 'warn' : 'info'
+      const level: LogLevel = manualLevel ?? (hasError ? 'error' : hasWarn ? 'warn' : 'info')
 
       let forceKeep = false
       if (overrides?._forceKeep) {

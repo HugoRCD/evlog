@@ -14,6 +14,7 @@ describe('evlogStorage', () => {
   it('stores and retrieves a logger inside a run context', () => {
     const mockLogger = {
       set: () => {},
+      setLevel: () => {},
       error: () => {},
       info: () => {},
       warn: () => {},
@@ -27,8 +28,8 @@ describe('evlogStorage', () => {
   })
 
   it('isolates stores across concurrent runs', async () => {
-    const logger1 = { id: 1, set: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
-    const logger2 = { id: 2, set: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
+    const logger1 = { id: 1, set: () => {}, setLevel: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
+    const logger2 = { id: 2, set: () => {}, setLevel: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
 
     const results: number[] = []
 
@@ -60,6 +61,7 @@ describe('useLogger', () => {
   it('returns the logger from the current AsyncLocalStorage context', () => {
     const mockLogger = {
       set: () => {},
+      setLevel: () => {},
       error: () => {},
       info: () => {},
       warn: () => {},

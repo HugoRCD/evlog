@@ -605,6 +605,27 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
   set: (context: FieldContext<T>) => void
 
   /**
+   * Set the wide event level explicitly without touching the error context.
+   *
+   * Use this when you want to mark an event as `error` or `warn` while
+   * controlling the `error` field yourself (e.g. a typed error code without a
+   * stack), or when neither `.error()` nor `.warn()` fits the situation.
+   *
+   * The explicit level wins over the default computation derived from
+   * `.error()` / `.warn()` calls, so a later `.error()` will *not* override
+   * the manual level.
+   *
+   * No-ops with a console warning after the wide event has been emitted.
+   *
+   * @example
+   * ```ts
+   * log.setLevel('error')
+   * log.set({ error: { code: 'INVALID_INPUT' } })
+   * ```
+   */
+  setLevel: (level: LogLevel) => void
+
+  /**
    * Log an error and capture its details.
    *
    * No-ops with a console warning after the wide event has been emitted.
