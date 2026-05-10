@@ -6,9 +6,12 @@ interface Route {
 }
 
 const routes: Route[] = [
-  { method: 'GET', path: '/health', description: 'health procedure with log.set()' },
-  { method: 'GET', path: '/users/42', description: 'getUser procedure with context accumulation + email masking' },
-  { method: 'POST', path: '/checkout', description: 'checkout procedure throws createError() with status/why/fix/link', body: '{}' },
+  { method: 'GET', path: '/health', description: 'Basic procedure with log.set()' },
+  { method: 'GET', path: '/users', description: 'Nested router (users.list)' },
+  { method: 'GET', path: '/users/42', description: 'Input schema + context accumulation + email mask' },
+  { method: 'GET', path: '/users/unknown', description: 'Typed USER_NOT_FOUND error' },
+  { method: 'POST', path: '/payments/charge', description: 'Typed PAYMENT_DECLINED error', body: '{"amount":1999}' },
+  { method: 'DELETE', path: '/admin/danger/x-42', description: 'Auth middleware injects context.user → FORBIDDEN' },
 ]
 
 export function testUI(): string {
