@@ -32,6 +32,7 @@ const frameworkRows = [
     { name: 'Hono', icon: 'i-simple-icons-hono', tab: 8 },
     { name: 'Fastify', icon: 'i-simple-icons-fastify', tab: 9 },
     { name: 'Elysia', icon: 'i-custom-elysia', tab: 10 },
+    { name: 'oRPC', icon: 'i-lucide-network', tab: 13 },
     { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 11 },
     { name: 'Vite', icon: 'i-custom-vite', link: '/reference/vite-plugin' },
   ],
@@ -152,6 +153,9 @@ const frameworkRows = [
       </div>
       <div v-show="activeTab === 12" class="landing-code">
         <slot name="bun" />
+      </div>
+      <div v-show="activeTab === 13" class="landing-code">
+        <slot name="orpc" />
       </div>
     </Motion>
   </section>
