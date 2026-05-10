@@ -170,7 +170,7 @@ describe('createHttpDrain', () => {
 describe('createHttpLogDrain', () => {
   beforeEach(() => {
     vi.useFakeTimers()
-    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+    mockFetch()
   })
 
   afterEach(() => {

@@ -167,7 +167,12 @@ Set `EVLOG_SLOW_TEST_BUDGET_MS=300 CI=1 pnpm test` to surface tests above 300ms
 
 ## CI structure
 
-`prepare` builds once and uploads `packages/evlog/dist/` as an artifact.
-`lint`, `typecheck`, `test` (sharded x4), `coverage`, and `publish` all
-download the artifact instead of rebuilding. The mutation testing workflow
-(`.github/workflows/mutation.yml`) runs Stryker on a weekly cron + on demand.
+`.github/workflows/ci.yml` runs five independent jobs in parallel on every PR:
+
+- `lint` — `pnpm run dev:prepare` + `pnpm run lint`
+- `typecheck` — `pnpm run dev:prepare` + `pnpm run typecheck`
+- `test` — `pnpm run dev:prepare` + `pnpm run build:package`, then `vitest run --shard=N/4` across a 4-way matrix
+- `coverage` — `pnpm run dev:prepare` + `pnpm run build:package` + `pnpm --filter evlog run test:coverage` (enforces the thresholds in `vitest.config.ts`)
+- `publish` — needs all of the above; runs `pkg-pr-new publish` for evlog + nuxthub on PR / main / manual dispatch
+
+Mutation testing is intentionally separate: `.github/workflows/mutation.yml` runs Stryker on a weekly Monday cron and on `workflow_dispatch` (Stryker is too slow to gate every PR).
