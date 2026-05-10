@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics, telemetry integration, cost estimation, embedding metadata).
+description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics, telemetry integration, cost estimation, embedding metadata).
 license: MIT
 metadata:
   author: HugoRCD
@@ -642,6 +642,61 @@ export const middleware: Route.MiddlewareFunction[] = [
     },
   }),
 ]
+```
+
+### oRPC
+
+```typescript
+import { os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+import { initLogger } from 'evlog'
+import { evlog, withEvlog, type EvlogOrpcContext } from 'evlog/orpc'
+
+initLogger({ env: { service: 'my-rpc' } })
+
+const base = os.$context<EvlogOrpcContext>().use(evlog())
+
+const router = {
+  ping: base.handler(({ context }) => {
+    context.log.set({ pinged: true })
+    return { ok: true }
+  }),
+}
+
+const handler = withEvlog(new RPCHandler(router))
+
+export default async function fetch(request: Request) {
+  const { matched, response } = await handler.handle(request, { prefix: '/rpc' })
+  return matched ? response : new Response('Not Found', { status: 404 })
+}
+```
+
+`withEvlog()` wraps the handler so each matched request emits one wide event; `os.use(evlog())` exposes `context.log` on every procedure that descends from `base` and tags the wide event with `operation` (the procedure path joined with `.`).
+
+Use `useLogger()` to access the logger from utility modules:
+
+```typescript
+import { useLogger } from 'evlog/orpc'
+
+async function chargeCard(amount: number) {
+  const log = useLogger()
+  log.set({ payment: { amount } })
+}
+```
+
+Full pipeline with drain, enrich, and tail sampling:
+
+```typescript
+import { createAxiomDrain } from 'evlog/axiom'
+
+const handler = withEvlog(new RPCHandler(router), {
+  include: ['/rpc/**'],
+  drain: createAxiomDrain(),
+  enrich: (ctx) => { ctx.event.region = process.env.FLY_REGION },
+  keep: (ctx) => {
+    if (ctx.duration && ctx.duration > 2000) ctx.shouldKeep = true
+  },
+})
 ```
 
 ### Cloudflare Workers
