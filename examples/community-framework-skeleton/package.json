@@ -1,6 +1,6 @@
 {
   "name": "evlog-community-framework-skeleton",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Reference skeleton for a community evlog framework integration built on defineFrameworkIntegration.",
   "private": true,
   "type": "module",
