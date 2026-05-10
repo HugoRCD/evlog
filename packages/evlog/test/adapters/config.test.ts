@@ -4,9 +4,7 @@ vi.mock('../../src/shared/nitroConfigBridge', () => ({
   getNitroRuntimeConfigRecord: vi.fn(),
 }))
 
-// eslint-disable-next-line import/first -- Must import after vi.mock
 import { resolveAdapterConfig } from '../../src/adapters/_config'
-// eslint-disable-next-line import/first -- Must import after vi.mock
 import { getNitroRuntimeConfigRecord } from '../../src/shared/nitroConfigBridge'
 
 interface TestAdapterConfig {

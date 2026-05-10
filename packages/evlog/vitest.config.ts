@@ -1,16 +1,55 @@
 import codspeedPlugin from '@codspeed/vitest-plugin'
+import swc from 'unplugin-swc'
 import { defineConfig } from 'vitest/config'
 
 export default defineConfig({
-  plugins: [codspeedPlugin()],
+  // NestJS uses legacy TypeScript decorators with reflect-metadata. Vite 8's
+  // default oxc transformer doesn't yet emit decorator metadata, and vitest's
+  // esbuild fallback can't either. SWC is the only option that preserves both
+  // decorator semantics and metadata for `Test.createTestingModule()` to work.
+  // `unplugin-swc` only transforms files matching the SWC parser config; other
+  // tests are unaffected (their AST doesn't change shape).
+  plugins: [
+    swc.vite({
+      jsc: {
+        target: 'es2022',
+        parser: { syntax: 'typescript', decorators: true },
+        transform: { legacyDecorator: true, decoratorMetadata: true },
+      },
+    }),
+    codspeedPlugin(),
+  ],
   test: {
     hookTimeout: 30_000,
     include: ['test/**/*.test.ts'],
     environment: 'node',
+    // Flag tests slower than this for triage; lift the suite out of the
+    // "everything is fast, no signal" zone. Custom reporter in
+    // test/helpers/slowReporter.ts logs offenders > 500ms.
+    slowTestThreshold: 250,
+    reporters: process.env.CI
+      ? ['default', './test/helpers/slowReporter.ts']
+      : ['default'],
     coverage: {
       provider: 'v8',
       include: ['src/**/*.ts'],
-      exclude: ['src/nuxt/**', 'src/nitro/**', 'src/runtime/**'],
+      // Exclude framework runtimes whose source is loaded by the framework's
+      // own module resolution (Nuxt, Nitro v2/v3, ambient runtime helpers) —
+      // their code path does run, but v8 instrumentation never sees it
+      // because it's loaded outside Vitest's worker. Behavior is verified by
+      // integration tests (`test/nitro-v3/nitro-v3.test.ts`,
+      // `test/nitro-plugin*.test.ts`, etc.).
+      exclude: ['src/nuxt/**', 'src/nitro/**', 'src/nitro-v3/**', 'src/runtime/**'],
+      // Thresholds set ~3 points below the measured baseline (Statements
+      // 85.9%, Branches 79.5%, Functions 87.3%, Lines 87.8%) so a regression
+      // fails CI without false alarms on flaky-but-fast metrics. Bump again
+      // when adding meaningful coverage to a hot module.
+      thresholds: {
+        statements: 83,
+        branches: 76,
+        functions: 84,
+        lines: 85,
+      },
     },
     benchmark: {
       include: ['bench/**/*.bench.ts'],

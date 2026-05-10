@@ -1,0 +1,31 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "_": "Mutation testing for evlog core. Slow (~minutes) — do not run in default CI; see .github/workflows/mutation.yml for the weekly cron.",
+  "packageManager": "pnpm",
+  "testRunner": "vitest",
+  "vitest": {
+    "configFile": "vitest.config.ts"
+  },
+  "reporters": ["html", "clear-text", "progress"],
+  "concurrency": 4,
+  "timeoutMS": 30000,
+  "thresholds": {
+    "high": 80,
+    "low": 60,
+    "break": 50
+  },
+  "mutate": [
+    "src/logger.ts",
+    "src/pipeline.ts",
+    "src/redact.ts",
+    "src/error.ts",
+    "src/catalog.ts",
+    "src/audit.ts",
+    "src/utils.ts",
+    "src/shared/routes.ts",
+    "src/shared/headers.ts",
+    "src/shared/middleware.ts"
+  ],
+  "tempDirName": ".stryker-tmp",
+  "cleanTempDir": "always"
+}

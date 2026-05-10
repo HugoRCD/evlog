@@ -24,6 +24,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
   let server: Awaited<ReturnType<ReturnType<typeof createDevServer>['listen']>>
 
   beforeAll(async () => {
+    process.env.EVLOG_TEST_LOG = '1'
     nitro = await createNitro({
       dev: true,
       rootDir,
@@ -39,6 +40,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
   })
 
   afterAll(async () => {
+    delete process.env.EVLOG_TEST_LOG
     await devServer?.close()
     await nitro?.close()
   })
@@ -114,8 +116,8 @@ describe.sequential('Nitro v3 Server with evlog', () => {
 
       // Verify error logs include wide context
       expect(mockFn).toHaveBeenCalled()
-      const logOutput = logs.join('\\n')
-      
+      const logOutput = logs.join('\n')
+
       expect(logOutput).toMatch(/ERROR.*GET \/throws.*402/)
       expect(logOutput).toContain('user:')
       expect(logOutput).toContain('id=42')
