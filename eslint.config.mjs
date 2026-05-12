@@ -15,6 +15,8 @@ export default createConfig(
       // bloats short utility classes. We keep `blocks` and `switches` set to
       // `'never'` (real readability win) but drop the class rule.
       'padded-blocks': ['error', { blocks: 'never', switches: 'never' }],
+      'require-await': 'off',
+      '@typescript-eslint/require-await': 'off',
     },
   },
   {

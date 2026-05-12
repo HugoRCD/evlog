@@ -1,0 +1,17 @@
+{
+  "name": "evlog-eval-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "tsx index.ts"
+  },
+  "dependencies": {
+    "@evlog/eval": "workspace:*",
+    "ai": "^6.0.168",
+    "evlog": "workspace:*",
+    "zod": "^3.24.3"
+  },
+  "devDependencies": {
+    "tsx": "^4.19.4"
+  }
+}

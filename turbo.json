@@ -36,6 +36,12 @@
       "dependsOn": ["^dev:prepare"],
       "outputs": ["dist/**", ".output/**", ".nuxt/**"]
     },
+    "start": {
+      "cache": false,
+      "env": [
+        "AI_GATEWAY_API_KEY"
+      ]
+    },
     "lint": {
       "dependsOn": ["^build"]
     },

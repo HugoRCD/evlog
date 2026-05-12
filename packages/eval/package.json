@@ -1,0 +1,82 @@
+{
+  "name": "@evlog/eval",
+  "version": "0.1.0",
+  "description": "AI eval runner for evlog — dataset + task + scorers, drained as structured wide events",
+  "author": "HugoRCD <contact@hrcd.fr>",
+  "homepage": "https://evlog.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HugoRCD/evlog.git",
+    "directory": "packages/eval"
+  },
+  "bugs": {
+    "url": "https://github.com/HugoRCD/evlog/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./drains": {
+      "types": "./dist/drains/index.d.mts",
+      "import": "./dist/drains/index.mjs",
+      "default": "./dist/drains/index.mjs"
+    },
+    "./ai-scorers": {
+      "types": "./dist/scorers/ai.d.mts",
+      "import": "./dist/scorers/ai.mjs",
+      "default": "./dist/scorers/ai.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "evlog",
+    "eval",
+    "evals",
+    "llm",
+    "ai",
+    "evaluation",
+    "typescript",
+    "wide-events",
+    "braintrust",
+    "langsmith"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "typecheck": "tsc --noEmit",
+    "lint": "eslint src test",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@ai-sdk/provider": "^3.0.8",
+    "@hrcd/eslint-config": "^3.0.3",
+    "ai": "^6.0.168",
+    "eslint": "^9.39.4",
+    "evlog": "workspace:*",
+    "tsdown": "^0.12.5",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
+  },
+  "peerDependencies": {
+    "evlog": "^2.17.0",
+    "ai": "^6.0.0"
+  },
+  "peerDependenciesMeta": {
+    "ai": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
