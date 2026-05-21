@@ -18,3 +18,16 @@ allowBuilds:
 overrides:
   minimark: 0.2.0
   '@nuxtjs/mcp-toolkit': ^0.16.1
+
+minimumReleaseAge: 2880
+
+minimumReleaseAgeExclude:
+  # Nuxt
+  - '@nuxt/*'
+  - '@nuxtjs/*'
+  - 'nuxt'
+  - 'nuxt-*'
+  # Vercel
+  - '@vercel/*'
+  - '@ai-sdk/*'
+  - 'ai'
