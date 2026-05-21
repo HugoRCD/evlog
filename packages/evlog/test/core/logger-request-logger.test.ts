@@ -383,6 +383,57 @@ describe('createRequestLogger', () => {
     expect(output).toContain('"level":"error"')
   })
 
+  it('setLevel() promotes the wide event level without touching the error context', () => {
+    const errorSpy = vi.spyOn(console, 'error')
+    const logger = createRequestLogger({})
+
+    logger.setLevel('error')
+    logger.set({ error: { code: 'INVALID_INPUT' } })
+    const result = logger.emit()
+
+    expect(result).toHaveProperty('level', 'error')
+    expect(result).toHaveProperty('error', { code: 'INVALID_INPUT' })
+    expect(errorSpy).toHaveBeenCalled()
+  })
+
+  it('setLevel("warn") emits at warn level without writing to requestLogs', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({})
+
+    logger.setLevel('warn')
+    const result = logger.emit()
+
+    expect(result).toHaveProperty('level', 'warn')
+    expect((result as Record<string, unknown>).requestLogs).toBeUndefined()
+    expect(warnSpy).toHaveBeenCalled()
+  })
+
+  it('setLevel() wins over the level computed from .error()/.warn()', () => {
+    const errorSpy = vi.spyOn(console, 'error')
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    const logger = createRequestLogger({})
+    logger.error(new Error('Boom'))
+    logger.setLevel('warn')
+    const result = logger.emit()
+
+    expect(result).toHaveProperty('level', 'warn')
+    expect(warnSpy).toHaveBeenCalled()
+    expect(errorSpy).not.toHaveBeenCalled()
+  })
+
+  it('setLevel() warns and is a no-op after emit()', () => {
+    const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({})
+
+    logger.emit()
+    consoleWarnSpy.mockClear()
+    logger.setLevel('error')
+
+    expect(consoleWarnSpy).toHaveBeenCalledTimes(1)
+    expect(consoleWarnSpy.mock.calls[0]?.[0]).toContain('log.setLevel() called after the wide event was emitted')
+  })
+
   it('includes duration in emitted event', async () => {
     await withFakeTimers(() => {
       const logger = createRequestLogger({})

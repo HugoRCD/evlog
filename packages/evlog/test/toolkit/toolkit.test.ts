@@ -391,6 +391,7 @@ describe('plugin runner', () => {
     ])
     const logger = {
       set: () => {},
+      setLevel: () => {},
       error: () => {},
       info: () => {},
       warn: () => {},
