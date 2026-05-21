@@ -9,14 +9,16 @@
  *
  * **Strategy**
  *
- * 1. `process.env.__EVLOG_CONFIG` — JSON set by evlog Nitro modules (no virtual
- *    modules; preferred in production Workers builds).
- * 2. Computed module IDs — `['a','b'].join('/')` passed to `import()` so emitted
+ * 1. `__EVLOG_CONFIG__` — build-time literal baked in by the evlog Nitro
+ *    modules via `nitro.options.replace`. When present, all runtime probing is
+ *    skipped (see issue #312: Vercel + Bun crashes if the v3 probe runs).
+ * 2. `process.env.__EVLOG_CONFIG` — JSON set by evlog Nitro modules during
+ *    build; survives into runtime on platforms that propagate build env vars.
+ * 3. Computed module IDs — `['a','b'].join('/')` passed to `import()` so emitted
  *    JS does not contain a static `import("a/b")`.
- * 3. Plugins call {@link setActiveNitroRuntime} so adapters never probe modules
- *    from the other major version (e.g. Bun on Vercel triggers a package-cache
- *    write when probing a missing dynamic import — see issue #312).
- * 4. When the active runtime is unknown (standalone use outside a Nitro
+ * 4. Plugins call {@link setActiveNitroRuntime} so adapters never probe modules
+ *    from the other major version.
+ * 5. When the active runtime is unknown (standalone use outside a Nitro
  *    plugin), the bridge falls back to the historical probe order.
  *
  * Not exported from `evlog/toolkit` — package-internal only.
@@ -27,6 +29,19 @@ import type { NitroPluginEvlogConfig } from '../nitro'
 type EvlogConfig = NitroPluginEvlogConfig
 
 const EVLOG_NITRO_ENV = '__EVLOG_CONFIG' as const
+
+// Replaced at build time by `nitro.options.replace` in the evlog Nitro
+// modules. Outside of a Nitro build, this identifier is undeclared and the
+// `typeof` guard below evaluates safely.
+// eslint-disable-next-line @typescript-eslint/naming-convention
+declare const __EVLOG_CONFIG__: EvlogConfig | undefined
+
+/** Build-time inlined config, or `undefined` if the bundle was not produced by an evlog Nitro module. */
+export function readEvlogConfigFromInline(): EvlogConfig | undefined {
+  if (typeof __EVLOG_CONFIG__ === 'undefined') return undefined
+  if (__EVLOG_CONFIG__ === null || typeof __EVLOG_CONFIG__ !== 'object') return undefined
+  return __EVLOG_CONFIG__
+}
 
 type NitroMajor = 'v2' | 'v3'
 
@@ -130,13 +145,18 @@ function evlogSlice(config: Record<string, any>): EvlogConfig | undefined {
  * Options for evlog Nitro plugins (nitropack v2 and Nitro v3).
  *
  * Lookup order:
- * 1. `process.env.__EVLOG_CONFIG`
- * 2. The active runtime declared by {@link setActiveNitroRuntime} — either
+ * 1. `__EVLOG_CONFIG__` — inlined at build time by the evlog Nitro module.
+ *    Hits in every deployed bundle and skips runtime probing entirely.
+ * 2. `process.env.__EVLOG_CONFIG`
+ * 3. The active runtime declared by {@link setActiveNitroRuntime} — either
  *    Nitro v3 `runtime-config` or nitropack internal config, never both.
- * 3. When no active runtime has been declared (standalone use): probe v3 then
+ * 4. When no active runtime has been declared (standalone use): probe v3 then
  *    nitropack v2 as a best-effort fallback.
  */
 export async function resolveEvlogConfigForNitroPlugin(): Promise<EvlogConfig | undefined> {
+  const fromInline = readEvlogConfigFromInline()
+  if (fromInline !== undefined) return fromInline
+
   const fromEnv = readEvlogConfigFromNitroEnv()
   if (fromEnv !== undefined) return fromEnv
 
@@ -180,8 +200,15 @@ export async function resolveEvlogConfigForNitroPlugin(): Promise<EvlogConfig | 
  * version, only that version's runtime module is probed. When no version has
  * been declared (standalone use outside Nitro), falls back to the historical
  * order: nitropack v2 first, then Nitro v3.
+ *
+ * When `__EVLOG_CONFIG__` was inlined at build time, returns a synthetic
+ * `{ evlog: <inlined> }` record so adapters can read `runtimeConfig.evlog.*`
+ * without triggering the dynamic import (issue #312).
  */
 export async function getNitroRuntimeConfigRecord(): Promise<Record<string, any> | undefined> {
+  const inline = readEvlogConfigFromInline()
+  if (inline !== undefined) return { evlog: inline }
+
   if (activeNitroRuntime === 'v3') {
     const v3 = await getNitroV3Runtime()
     return v3 ? v3.useRuntimeConfig() : undefined

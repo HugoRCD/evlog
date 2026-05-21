@@ -2,10 +2,12 @@
 'evlog': patch
 ---
 
-Fix a runtime crash on Vercel + Bun + Nitro v3 where evlog probed `nitropack/runtime/internal/config` even though only Nitro v3 was installed. Bun's auto-install kicked in for the missing dependency and tried to write `node_modules/.cache`, which crashes on Vercel's read-only function filesystem with `bun is unable to write files: ReadOnlyFileSystem`.
+Fix a runtime crash on Vercel + Bun + Nitro v3 where every request failed with `bun is unable to write files: ReadOnlyFileSystem`. The Nitro plugin probed `nitro/runtime-config` at runtime to read evlog's config; that module transitively imports the build-only `#nitro/virtual/runtime-config`, which doesn't exist in deployed bundles. On Vercel + Bun the missing virtual triggered Bun's package auto-installer, which tried to write `node_modules/.cache` and crashed on the read-only function filesystem.
 
-The Nitro plugins now declare their major version once (via the new internal `setActiveNitroRuntime` helper) and the shared config bridge probes only the matching runtime — `nitro/runtime-config` for v3, `nitropack/...` for v2. Adapters resolving config through `runtimeConfig.evlog.<adapter>` benefit from the same restriction, so `createPostHogDrain()` (and any adapter using `resolveAdapterConfig`) no longer triggers the cross-version probe.
+The Nitro modules now bake the evlog config into the bundle as a literal via `nitro.options.replace.__EVLOG_CONFIG__`. The shared config bridge reads that build-time literal first and skips all runtime probing — no `import('nitro/runtime-config')`, no env propagation guesswork. The bridge also exposes the inlined value as a synthetic `{ evlog: <inlined> }` record, so drain adapters resolving `runtimeConfig.evlog.<adapter>` never trigger the probe either.
 
-No public-API change. The `process.env.__EVLOG_CONFIG` fast path remains the highest-priority lookup.
+For defense-in-depth, the bridge additionally scopes its dynamic-import fallback to the major version declared by the plugin (new internal `setActiveNitroRuntime` helper) — `nitro/runtime-config` for v3, `nitropack/...` for v2 — so standalone use outside a plugin (e.g. adapters called from non-Nitro code) doesn't probe both versions.
+
+No public-API change.
 
 Closes [#312](https://github.com/HugoRCD/evlog/issues/312).

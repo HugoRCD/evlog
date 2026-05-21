@@ -1,9 +1,15 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  var __EVLOG_CONFIG__: unknown
+}
+
 beforeEach(() => {
   vi.resetModules()
   vi.unstubAllEnvs()
   delete process.env.__EVLOG_CONFIG
+  delete (globalThis as { __EVLOG_CONFIG__?: unknown }).__EVLOG_CONFIG__
 })
 
 afterEach(() => {
@@ -11,6 +17,7 @@ afterEach(() => {
   vi.doUnmock(['nitro', 'runtime-config'].join('/'))
   vi.doUnmock(['nitropack', 'runtime', 'internal', 'config'].join('/'))
   vi.doUnmock(['nitropack', 'runtime'].join('/'))
+  delete (globalThis as { __EVLOG_CONFIG__?: unknown }).__EVLOG_CONFIG__
 })
 
 async function loadBridgeWithMocks() {
@@ -82,5 +89,41 @@ describe('nitroConfigBridge — active runtime', () => {
     expect(config).toEqual({ env: { service: 'svc-v3' } })
     const probed = importSpy.mock.calls.map(call => call[0])
     expect(probed).toContain('nitro/runtime-config')
+  })
+
+  it('returns the build-time inlined __EVLOG_CONFIG__ without probing', async () => {
+    globalThis.__EVLOG_CONFIG__ = { env: { service: 'svc-inline' } }
+    const { bridge, importSpy } = await loadBridgeWithMocks()
+    bridge.setActiveNitroRuntime('v3')
+
+    const config = await bridge.resolveEvlogConfigForNitroPlugin()
+    const record = await bridge.getNitroRuntimeConfigRecord()
+
+    expect(config).toEqual({ env: { service: 'svc-inline' } })
+    expect(record).toEqual({ evlog: { env: { service: 'svc-inline' } } })
+    expect(importSpy).not.toHaveBeenCalled()
+  })
+
+  it('prefers __EVLOG_CONFIG__ over process.env.__EVLOG_CONFIG', async () => {
+    globalThis.__EVLOG_CONFIG__ = { env: { service: 'svc-inline' } }
+    process.env.__EVLOG_CONFIG = JSON.stringify({ env: { service: 'svc-env' } })
+    const { bridge, importSpy } = await loadBridgeWithMocks()
+    bridge.setActiveNitroRuntime('v3')
+
+    const config = await bridge.resolveEvlogConfigForNitroPlugin()
+
+    expect(config).toEqual({ env: { service: 'svc-inline' } })
+    expect(importSpy).not.toHaveBeenCalled()
+  })
+
+  it('ignores __EVLOG_CONFIG__ when it is not an object literal', async () => {
+    globalThis.__EVLOG_CONFIG__ = 'not-an-object'
+    const { bridge, importSpy } = await loadBridgeWithMocks()
+    bridge.setActiveNitroRuntime('v3')
+
+    const config = await bridge.resolveEvlogConfigForNitroPlugin()
+
+    expect(config).toEqual({ env: { service: 'svc-v3' } })
+    expect(importSpy.mock.calls.map(c => c[0])).toContain('nitro/runtime-config')
   })
 })

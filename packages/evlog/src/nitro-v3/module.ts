@@ -38,6 +38,15 @@ export default function evlog(options?: NitroModuleOptions) {
       nitro.options.runtimeConfig = nitro.options.runtimeConfig || {}
       nitro.options.runtimeConfig.evlog = options || {}
 
+      // Bake the config into the bundle as a literal so the plugin never has
+      // to do a runtime `import('nitro/runtime-config')` to discover it. That
+      // dynamic import resolves to a module which itself imports the build-only
+      // virtual `#nitro/virtual/runtime-config` — fine inside the Nitro build,
+      // but on Vercel + Bun the missing virtual triggers Bun's auto-installer
+      // and crashes with `ReadOnlyFileSystem` (see issue #312).
+      nitro.options.replace = nitro.options.replace || {}
+      nitro.options.replace.__EVLOG_CONFIG__ = JSON.stringify(options || {})
+
       // In dev mode, Nitro loads plugins externally (not bundled), so the
       // virtual runtime-config module is unreachable and useRuntimeConfig()
       // returns a stub without our values. process.env is inherited by the
