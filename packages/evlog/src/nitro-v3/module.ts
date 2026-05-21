@@ -7,13 +7,21 @@ export type { NitroModuleOptions }
 
 const _dir = dirname(fileURLToPath(import.meta.url))
 
+// Nitro raw-interpolates these paths into JS string literals when generating
+// the #nitro/virtual/plugins and #nitro/virtual/error-handler modules, so
+// Windows backslashes would be parsed as escape sequences (\n, \v, …) and
+// break module resolution. Normalize to POSIX separators.
+function resolveModulePath(name: string): string {
+  return resolve(_dir, name).replace(/\\/g, '/')
+}
+
 export default function evlog(options?: NitroModuleOptions) {
   return {
     name: 'evlog',
     setup(nitro: Nitro) {
       // Push the plugin (no extension — Nitro's bundler resolves it)
       nitro.options.plugins = nitro.options.plugins || []
-      nitro.options.plugins.push(resolve(_dir, 'plugin'))
+      nitro.options.plugins.push(resolveModulePath('plugin'))
 
       // explicitly tell nitro to bundle evlog's files to correctly resolve nitro dependencies
       if (!nitro.options.noExternals) {
@@ -21,15 +29,15 @@ export default function evlog(options?: NitroModuleOptions) {
       } else if (Array.isArray(nitro.options.noExternals)) {
         nitro.options.noExternals.push('evlog')
       }
-      
+
 
       // Set error handler only if not already configured by user
       if (!nitro.options.errorHandler) {
-        nitro.options.errorHandler = [resolve(_dir, 'errorHandler')]
+        nitro.options.errorHandler = [resolveModulePath('errorHandler')]
       } else if (Array.isArray(nitro.options.errorHandler)) {
-        nitro.options.errorHandler.unshift(resolve(_dir, 'errorHandler'))
+        nitro.options.errorHandler.unshift(resolveModulePath('errorHandler'))
       } else if (typeof nitro.options.errorHandler === 'string') {
-        nitro.options.errorHandler = [resolve(_dir, 'errorHandler'), nitro.options.errorHandler]
+        nitro.options.errorHandler = [resolveModulePath('errorHandler'), nitro.options.errorHandler]
       }
 
       // Inject config into runtimeConfig — works in production where the
