@@ -11,6 +11,9 @@ allowBuilds:
   esbuild: false
   unrs-resolver: false
   vue-demi: false
+  '@nestjs/core': false
+  '@swc/core': false
+  workerd: false
   better-sqlite3: true
   isolated-vm: true
   sharp: true
