@@ -3,13 +3,18 @@ packages:
   - packages/*
   - examples/*
 
-ignoredBuiltDependencies:
-  - '@parcel/watcher'
-  - esbuild
-  - unrs-resolver
-  - vue-demi
+shamefullyHoist: true
+strictPeerDependencies: false
 
-onlyBuiltDependencies:
-  - better-sqlite3
-  - isolated-vm
-  - sharp
+allowBuilds:
+  '@parcel/watcher': false
+  esbuild: false
+  unrs-resolver: false
+  vue-demi: false
+  better-sqlite3: true
+  isolated-vm: true
+  sharp: true
+
+overrides:
+  minimark: 0.2.0
+  '@nuxtjs/mcp-toolkit': ^0.16.1
