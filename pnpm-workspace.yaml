@@ -34,3 +34,5 @@ minimumReleaseAgeExclude:
   - '@vercel/*'
   - '@ai-sdk/*'
   - 'ai'
+  # Other
+  - '@databuddy/nuxt'

@@ -11,7 +11,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@databuddy/nuxt": "^1.0.0",
+    "@databuddy/nuxt": "^2.4.20",
     "@nuxt/fonts": "0.14.0",
     "@nuxt/ui": "^4.7.1",
     "@resvg/resvg-js": "^2.6.2",
