@@ -41,6 +41,11 @@ function mergeInto(target: Record<string, unknown>, source: Record<string, unkno
   }
 }
 
+/**
+ * @internal Wide-event field merge — exported for test mocks that mirror emit accumulation.
+ */
+export { mergeInto as mergeWideEventFields }
+
 let globalEnv: EnvironmentContext = {
   service: 'app',
   environment: 'development',
@@ -359,6 +364,11 @@ interface ToolCallEntry {
   input: unknown
 }
 
+function serializeToolInput(input: unknown): string {
+  if (typeof input === 'string') return input
+  return JSON.stringify(input) ?? ''
+}
+
 function isToolCallEntry(value: unknown): value is ToolCallEntry {
   return isPlainObject(value) && typeof value.name === 'string' && 'input' in value
 }
@@ -439,7 +449,7 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
       if (t.error) line += ` ${t.error}`
       if (hasInputs && toolCallEntries && idx < toolCallEntries.length) {
         const tc = toolCallEntries[idx]
-        const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+        const inputStr = serializeToolInput(tc.input)
         const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
         line += ` ${truncated}`
       }
@@ -449,7 +459,7 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
   } else if (toolCalls?.length) {
     if (toolCallEntries?.length) {
       const children = toolCallEntries.map((tc) => {
-        const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
+        const inputStr = serializeToolInput(tc.input)
         const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
         return `${tc.name}(${truncated})`
       })

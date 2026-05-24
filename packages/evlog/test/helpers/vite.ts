@@ -25,14 +25,17 @@ export function getPluginHook<T extends(...args: never[]) => unknown>(
 }
 
 /** Minimal `configResolved` input for plugin tests. */
-export function callConfigResolved(plugin: Plugin, config: Pick<ResolvedConfig, 'command'> & Partial<ResolvedConfig>): void {
+export async function callConfigResolved(
+  plugin: Plugin,
+  config: Pick<ResolvedConfig, 'command'> & Partial<ResolvedConfig>,
+): Promise<void> {
   const hook = plugin.configResolved
   if (!hook) return
   if (typeof hook === 'function') {
-    hook(config as ResolvedConfig)
+    await hook(config as ResolvedConfig)
     return
   }
-  hook.handler(config as ResolvedConfig)
+  await hook.handler(config as ResolvedConfig)
 }
 
 /** Rollup transform context stub with acorn `parse` — matches Vite's transform hook. */
@@ -53,14 +56,14 @@ type PluginTransformHandler = (
 ) => TransformResult | Promise<TransformResult>
 
 /** Run a plugin `transform` hook after optional `configResolved`. */
-export function runPluginTransform(
+export async function runPluginTransform(
   plugin: Plugin,
   code: string,
   id: string,
   options?: { config?: Pick<ResolvedConfig, 'command'> & Partial<ResolvedConfig> },
-): TransformResult | Promise<TransformResult> {
+): Promise<TransformResult> {
   if (options?.config) {
-    callConfigResolved(plugin, options.config)
+    await callConfigResolved(plugin, options.config)
   }
   const handler = getPluginHook<PluginTransformHandler>(plugin, 'transform')
   const ctx = createParseTransformContext() as TransformPluginContext

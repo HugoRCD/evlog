@@ -396,6 +396,38 @@ describe('idempotency key', () => {
   })
 })
 
+describe('stableStringify plain-object guard', () => {
+  it('serializes Date in audit changes via JSON.stringify, not key enumeration', async () => {
+    const calls: WideEvent[] = []
+    const when = new Date('2026-01-01T00:00:00.000Z')
+    const drain = signed((ctx: DrainContext) => {
+      calls.push(ctx.event)
+    }, { strategy: 'hmac', secret: 'test-secret' })
+
+    await drain(createDrainCtx({
+      audit: {
+        action: 'update',
+        actor: { type: 'user', id: 'u1' },
+        outcome: 'success',
+        changes: { when },
+      },
+    }))
+    await drain(createDrainCtx({
+      audit: {
+        action: 'update',
+        actor: { type: 'user', id: 'u1' },
+        outcome: 'success',
+        changes: { when: new Date('2026-01-01T00:00:00.000Z') },
+      },
+    }))
+
+    const sig1 = defined(defined(calls[0], 'first event').audit as AuditFields).signature
+    const sig2 = defined(defined(calls[1], 'second event').audit as AuditFields).signature
+    expect(sig1).toBeDefined()
+    expect(sig1).toBe(sig2)
+  })
+})
+
 describe('end-to-end: audit + auditOnly + global drain', () => {
   it('routes audit-only drain alongside the main drain', () => {
     const main = vi.fn<(ctx: DrainContext) => void>()

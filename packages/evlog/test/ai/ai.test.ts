@@ -3,36 +3,8 @@ import type { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3Finish
 import type { OnFinishEvent, OnStartEvent, OnToolCallFinishEvent, TelemetryIntegration } from 'ai'
 import type { RequestLogger } from '../../src/types'
 import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
-import { createLogger } from '../../src/logger'
+import { createLogger, mergeWideEventFields } from '../../src/logger'
 import { defined } from '../helpers/defined'
-
-/**
- * Mirrors evlog's `mergeInto` so the mock reflects what the wide event
- * actually accumulates: arrays are concatenated, plain objects are merged
- * recursively, scalars are replaced. Without this, a `log.set()` mock that
- * just records each call would hide bugs whose impact only shows up on
- * the assembled wide event (e.g. quadratic array growth).
- */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null
-}
-
-function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
-  for (const key in source) {
-    const sourceVal = source[key]
-    if (sourceVal === undefined || sourceVal === null) continue
-    const targetVal = target[key]
-    if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
-      mergeInto(targetVal, sourceVal)
-    } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
-      target[key] = [...targetVal, ...sourceVal]
-    } else {
-      target[key] = sourceVal
-    }
-  }
-}
 
 interface MockLogger extends RequestLogger {
   setCalls: Array<Record<string, unknown>>
@@ -53,7 +25,7 @@ function createMockLogger(): MockLogger {
     set: vi.fn((data: Record<string, unknown>) => {
       const cloned = structuredClone(data)
       setCalls.push(cloned)
-      mergeInto(merged, structuredClone(data))
+      mergeWideEventFields(merged, structuredClone(data))
     }),
     error: vi.fn(),
     info: vi.fn(),

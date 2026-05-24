@@ -34,7 +34,7 @@ export default defineNuxtModule({
     const retention = evlogConfig.retention ?? '7d'
     const cron = retentionToCron(retention)
 
-    const crons: Array<{ path: string, schedule: string }> = config.crons || []
+    const crons: Array<{ path: string, schedule: string }> = Array.isArray(config.crons) ? config.crons : []
     const existing = crons.findIndex(c => c.path === '/api/_cron/evlog-cleanup')
     if (existing >= 0) {
       const entry = crons[existing]
