@@ -1,0 +1,154 @@
+import type { LogLevel, WideEvent } from '../types'
+import { defineDrain } from '../shared/drain'
+
+/**
+ * Configuration for the in-memory drain.
+ */
+export interface MemoryConfig {
+  /** Named store key. Multiple drains sharing the same key share the same buffer. Default: `'default'` */
+  store: string
+  /** Maximum number of events to keep in the ring buffer. Oldest events are discarded when the limit is exceeded. Default: `1000` */
+  maxEvents: number
+}
+
+const DEFAULT_STORE = 'default'
+const DEFAULT_MAX_EVENTS = 1000
+
+const stores = new Map<string, WideEvent[]>()
+
+function getOrCreateStore(name: string): WideEvent[] {
+  if (!stores.has(name)) stores.set(name, [])
+  return stores.get(name)!
+}
+
+/**
+ * Write events directly into the named store. Exported for direct use and
+ * easier testing without going through the drain pipeline.
+ */
+export function writeToMemory(events: WideEvent[], config: MemoryConfig): void {
+  if (events.length === 0) return
+  const store = getOrCreateStore(config.store)
+  store.push(...events)
+  if (store.length > config.maxEvents) {
+    store.splice(0, store.length - config.maxEvents)
+  }
+}
+
+/**
+ * Create a drain that stores wide events in an in-memory ring buffer.
+ *
+ * Works in **any** runtime — including Cloudflare Workers (workerd) — where
+ * the filesystem (`evlog/fs`) is not available. Pair it with a dev-only HTTP
+ * endpoint to let agents retrieve the buffer over HTTP.
+ *
+ * @example
+ * ```ts
+ * // Hono + Cloudflare Workers
+ * import { createMemoryDrain, readMemoryLogs } from 'evlog/memory'
+ *
+ * app.use(evlog({ drain: createMemoryDrain() }))
+ *
+ * // Dev-only endpoint for agent retrieval
+ * if (env.NODE_ENV === 'development') {
+ *   app.get('/_evlog/logs', (c) => c.json(readMemoryLogs()))
+ * }
+ * ```
+ */
+export function createMemoryDrain(overrides?: Partial<MemoryConfig>) {
+  const config: MemoryConfig = {
+    store: overrides?.store ?? DEFAULT_STORE,
+    maxEvents: overrides?.maxEvents ?? DEFAULT_MAX_EVENTS,
+  }
+  return defineDrain<MemoryConfig>({
+    name: 'memory',
+    resolve: () => config,
+    send: async (events, cfg) => writeToMemory(events, cfg),
+  })
+}
+
+/** Options accepted by {@link readMemoryLogs}. */
+export interface ReadMemoryLogsOptions {
+  /** Named store to read from. Default: `'default'` */
+  store?: string
+  /** Only include events with `timestamp >= since`. */
+  since?: Date | string
+  /** Only include events with `timestamp <= until`. */
+  until?: Date | string
+  /** Filter by log level. */
+  level?: LogLevel | LogLevel[]
+  /** Custom predicate — return `false` to skip the event. */
+  filter?: (event: WideEvent) => boolean
+  /** Return at most this many of the most-recent matching events. */
+  limit?: number
+}
+
+function normalizeTimestamp(value: Date | string | undefined): number | undefined {
+  if (!value) return undefined
+  const date = value instanceof Date ? value : new Date(value)
+  const ts = date.getTime()
+  return Number.isNaN(ts) ? undefined : ts
+}
+
+/**
+ * Read events from the named in-memory store. Returns a snapshot of the
+ * buffer with optional filtering, ordered oldest-first.
+ *
+ * @example
+ * ```ts
+ * import { readMemoryLogs } from 'evlog/memory'
+ *
+ * // All events
+ * const events = readMemoryLogs()
+ *
+ * // Errors in the last hour
+ * const errors = readMemoryLogs({
+ *   level: 'error',
+ *   since: new Date(Date.now() - 60 * 60 * 1000),
+ * })
+ *
+ * // Expose as a JSON endpoint
+ * app.get('/_evlog/logs', (c) => c.json(readMemoryLogs({ limit: 200 })))
+ * ```
+ */
+export function readMemoryLogs(options: ReadMemoryLogsOptions = {}): WideEvent[] {
+  const storeName = options.store ?? DEFAULT_STORE
+  const events = [...getOrCreateStore(storeName)]
+
+  const sinceMs = normalizeTimestamp(options.since)
+  const untilMs = normalizeTimestamp(options.until)
+  const levels = options.level
+    ? new Set<LogLevel>(Array.isArray(options.level) ? options.level : [options.level])
+    : undefined
+  const custom = options.filter
+
+  const filtered = events.filter((event) => {
+    if (levels && !levels.has(event.level)) return false
+    if (sinceMs !== undefined || untilMs !== undefined) {
+      const ts = typeof event.timestamp === 'string' ? Date.parse(event.timestamp) : Number.NaN
+      if (Number.isNaN(ts)) return false
+      if (sinceMs !== undefined && ts < sinceMs) return false
+      if (untilMs !== undefined && ts > untilMs) return false
+    }
+    if (custom && !custom(event)) return false
+    return true
+  })
+
+  if (options.limit !== undefined && filtered.length > options.limit) {
+    return filtered.slice(-options.limit)
+  }
+  return filtered
+}
+
+/**
+ * Clear all events from a named store (or `'default'`).
+ *
+ * @example
+ * ```ts
+ * clearMemoryLogs()           // clears the default store
+ * clearMemoryLogs('my-store') // clears a named store
+ * ```
+ */
+export function clearMemoryLogs(store = DEFAULT_STORE): void {
+  const s = stores.get(store)
+  if (s) s.length = 0
+}

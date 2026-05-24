@@ -122,6 +122,12 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "sendToHyperDX",
     "toHyperDXOTLPConfig",
   ],
+  "./memory": [
+    "clearMemoryLogs",
+    "createMemoryDrain",
+    "readMemoryLogs",
+    "writeToMemory",
+  ],
   "./nestjs": [
     "EvlogModule",
     "useLogger",
