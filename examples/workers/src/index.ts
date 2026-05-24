@@ -11,7 +11,7 @@ export default defineWorkerFetch(async (request, _env, _ctx, log) => {
     log.emit({ status: response.status })
     return response
   } catch (error) {
-    log.error(error as Error)
+    log.error(error instanceof Error ? error : new Error(String(error)))
     log.emit({ status: 500 })
     throw error
   }

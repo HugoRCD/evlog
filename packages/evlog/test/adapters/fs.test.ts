@@ -1,7 +1,9 @@
+import type { Stats } from 'node:fs'
 import { join } from 'node:path'
-import { mkdir, appendFile, readdir, stat, unlink, writeFile } from 'node:fs/promises'
+import { readdir, mkdir, appendFile, stat, unlink, writeFile } from 'node:fs/promises'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
+import { defined } from '../helpers/defined'
 
 import { writeBatchToFs, writeToFs } from '../../src/adapters/fs'
 
@@ -17,6 +19,15 @@ vi.mock('node:fs/promises', () => ({
 const mockedMkdir = vi.mocked(mkdir)
 const mockedAppendFile = vi.mocked(appendFile)
 const mockedReaddir = vi.mocked(readdir)
+
+function mockReaddirNames(names: string[]) {
+  mockedReaddir.mockResolvedValueOnce(names as unknown as Awaited<ReturnType<typeof readdir>>)
+}
+
+function getAppendFileContent(callIndex = 0): string {
+  const args = defined(mockedAppendFile.mock.calls[callIndex], 'appendFile call')
+  return String(args[1])
+}
 const mockedStat = vi.mocked(stat)
 const mockedUnlink = vi.mocked(unlink)
 const mockedWriteFile = vi.mocked(writeFile)
@@ -78,7 +89,7 @@ describe('fs adapter', () => {
     })
 
     it('skips .gitignore creation when it already exists', async () => {
-      mockedStat.mockResolvedValueOnce({} as any)
+      mockedStat.mockResolvedValueOnce({ size: 0 } as Stats)
 
       await writeToFs(createTestEvent(), { dir: 'other/.evlog/logs', pretty: false })
 
@@ -95,7 +106,8 @@ describe('fs adapter', () => {
       expect(mockedMkdir).toHaveBeenCalledWith('.evlog/logs', { recursive: true })
       expect(mockedAppendFile).toHaveBeenCalledTimes(1)
 
-      const [filePath, content] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
+      const content = getAppendFileContent()
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.jsonl'))
       expect(content).toBe(`${JSON.stringify(event) }\n`)
     })
@@ -105,7 +117,7 @@ describe('fs adapter', () => {
 
       await writeToFs(event, { dir: '.evlog/logs', pretty: true })
 
-      const [, content] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const content = getAppendFileContent()
       expect(content).toBe(`${JSON.stringify(event, null, 2) }\n`)
     })
 
@@ -114,7 +126,7 @@ describe('fs adapter', () => {
 
       await writeToFs(createTestEvent(), { dir: 'logs', pretty: false })
 
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('logs', '2025-12-25.jsonl'))
     })
   })
@@ -130,7 +142,7 @@ describe('fs adapter', () => {
       await writeBatchToFs(events, { dir: '.evlog/logs', pretty: false })
 
       expect(mockedAppendFile).toHaveBeenCalledTimes(1)
-      const [, content] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const content = getAppendFileContent()
       const lines = content.trimEnd().split('\n')
       expect(lines).toHaveLength(3)
 
@@ -151,14 +163,14 @@ describe('fs adapter', () => {
       await writeBatchToFs([createTestEvent()], { dir: '/var/log/app', pretty: false })
 
       expect(mockedMkdir).toHaveBeenCalledWith('/var/log/app', { recursive: true })
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('/var/log/app', '2026-03-14.jsonl'))
     })
   })
 
   describe('file rotation (maxSizePerFile)', () => {
     it('uses base file when under size limit', async () => {
-      mockedStat.mockResolvedValueOnce({ size: 500 } as any)
+      mockedStat.mockResolvedValueOnce({ size: 500 } as Stats)
 
       await writeToFs(createTestEvent(), {
         dir: '.evlog/logs',
@@ -166,13 +178,13 @@ describe('fs adapter', () => {
         maxSizePerFile: 1024,
       })
 
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.jsonl'))
     })
 
     it('rotates to suffixed file when base file exceeds size limit', async () => {
       mockedStat
-        .mockResolvedValueOnce({ size: 2048 } as any)
+        .mockResolvedValueOnce({ size: 2048 } as Stats)
         .mockRejectedValueOnce(new Error('ENOENT'))
 
       await writeToFs(createTestEvent(), {
@@ -181,15 +193,15 @@ describe('fs adapter', () => {
         maxSizePerFile: 1024,
       })
 
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.1.jsonl'))
     })
 
     it('skips full rotated files and finds next available', async () => {
       mockedStat
-        .mockResolvedValueOnce({ size: 2048 } as any)
-        .mockResolvedValueOnce({ size: 2048 } as any)
-        .mockResolvedValueOnce({ size: 2048 } as any)
+        .mockResolvedValueOnce({ size: 2048 } as Stats)
+        .mockResolvedValueOnce({ size: 2048 } as Stats)
+        .mockResolvedValueOnce({ size: 2048 } as Stats)
         .mockRejectedValueOnce(new Error('ENOENT'))
 
       await writeToFs(createTestEvent(), {
@@ -198,7 +210,7 @@ describe('fs adapter', () => {
         maxSizePerFile: 1024,
       })
 
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.3.jsonl'))
     })
 
@@ -209,20 +221,20 @@ describe('fs adapter', () => {
         maxSizePerFile: 1024,
       })
 
-      const [filePath] = mockedAppendFile.mock.calls[0] as [string, string, string]
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.jsonl'))
     })
   })
 
   describe('cleanup (maxFiles)', () => {
     it('deletes oldest files when exceeding maxFiles', async () => {
-      mockedReaddir.mockResolvedValueOnce([
+      mockReaddirNames([
         '2026-03-10.jsonl',
         '2026-03-11.jsonl',
         '2026-03-12.jsonl',
         '2026-03-13.jsonl',
         '2026-03-14.jsonl',
-      ] as any)
+      ])
 
       await writeToFs(createTestEvent(), {
         dir: '.evlog/logs',
@@ -236,10 +248,10 @@ describe('fs adapter', () => {
     })
 
     it('does not delete files when under maxFiles limit', async () => {
-      mockedReaddir.mockResolvedValueOnce([
+      mockReaddirNames([
         '2026-03-13.jsonl',
         '2026-03-14.jsonl',
-      ] as any)
+      ])
 
       await writeToFs(createTestEvent(), {
         dir: '.evlog/logs',
@@ -251,13 +263,13 @@ describe('fs adapter', () => {
     })
 
     it('ignores non-jsonl files during cleanup', async () => {
-      mockedReaddir.mockResolvedValueOnce([
+      mockReaddirNames([
         '2026-03-10.jsonl',
         '2026-03-11.jsonl',
         '2026-03-12.jsonl',
         'README.md',
         '.gitkeep',
-      ] as any)
+      ])
 
       await writeToFs(createTestEvent(), {
         dir: '.evlog/logs',

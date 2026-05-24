@@ -5,11 +5,18 @@ import { db, schema } from '@nuxthub/db'
 
 type EventRow = typeof schema.evlogEvents.$inferInsert
 
+function coalesceString(...values: unknown[]): string | null {
+  for (const value of values) {
+    if (typeof value === 'string' && value.length > 0) return value
+  }
+  return null
+}
+
 function parseDurationMs(event: WideEvent): number | null {
   if (typeof event.durationMs === 'number') return event.durationMs
   if (typeof event.duration === 'number') return event.duration
   if (typeof event.duration === 'string') {
-    const str = event.duration as string
+    const str = event.duration
     const msMatch = str.match(/^([\d.]+)\s*ms$/)
     if (msMatch) return Math.round(Number.parseFloat(msMatch[1]))
     const sMatch = str.match(/^([\d.]+)\s*s$/)
@@ -64,12 +71,12 @@ function extractRow(ctx: DrainContext): EventRow {
     level: event.level,
     service: event.service,
     environment: event.environment,
-    method: (request?.method ?? event.method as string) || null,
-    path: (request?.path ?? event.path as string) || null,
+    method: coalesceString(request?.method, event.method),
+    path: coalesceString(request?.path, event.path),
     status: typeof event.status === 'number' ? event.status : null,
     durationMs: parseDurationMs(event),
-    requestId: (request?.requestId ?? event.requestId as string) || null,
-    source: (event.source as string) || null,
+    requestId: coalesceString(request?.requestId, event.requestId),
+    source: typeof event.source === 'string' && event.source.length > 0 ? event.source : null,
     error: errorJson,
     data: Object.keys(data).length > 0 ? JSON.stringify(data) : null,
     createdAt: new Date().toISOString(),
@@ -88,9 +95,9 @@ const RETRYABLE_CODES = new Set([
 ])
 
 function isRetryable(error: unknown): boolean {
-  if (error instanceof Error) {
-    const cause = (error as any).cause
-    if (cause && typeof cause.code === 'string') {
+  if (error instanceof Error && 'cause' in error) {
+    const { cause } = error
+    if (cause && typeof cause === 'object' && 'code' in cause && typeof cause.code === 'string') {
       return RETRYABLE_CODES.has(cause.code)
     }
   }

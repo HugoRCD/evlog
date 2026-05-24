@@ -6,6 +6,14 @@ import { filterSafeHeaders } from '../../../../utils'
 
 const VALID_LEVELS = ['info', 'error', 'warn', 'debug'] as const
 
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isLogLevel(value: string): value is IngestPayload['level'] {
+  return (VALID_LEVELS as readonly string[]).includes(value)
+}
+
 function validateOrigin(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): void {
   const origin = getHeader(event, 'origin')
   const referer = getHeader(event, 'referer')
@@ -34,17 +42,15 @@ function isValidISOTimestamp(value: string): boolean {
 }
 
 function validatePayload(body: unknown): IngestPayload {
-  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+  if (!isRecord(body)) {
     throw createError({ statusCode: 400, message: 'Invalid request body' })
   }
 
-  const payload = body as Record<string, unknown>
-
-  if (payload.timestamp === undefined || payload.timestamp === null) {
+  if (body.timestamp === undefined || body.timestamp === null) {
     throw createError({ statusCode: 400, message: 'Missing required field: timestamp' })
   }
 
-  const { timestamp: rawTimestamp } = payload
+  const { timestamp: rawTimestamp } = body
   let timestamp: string
   if (typeof rawTimestamp === 'number') {
     const minTimestamp = new Date('2000-01-01').getTime()
@@ -62,24 +68,44 @@ function validatePayload(body: unknown): IngestPayload {
     throw createError({ statusCode: 400, message: 'Invalid timestamp: must be string or number' })
   }
 
-  if (!payload.level || typeof payload.level !== 'string') {
+  if (!body.level || typeof body.level !== 'string') {
     throw createError({ statusCode: 400, message: 'Missing required field: level' })
   }
 
-  if (!VALID_LEVELS.includes(payload.level as typeof VALID_LEVELS[number])) {
+  if (!isLogLevel(body.level)) {
     throw createError({ statusCode: 400, message: `Invalid level: must be one of ${VALID_LEVELS.join(', ')}` })
   }
 
   return {
-    ...payload,
+    ...body,
     timestamp,
-    level: payload.level as IngestPayload['level'],
+    level: body.level,
   }
 }
 
 function getSafeHeaders(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): Record<string, string> {
   const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
   return filterSafeHeaders(allHeaders)
+}
+
+interface WaitUntilHost {
+  waitUntil?: (promise: Promise<unknown>) => void
+}
+
+function hasWaitUntil(value: unknown): value is WaitUntilHost & { waitUntil: (promise: Promise<unknown>) => void } {
+  return isRecord(value) && typeof value.waitUntil === 'function'
+}
+
+/** Resolve platform waitUntil from Nitro event context (Cloudflare Workers, Vercel Edge). */
+function resolveWaitUntilContext(event: unknown): WaitUntilHost | undefined {
+  if (!isRecord(event)) return undefined
+  const { context } = event
+  if (!isRecord(context)) return undefined
+  const { cloudflare } = context
+  if (isRecord(cloudflare) && isRecord(cloudflare.context)) {
+    return cloudflare.context
+  }
+  return context
 }
 
 export default defineEventHandler(async (event) => {
@@ -90,7 +116,7 @@ export default defineEventHandler(async (event) => {
   const nitroApp = useNitroApp()
   const env = getEnvironment()
 
-  const { service: _clientService, ...sanitizedPayload } = payload as IngestPayload & { service?: unknown }
+  const { service: _clientService, ...sanitizedPayload } = payload
 
   const wideEvent: WideEvent = {
     ...sanitizedPayload,
@@ -104,7 +130,7 @@ export default defineEventHandler(async (event) => {
 
   if (runner.hasClientLog) {
     runner.runOnClientLog({
-      payload: payload as Record<string, unknown>,
+      payload,
       request,
       headers,
     })
@@ -142,10 +168,9 @@ export default defineEventHandler(async (event) => {
 
   // Use waitUntil if available (Cloudflare Workers, Vercel Edge)
   // Otherwise, await the drain to prevent lost logs in serverless environments
-  const waitUntilCtx = (event as unknown as { context: Record<string, unknown> }).context
-  const cfCtx = (waitUntilCtx as { cloudflare?: { context?: { waitUntil?: (p: Promise<unknown>) => void } } }).cloudflare?.context ?? waitUntilCtx
-  if (typeof (cfCtx as { waitUntil?: unknown }).waitUntil === 'function') {
-    (cfCtx as { waitUntil: (p: Promise<unknown>) => void }).waitUntil(drainPromise)
+  const waitUntilCtx = resolveWaitUntilContext(event)
+  if (waitUntilCtx && hasWaitUntil(waitUntilCtx)) {
+    waitUntilCtx.waitUntil(drainPromise)
   } else {
     await drainPromise
   }

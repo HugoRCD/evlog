@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { redactEvent, resolveRedactConfig } from '../../src/redact'
 import { createLogger, initLogger } from '../../src/logger'
 import { createPipelineSpies, waitForDrainCalls } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
 
 
 describe('initLogger + redact integration', () => {
@@ -24,10 +25,8 @@ describe('initLogger + redact integration', () => {
     })
 
     const logger = createLogger({ user: { email: 'alice@example.com', id: '123' } })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    const user = event!.user as Record<string, unknown>
+    const event = defined(logger.emit(), 'emitted event')
+    const user = event.user as Record<string, unknown>
     expect(user.email).toBe('[REDACTED]')
     expect(user.id).toBe('123')
   })
@@ -42,10 +41,8 @@ describe('initLogger + redact integration', () => {
     })
 
     const logger = createLogger({ message: 'Contact alice@example.com' })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.message).toBe('Contact [REDACTED]')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.message).toBe('Contact [REDACTED]')
   })
 
   it('redacts before console output', () => {
@@ -85,7 +82,7 @@ describe('initLogger + redact integration', () => {
     logger.emit()
 
     await waitForDrainCalls(drain)
-    const drained = drain.mock.calls[0]![0].event
+    const drained = getDrainCallArg(defined(drain.mock.calls[0], 'drain call')).event
     expect((drained.user as Record<string, unknown>).email).toBe('[REDACTED]')
     expect(drained.note).toBe('Card ****1111')
   })
@@ -96,12 +93,10 @@ describe('initLogger + redact integration', () => {
     const logger = createLogger({
       message: 'User alice@example.com paid with 4111-1111-1111-1111 from 192.168.1.100',
     })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.message).not.toContain('alice@example.com')
-    expect(event!.message).not.toContain('4111-1111-1111-1111')
-    expect(event!.message).not.toContain('192.168.1.100')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.message).not.toContain('alice@example.com')
+    expect(event.message).not.toContain('4111-1111-1111-1111')
+    expect(event.message).not.toContain('192.168.1.100')
   })
 
   it('redact: true with custom paths on top', () => {
@@ -115,10 +110,8 @@ describe('initLogger + redact integration', () => {
     const logger = createLogger({
       user: { password: 'secret123', email: 'alice@example.com' },
     })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    const user = event!.user as Record<string, unknown>
+    const event = defined(logger.emit(), 'emitted event')
+    const user = event.user as Record<string, unknown>
     expect(user.password).toBe('[REDACTED]')
     expect(user.email).toBe('a***@***.com')
   })
@@ -136,11 +129,9 @@ describe('initLogger + redact integration', () => {
       secret: 'hidden',
       email: 'alice@example.com',
     })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.secret).toBe('[REDACTED]')
-    expect(event!.email).toBe('alice@example.com')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.secret).toBe('[REDACTED]')
+    expect(event.email).toBe('alice@example.com')
   })
 
   it('redact with selected builtins', () => {
@@ -155,11 +146,9 @@ describe('initLogger + redact integration', () => {
       contact: 'alice@example.com',
       card: '4111-1111-1111-1111',
     })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.contact).not.toContain('alice@example.com')
-    expect(event!.card).toBe('4111-1111-1111-1111')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.contact).not.toContain('alice@example.com')
+    expect(event.card).toBe('4111-1111-1111-1111')
   })
 })
 
@@ -183,10 +172,8 @@ describe('default redaction behavior', () => {
     initLogger({ pretty: false })
 
     const logger = createLogger({ email: 'alice@example.com' })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.email).toBe('a***@***.com')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.email).toBe('a***@***.com')
   })
 
   it('disables redaction by default in development', () => {
@@ -194,10 +181,8 @@ describe('default redaction behavior', () => {
     initLogger({ pretty: false })
 
     const logger = createLogger({ email: 'alice@example.com' })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.email).toBe('alice@example.com')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.email).toBe('alice@example.com')
   })
 
   it('respects explicit redact: false in production', () => {
@@ -205,10 +190,8 @@ describe('default redaction behavior', () => {
     initLogger({ pretty: false, redact: false })
 
     const logger = createLogger({ email: 'alice@example.com' })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.email).toBe('alice@example.com')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.email).toBe('alice@example.com')
   })
 
   it('respects explicit redact: true in development', () => {
@@ -216,10 +199,8 @@ describe('default redaction behavior', () => {
     initLogger({ pretty: false, redact: true })
 
     const logger = createLogger({ email: 'alice@example.com' })
-    const event = logger.emit()
-
-    expect(event).not.toBeNull()
-    expect(event!.email).toBe('a***@***.com')
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.email).toBe('a***@***.com')
   })
 })
 
@@ -231,7 +212,7 @@ describe('built-in smart masking', () => {
       c: '4111 1111 1111 1111',
       safe: 'no card here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['creditCard'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['creditCard'] }), 'redact config'))
     expect(event.a).toBe('****1111')
     expect(event.b).toBe('****1111')
     expect(event.c).toBe('****1111')
@@ -244,7 +225,7 @@ describe('built-in smart masking', () => {
       b: 'Contact bob.smith+tag@company.co.uk',
       safe: 'no email here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['email'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config'))
     expect(event.a).toBe('a***@***.com')
     expect(event.b).toBe('Contact b***@***.uk')
     expect(event.safe).toBe('no email here')
@@ -257,7 +238,7 @@ describe('built-in smart masking', () => {
       localhost: '127.0.0.1',
       zero: '0.0.0.0',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['ipv4'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['ipv4'] }), 'redact config'))
     expect(event.a).toBe('***.***.***.1')
     expect(event.b).toBe('Client ***.***.***.5 connected')
     expect(event.localhost).toBe('127.0.0.1')
@@ -273,7 +254,7 @@ describe('built-in smart masking', () => {
       parens: '(555) 123-4567',
       safe: 'no phone here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['phone'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
     expect(event.us).toContain('****')
     expect(event.us).not.toContain('555')
     expect(event.fr).not.toContain('12 34')
@@ -291,7 +272,7 @@ describe('built-in smart masking', () => {
       bareDigits: '0612345678',
       localPhone: '06 12 34 56 78',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['phone'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
     expect(event.uuid).toBe('12345642-f647-42bb-9fda-742d2b4f41fa')
     expect(event.requestId).toBe('00000000-1111-2222-3333-444444444444')
     expect(event.idempotencyKey).toBe('961da3f34097bb096902b5457ae02687')
@@ -310,7 +291,7 @@ describe('built-in smart masking', () => {
       auth: `Token: ${token}`,
       safe: 'no jwt here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['jwt'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['jwt'] }), 'redact config'))
     expect(event.auth).toContain('eyJ***')
     expect(event.auth).not.toContain(tokenTail)
     expect(event.safe).toBe('no jwt here')
@@ -323,7 +304,7 @@ describe('built-in smart masking', () => {
       header: `Bearer ${fakeStripeKey}`,
       safe: 'no bearer here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['bearer'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['bearer'] }), 'redact config'))
     expect(event.header).toContain('Bearer')
     expect(event.header).not.toContain(fakeStripeKey)
     expect(event.safe).toBe('no bearer here')
@@ -335,7 +316,7 @@ describe('built-in smart masking', () => {
       de: 'DE89 3704 0044 0532 0130 00',
       safe: 'no iban here',
     }
-    redactEvent(event, resolveRedactConfig({ builtins: ['iban'] })!)
+    redactEvent(event, defined(resolveRedactConfig({ builtins: ['iban'] }), 'redact config'))
     expect(event.fr).toContain('FR76')
     expect(event.fr).not.toContain('3000')
     expect(event.de).toContain('DE89')

@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { resetStreamServerForTests, setDefaultStream, startStreamServer, type StreamServer } from '../../src/stream'
 import type { WideEvent } from '../../src/types'
 import { makeEvent } from '../helpers/events'
+import { defined } from '../helpers/defined'
 
 async function readSSE(url: string, durationMs: number, headers: Record<string, string> = {}): Promise<string[]> {
   const session = await openSSE(url, headers)
@@ -22,7 +23,7 @@ async function openSSE(url: string, headers: Record<string, string> = {}): Promi
 }> {
   const res = await fetch(url, { headers })
   expect(res.ok).toBe(true)
-  const reader = res.body!.getReader()
+  const reader = defined(res.body, 'response body').getReader()
   const decoder = new TextDecoder()
   const frames: string[] = []
   let buffer = ''
@@ -156,7 +157,7 @@ describe('startStreamServer', () => {
     const parsed = parseDataFrames(frames)
 
     expect(parsed[0]).toMatchObject({ type: 'hello' })
-    expect(parsed[0]!.data).toMatchObject({ bufferSize: 50, heartbeatMs: 60_000 })
+    expect(defined(parsed[0], 'hello frame').data).toMatchObject({ bufferSize: 50, heartbeatMs: 60_000 })
   })
 
   it('forwards drained events as event frames', async () => {
@@ -171,8 +172,8 @@ describe('startStreamServer', () => {
     const events = parsed.filter(p => p.type === 'event')
 
     expect(events).toHaveLength(2)
-    expect((events[0]!.data as WideEvent).id).toBe(1)
-    expect((events[1]!.data as WideEvent).id).toBe(2)
+    expect((defined(events[0], 'event 0').data as WideEvent).id).toBe(1)
+    expect((defined(events[1], 'event 1').data as WideEvent).id).toBe(2)
   })
 
   it('replays buffered events when ?since is set', async () => {
@@ -187,7 +188,7 @@ describe('startStreamServer', () => {
     const replays = parsed.filter(p => p.type === 'replay')
 
     expect(replays).toHaveLength(1)
-    expect((replays[0]!.data as WideEvent).id).toBe(11)
+    expect((defined(replays[0], 'replay 0').data as WideEvent).id).toBe(11)
   })
 
   it('exposes /info with version and config', async () => {

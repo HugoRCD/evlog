@@ -1,6 +1,11 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DrainContext } from '../../src/types'
 import { createDrainPipeline } from '../../src/pipeline'
+import { defined } from '../helpers/defined'
+
+function getBatchArg(call: unknown[]): DrainContext[] {
+  return defined(call[0], 'batch arg') as DrainContext[]
+}
 
 function createTestContext(id: number): DrainContext {
   return {
@@ -48,11 +53,11 @@ describe('createDrainPipeline', () => {
       await vi.runAllTimersAsync()
 
       expect(drain).toHaveBeenCalledTimes(1)
-      const batch = drain.mock.calls[0]![0] as DrainContext[]
+      const batch = getBatchArg(defined(drain.mock.calls[0], 'drain call'))
       expect(batch).toHaveLength(3)
-      expect(batch[0]!.event.id).toBe(1)
-      expect(batch[1]!.event.id).toBe(2)
-      expect(batch[2]!.event.id).toBe(3)
+      expect(defined(batch[0], 'batch[0]').event.id).toBe(1)
+      expect(defined(batch[1], 'batch[1]').event.id).toBe(2)
+      expect(defined(batch[2], 'batch[2]').event.id).toBe(3)
     })
 
     it('splits into multiple batches', async () => {
@@ -64,9 +69,9 @@ describe('createDrainPipeline', () => {
       await hook.flush()
 
       expect(drain).toHaveBeenCalledTimes(3)
-      expect((drain.mock.calls[0]![0] as DrainContext[])).toHaveLength(3)
-      expect((drain.mock.calls[1]![0] as DrainContext[])).toHaveLength(3)
-      expect((drain.mock.calls[2]![0] as DrainContext[])).toHaveLength(1)
+      expect(getBatchArg(defined(drain.mock.calls[0], 'drain call 0'))).toHaveLength(3)
+      expect(getBatchArg(defined(drain.mock.calls[1], 'drain call 1'))).toHaveLength(3)
+      expect(getBatchArg(defined(drain.mock.calls[2], 'drain call 2'))).toHaveLength(1)
     })
   })
 
@@ -83,7 +88,7 @@ describe('createDrainPipeline', () => {
 
       await vi.advanceTimersByTimeAsync(1)
       expect(drain).toHaveBeenCalledTimes(1)
-      expect((drain.mock.calls[0]![0] as DrainContext[])).toHaveLength(2)
+      expect(getBatchArg(defined(drain.mock.calls[0], 'drain call'))).toHaveLength(2)
     })
 
     it('resets interval when batch size is reached', async () => {
@@ -216,9 +221,10 @@ describe('createDrainPipeline', () => {
 
       expect(drain).toHaveBeenCalledTimes(2)
       expect(onDropped).toHaveBeenCalledTimes(1)
-      expect((onDropped.mock.calls[0]![0] as DrainContext[])).toHaveLength(1)
-      expect(onDropped.mock.calls[0]![1]).toBeInstanceOf(Error)
-      expect((onDropped.mock.calls[0]![1] as Error).message).toBe('permanent failure')
+      const droppedCall = defined(onDropped.mock.calls[0], 'onDropped call')
+      expect(getBatchArg(droppedCall)).toHaveLength(1)
+      expect(droppedCall[1]).toBeInstanceOf(Error)
+      expect((defined(droppedCall[1], 'dropped error') as Error).message).toBe('permanent failure')
     })
   })
 
@@ -241,14 +247,15 @@ describe('createDrainPipeline', () => {
       // Buffer full - should drop oldest
       hook(createTestContext(4))
       expect(onDropped).toHaveBeenCalledTimes(1)
-      expect((onDropped.mock.calls[0]![0] as DrainContext[])).toHaveLength(1)
-      expect((onDropped.mock.calls[0]![0] as DrainContext[])[0]!.event.id).toBe(1)
+      const droppedBatch = getBatchArg(defined(onDropped.mock.calls[0], 'onDropped call'))
+      expect(droppedBatch).toHaveLength(1)
+      expect(defined(droppedBatch[0], 'dropped batch[0]').event.id).toBe(1)
 
       expect(hook.pending).toBe(3)
 
       // Flush and verify the remaining events are 2, 3, 4
       await hook.flush()
-      const batch = drain.mock.calls[0]![0] as DrainContext[]
+      const batch = getBatchArg(defined(drain.mock.calls[0], 'drain call'))
       expect(batch.map(c => c.event.id)).toEqual([2, 3, 4])
     })
   })
@@ -265,7 +272,7 @@ describe('createDrainPipeline', () => {
       await hook.flush()
 
       expect(drain).toHaveBeenCalledTimes(1)
-      expect((drain.mock.calls[0]![0] as DrainContext[])).toHaveLength(3)
+      expect(getBatchArg(defined(drain.mock.calls[0], 'drain call'))).toHaveLength(3)
       expect(hook.pending).toBe(0)
     })
 

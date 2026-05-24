@@ -21,7 +21,11 @@ const { public: pub } = useRuntimeConfig()
 const docsUrl = pub.docsUrl || 'https://www.evlog.dev'
 const siteUrl = pub.siteUrl || 'https://www.justfuckinguseevlog.com'
 
-const fm = page.value as unknown as Record<string, string>
+const pageData = page.value
+
+function pickString(value: unknown): string {
+  return typeof value === 'string' ? value : ''
+}
 
 useHead({
   htmlAttrs: { lang: 'en' },
@@ -36,7 +40,7 @@ useHead({
         '@context': 'https://schema.org',
         '@type': 'SoftwareApplication',
         'name': 'evlog',
-        'description': fm.description,
+        'description': pickString(pageData.description),
         'applicationCategory': 'DeveloperApplication',
         'operatingSystem': 'Any',
         'offers': { '@type': 'Offer', 'price': '0', 'priceCurrency': 'USD' },
@@ -49,12 +53,12 @@ useHead({
 })
 
 useSeoMeta({
-  title: fm.title,
-  description: fm.description,
+  title: pickString(pageData.title),
+  description: pickString(pageData.description),
   ogType: 'website',
   ogUrl: `${siteUrl}/`,
-  ogTitle: fm.ogTitle || fm.title,
-  ogDescription: fm.ogDescription || fm.description,
+  ogTitle: pickString(pageData.ogTitle) || pickString(pageData.title),
+  ogDescription: pickString(pageData.ogDescription) || pickString(pageData.description),
   ogImage: `${siteUrl}/og.jpg`,
   ogImageWidth: 1200,
   ogImageHeight: 630,

@@ -85,7 +85,7 @@ export function evlog(options: EvlogMyFrameworkOptions = {}): MyFrameworkMiddlew
       await runWith(() => next())
       await finish({ status: ctx.res.statusCode })
     } catch (error) {
-      await finish({ error: error as Error })
+      await finish({ error: error instanceof Error ? error : new Error(String(error)) })
       throw error
     }
   }

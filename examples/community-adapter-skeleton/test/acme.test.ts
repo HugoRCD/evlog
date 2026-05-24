@@ -10,7 +10,7 @@ const baseEvent = (): WideEvent => ({
   action: 'checkout',
 })
 
-const ctx = (event: WideEvent): DrainContext => ({ event } as DrainContext)
+const ctx = (event: WideEvent): DrainContext => ({ event })
 
 describe('toAcmeEvent', () => {
   it('flattens timestamp + level + attributes', () => {
@@ -60,8 +60,13 @@ describe('createAcmeDrain', () => {
   it('honors explicit overrides over env vars', async () => {
     const drain = createAcmeDrain({ apiKey: 'override-secret' })
     await drain(ctx(baseEvent()))
-    const call = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls[0] as [string, RequestInit]
-    const headers = call[1].headers as Record<string, string>
-    expect(headers.Authorization).toBe('Bearer override-secret')
+    expect(fetch).toHaveBeenCalledWith(
+      expect.any(String),
+      expect.objectContaining({
+        headers: expect.objectContaining({
+          Authorization: 'Bearer override-secret',
+        }),
+      }),
+    )
   })
 })

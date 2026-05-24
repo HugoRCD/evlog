@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
-import type { RequestLogger } from '../../src/types'
 import { initLogger } from '../../src/logger'
+import type { RequestLogger } from '../../src/types'
 import { evlog, useLogger } from '../../src/fastify/index'
 import {
   assertDrainCalledWith,
@@ -12,6 +12,7 @@ import {
   findEventViaDrain,
   waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
 
 describe('evlog/fastify', () => {
   beforeEach(() => {
@@ -35,7 +36,7 @@ describe('evlog/fastify', () => {
 
     let hasLogger = false
     app.get('/api/test', (request) => {
-      hasLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
+      hasLogger = request.log !== undefined && typeof request.log.set === 'function'
       return { ok: true }
     })
 
@@ -65,26 +66,28 @@ describe('evlog/fastify', () => {
     const { drain } = createPipelineSpies()
     const app = Fastify({ logger: false })
     await app.register(evlog, { drain })
-    app.get('/api/users', (request) => {
-      ((request.log) as unknown as RequestLogger).set({ user: { id: 'u-1' }, db: { queries: 3 } })
+    app.get('/api/users', () => {
+      useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return { users: [] }
     })
 
     await app.inject({ method: 'GET', url: '/api/users' })
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/users')
-    expect(event).toBeDefined()
-    expect((event!.user as { id: string }).id).toBe('u-1')
-    expect((event!.db as { queries: number }).queries).toBe(3)
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
+    )
+    expect(event.user).toEqual({ id: 'u-1' })
+    expect(event.db).toEqual({ queries: 3 })
   })
 
   it('logs error status when handler throws', async () => {
     const { drain } = createPipelineSpies()
     const app = Fastify({ logger: false })
     await app.register(evlog, { drain })
-    app.get('/api/fail', (request) => {
-      ((request.log) as unknown as RequestLogger).error(new Error('Something broke'))
+    app.get('/api/fail', () => {
+      useLogger().error(new Error('Something broke'))
       const error = new Error('Something broke') as Error & { statusCode?: number }
       error.statusCode = 500
       throw error
@@ -102,7 +105,7 @@ describe('evlog/fastify', () => {
 
     let isEvlogLogger = false
     app.get('/health', (request) => {
-      isEvlogLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
+      isEvlogLogger = typeof request.log?.set === 'function'
       return { ok: true }
     })
 
@@ -114,8 +117,8 @@ describe('evlog/fastify', () => {
     const { drain } = createPipelineSpies()
     const app = Fastify({ logger: false })
     await app.register(evlog, { include: ['/api/**'], drain })
-    app.get('/api/data', (request) => {
-      ((request.log) as unknown as RequestLogger).set({ data: true })
+    app.get('/api/data', () => {
+      useLogger().set({ data: true })
       return { ok: true }
     })
 
@@ -138,9 +141,11 @@ describe('evlog/fastify', () => {
     })
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/test')
-    expect(event).toBeDefined()
-    expect(event!.requestId).toBe('custom-req-id')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/test'),
+      'event with x-request-id',
+    )
+    expect(event.requestId).toBe('custom-req-id')
   })
 
   it('handles POST requests with correct method', async () => {
@@ -161,7 +166,7 @@ describe('evlog/fastify', () => {
 
     let isEvlogLogger = false
     app.get('/_internal/probe', (request) => {
-      isEvlogLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
+      isEvlogLogger = typeof request.log?.set === 'function'
       return { ok: true }
     })
 
@@ -181,9 +186,11 @@ describe('evlog/fastify', () => {
     await app.inject({ method: 'GET', url: '/api/auth/login' })
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/auth/login')
-    expect(event).toBeDefined()
-    expect(event!.service).toBe('auth-service')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
+      'route service override event',
+    )
+    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {
@@ -192,8 +199,8 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
-      app.get('/api/test', (request) => {
-        ((request.log) as unknown as RequestLogger).set({ user: { id: 'u-1' } })
+      app.get('/api/test', () => {
+        useLogger().set({ user: { id: 'u-1' } })
         return { ok: true }
       })
 
@@ -237,10 +244,10 @@ describe('evlog/fastify', () => {
       })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -260,8 +267,9 @@ describe('evlog/fastify', () => {
         },
       })
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -272,8 +280,8 @@ describe('evlog/fastify', () => {
 
       const app = Fastify({ logger: false })
       await app.register(evlog, { keep, drain })
-      app.get('/api/test', (request) => {
-        ((request.log) as unknown as RequestLogger).set({ important: true })
+      app.get('/api/test', () => {
+        useLogger().set({ important: true })
         return { ok: true }
       })
 
@@ -330,30 +338,29 @@ describe('evlog/fastify', () => {
 
   describe('useLogger()', () => {
     it('returns the request-scoped logger from anywhere in the call stack', async () => {
+      const { drain } = createPipelineSpies()
       const app = Fastify({ logger: false })
-      await app.register(evlog)
+      await app.register(evlog, { drain })
 
-      let loggerFromService: unknown
+      let loggerFromService: RequestLogger | undefined
       function serviceFunction() {
         loggerFromService = useLogger()
         useLogger().set({ fromService: true })
       }
 
-      app.get('/api/test', (_request) => {
+      app.get('/api/test', () => {
         serviceFunction()
         return { ok: true }
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await app.inject({ method: 'GET', url: '/api/test' })
+      await waitForDrainCalls(drain)
 
       expect(loggerFromService).toBeDefined()
-      expect(typeof (loggerFromService as Record<string, unknown>).set).toBe('function')
+      expect(typeof defined(loggerFromService).set).toBe('function')
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"fromService":true'),
-      )
-      expect(lastCall).toBeDefined()
+      const event = findEventViaDrain(drain, e => e.fromService === true)
+      expect(event).toBeDefined()
     })
 
     it('returns the same logger as request.log', async () => {
@@ -362,7 +369,7 @@ describe('evlog/fastify', () => {
 
       let isSame = false
       app.get('/api/test', (request) => {
-        isSame = useLogger() === (request.log as unknown as RequestLogger)
+        isSame = useLogger() === defined(request.log, 'request.log in handler')
         return { ok: true }
       })
 
@@ -375,26 +382,25 @@ describe('evlog/fastify', () => {
     })
 
     it('works across async boundaries', async () => {
+      const { drain } = createPipelineSpies()
       const app = Fastify({ logger: false })
-      await app.register(evlog)
+      await app.register(evlog, { drain })
 
       async function asyncService() {
         await new Promise(resolve => setTimeout(resolve, 5))
         useLogger().set({ asyncWork: 'done' })
       }
 
-      app.get('/api/test', async (_request) => {
+      app.get('/api/test', async () => {
         await asyncService()
         return { ok: true }
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await app.inject({ method: 'GET', url: '/api/test' })
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"asyncWork":"done"'),
-      )
-      expect(lastCall).toBeDefined()
+      const event = findEventViaDrain(drain, e => e.asyncWork === 'done')
+      expect(event).toBeDefined()
     })
   })
 })

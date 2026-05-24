@@ -1,36 +1,10 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { LanguageModelV3, LanguageModelV3FinishReason, LanguageModelV3StreamPart } from '@ai-sdk/provider'
+import type { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3FinishReason, LanguageModelV3StreamPart } from '@ai-sdk/provider'
+import type { OnFinishEvent, OnStartEvent, OnToolCallFinishEvent, TelemetryIntegration } from 'ai'
 import type { RequestLogger } from '../../src/types'
 import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
-import { createLogger } from '../../src/logger'
-
-/**
- * Mirrors evlog's `mergeInto` so the mock reflects what the wide event
- * actually accumulates: arrays are concatenated, plain objects are merged
- * recursively, scalars are replaced. Without this, a `log.set()` mock that
- * just records each call would hide bugs whose impact only shows up on
- * the assembled wide event (e.g. quadratic array growth).
- */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) return false
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null
-}
-
-function mergeInto(target: Record<string, unknown>, source: Record<string, unknown>): void {
-  for (const key in source) {
-    const sourceVal = source[key]
-    if (sourceVal === undefined || sourceVal === null) continue
-    const targetVal = target[key]
-    if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
-      mergeInto(targetVal, sourceVal)
-    } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
-      target[key] = [...targetVal, ...sourceVal]
-    } else {
-      target[key] = sourceVal
-    }
-  }
-}
+import { createLogger, mergeWideEventFields } from '../../src/logger'
+import { defined } from '../helpers/defined'
 
 interface MockLogger extends RequestLogger {
   setCalls: Array<Record<string, unknown>>
@@ -51,7 +25,7 @@ function createMockLogger(): MockLogger {
     set: vi.fn((data: Record<string, unknown>) => {
       const cloned = structuredClone(data)
       setCalls.push(cloned)
-      mergeInto(merged, structuredClone(data))
+      mergeWideEventFields(merged, structuredClone(data))
     }),
     error: vi.fn(),
     info: vi.fn(),
@@ -84,15 +58,81 @@ function createMockUsage(overrides?: Partial<{
   }
 }
 
-function createMockModel(overrides?: Partial<{ provider: string, modelId: string }>): LanguageModelV3 {
+type GenerateResult = Awaited<ReturnType<LanguageModelV3['doGenerate']>>
+type StreamResult = Awaited<ReturnType<LanguageModelV3['doStream']>>
+
+/** AI SDK generate results require many fields — partial mocks cast once here. */
+function asGenerateResult(value: Record<string, unknown>): GenerateResult {
+  return value as GenerateResult
+}
+
+function asStreamResult(value: Record<string, unknown>): StreamResult {
+  return value as StreamResult
+}
+
+type MockLanguageModel = Pick<LanguageModelV3, 'specificationVersion' | 'provider' | 'modelId'> & {
+  doGenerate: ReturnType<typeof vi.fn<LanguageModelV3['doGenerate']>>
+  doStream: ReturnType<typeof vi.fn<LanguageModelV3['doStream']>>
+}
+
+function createMockCallOptions(): LanguageModelV3CallOptions {
+  return { prompt: [] }
+}
+
+function getLastAiData(log: MockLogger): Record<string, unknown> {
+  return defined(log.setCalls.at(-1)?.ai, 'last ai payload') as Record<string, unknown>
+}
+
+function callIntegrationOnStart(integration: TelemetryIntegration, event?: Partial<OnStartEvent>) {
+  defined(integration.onStart, 'onStart')({
+    model: { provider: 'anthropic', modelId: 'claude-sonnet-4.6' },
+    maxRetries: 0,
+    ...event,
+  } as OnStartEvent)
+}
+
+/** createEvlogIntegration ignores the onFinish payload — cast kept in one place. */
+function callIntegrationOnFinish(integration: TelemetryIntegration) {
+  defined(integration.onFinish, 'onFinish')({} as OnFinishEvent)
+}
+
+function callIntegrationOnToolCallFinish(
+  integration: TelemetryIntegration,
+  input: {
+    toolName: string
+    durationMs: number
+    success: boolean
+    output?: unknown
+    error?: unknown
+  },
+) {
+  const base = {
+    toolCall: { toolName: input.toolName, toolCallId: 'tc1', input: {} },
+    durationMs: input.durationMs,
+    messages: [],
+    stepNumber: undefined,
+    model: undefined,
+    abortSignal: undefined,
+    functionId: undefined,
+    metadata: undefined,
+    experimental_context: undefined,
+  }
+
+  const event: OnToolCallFinishEvent = input.success
+    ? { ...base, success: true, output: input.output ?? {} }
+    : { ...base, success: false, error: input.error ?? new Error('failed') }
+
+  defined(integration.onToolCallFinish, 'onToolCallFinish')(event as OnToolCallFinishEvent)
+}
+
+function createMockModel(overrides?: Partial<{ provider: string, modelId: string }>): MockLanguageModel {
   return {
     specificationVersion: 'v3',
     provider: overrides?.provider ?? 'anthropic',
     modelId: overrides?.modelId ?? 'claude-sonnet-4.6',
-    defaultObjectGenerationMode: 'json',
     doGenerate: vi.fn(),
     doStream: vi.fn(),
-  } as unknown as LanguageModelV3
+  }
 }
 
 function createFinishReason(unified: LanguageModelV3FinishReason['unified'] = 'stop'): LanguageModelV3FinishReason {
@@ -141,8 +181,8 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       expect(log.set).toHaveBeenCalled()
       const lastSetCall = log.setCalls[log.setCalls.length - 1]
@@ -170,8 +210,8 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.cacheReadTokens).toBe(150)
@@ -192,8 +232,8 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.cacheReadTokens).toBeUndefined()
@@ -218,8 +258,8 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.toolCalls).toEqual(['searchWeb', 'calculatePrice'])
@@ -239,8 +279,8 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6-20250514' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.model).toBe('claude-sonnet-4.6-20250514')
@@ -258,8 +298,8 @@ describe('createAILogger', () => {
         usage: createMockUsage(),
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.model).toBe('claude-sonnet-4.6')
@@ -285,11 +325,11 @@ describe('createAILogger', () => {
         },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -312,11 +352,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -339,11 +379,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason('tool-calls'), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -364,11 +404,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -388,11 +428,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(inputChunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       const outputChunks = await consumeStream(result.stream)
 
       expect(outputChunks).toHaveLength(inputChunks.length)
@@ -407,7 +447,7 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>)
+      vi.mocked(model.doGenerate)
         .mockResolvedValueOnce({
           content: [],
           finishReason: createFinishReason(),
@@ -421,8 +461,8 @@ describe('createAILogger', () => {
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-      await wrappedModel.doGenerate({} as any)
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.calls).toBe(2)
@@ -444,14 +484,14 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
       let aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.steps).toBeUndefined()
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
-      await wrappedModel.doGenerate({} as any)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
+      await wrappedModel.doGenerate(createMockCallOptions())
       aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.steps).toBe(2)
     })
@@ -466,22 +506,22 @@ describe('createAILogger', () => {
       const wrappedGemini = ai.wrap(gemini)
       const wrappedClaude = ai.wrap(claude)
 
-      ;(gemini.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(gemini.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
         response: { modelId: 'gemini-3-flash' },
       })
 
-      ;(claude.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(claude.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedGemini.doGenerate({} as any)
-      await wrappedClaude.doGenerate({} as any)
+      await wrappedGemini.doGenerate(createMockCallOptions())
+      await wrappedClaude.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.model).toBe('claude-sonnet-4.6')
@@ -503,10 +543,10 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       }
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(mockResult)
+      vi.mocked(model.doGenerate).mockResolvedValue(asGenerateResult(mockResult))
 
-      await wrappedModel.doGenerate({} as any)
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.model).toBe('claude-sonnet-4.6')
@@ -519,7 +559,7 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>)
+      vi.mocked(model.doGenerate)
         .mockResolvedValueOnce({
           content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', args: '{}' }],
           finishReason: createFinishReason('tool-calls'),
@@ -533,8 +573,8 @@ describe('createAILogger', () => {
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-      await wrappedModel.doGenerate({} as any)
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.merged.ai as Record<string, unknown>
       expect(aiData.toolCalls).toEqual(['search', 'calculate'])
@@ -548,7 +588,7 @@ describe('createAILogger', () => {
 
       const tools = ['list-pages', 'get-page', 'get-page', 'get-page', 'get-page', 'get-page']
 
-      const doGenerate = model.doGenerate as ReturnType<typeof vi.fn>
+      const doGenerate = vi.mocked(model.doGenerate)
       for (const toolName of tools) {
         doGenerate.mockResolvedValueOnce({
           content: [{ type: 'tool-call', toolCallId: `tc-${toolName}`, toolName, args: '{}' }],
@@ -556,7 +596,7 @@ describe('createAILogger', () => {
           usage: createMockUsage({ inputTotal: 100, outputTotal: 20 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
       }
 
       const merged = log.merged.ai as Record<string, unknown>
@@ -581,13 +621,13 @@ describe('createAILogger', () => {
       const model = createMockModel({ provider: 'gateway', modelId: 'google/gemini-3-flash' })
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage(),
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.provider).toBe('google')
@@ -600,14 +640,14 @@ describe('createAILogger', () => {
       const model = createMockModel({ provider: 'gateway', modelId: 'anthropic/claude-sonnet-4.6' })
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage(),
         response: { modelId: 'anthropic/claude-sonnet-4.6-20250514' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.provider).toBe('anthropic')
@@ -620,14 +660,14 @@ describe('createAILogger', () => {
       const model = createMockModel({ provider: 'anthropic', modelId: 'claude-sonnet-4.6' })
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.provider).toBe('anthropic')
@@ -647,11 +687,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -685,12 +725,12 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage({ outputTotal: 500 }) },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockImplementation(async () => {
+      vi.mocked(model.doStream).mockImplementation(async () => {
         await new Promise(r => setTimeout(r, 20))
         return { stream: makeReadableStream(chunks) }
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -712,11 +752,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage({ outputTotal: 500 }) },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -733,9 +773,9 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('API rate limit exceeded'))
+      vi.mocked(model.doGenerate).mockRejectedValue(new Error('API rate limit exceeded'))
 
-      await expect(wrappedModel.doGenerate({} as any)).rejects.toThrow('API rate limit exceeded')
+      await expect(wrappedModel.doGenerate(createMockCallOptions())).rejects.toThrow('API rate limit exceeded')
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.error).toBe('API rate limit exceeded')
@@ -749,9 +789,9 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Connection timeout'))
+      vi.mocked(model.doStream).mockRejectedValue(new Error('Connection timeout'))
 
-      await expect(wrappedModel.doStream({} as any)).rejects.toThrow('Connection timeout')
+      await expect(wrappedModel.doStream(createMockCallOptions())).rejects.toThrow('Connection timeout')
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.error).toBe('Connection timeout')
@@ -771,11 +811,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason('content-filter'), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -805,14 +845,14 @@ describe('createAILogger', () => {
 
       ai.captureEmbed({ usage: { tokens: 30 } })
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.calls).toBe(2)
@@ -829,14 +869,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'searchWeb', input: '{"query":"weather"}' }],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.toolCalls).toEqual(['searchWeb'])
@@ -848,7 +888,7 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [
           { type: 'tool-call', toolCallId: 'tc1', toolName: 'searchWeb', input: '{"query":"weather in SF"}' },
           { type: 'tool-call', toolCallId: 'tc2', toolName: 'calculate', input: '{"expression":"2+2"}' },
@@ -858,7 +898,7 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.toolCalls).toEqual([
@@ -873,14 +913,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'run', input: 'not-json' }],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const toolCalls = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -901,11 +941,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason('tool-calls'), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -925,11 +965,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason('tool-calls'), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -942,14 +982,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'run', input: { already: 'parsed' } }],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const toolCalls = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -962,14 +1002,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'queryDB', input: '{"sql":"SELECT * FROM events WHERE status = 200 ORDER BY created_at DESC LIMIT 50"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const inputs = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -984,14 +1024,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"q":"hello"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const inputs = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -1013,7 +1053,7 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [
           { type: 'tool-call', toolCallId: 'tc1', toolName: 'queryDB', input: '{"sql":"SELECT * FROM users"}' },
           { type: 'tool-call', toolCallId: 'tc2', toolName: 'search', input: '{"q":"hello"}' },
@@ -1023,7 +1063,7 @@ describe('createAILogger', () => {
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const inputs = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -1042,14 +1082,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"query":"a very long search query that exceeds the limit"}' },],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const inputs = aiData.toolCalls as Array<{ name: string, input: unknown }>
@@ -1071,11 +1111,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason('tool-calls'), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -1092,14 +1132,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6', id: 'msg_01XFDUDYJgAACzvnptvVoYEL' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.responseId).toBe('msg_01XFDUDYJgAACzvnptvVoYEL')
@@ -1119,11 +1159,11 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage() },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doStream).mockResolvedValue({
         stream: makeReadableStream(chunks),
       })
 
-      const result = await wrappedModel.doStream({} as any)
+      const result = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -1136,14 +1176,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage(),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.responseId).toBeUndefined()
@@ -1157,14 +1197,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.stepsUsage).toBeUndefined()
@@ -1177,7 +1217,7 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>)
+      vi.mocked(model.doGenerate)
         .mockResolvedValueOnce({
           content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{}' }],
           finishReason: createFinishReason('tool-calls'),
@@ -1191,8 +1231,8 @@ describe('createAILogger', () => {
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-      await wrappedModel.doGenerate({} as any)
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.steps).toBe(2)
@@ -1231,13 +1271,13 @@ describe('createAILogger', () => {
         { type: 'finish', finishReason: createFinishReason(), usage: createMockUsage({ inputTotal: 400, outputTotal: 100 }) },
       ]
 
-      ;(model.doStream as ReturnType<typeof vi.fn>)
+      vi.mocked(model.doStream)
         .mockResolvedValueOnce({ stream: makeReadableStream(chunks1) })
         .mockResolvedValueOnce({ stream: makeReadableStream(chunks2) })
 
-      const result1 = await wrappedModel.doStream({} as any)
+      const result1 = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result1.stream)
-      const result2 = await wrappedModel.doStream({} as any)
+      const result2 = await wrappedModel.doStream(createMockCallOptions())
       await consumeStream(result2.stream)
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
@@ -1266,22 +1306,22 @@ describe('createAILogger', () => {
       const wrappedFast = ai.wrap(fast)
       const wrappedSmart = ai.wrap(smart)
 
-      ;(fast.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(fast.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 50, outputTotal: 20 }),
         response: { modelId: 'claude-haiku-4.5' },
       })
 
-      ;(smart.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(smart.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedFast.doGenerate({} as any)
-      await wrappedSmart.doGenerate({} as any)
+      await wrappedFast.doGenerate(createMockCallOptions())
+      await wrappedSmart.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       const stepsUsage = aiData.stepsUsage as Array<Record<string, unknown>>
@@ -1308,14 +1348,14 @@ describe('createAILogger', () => {
 
       const wrappedModel = wrapLanguageModel({ model, middleware })
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{"q":"test"}' }],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
         response: { modelId: 'claude-sonnet-4.6', id: 'msg_abc' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.calls).toBe(1)
@@ -1393,14 +1433,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       // 1M input * $3/1M = $3 + 500K output * $15/1M = $7.5 => $10.5
@@ -1417,14 +1457,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.estimatedCost).toBeUndefined()
@@ -1436,14 +1476,14 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [],
         finishReason: createFinishReason(),
         usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      await wrappedModel.doGenerate({} as any)
+      await wrappedModel.doGenerate(createMockCallOptions())
 
       const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
       expect(aiData.estimatedCost).toBeUndefined()
@@ -1465,20 +1505,16 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({
-        model: { provider: 'anthropic', modelId: 'claude-sonnet-4.6' },
-      } as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+      callIntegrationOnStart(integration)
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'getWeather',
         durationMs: 150,
         success: true,
         output: { temperature: 22 },
-      } as any)
+      })
+      callIntegrationOnFinish(integration)
 
-      integration.onFinish!({} as any)
-
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       const tools = aiData.tools as Array<Record<string, unknown>>
       expect(tools).toHaveLength(1)
       expect(tools[0]).toEqual({
@@ -1494,18 +1530,16 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({} as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'searchDB', toolCallId: 'tc2', input: {} },
+      callIntegrationOnStart(integration)
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'searchDB',
         durationMs: 50,
         success: false,
         error: new Error('Connection refused'),
-      } as any)
+      })
+      callIntegrationOnFinish(integration)
 
-      integration.onFinish!({} as any)
-
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       const tools = aiData.tools as Array<Record<string, unknown>>
       expect(tools).toHaveLength(1)
       expect(tools[0]).toEqual({
@@ -1520,25 +1554,22 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({} as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+      callIntegrationOnStart(integration)
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'getWeather',
         durationMs: 100,
         success: true,
         output: {},
-      } as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'searchDB', toolCallId: 'tc2', input: {} },
+      })
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'searchDB',
         durationMs: 250,
         success: true,
         output: {},
-      } as any)
+      })
+      callIntegrationOnFinish(integration)
 
-      integration.onFinish!({} as any)
-
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       const tools = aiData.tools as Array<Record<string, unknown>>
       expect(tools).toHaveLength(2)
       expect(tools[0].name).toBe('getWeather')
@@ -1552,26 +1583,24 @@ describe('createAILogger', () => {
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
-      ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+      vi.mocked(model.doGenerate).mockResolvedValue({
         content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'getWeather', input: '{}' }],
         finishReason: createFinishReason('tool-calls'),
         usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
         response: { modelId: 'claude-sonnet-4.6' },
       })
 
-      integration.onStart!({} as any)
-      await wrappedModel.doGenerate({} as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+      callIntegrationOnStart(integration)
+      await wrappedModel.doGenerate(createMockCallOptions())
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'getWeather',
         durationMs: 75,
         success: true,
         output: { temp: 20 },
-      } as any)
+      })
+      callIntegrationOnFinish(integration)
 
-      integration.onFinish!({} as any)
-
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       expect(aiData.calls).toBe(1)
       expect(aiData.model).toBe('claude-sonnet-4.6')
       expect(aiData.inputTokens).toBe(200)
@@ -1587,11 +1616,11 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({} as any)
+      callIntegrationOnStart(integration)
       await new Promise(resolve => setTimeout(resolve, 20))
-      integration.onFinish!({} as any)
+      callIntegrationOnFinish(integration)
 
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       expect(aiData.totalDurationMs).toBeTypeOf('number')
       expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
     })
@@ -1600,18 +1629,16 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({} as any)
-
-      integration.onToolCallFinish!({
-        toolCall: { toolName: 'myTool', toolCallId: 'tc1', input: {} },
+      callIntegrationOnStart(integration)
+      callIntegrationOnToolCallFinish(integration, {
+        toolName: 'myTool',
         durationMs: 10,
         success: false,
         error: 'Something went wrong',
-      } as any)
+      })
+      callIntegrationOnFinish(integration)
 
-      integration.onFinish!({} as any)
-
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       const tools = aiData.tools as Array<Record<string, unknown>>
       expect(tools[0].error).toBe('Something went wrong')
     })
@@ -1620,10 +1647,10 @@ describe('createAILogger', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
-      integration.onStart!({} as any)
-      integration.onFinish!({} as any)
+      callIntegrationOnStart(integration)
+      callIntegrationOnFinish(integration)
 
-      const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
+      const aiData = getLastAiData(log)
       expect(aiData.tools).toBeUndefined()
     })
   })
@@ -1653,14 +1680,14 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{}' }],
           finishReason: createFinishReason('tool-calls'),
           usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
           response: { modelId: 'claude-sonnet-4.6', id: 'msg_abc' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
 
         const aiData = log.setCalls[log.setCalls.length - 1].ai as Record<string, unknown>
         const metadata = ai.getMetadata()
@@ -1684,14 +1711,14 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'search', input: '{}' }],
           finishReason: createFinishReason('tool-calls'),
           usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
 
         const first = ai.getMetadata()
         ;(first.toolCalls as string[]).push('mutated')
@@ -1708,7 +1735,7 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>)
+        vi.mocked(model.doGenerate)
           .mockResolvedValueOnce({
             content: [],
             finishReason: createFinishReason(),
@@ -1722,12 +1749,12 @@ describe('createAILogger', () => {
             response: { modelId: 'claude-sonnet-4.6' },
           })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         const afterStep1 = ai.getMetadata()
         expect(afterStep1.calls).toBe(1)
         expect(afterStep1.totalTokens).toBe(150)
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         const afterStep2 = ai.getMetadata()
         expect(afterStep2.calls).toBe(2)
         expect(afterStep2.totalTokens).toBe(450)
@@ -1755,9 +1782,9 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('quota exceeded'))
+        vi.mocked(model.doGenerate).mockRejectedValue(new Error('quota exceeded'))
 
-        await expect(wrappedModel.doGenerate({} as any)).rejects.toThrow('quota exceeded')
+        await expect(wrappedModel.doGenerate(createMockCallOptions())).rejects.toThrow('quota exceeded')
 
         const metadata = ai.getMetadata()
         expect(metadata.error).toBe('quota exceeded')
@@ -1772,14 +1799,14 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [],
           finishReason: createFinishReason(),
           usage: createMockUsage({ inputTotal: 100, outputTotal: 50 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         expect(ai.getEstimatedCost()).toBeUndefined()
       })
 
@@ -1791,14 +1818,14 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [],
           finishReason: createFinishReason(),
           usage: createMockUsage({ inputTotal: 1_000_000, outputTotal: 500_000 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
 
         expect(ai.getEstimatedCost()).toBe(10.5)
         expect(ai.getEstimatedCost()).toBe(ai.getMetadata().estimatedCost)
@@ -1810,14 +1837,14 @@ describe('createAILogger', () => {
         const model = createMockModel()
         const wrappedModel = ai.wrap(model)
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [],
           finishReason: createFinishReason(),
           usage: createMockUsage(),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         expect(ai.getEstimatedCost()).toBeUndefined()
       })
     })
@@ -1834,7 +1861,7 @@ describe('createAILogger', () => {
           updates.push(metadata)
         })
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>)
+        vi.mocked(model.doGenerate)
           .mockResolvedValueOnce({
             content: [],
             finishReason: createFinishReason(),
@@ -1848,8 +1875,8 @@ describe('createAILogger', () => {
             response: { modelId: 'claude-sonnet-4.6' },
           })
 
-        await wrappedModel.doGenerate({} as any)
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
+        await wrappedModel.doGenerate(createMockCallOptions())
 
         expect(updates).toHaveLength(2)
         expect(updates[0].calls).toBe(1)
@@ -1880,8 +1907,8 @@ describe('createAILogger', () => {
         const updates: Array<ReturnType<typeof ai.getMetadata>> = []
         ai.onUpdate(metadata => updates.push(metadata))
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('boom'))
-        await expect(wrappedModel.doGenerate({} as any)).rejects.toThrow('boom')
+        vi.mocked(model.doGenerate).mockRejectedValue(new Error('boom'))
+        await expect(wrappedModel.doGenerate(createMockCallOptions())).rejects.toThrow('boom')
 
         expect(updates).toHaveLength(1)
         expect(updates[0].error).toBe('boom')
@@ -1898,22 +1925,22 @@ describe('createAILogger', () => {
         const updates: Array<ReturnType<typeof ai.getMetadata>> = []
         ai.onUpdate(metadata => updates.push(metadata))
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [{ type: 'tool-call', toolCallId: 'tc1', toolName: 'getWeather', input: '{}' }],
           finishReason: createFinishReason('tool-calls'),
           usage: createMockUsage({ inputTotal: 200, outputTotal: 100 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        integration.onStart!({} as any)
-        await wrappedModel.doGenerate({} as any)
-        integration.onToolCallFinish!({
-          toolCall: { toolName: 'getWeather', toolCallId: 'tc1', input: {} },
+        callIntegrationOnStart(integration)
+        await wrappedModel.doGenerate(createMockCallOptions())
+        callIntegrationOnToolCallFinish(integration, {
+          toolName: 'getWeather',
           durationMs: 50,
           success: true,
           output: {},
-        } as any)
-        integration.onFinish!({} as any)
+        })
+        callIntegrationOnFinish(integration)
 
         expect(updates.length).toBeGreaterThanOrEqual(2)
         const last = updates[updates.length - 1]
@@ -1932,19 +1959,19 @@ describe('createAILogger', () => {
           count++ 
         })
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [],
           finishReason: createFinishReason(),
           usage: createMockUsage(),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         expect(count).toBe(1)
 
         off()
 
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
         expect(count).toBe(1)
       })
 
@@ -1982,14 +2009,14 @@ describe('createAILogger', () => {
           calls++ 
         })
 
-        ;(model.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue({
+        vi.mocked(model.doGenerate).mockResolvedValue({
           content: [],
           finishReason: createFinishReason(),
           usage: createMockUsage(),
           response: { modelId: 'claude-sonnet-4.6' },
         })
 
-        await expect(wrappedModel.doGenerate({} as any)).resolves.toBeDefined()
+        await expect(wrappedModel.doGenerate(createMockCallOptions())).resolves.toBeDefined()
         expect(calls).toBe(1)
       })
 
@@ -2014,12 +2041,12 @@ describe('createAILogger', () => {
   describe('end-to-end with the real logger', () => {
     it('produces a wide event with linear array growth across a multi-step run', async () => {
       const log = createLogger()
-      const ai = createAILogger(log as unknown as RequestLogger)
+      const ai = createAILogger(log)
       const model = createMockModel()
       const wrappedModel = ai.wrap(model)
 
       const tools = ['list-pages', 'get-page', 'get-page', 'get-page', 'get-page', 'get-page']
-      const doGenerate = model.doGenerate as ReturnType<typeof vi.fn>
+      const doGenerate = vi.mocked(model.doGenerate)
       for (const toolName of tools) {
         doGenerate.mockResolvedValueOnce({
           content: [{ type: 'tool-call', toolCallId: `tc-${toolName}`, toolName, args: '{}' }],
@@ -2027,12 +2054,12 @@ describe('createAILogger', () => {
           usage: createMockUsage({ inputTotal: 100, outputTotal: 20 }),
           response: { modelId: 'claude-sonnet-4.6' },
         })
-        await wrappedModel.doGenerate({} as any)
+        await wrappedModel.doGenerate(createMockCallOptions())
       }
 
-      const wide = log.emit({ _forceKeep: true } as any)
+      const wide = defined(log.emit({ _forceKeep: true }), 'wide event')
       expect(wide).not.toBeNull()
-      const aiData = (wide as Record<string, unknown>).ai as Record<string, unknown>
+      const aiData = defined(wide.ai, 'wide event ai') as Record<string, unknown>
 
       expect((aiData.toolCalls as string[])).toEqual(tools)
       expect((aiData.stepsUsage as unknown[])).toHaveLength(tools.length)
@@ -2044,7 +2071,7 @@ describe('createAILogger', () => {
 
     it('keeps `models` deduplicated across many flushes on the real wide event', async () => {
       const log = createLogger()
-      const ai = createAILogger(log as unknown as RequestLogger)
+      const ai = createAILogger(log)
 
       const gemini = createMockModel({ provider: 'google', modelId: 'gemini-3-flash' })
       const claude = createMockModel({ provider: 'anthropic', modelId: 'claude-sonnet-4.6' })
@@ -2057,17 +2084,17 @@ describe('createAILogger', () => {
         usage: createMockUsage({ inputTotal: 50, outputTotal: 10 }),
         response: { modelId },
       })
-      ;(gemini.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(baseResult('gemini-3-flash'))
-      ;(claude.doGenerate as ReturnType<typeof vi.fn>).mockResolvedValue(baseResult('claude-sonnet-4.6'))
+      vi.mocked(gemini.doGenerate).mockResolvedValue(baseResult('gemini-3-flash'))
+      vi.mocked(claude.doGenerate).mockResolvedValue(baseResult('claude-sonnet-4.6'))
 
       // Alternate models so each `flushState` re-evaluates the unique set.
-      await wrappedGemini.doGenerate({} as any)
-      await wrappedClaude.doGenerate({} as any)
-      await wrappedGemini.doGenerate({} as any)
-      await wrappedClaude.doGenerate({} as any)
+      await wrappedGemini.doGenerate(createMockCallOptions())
+      await wrappedClaude.doGenerate(createMockCallOptions())
+      await wrappedGemini.doGenerate(createMockCallOptions())
+      await wrappedClaude.doGenerate(createMockCallOptions())
 
-      const wide = log.emit({ _forceKeep: true } as any)
-      const aiData = (wide as Record<string, unknown>).ai as Record<string, unknown>
+      const wide = defined(log.emit({ _forceKeep: true }), 'wide event')
+      const aiData = defined(wide.ai, 'wide event ai') as Record<string, unknown>
       expect(aiData.models).toEqual(['gemini-3-flash', 'claude-sonnet-4.6'])
     })
   })

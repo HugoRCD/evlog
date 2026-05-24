@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { BaseEvlogOptions } from '../../src/shared/middleware'
 import { assertHttpEventEmitted, createPipelineSpies, findEventViaDrain, waitForDrainCalls } from './framework'
+import { defined } from './defined'
 
 /**
  * Minimal viable surface every framework adapter must expose for the shared
@@ -78,9 +79,11 @@ export function describeStandardHttpMatrix(adapter: FrameworkAdapter): void {
       try {
         await fire({ method: 'GET', path: '/api/users', headers: { 'x-request-id': 'shared-matrix-id' } })
         await waitForDrainCalls(drain)
-        const event = findEventViaDrain(drain, e => e.path === '/api/users')
-        expect(event).toBeDefined()
-        expect(event!.requestId).toBe('shared-matrix-id')
+        const event = defined(
+          findEventViaDrain(drain, e => e.path === '/api/users'),
+          'event with x-request-id',
+        )
+        expect(event.requestId).toBe('shared-matrix-id')
       } finally {
         await cleanup?.()
       }
@@ -95,9 +98,11 @@ export function describeStandardHttpMatrix(adapter: FrameworkAdapter): void {
       try {
         await fire({ method: 'GET', path: '/api/users' })
         await waitForDrainCalls(drain)
-        const event = findEventViaDrain(drain, e => e.path === '/api/users')
-        expect(event).toBeDefined()
-        expect(event!.service).toBe('matrix-service')
+        const event = defined(
+          findEventViaDrain(drain, e => e.path === '/api/users'),
+          'event with service override',
+        )
+        expect(event.service).toBe('matrix-service')
       } finally {
         await cleanup?.()
       }

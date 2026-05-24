@@ -3,6 +3,7 @@ import { lt } from 'drizzle-orm'
 // @ts-expect-error nuxthub/db is a virtual module provided by @nuxthub/core
 import { db, schema } from '@nuxthub/db'
 import { parseRetention } from '../utils/retention'
+import type { RuntimeConfigWithEvlog } from '../../config'
 
 export default defineTask({
   meta: {
@@ -10,8 +11,8 @@ export default defineTask({
     description: 'Clean up expired evlog events based on retention policy',
   },
   async run() {
-    const config = useRuntimeConfig()
-    const retention = (config as any).evlog?.retention ?? '7d'
+    const config = useRuntimeConfig() as RuntimeConfigWithEvlog
+    const retention = config.evlog?.retention ?? '7d'
     const { totalMs } = parseRetention(retention)
     const cutoff = new Date(Date.now() - totalMs).toISOString()
 

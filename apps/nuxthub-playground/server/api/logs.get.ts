@@ -3,7 +3,7 @@ import { count as sqlCount, desc, eq } from 'drizzle-orm'
 
 export default defineEventHandler(async (event) => {
   const query = getQuery(event)
-  const level = query.level as string | undefined
+  const level = typeof query.level === 'string' ? query.level : undefined
   const limit = Math.min(Number(query.limit) || 50, 200)
 
   const conditions = level ? eq(schema.evlogEvents.level, level) : undefined

@@ -32,7 +32,8 @@ const integration = defineFrameworkIntegration<FastifyRequest>({
     requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined,
   }),
   attachLogger: (req, logger) => {
-    (req as any).log = logger
+    // @ts-expect-error evlog replaces Fastify's built-in pino logger with RequestLogger
+    req.log = logger
   },
   storage,
 })
@@ -62,21 +63,19 @@ const evlogPlugin: FastifyPluginCallback<EvlogFastifyOptions> = (fastify, option
     const state = requestState.get(request)
     if (!state || emitted.has(request)) return
     emitted.add(request)
-    const logger = (request as any).log
     const err = error instanceof Error ? error : new Error(String(error))
-    if (logger && typeof logger.error === 'function') logger.error(err)
+    request.log.error(err)
     await state.finish({ error: err })
   })
 
   done()
 }
 
-const plugin = evlogPlugin as any
-plugin[Symbol.for('skip-override')] = true
-plugin[Symbol.for('fastify.display-name')] = 'evlog'
-
 /**
  * Create an evlog plugin for Fastify.
+ *
+ * Plugin metadata symbols (`skip-override`, `fastify.display-name`) are attached
+ * for @fastify/autoload — they are not part of `FastifyPluginCallback`.
  *
  * @example
  * ```ts
@@ -96,4 +95,7 @@ plugin[Symbol.for('fastify.display-name')] = 'evlog'
  * })
  * ```
  */
-export const evlog = evlogPlugin
+export const evlog = Object.assign(evlogPlugin, {
+  [Symbol.for('skip-override')]: true,
+  [Symbol.for('fastify.display-name')]: 'evlog',
+})

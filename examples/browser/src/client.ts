@@ -1,8 +1,20 @@
 import { initLogger, log } from 'evlog'
 import { createHttpLogDrain } from 'evlog/http'
 
+function requireElement(id: string): HTMLElement {
+  const el = document.getElementById(id)
+  if (!el) throw new Error(`Missing element #${id}`)
+  return el
+}
+
+function requireInput(id: string): HTMLInputElement {
+  const el = document.getElementById(id)
+  if (!(el instanceof HTMLInputElement)) throw new Error(`Missing input #${id}`)
+  return el
+}
+
 // Visual feedback
-const logList = document.getElementById('log-list')!
+const logList = requireElement('log-list')
 
 function notify(action: string, level: 'info' | 'error' = 'info') {
   const el = document.createElement('div')
@@ -23,15 +35,15 @@ log.info({ action: 'page_view', path: location.pathname, referrer: document.refe
 notify('page_view')
 
 // User clicks "Add to cart"
-document.getElementById('add-to-cart')!.addEventListener('click', () => {
+requireElement('add-to-cart').addEventListener('click', () => {
   log.info({ action: 'add_to_cart', product: 'T-Shirt', price: 29.99, currency: 'EUR' })
   notify('add_to_cart')
 })
 
 // User submits checkout form
-document.getElementById('checkout-form')!.addEventListener('submit', async (e) => {
+requireElement('checkout-form').addEventListener('submit', async (e) => {
   e.preventDefault()
-  const email = (document.getElementById('email') as HTMLInputElement).value
+  const email = requireInput('email').value
 
   log.info({ action: 'checkout_started', email_provided: !!email })
   notify('checkout_started')

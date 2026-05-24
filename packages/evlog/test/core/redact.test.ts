@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { redactEvent, normalizeRedactConfig, resolveRedactConfig, builtinPatterns } from '../../src/redact'
 import type { RedactConfig } from '../../src/types'
 import { createLogger, initLogger } from '../../src/logger'
+import { defined } from '../helpers/defined'
 
 describe('redactEvent - path-based', () => {
   it('redacts a top-level field', () => {
@@ -132,9 +133,9 @@ describe('redactEvent - pattern-based', () => {
     }
     redactEvent(event, { patterns: [emailPattern] })
     const users = event.users as Record<string, unknown>[]
-    expect(users[0]!.email).toBe('[REDACTED]')
-    expect(users[1]!.email).toBe('[REDACTED]')
-    expect(users[0]!.name).toBe('Alice')
+    expect(defined(users[0], 'users[0]').email).toBe('[REDACTED]')
+    expect(defined(users[1], 'users[1]').email).toBe('[REDACTED]')
+    expect(defined(users[0], 'users[0]').name).toBe('Alice')
   })
 
   it('uses custom replacement string', () => {
@@ -226,37 +227,36 @@ describe('resolveRedactConfig', () => {
   })
 
   it('returns all built-in maskers for true', () => {
-    const config = resolveRedactConfig(true)
-    expect(config).toBeDefined()
-    expect(config!._maskers).toHaveLength(Object.keys(builtinPatterns).length)
+    const config = defined(resolveRedactConfig(true), 'redact config')
+    expect(config._maskers).toHaveLength(Object.keys(builtinPatterns).length)
   })
 
   it('includes built-in maskers by default when object is passed', () => {
-    const config = resolveRedactConfig({ paths: ['user.password'] })
-    expect(config!.paths).toEqual(['user.password'])
-    expect(config!._maskers).toHaveLength(Object.keys(builtinPatterns).length)
+    const config = defined(resolveRedactConfig({ paths: ['user.password'] }), 'redact config')
+    expect(config.paths).toEqual(['user.password'])
+    expect(config._maskers).toHaveLength(Object.keys(builtinPatterns).length)
   })
 
   it('disables built-ins with builtins: false', () => {
-    const config = resolveRedactConfig({ builtins: false, paths: ['user.email'] })
-    expect(config!.paths).toEqual(['user.email'])
-    expect(config!._maskers).toBeUndefined()
-    expect(config!.patterns).toBeUndefined()
+    const config = defined(resolveRedactConfig({ builtins: false, paths: ['user.email'] }), 'redact config')
+    expect(config.paths).toEqual(['user.email'])
+    expect(config._maskers).toBeUndefined()
+    expect(config.patterns).toBeUndefined()
   })
 
   it('selects specific built-in maskers', () => {
-    const config = resolveRedactConfig({ builtins: ['email', 'creditCard'] })
-    expect(config!._maskers).toHaveLength(2)
+    const config = defined(resolveRedactConfig({ builtins: ['email', 'creditCard'] }), 'redact config')
+    expect(config._maskers).toHaveLength(2)
   })
 
   it('keeps custom patterns separate from built-in maskers', () => {
     const custom = /SECRET_\w+/g
-    const config = resolveRedactConfig({
+    const config = defined(resolveRedactConfig({
       builtins: ['email'],
       patterns: [custom],
-    })
-    expect(config!._maskers).toHaveLength(1)
-    expect(config!.patterns).toHaveLength(1)
+    }), 'redact config')
+    expect(config._maskers).toHaveLength(1)
+    expect(config.patterns).toHaveLength(1)
   })
 })
 
@@ -270,9 +270,8 @@ describe('normalizeRedactConfig', () => {
   })
 
   it('resolves true to all built-in maskers', () => {
-    const config = normalizeRedactConfig(true)
-    expect(config).toBeDefined()
-    expect(config!._maskers!.length).toBe(Object.keys(builtinPatterns).length)
+    const config = defined(normalizeRedactConfig(true), 'redact config')
+    expect(defined(config._maskers, 'maskers').length).toBe(Object.keys(builtinPatterns).length)
   })
 
   it('preserves paths and replacement', () => {
@@ -285,32 +284,32 @@ describe('normalizeRedactConfig', () => {
   })
 
   it('converts string patterns to RegExp separately from built-in maskers', () => {
-    const config = normalizeRedactConfig({
+    const config = defined(normalizeRedactConfig({
       patterns: ['\\b\\d{4}\\b'],
-    })
-    expect(config?._maskers).toHaveLength(Object.keys(builtinPatterns).length)
-    expect(config?.patterns).toHaveLength(1)
-    expect(config?.patterns![0]!.source).toBe('\\b\\d{4}\\b')
+    }), 'redact config')
+    expect(config._maskers).toHaveLength(Object.keys(builtinPatterns).length)
+    expect(config.patterns).toHaveLength(1)
+    expect(defined(config.patterns?.[0], 'patterns[0]').source).toBe('\\b\\d{4}\\b')
   })
 
   it('converts source/flags objects to RegExp', () => {
-    const config = normalizeRedactConfig({
+    const config = defined(normalizeRedactConfig({
       builtins: false,
       patterns: [{ source: '\\d+', flags: 'gi' }],
-    })
-    expect(config?.patterns).toHaveLength(1)
-    expect(config?.patterns![0]).toBeInstanceOf(RegExp)
-    expect(config?.patterns![0]!.source).toBe('\\d+')
-    expect(config?.patterns![0]!.flags).toBe('gi')
+    }), 'redact config')
+    const pattern = defined(config.patterns?.[0], 'patterns[0]')
+    expect(pattern).toBeInstanceOf(RegExp)
+    expect(pattern.source).toBe('\\d+')
+    expect(pattern.flags).toBe('gi')
   })
 
   it('preserves existing RegExp instances', () => {
     const re = /test/g
-    const config = normalizeRedactConfig({
+    const config = defined(normalizeRedactConfig({
       builtins: false,
       patterns: [re],
-    })
-    expect(config?.patterns![0]).toBe(re)
+    }), 'redact config')
+    expect(defined(config.patterns?.[0], 'patterns[0]')).toBe(re)
   })
 
   it('filters out invalid pattern entries', () => {

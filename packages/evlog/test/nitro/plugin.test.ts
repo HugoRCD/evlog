@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
-import type { DrainContext, EnrichContext, RequestLogger, RouteConfig, ServerEvent, WideEvent } from '../../src/types'
+import type { DrainContext, RouteConfig, ServerEvent, WideEvent } from '../../src/types'
+import { defined } from '../helpers/defined'
 import { filterSafeHeaders } from '../../src/utils'
 import { getServiceForPath, shouldLog } from '../../src/shared/routes'
 import { createRequestLogger, initLogger } from '../../src/logger'
@@ -48,7 +49,7 @@ describe('nitro plugin - drain hook headers', () => {
     }
 
     // Simulate what callDrainHook does
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: mockEmittedEvent,
       request: {
@@ -71,8 +72,8 @@ describe('nitro plugin - drain hook headers', () => {
     }))
 
     // Verify drainContext contains headers
-    expect(drainContext).not.toBeNull()
-    expect(drainContext!.headers).toMatchObject({
+    const ctx = defined(drainContext, 'drainContext')
+    expect(ctx.headers).toMatchObject({
       'content-type': 'application/json',
       'x-request-id': 'test-123',
       'x-posthog-session-id': 'session-456',
@@ -108,24 +109,26 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/api/users', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
       headers: getSafeHeaders(allHeaders),
     })
 
+    const ctx = defined(drainContext, 'drainContext')
+
     // Verify sensitive headers are NOT included
-    expect(drainContext!.headers).not.toHaveProperty('authorization')
-    expect(drainContext!.headers).not.toHaveProperty('cookie')
-    expect(drainContext!.headers).not.toHaveProperty('set-cookie')
-    expect(drainContext!.headers).not.toHaveProperty('x-api-key')
-    expect(drainContext!.headers).not.toHaveProperty('x-auth-token')
-    expect(drainContext!.headers).not.toHaveProperty('proxy-authorization')
+    expect(ctx.headers).not.toHaveProperty('authorization')
+    expect(ctx.headers).not.toHaveProperty('cookie')
+    expect(ctx.headers).not.toHaveProperty('set-cookie')
+    expect(ctx.headers).not.toHaveProperty('x-api-key')
+    expect(ctx.headers).not.toHaveProperty('x-auth-token')
+    expect(ctx.headers).not.toHaveProperty('proxy-authorization')
 
     // Verify safe headers ARE included
-    expect(drainContext!.headers).toHaveProperty('content-type', 'application/json')
-    expect(drainContext!.headers).toHaveProperty('x-request-id', 'test-123')
+    expect(ctx.headers).toHaveProperty('content-type', 'application/json')
+    expect(ctx.headers).toHaveProperty('x-request-id', 'test-123')
   })
 
   it('includes all standard non-sensitive HTTP headers', () => {
@@ -155,17 +158,19 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/api/users', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
       headers: getSafeHeaders(allHeaders),
     })
 
+    const ctx = defined(drainContext, 'drainContext')
+
     // Verify all safe headers are passed through
-    expect(drainContext!.headers).toEqual(mockHeaders)
-    expect(drainContext!.headers?.['user-agent']).toBe('Mozilla/5.0')
-    expect(drainContext!.headers?.['x-forwarded-for']).toBe('192.168.1.1')
+    expect(ctx.headers).toEqual(mockHeaders)
+    expect(ctx.headers?.['user-agent']).toBe('Mozilla/5.0')
+    expect(ctx.headers?.['x-forwarded-for']).toBe('192.168.1.1')
   })
 
   it('handles empty headers', () => {
@@ -184,14 +189,14 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
       headers: getSafeHeaders(allHeaders),
     })
 
-    expect(drainContext!.headers).toEqual({})
+    expect(defined(drainContext, 'drainContext').headers).toEqual({})
   })
 
   it('preserves custom correlation headers for external services', () => {
@@ -226,19 +231,21 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'POST', path: '/api/checkout', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
       headers: getSafeHeaders(allHeaders),
     })
 
+    const ctx = defined(drainContext, 'drainContext')
+
     // Verify all correlation headers are available
-    expect(drainContext!.headers?.['x-posthog-session-id']).toBe('ph-session-123')
-    expect(drainContext!.headers?.['x-posthog-distinct-id']).toBe('ph-user-456')
-    expect(drainContext!.headers?.['sentry-trace']).toBe('00-abc123-def456-01')
-    expect(drainContext!.headers?.['traceparent']).toBeDefined()
-    expect(drainContext!.headers?.['x-correlation-id']).toBe('corr-789')
+    expect(ctx.headers?.['x-posthog-session-id']).toBe('ph-session-123')
+    expect(ctx.headers?.['x-posthog-distinct-id']).toBe('ph-user-456')
+    expect(ctx.headers?.['sentry-trace']).toBe('00-abc123-def456-01')
+    expect(ctx.headers?.['traceparent']).toBeDefined()
+    expect(ctx.headers?.['x-correlation-id']).toBe('corr-789')
   })
 
   it('filters sensitive headers case-insensitively', () => {
@@ -264,20 +271,22 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
       headers: getSafeHeaders(allHeaders),
     })
 
+    const ctx = defined(drainContext, 'drainContext')
+
     // Verify sensitive headers are filtered regardless of case
-    expect(drainContext!.headers).not.toHaveProperty('Authorization')
-    expect(drainContext!.headers).not.toHaveProperty('COOKIE')
-    expect(drainContext!.headers).not.toHaveProperty('X-Api-Key')
+    expect(ctx.headers).not.toHaveProperty('Authorization')
+    expect(ctx.headers).not.toHaveProperty('COOKIE')
+    expect(ctx.headers).not.toHaveProperty('X-Api-Key')
 
     // Verify safe headers are kept
-    expect(drainContext!.headers).toHaveProperty('content-type', 'application/json')
+    expect(ctx.headers).toHaveProperty('content-type', 'application/json')
   })
 })
 
@@ -840,7 +849,7 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
     if (event.context._evlogEmitted || !event.context._evlogShouldEmit) {
       return { emitted: false }
     }
-    const log = event.context.log as RequestLogger | undefined
+    const { log } = event.context
     if (!log) return { emitted: false }
     log.set({ status: 200 })
     const result = log.emit()
@@ -852,7 +861,7 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
    */
   function simulateErrorHook(event: ServerEvent, error: Error): { emitted: boolean } {
     if (!event.context._evlogShouldEmit) return { emitted: false }
-    const log = event.context.log as RequestLogger | undefined
+    const { log } = event.context
     if (!log) return { emitted: false }
     log.error(error)
     log.set({ status: 500 })
@@ -894,9 +903,10 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
     simulateRequestHook(event, { include: ['/api/**'] })
 
     expect(event.context._evlogShouldEmit).toBe(false)
-    event.context.log!.set({ user: { id: 'usr_123', plan: 'enterprise' } })
+    const log = defined(event.context.log, 'event.context.log')
+    log.set({ user: { id: 'usr_123', plan: 'enterprise' } })
 
-    const ctx = event.context.log!.getContext()
+    const ctx = log.getContext()
     expect(ctx.user).toEqual({ id: 'usr_123', plan: 'enterprise' })
   })
 
@@ -905,7 +915,7 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
     const event: ServerEvent = { method: 'GET', path: '/dashboard', context: {} }
 
     simulateRequestHook(event, { include: ['/api/**'] })
-    event.context.log!.set({ user: { id: 'test' } })
+    defined(event.context.log, 'event.context.log').set({ user: { id: 'test' } })
 
     const { emitted } = simulateAfterResponseHook(event)
 

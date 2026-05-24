@@ -3,7 +3,7 @@ export default defineEventHandler((event) => {
   log.set({ action: 'whoami' })
 
   const ctx = log.getContext()
-  const userId = ctx.userId as string | undefined
+  const userId = typeof ctx.userId === 'string' ? ctx.userId : undefined
 
   return {
     identified: !!userId,

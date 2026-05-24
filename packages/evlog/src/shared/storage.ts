@@ -20,6 +20,7 @@ export function createLoggerStorage(contextHint: string) {
         `[evlog] useLogger() was called outside of an evlog ${contextHint}`,
       )
     }
+    /** @internal ALS store is untyped; cast satisfies the caller's generic `T`. */
     return logger as RequestLogger<T>
   }
 
