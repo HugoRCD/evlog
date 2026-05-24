@@ -4,7 +4,7 @@ vi.mock('../../src/shared/nitroConfigBridge', () => ({
   getNitroRuntimeConfigRecord: vi.fn(),
 }))
 
-import { resolveAdapterConfig } from '../../src/adapters/_config'
+import { resolveAdapterConfig } from '../../src/shared/config'
 import { getNitroRuntimeConfigRecord } from '../../src/shared/nitroConfigBridge'
 
 interface TestAdapterConfig {

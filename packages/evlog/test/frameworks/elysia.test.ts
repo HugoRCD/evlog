@@ -12,6 +12,25 @@ import {
   waitForDrainCalls,
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+describeStandardHttpMatrix({
+  name: 'elysia',
+  mount(options) {
+    const app = new Elysia()
+    app.use(evlog(options))
+    app.get('/api/users', () => ({ users: [] }))
+    return Promise.resolve({
+      async fire(req) {
+        const res = await app.handle(new Request(`http://localhost${req.path}`, {
+          method: req.method || 'GET',
+          headers: req.headers,
+        }))
+        return { status: res.status }
+      },
+    })
+  },
+})
 
 function delay(ms = 1) {
   return new Promise((resolve) => {
@@ -57,24 +76,6 @@ describe('evlog/elysia', () => {
 
     await request(app, '/api/test')
     expect(hasLogger).toBe(true)
-  })
-
-  it('emits event with correct method, path, and status', async () => {
-    const { drain } = createPipelineSpies()
-    const app = new Elysia()
-      .use(evlog({ drain }))
-      .get('/api/users', () => ({ users: [] }))
-
-    await request(app, '/api/users')
-    await waitForDrainCalls(drain)
-
-    const event = assertHttpEventEmitted(drain, {
-      path: '/api/users',
-      method: 'GET',
-      status: 200,
-      level: 'info',
-    })
-    expect(event.duration).toBeDefined()
   })
 
   it('emits event with correct status when using Elysia.status', async () => {
@@ -158,24 +159,6 @@ describe('evlog/elysia', () => {
     expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
-  it('uses x-request-id header when present', async () => {
-    const { drain } = createPipelineSpies()
-    const app = new Elysia()
-      .use(evlog({ drain }))
-      .get('/api/test', () => ({ ok: true }))
-
-    await request(app, '/api/test', {
-      headers: { 'x-request-id': 'custom-req-id' },
-    })
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/test'),
-      'event with x-request-id',
-    )
-    expect(event.requestId).toBe('custom-req-id')
-  })
-
   it('handles POST requests with correct method', async () => {
     const { drain } = createPipelineSpies()
     const app = new Elysia()
@@ -197,25 +180,6 @@ describe('evlog/elysia', () => {
 
     await request(app, '/_internal/probe')
     expect(drain).not.toHaveBeenCalled()
-  })
-
-  it('applies route-based service override', async () => {
-    const { drain } = createPipelineSpies()
-    const app = new Elysia()
-      .use(evlog({
-        routes: { '/api/auth/**': { service: 'auth-service' } },
-        drain,
-      }))
-      .get('/api/auth/login', () => ({ ok: true }))
-
-    await request(app, '/api/auth/login')
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-      'route service override event',
-    )
-    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {

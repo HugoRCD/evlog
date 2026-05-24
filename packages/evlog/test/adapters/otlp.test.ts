@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { sendBatchToOTLP, sendToOTLP, toOTLPLogRecord } from '../../src/adapters/otlp'
+import { sendBatchToOTLP, sendToOTLP, toOTLPLogRecord, createOTLPDrain } from '../../src/adapters/otlp'
 
 describe('otlp adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -420,6 +420,35 @@ describe('otlp adapter', () => {
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
+    })
+  })
+
+  describe('createOTLPDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    afterEach(() => {
+      delete process.env.NUXT_OTLP_ENDPOINT
+      delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createOTLPDrain({ endpoint: 'http://localhost:4318' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when endpoint is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createOTLPDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/otlp] Missing endpoint'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })

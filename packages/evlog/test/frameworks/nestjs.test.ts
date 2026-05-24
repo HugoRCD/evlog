@@ -17,6 +17,7 @@ import {
   waitForDrainCalls,
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
 
 type MiddlewareProxyStub = {
   forRoutes: (...routes: unknown[]) => MiddlewareConsumer
@@ -55,6 +56,26 @@ function getMiddleware(options: EvlogNestJSOptions = {}): RequestHandler {
   }))
   return defined(middleware, 'evlog middleware from configure()')
 }
+
+describeStandardHttpMatrix({
+  name: 'nestjs',
+  mount(options) {
+    const app = express()
+    app.use(getMiddleware(options))
+    app.get('/api/users', (_req, res) => res.json({ users: [] }))
+    return Promise.resolve({
+      async fire(req) {
+        const method = (req.method || 'GET').toLowerCase()
+        const agent = method === 'post'
+          ? request(app).post(req.path)
+          : request(app).get(req.path)
+        for (const [k, v] of Object.entries(req.headers || {})) agent.set(k, v)
+        const res = await agent
+        return { status: res.status }
+      },
+    })
+  },
+})
 
 describe('evlog/nestjs', () => {
   beforeEach(() => {
@@ -133,24 +154,6 @@ describe('evlog/nestjs', () => {
       expect(hasLogger).toBe(true)
     })
 
-    it('emits event with correct method, path, and status', async () => {
-      const { drain } = createPipelineSpies()
-      const app = express()
-      app.use(getMiddleware({ drain }))
-      app.get('/api/users', (_req, res) => res.json({ users: [] }))
-
-      await request(app).get('/api/users')
-      await waitForDrainCalls(drain)
-
-      const event = assertHttpEventEmitted(drain, {
-        path: '/api/users',
-        method: 'GET',
-        status: 200,
-        level: 'info',
-      })
-      expect(event.duration).toBeDefined()
-    })
-
     it('accumulates context set by route handler', async () => {
       const { drain } = createPipelineSpies()
       const app = express()
@@ -219,22 +222,6 @@ describe('evlog/nestjs', () => {
       expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
     })
 
-    it('uses x-request-id header when present', async () => {
-      const { drain } = createPipelineSpies()
-      const app = express()
-      app.use(getMiddleware({ drain }))
-      app.get('/api/test', (_req, res) => res.json({ ok: true }))
-
-      await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
-      await waitForDrainCalls(drain)
-
-      const event = defined(
-        findEventViaDrain(drain, e => e.path === '/api/test'),
-        'event with x-request-id',
-      )
-      expect(event.requestId).toBe('custom-req-id')
-    })
-
     it('handles POST requests with correct method', async () => {
       const { drain } = createPipelineSpies()
       const app = express()
@@ -259,25 +246,6 @@ describe('evlog/nestjs', () => {
 
       await request(app).get('/_internal/probe')
       expect(logValue).toBeUndefined()
-    })
-
-    it('applies route-based service override', async () => {
-      const { drain } = createPipelineSpies()
-      const app = express()
-      app.use(getMiddleware({
-        routes: { '/api/auth/**': { service: 'auth-service' } },
-        drain,
-      }))
-      app.get('/api/auth/login', (_req, res) => res.json({ ok: true }))
-
-      await request(app).get('/api/auth/login')
-      await waitForDrainCalls(drain)
-
-      const event = defined(
-        findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-        'route service override event',
-      )
-      expect(event.service).toBe('auth-service')
     })
   })
 

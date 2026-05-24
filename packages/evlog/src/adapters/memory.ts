@@ -1,4 +1,6 @@
 import type { LogLevel, WideEvent } from '../types'
+import type { ConfigField } from '../shared/config'
+import { resolveAdapterConfig } from '../shared/config'
 import { defineDrain } from '../shared/drain'
 
 /**
@@ -14,11 +16,32 @@ export interface MemoryConfig {
 const DEFAULT_STORE = 'default'
 const DEFAULT_MAX_EVENTS = 1000
 
+const MEMORY_FIELDS: ConfigField<Partial<MemoryConfig>>[] = [
+  { key: 'store', env: ['NUXT_EVLOG_MEMORY_STORE', 'EVLOG_MEMORY_STORE'] },
+  { key: 'maxEvents', env: ['NUXT_EVLOG_MEMORY_MAX_EVENTS', 'EVLOG_MEMORY_MAX_EVENTS'] },
+]
+
 const stores = new Map<string, WideEvent[]>()
 
 function getOrCreateStore(name: string): WideEvent[] {
   if (!stores.has(name)) stores.set(name, [])
   return stores.get(name)!
+}
+
+function parseMaxEvents(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.floor(value)
+  if (typeof value === 'string' && value) {
+    const n = Number.parseInt(value, 10)
+    if (!Number.isNaN(n) && n > 0) return n
+  }
+  return undefined
+}
+
+function resolveMemoryConfig(overrides?: Partial<MemoryConfig>): MemoryConfig {
+  return {
+    store: overrides?.store ?? DEFAULT_STORE,
+    maxEvents: parseMaxEvents(overrides?.maxEvents) ?? DEFAULT_MAX_EVENTS,
+  }
 }
 
 /**
@@ -41,6 +64,12 @@ export function writeToMemory(events: WideEvent[], config: MemoryConfig): void {
  * the filesystem (`evlog/fs`) is not available. Pair it with a dev-only HTTP
  * endpoint to let agents retrieve the buffer over HTTP.
  *
+ * Configuration priority (highest to lowest):
+ * 1. Overrides passed to `createMemoryDrain()`
+ * 2. `runtimeConfig.evlog.memory` / `runtimeConfig.memory` (Nitro)
+ * 3. Environment variables: `NUXT_EVLOG_MEMORY_STORE`, `EVLOG_MEMORY_STORE`,
+ *    `NUXT_EVLOG_MEMORY_MAX_EVENTS`, `EVLOG_MEMORY_MAX_EVENTS`
+ *
  * @example
  * ```ts
  * // Hono + Cloudflare Workers
@@ -55,13 +84,12 @@ export function writeToMemory(events: WideEvent[], config: MemoryConfig): void {
  * ```
  */
 export function createMemoryDrain(overrides?: Partial<MemoryConfig>) {
-  const config: MemoryConfig = {
-    store: overrides?.store ?? DEFAULT_STORE,
-    maxEvents: overrides?.maxEvents ?? DEFAULT_MAX_EVENTS,
-  }
   return defineDrain<MemoryConfig>({
     name: 'memory',
-    resolve: () => config,
+    resolve: async () => {
+      const resolved = await resolveAdapterConfig<Partial<MemoryConfig>>('memory', MEMORY_FIELDS, overrides)
+      return resolveMemoryConfig(resolved)
+    },
     send: (events, cfg) => Promise.resolve(writeToMemory(events, cfg)),
   })
 }

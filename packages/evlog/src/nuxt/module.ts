@@ -17,8 +17,12 @@ import { name, version } from '../../package.json'
 interface ModuleAxiomBaseConfig {
   /** Axiom dataset name */
   dataset: string
-  /** Axiom API token */
-  token: string
+  /** Axiom API token (evlog field `apiKey`) */
+  apiKey?: string
+  /**
+   * @deprecated Renamed to `apiKey`. Will be removed in the next major version.
+   */
+  token?: string
   /** Organization ID (required for Personal Access Tokens) */
   orgId?: string
   /** Request timeout in milliseconds. Default: 5000 */
@@ -186,7 +190,7 @@ export interface ModuleOptions {
    * ```ts
    * axiom: {
    *   dataset: 'my-app-logs',
-   *   token: process.env.AXIOM_TOKEN,
+   *   apiKey: process.env.AXIOM_API_KEY,
    * }
    * ```
    */

@@ -22,5 +22,7 @@ Key features:
 - **Filtering API** — `readMemoryLogs` accepts `since`, `until`, `level`, `filter`, and `limit` options, matching the `readFsLogs` interface
 - **`parseReadMemoryLogsQuery(query)`** — coerce HTTP query-string params (`Record<string, string>`) into typed `ReadMemoryLogsOptions`; works with Hono, h3/Nitro, Express, Fastify, Next.js, Elysia, NestJS
 - **`clearMemoryLogs(store?)`** — reset a store, useful in tests
+- **Environment variables** — `NUXT_EVLOG_MEMORY_STORE` / `EVLOG_MEMORY_STORE`, `NUXT_EVLOG_MEMORY_MAX_EVENTS` / `EVLOG_MEMORY_MAX_EVENTS` (via `resolveAdapterConfig`)
+- **Nuxt module** — `ModuleOptions.axiom` now documents `apiKey` as the canonical field; legacy `token` remains as a deprecated alias until the next major release
 
 Closes [#349](https://github.com/HugoRCD/evlog/issues/349).

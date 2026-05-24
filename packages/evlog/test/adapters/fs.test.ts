@@ -5,7 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
 import { defined } from '../helpers/defined'
 
-import { writeBatchToFs, writeToFs } from '../../src/adapters/fs'
+import { writeBatchToFs, writeToFs, createFsDrain } from '../../src/adapters/fs'
 
 vi.mock('node:fs/promises', () => ({
   mkdir: vi.fn().mockResolvedValue(undefined),
@@ -288,6 +288,31 @@ describe('fs adapter', () => {
       })
 
       expect(mockedReaddir).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('createFsDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    afterEach(() => {
+      delete process.env.NUXT_EVLOG_FS_DIR
+      delete process.env.EVLOG_FS_DIR
+    })
+
+    it('returns a callable drain that writes events', async () => {
+      const drain = createFsDrain({ dir: '.evlog/logs' })
+      await drain(createDrainContext({ action: 'drain_test' }))
+      expect(mockedAppendFile).toHaveBeenCalled()
+    })
+
+    it('uses default dir when no config is provided', async () => {
+      const drain = createFsDrain()
+      await drain(createDrainContext())
+      expect(mockedAppendFile).toHaveBeenCalled()
     })
   })
 })

@@ -13,6 +13,7 @@ import {
   waitForDrainCalls,
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
 
 function createMockEvent(method = 'GET', path = '/api/test', headers: Record<string, string> = {}) {
   const reqHeaders = new Headers(headers)
@@ -26,6 +27,21 @@ function createMockEvent(method = 'GET', path = '/api/test', headers: Record<str
 function createMockResolve(status = 200): (event: ReturnType<typeof createMockEvent>) => Promise<Response> {
   return vi.fn((_ev) => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status })))
 }
+
+describeStandardHttpMatrix({
+  name: 'sveltekit',
+  mount(options) {
+    const handle = evlog(options)
+    return Promise.resolve({
+      async fire(req) {
+        const event = createMockEvent(req.method || 'GET', req.path, req.headers || {})
+        const resolve = createMockResolve()
+        await handle({ event, resolve })
+        return { status: 200 }
+      },
+    })
+  },
+})
 
 describe('evlog/sveltekit', () => {
   beforeEach(() => {
@@ -55,24 +71,6 @@ describe('evlog/sveltekit', () => {
     expect(typeof event.locals.log.error).toBe('function')
     expect(typeof event.locals.log.info).toBe('function')
     expect(typeof event.locals.log.warn).toBe('function')
-  })
-
-  it('emits event with correct method, path, and status', async () => {
-    const { drain } = createPipelineSpies()
-    const handle = evlog({ drain })
-    const event = createMockEvent('GET', '/api/users')
-    const resolve = createMockResolve()
-
-    await handle({ event, resolve })
-    await waitForDrainCalls(drain)
-
-    const emitted = assertHttpEventEmitted(drain, {
-      path: '/api/users',
-      method: 'GET',
-      status: 200,
-      level: 'info',
-    })
-    expect(emitted.duration).toBeDefined()
   })
 
   it('accumulates context set by route handler', async () => {
@@ -220,22 +218,6 @@ describe('evlog/sveltekit', () => {
     expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
-  it('uses x-request-id header when present', async () => {
-    const { drain } = createPipelineSpies()
-    const handle = evlog({ drain })
-    const event = createMockEvent('GET', '/api/test', { 'x-request-id': 'custom-req-id' })
-    const resolve = createMockResolve()
-
-    await handle({ event, resolve })
-    await waitForDrainCalls(drain)
-
-    const emitted = defined(
-      findEventViaDrain(drain, e => e.path === '/api/test'),
-      'event with x-request-id',
-    )
-    expect(emitted.requestId).toBe('custom-req-id')
-  })
-
   it('handles POST requests with correct method', async () => {
     const { drain } = createPipelineSpies()
     const handle = evlog({ drain })
@@ -256,25 +238,6 @@ describe('evlog/sveltekit', () => {
     await handle({ event, resolve })
 
     expect(event.locals.log).toBeUndefined()
-  })
-
-  it('applies route-based service override', async () => {
-    const { drain } = createPipelineSpies()
-    const handle = evlog({
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-      drain,
-    })
-    const event = createMockEvent('GET', '/api/auth/login')
-    const resolve = createMockResolve()
-
-    await handle({ event, resolve })
-    await waitForDrainCalls(drain)
-
-    const emitted = defined(
-      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-      'route service override event',
-    )
-    expect(emitted.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {

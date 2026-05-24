@@ -13,11 +13,8 @@ import {
   waitForDrainCalls,
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
 
-// Use the actual react-router context provider. `RouterContextProvider` is
-// the same class react-router instantiates per request server-side; passing
-// it to evlog's middleware exercises the real `set` / `get` semantics
-// (typed-context lookup, default values, etc.) instead of a Map duck-mock.
 function createMockContext(): RouterContextProvider {
   return new RouterContextProvider()
 }
@@ -29,6 +26,24 @@ function createRequest(path: string, init?: RequestInit) {
 function okResponse() {
   return Promise.resolve(new Response('ok', { status: 200 }))
 }
+
+describeStandardHttpMatrix({
+  name: 'react-router',
+  mount(options) {
+    const middleware = evlog(options)
+    return Promise.resolve({
+      async fire(req) {
+        const context = createMockContext()
+        const next = vi.fn(() => okResponse())
+        await middleware({
+          request: createRequest(req.path, { method: req.method || 'GET', headers: req.headers }),
+          context,
+        }, next)
+        return { status: 200 }
+      },
+    })
+  },
+})
 
 describe('evlog/react-router', () => {
   beforeEach(() => {
@@ -56,24 +71,6 @@ describe('evlog/react-router', () => {
     const logger = context.get(loggerContext)
     expect(logger).toBeDefined()
     expect(typeof logger.set).toBe('function')
-  })
-
-  it('emits event with correct method, path, and status', async () => {
-    const { drain } = createPipelineSpies()
-    const middleware = evlog({ drain })
-    const context = createMockContext()
-    const next = vi.fn(() => okResponse())
-
-    await middleware({ request: createRequest('/api/users'), context }, next)
-    await waitForDrainCalls(drain)
-
-    const event = assertHttpEventEmitted(drain, {
-      path: '/api/users',
-      method: 'GET',
-      status: 200,
-      level: 'info',
-    })
-    expect(event.duration).toBeDefined()
   })
 
   it('accumulates context set by loader', async () => {
@@ -150,27 +147,6 @@ describe('evlog/react-router', () => {
     expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
-  it('uses x-request-id header when present', async () => {
-    const { drain } = createPipelineSpies()
-    const middleware = evlog({ drain })
-    const context = createMockContext()
-    const next = vi.fn(() => okResponse())
-
-    await middleware({
-      request: createRequest('/api/test', {
-        headers: { 'x-request-id': 'custom-req-id' },
-      }),
-      context,
-    }, next)
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/test'),
-      'event with x-request-id',
-    )
-    expect(event.requestId).toBe('custom-req-id')
-  })
-
   it('handles POST requests with correct method', async () => {
     const { drain } = createPipelineSpies()
     const middleware = evlog({ drain })
@@ -197,25 +173,6 @@ describe('evlog/react-router', () => {
     expect(next).toHaveBeenCalledOnce()
     expect(drain).not.toHaveBeenCalled()
     expect(() => context.get(loggerContext)).toThrow()
-  })
-
-  it('applies route-based service override', async () => {
-    const { drain } = createPipelineSpies()
-    const middleware = evlog({
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-      drain,
-    })
-    const context = createMockContext()
-    const next = vi.fn(() => okResponse())
-
-    await middleware({ request: createRequest('/api/auth/login'), context }, next)
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-      'route service override event',
-    )
-    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {

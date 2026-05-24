@@ -97,7 +97,7 @@ import { createDrainPipeline } from 'evlog/pipeline'
 
 const enrichers = [createUserAgentEnricher(), createRequestSizeEnricher()]
 const pipeline = createDrainPipeline<DrainContext>({ batch: { size: 50, intervalMs: 5000 } })
-const drain = pipeline(createAxiomDrain({ dataset: 'logs', token: process.env.AXIOM_TOKEN! }))
+const drain = pipeline(createAxiomDrain({ dataset: 'logs', apiKey: process.env.AXIOM_API_KEY! }))
 
 export const { withEvlog, useLogger, log, createError } = createEvlog({
   service: 'my-app',
@@ -387,7 +387,7 @@ EvlogModule.forRootAsync({
   imports: [ConfigModule],
   inject: [ConfigService],
   useFactory: (config) => ({
-    drain: createAxiomDrain({ token: config.get('AXIOM_TOKEN') }),
+    drain: createAxiomDrain({ apiKey: config.get('AXIOM_API_KEY') }),
   }),
 })
 ```
@@ -743,7 +743,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 
 | Adapter | Import | Env Vars |
 |---------|--------|----------|
-| Axiom | `evlog/axiom` | `AXIOM_TOKEN`, `AXIOM_DATASET` |
+| Axiom | `evlog/axiom` | `AXIOM_API_KEY`, `AXIOM_DATASET` |
 | OTLP | `evlog/otlp` | `OTLP_ENDPOINT` (or `OTEL_EXPORTER_OTLP_ENDPOINT`) |
 | HyperDX | `evlog/hyperdx` | `HYPERDX_API_KEY` (optional `HYPERDX_OTLP_ENDPOINT`; defaults to `https://in-otel.hyperdx.io`) |
 | PostHog | `evlog/posthog` | `POSTHOG_API_KEY`, `POSTHOG_HOST` |
@@ -753,7 +753,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | File System | `evlog/fs` | None (local file system) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
-In Nuxt/Nitro, use the `NUXT_` prefix (e.g., `NUXT_AXIOM_TOKEN`) so values are available via `useRuntimeConfig()`. All adapters also read unprefixed variables as fallback.
+In Nuxt/Nitro, use the `NUXT_` prefix (e.g., `NUXT_AXIOM_API_KEY`) so values are available via `useRuntimeConfig()`. All adapters also read unprefixed variables as fallback.
 
 Setup pattern per framework:
 

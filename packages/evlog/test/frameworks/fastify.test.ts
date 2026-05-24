@@ -13,6 +13,29 @@ import {
   waitForDrainCalls,
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+describeStandardHttpMatrix({
+  name: 'fastify',
+  async mount(options) {
+    const app = Fastify({ logger: false })
+    await app.register(evlog, options)
+    app.get('/api/users', () => ({ users: [] }))
+    return {
+      async fire(req) {
+        const res = await app.inject({
+          method: req.method || 'GET',
+          url: req.path,
+          headers: req.headers,
+        })
+        return { status: res.statusCode }
+      },
+      async cleanup() {
+        await app.close()
+      },
+    }
+  },
+})
 
 describe('evlog/fastify', () => {
   beforeEach(() => {
@@ -42,24 +65,6 @@ describe('evlog/fastify', () => {
 
     await app.inject({ method: 'GET', url: '/api/test' })
     expect(hasLogger).toBe(true)
-  })
-
-  it('emits event with correct method, path, and status', async () => {
-    const { drain } = createPipelineSpies()
-    const app = Fastify({ logger: false })
-    await app.register(evlog, { drain })
-    app.get('/api/users', () => ({ users: [] }))
-
-    await app.inject({ method: 'GET', url: '/api/users' })
-    await waitForDrainCalls(drain)
-
-    const event = assertHttpEventEmitted(drain, {
-      path: '/api/users',
-      method: 'GET',
-      status: 200,
-      level: 'info',
-    })
-    expect(event.duration).toBeDefined()
   })
 
   it('accumulates context set by route handler', async () => {
@@ -128,26 +133,6 @@ describe('evlog/fastify', () => {
     expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
-  it('uses x-request-id header when present', async () => {
-    const { drain } = createPipelineSpies()
-    const app = Fastify({ logger: false })
-    await app.register(evlog, { drain })
-    app.get('/api/test', () => ({ ok: true }))
-
-    await app.inject({
-      method: 'GET',
-      url: '/api/test',
-      headers: { 'x-request-id': 'custom-req-id' },
-    })
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/test'),
-      'event with x-request-id',
-    )
-    expect(event.requestId).toBe('custom-req-id')
-  })
-
   it('handles POST requests with correct method', async () => {
     const { drain } = createPipelineSpies()
     const app = Fastify({ logger: false })
@@ -172,25 +157,6 @@ describe('evlog/fastify', () => {
 
     await app.inject({ method: 'GET', url: '/_internal/probe' })
     expect(isEvlogLogger).toBe(false)
-  })
-
-  it('applies route-based service override', async () => {
-    const { drain } = createPipelineSpies()
-    const app = Fastify({ logger: false })
-    await app.register(evlog, {
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-      drain,
-    })
-    app.get('/api/auth/login', () => ({ ok: true }))
-
-    await app.inject({ method: 'GET', url: '/api/auth/login' })
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-      'route service override event',
-    )
-    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {

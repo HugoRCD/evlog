@@ -67,24 +67,6 @@ describe('evlog/express', () => {
     expect(hasLogger).toBe(true)
   })
 
-  it('emits event with correct method, path, and status', async () => {
-    const { drain } = createPipelineSpies()
-    const app = express()
-    app.use(evlog({ drain }))
-    app.get('/api/users', (_req, res) => res.json({ users: [] }))
-
-    await request(app).get('/api/users')
-    await waitForDrainCalls(drain)
-
-    const event = assertHttpEventEmitted(drain, {
-      path: '/api/users',
-      method: 'GET',
-      status: 200,
-      level: 'info',
-    })
-    expect(event.duration).toBeDefined()
-  })
-
   it('accumulates context set by route handler', async () => {
     const { drain } = createPipelineSpies()
     const app = express()
@@ -153,22 +135,6 @@ describe('evlog/express', () => {
     expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
-  it('uses x-request-id header when present', async () => {
-    const { drain } = createPipelineSpies()
-    const app = express()
-    app.use(evlog({ drain }))
-    app.get('/api/test', (_req, res) => res.json({ ok: true }))
-
-    await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/test'),
-      'event with x-request-id',
-    )
-    expect(event.requestId).toBe('custom-req-id')
-  })
-
   it('handles POST requests with correct method', async () => {
     const { drain } = createPipelineSpies()
     const app = express()
@@ -193,25 +159,6 @@ describe('evlog/express', () => {
 
     await request(app).get('/_internal/probe')
     expect(logValue).toBeUndefined()
-  })
-
-  it('applies route-based service override', async () => {
-    const { drain } = createPipelineSpies()
-    const app = express()
-    app.use(evlog({
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-      drain,
-    }))
-    app.get('/api/auth/login', (_req, res) => res.json({ ok: true }))
-
-    await request(app).get('/api/auth/login')
-    await waitForDrainCalls(drain)
-
-    const event = defined(
-      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
-      'route service override event',
-    )
-    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {

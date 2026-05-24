@@ -14,7 +14,7 @@ Goals: fast (full suite < 2s locally), deterministic, no fake-greens, no console
 | Accessing the request logger inside a route handler test | `useLogger()` — not `req.log!` (keep one test per framework that asserts `req.log` is attached) |
 | An adapter posts the right URL / body / headers | `mockFetch()` from `helpers/fetch.ts` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` |
 | A wide event factory for adapter tests | `makeWideEvent(overrides?)` from `helpers/events.ts` |
-| The sweep of HTTP framework specs ("emits event", "x-request-id", "route service") | `describeStandardHttpMatrix({ name, mount })` from `helpers/frameworkMatrix.ts` |
+| The sweep of HTTP framework specs ("emits event", "x-request-id", "route service") | `describeStandardHttpMatrix({ name, mount })` from `helpers/frameworkMatrix.ts` — wired in all seven HTTP framework test files |
 
 ## Framework runtime fidelity
 
@@ -112,7 +112,6 @@ test/
   nitro-v3/                # Nitro v3 (separate; full fixture build + dev-server)
     barrel-exports.test.ts
     cloudflare-durable-build.test.ts  # gated on dist/, ~120s timeout
-    module.test.ts
     nitro-v3.test.ts                  # real createNitro + listen + fetch
     fixture/                          # nitro app used by nitro-v3.test.ts
 
