@@ -385,7 +385,7 @@ describe('plugin runner', () => {
       {
         name: 'audit',
         extendLogger: (logger) => {
-          (logger as Record<string, unknown>).custom = () => 'hi'
+          (logger as unknown as Record<string, unknown>).custom = () => 'hi'
         },
       },
     ])

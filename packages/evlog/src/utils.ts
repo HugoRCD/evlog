@@ -124,11 +124,20 @@ export const SENSITIVE_HEADERS = [
   'proxy-authorization',
 ]
 
-export function filterSafeHeaders(headers: Record<string, string>): Record<string, string> {
+/**
+ * Filter out undefined values and sensitive headers from a raw header map.
+ *
+ * @param headers - Flat header map where values may be `undefined`
+ *   (e.g. from `IncomingMessage.headers` or a framework's header accessor).
+ * @returns A new object containing only the headers whose values are defined
+ *   and whose lowercased key is not in the built-in sensitive-header list
+ *   (e.g. `authorization`, `cookie`, `x-api-key`).
+ */
+export function filterSafeHeaders(headers: Partial<Record<string, string | undefined>>): Record<string, string> {
   const safeHeaders: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(headers)) {
-    if (!SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+    if (value !== undefined && !SENSITIVE_HEADERS.includes(key.toLowerCase())) {
       safeHeaders[key] = value
     }
   }

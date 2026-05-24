@@ -26,9 +26,9 @@ export async function waitForDrainCalls(
  */
 export function createPipelineSpies() {
   return {
-    drain: vi.fn<[DrainContext], void | Promise<void>>(),
-    enrich: vi.fn<[EnrichContext], void | Promise<void>>(),
-    keep: vi.fn<[TailSamplingContext], void | Promise<void>>(),
+    drain: vi.fn<(ctx: DrainContext) => void | Promise<void>>(),
+    enrich: vi.fn<(ctx: EnrichContext) => void | Promise<void>>(),
+    keep: vi.fn<(ctx: TailSamplingContext) => void | Promise<void>>(),
   }
 }
 

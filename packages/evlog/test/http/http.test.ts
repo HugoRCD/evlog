@@ -116,7 +116,7 @@ describe('createHttpDrain', () => {
       if (originalVisibilityState) {
         Object.defineProperty(document, 'visibilityState', originalVisibilityState)
       } else {
-        delete (document as Record<string, unknown>).visibilityState
+        delete (document as unknown as Record<string, unknown>).visibilityState
       }
     })
 

@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import Fastify from 'fastify'
+import type { RequestLogger } from '../../src/types'
 import { initLogger } from '../../src/logger'
 import { evlog, useLogger } from '../../src/fastify/index'
 import {
@@ -34,7 +35,7 @@ describe('evlog/fastify', () => {
 
     let hasLogger = false
     app.get('/api/test', (request) => {
-      hasLogger = request.log !== null && typeof request.log.set === 'function'
+      hasLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
       return { ok: true }
     })
 
@@ -65,7 +66,7 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { drain })
     app.get('/api/users', (request) => {
-      request.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+      ((request.log) as unknown as RequestLogger).set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return { users: [] }
     })
 
@@ -83,7 +84,7 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { drain })
     app.get('/api/fail', (request) => {
-      request.log.error(new Error('Something broke'))
+      ((request.log) as unknown as RequestLogger).error(new Error('Something broke'))
       const error = new Error('Something broke') as Error & { statusCode?: number }
       error.statusCode = 500
       throw error
@@ -101,7 +102,7 @@ describe('evlog/fastify', () => {
 
     let isEvlogLogger = false
     app.get('/health', (request) => {
-      isEvlogLogger = typeof request.log.set === 'function'
+      isEvlogLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
       return { ok: true }
     })
 
@@ -114,7 +115,7 @@ describe('evlog/fastify', () => {
     const app = Fastify({ logger: false })
     await app.register(evlog, { include: ['/api/**'], drain })
     app.get('/api/data', (request) => {
-      request.log.set({ data: true })
+      ((request.log) as unknown as RequestLogger).set({ data: true })
       return { ok: true }
     })
 
@@ -160,7 +161,7 @@ describe('evlog/fastify', () => {
 
     let isEvlogLogger = false
     app.get('/_internal/probe', (request) => {
-      isEvlogLogger = typeof request.log.set === 'function'
+      isEvlogLogger = typeof (request.log as unknown as RequestLogger)?.set === 'function'
       return { ok: true }
     })
 
@@ -192,7 +193,7 @@ describe('evlog/fastify', () => {
       const app = Fastify({ logger: false })
       await app.register(evlog, { drain })
       app.get('/api/test', (request) => {
-        request.log.set({ user: { id: 'u-1' } })
+        ((request.log) as unknown as RequestLogger).set({ user: { id: 'u-1' } })
         return { ok: true }
       })
 
@@ -272,7 +273,7 @@ describe('evlog/fastify', () => {
       const app = Fastify({ logger: false })
       await app.register(evlog, { keep, drain })
       app.get('/api/test', (request) => {
-        request.log.set({ important: true })
+        ((request.log) as unknown as RequestLogger).set({ important: true })
         return { ok: true }
       })
 
@@ -361,7 +362,7 @@ describe('evlog/fastify', () => {
 
       let isSame = false
       app.get('/api/test', (request) => {
-        isSame = useLogger() === request.log
+        isSame = useLogger() === (request.log as unknown as RequestLogger)
         return { ok: true }
       })
 

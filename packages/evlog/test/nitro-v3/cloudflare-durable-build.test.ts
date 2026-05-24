@@ -15,7 +15,7 @@ if (!distExists) {
  * Static or Rollup-resolvable `import("nitro/runtime-config")` from published
  * dist used to fail with "Cannot resolve ... externals are not allowed".
  */
-describe.sequential.skipIf(!distExists)('Nitro cloudflare-durable build with evlog dist', () => {
+describe.skipIf(!distExists).sequential('Nitro cloudflare-durable build with evlog dist', () => {
   let nitro: Awaited<ReturnType<typeof createNitro>>
 
   afterAll(async () => {

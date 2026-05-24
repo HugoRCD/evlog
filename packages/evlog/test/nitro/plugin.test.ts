@@ -9,7 +9,7 @@ vi.mock('h3', () => ({
   getHeaders: vi.fn(),
 }))
 
-function getSafeHeaders(allHeaders: Record<string, string>): Record<string, string> {
+function getSafeHeaders(allHeaders: Partial<Record<string, string | undefined>>): Record<string, string> {
   return filterSafeHeaders(allHeaders)
 }
 
@@ -48,7 +48,7 @@ describe('nitro plugin - drain hook headers', () => {
     }
 
     // Simulate what callDrainHook does
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: mockEmittedEvent,
       request: {
@@ -108,7 +108,7 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/api/users', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
@@ -155,7 +155,7 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/api/users', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
@@ -184,7 +184,7 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
@@ -226,7 +226,7 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'POST', path: '/api/checkout', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
@@ -264,7 +264,7 @@ describe('nitro plugin - drain hook headers', () => {
     const mockNitroApp = { hooks: mockHooks }
     const mockEvent = { method: 'GET', path: '/', context: {} }
 
-    const allHeaders = getHeaders(mockEvent as Parameters<typeof getHeaders>[0])
+    const allHeaders = getHeaders(mockEvent as unknown as Parameters<typeof getHeaders>[0])
     mockNitroApp.hooks.callHook('evlog:drain', {
       event: { timestamp: '', level: 'info', service: 'test', environment: 'test' },
       request: { method: mockEvent.method, path: mockEvent.path },
@@ -594,6 +594,9 @@ describe('nitro plugin - useLogger service parameter', () => {
   it('service parameter overrides default service', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({ service: 'default-service' }),
@@ -619,6 +622,9 @@ describe('nitro plugin - useLogger service parameter', () => {
   it('calling useLogger without service parameter preserves existing service', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({ service: 'existing-service' }),
@@ -643,6 +649,9 @@ describe('nitro plugin - useLogger service parameter', () => {
   it('explicit service parameter takes precedence over route-based config', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({}),
@@ -670,6 +679,9 @@ describe('nitro plugin - useLogger service parameter', () => {
   it('service parameter can override any existing service configuration', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({ service: 'default-service' }),
@@ -697,6 +709,9 @@ describe('nitro plugin - service resolution priority', () => {
   it('explicit service parameter has highest priority', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({
@@ -734,6 +749,9 @@ describe('nitro plugin - service resolution priority', () => {
   it('route-based config applies when no explicit service provided', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({
@@ -765,6 +783,9 @@ describe('nitro plugin - service resolution priority', () => {
   it('env.service fallback when no route matches and no explicit service', () => {
     const mockLog = {
       set: vi.fn(),
+      info: vi.fn(),
+      warn: vi.fn(),
+      setLevel: vi.fn(),
       error: vi.fn(),
       emit: vi.fn(),
       getContext: vi.fn().mockReturnValue({

@@ -19,7 +19,7 @@ export { useLogger }
  */
 type SvelteKitHandle = (input: {
   event: { request: Request; url: URL; locals: Record<string, any> }
-  resolve: (event: any) => Promise<Response>
+  resolve: (...args: any[]) => Response | Promise<Response>
 }) => Promise<Response>
 
 /**

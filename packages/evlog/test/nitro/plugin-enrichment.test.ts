@@ -8,7 +8,7 @@ vi.mock('h3', () => ({
   getHeaders: vi.fn(),
 }))
 
-function getSafeHeaders(allHeaders: Record<string, string>): Record<string, string> {
+function getSafeHeaders(allHeaders: Partial<Record<string, string | undefined>>): Record<string, string> {
   return filterSafeHeaders(allHeaders)
 }
 

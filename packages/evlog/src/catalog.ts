@@ -167,7 +167,7 @@ export function defineError<
   const TEntry extends ErrorCatalogEntry,
 >(code: TCode, entry: TEntry): DefinedError<TCode, TEntry> {
   const factory = ((...args: unknown[]) =>
-    buildEvlogError(code, entry, args[0] as Record<string, unknown> | undefined)) as DefinedError<TCode, TEntry>
+    buildEvlogError(code, entry, args[0] as Record<string, unknown> | undefined)) as unknown as DefinedError<TCode, TEntry>
 
   Object.defineProperties(factory, {
     code: { value: code, enumerable: true },

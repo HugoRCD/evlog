@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import type { LanguageModelV3, LanguageModelV3StreamPart } from '@ai-sdk/provider'
+import type { LanguageModelV3, LanguageModelV3FinishReason, LanguageModelV3StreamPart } from '@ai-sdk/provider'
 import type { RequestLogger } from '../../src/types'
 import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
 import { createLogger } from '../../src/logger'
@@ -56,6 +56,7 @@ function createMockLogger(): MockLogger {
     error: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
+    setLevel: vi.fn(),
     emit: vi.fn(() => null),
     getContext: vi.fn(() => ({})),
   }
@@ -94,7 +95,7 @@ function createMockModel(overrides?: Partial<{ provider: string, modelId: string
   } as unknown as LanguageModelV3
 }
 
-function createFinishReason(unified = 'stop') {
+function createFinishReason(unified: LanguageModelV3FinishReason['unified'] = 'stop'): LanguageModelV3FinishReason {
   return { unified, raw: undefined }
 }
 

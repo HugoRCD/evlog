@@ -29,7 +29,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -42,7 +42,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         baseUrl: 'https://custom.axiom.co',
       })
 
@@ -55,7 +55,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
       })
 
@@ -68,7 +68,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'http://localhost:3400/custom/ingest/',
       })
 
@@ -81,7 +81,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my dataset/test',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -93,7 +93,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my dataset/test',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
       })
 
@@ -106,7 +106,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'my-secret-token',
+        apiKey: 'my-secret-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -120,7 +120,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         orgId: 'my-org-123',
       })
 
@@ -135,7 +135,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -148,7 +148,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -162,7 +162,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -179,7 +179,7 @@ describe('axiom adapter', () => {
 
       await expect(sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })).rejects.toThrow('Axiom API error: 400 Bad Request')
     })
   })
@@ -194,7 +194,7 @@ describe('axiom adapter', () => {
 
       await sendBatchToAxiom(events, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -207,7 +207,7 @@ describe('axiom adapter', () => {
     it('sends empty array when no events', async () => {
       await sendBatchToAxiom([], {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -225,7 +225,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
@@ -237,7 +237,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         timeout: 10000,
       })
 

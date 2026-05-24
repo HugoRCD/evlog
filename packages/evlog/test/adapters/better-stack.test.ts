@@ -50,7 +50,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -62,7 +62,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         endpoint: 'https://custom.betterstack.com',
       })
 
@@ -74,7 +74,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         endpoint: 'https://custom.betterstack.com/',
       })
 
@@ -86,7 +86,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'my-secret-token',
+        apiKey: 'my-secret-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -99,7 +99,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -112,7 +112,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent({ action: 'test-action', userId: '123' })
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -137,7 +137,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await expect(sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })).rejects.toThrow('Better Stack API error: 400 Bad Request')
     })
   })
@@ -151,7 +151,7 @@ describe('better-stack adapter', () => {
       ]
 
       await sendBatchToBetterStack(events, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -164,7 +164,7 @@ describe('better-stack adapter', () => {
 
     it('sends empty array when no events', async () => {
       await sendBatchToBetterStack([], {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -179,7 +179,7 @@ describe('better-stack adapter', () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
@@ -190,7 +190,7 @@ describe('better-stack adapter', () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         timeout: 10000,
       })
 

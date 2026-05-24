@@ -17,6 +17,7 @@ function createMockLogger(): RequestLogger & { setCalls: Array<Record<string, un
     error: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
+    setLevel: vi.fn(),
     emit: vi.fn(() => null),
     getContext: vi.fn(() => ({})),
   }
@@ -258,7 +259,7 @@ describe('createAuthMiddleware', () => {
 
     expect(result).toBe(true)
     expect(auth.api.getSession).toHaveBeenCalledOnce()
-    const passed = (auth.api.getSession.mock.calls[0]![0] as { headers: Headers }).headers
+    const passed = ((auth.api.getSession.mock.calls[0]! as unknown as [{ headers: Headers }])[0]).headers
     expect(passed).toBeInstanceOf(Headers)
     expect(passed.get('cookie')).toBe('session=abc')
     expect(passed.get('x-forwarded-for')).toBe('1.2.3.4, 5.6.7.8')
@@ -273,7 +274,7 @@ describe('createAuthMiddleware', () => {
     const headers = new Headers({ cookie: 'session=abc' })
     await identify(log, headers)
 
-    const passed = (auth.api.getSession.mock.calls[0]![0] as { headers: Headers }).headers
+    const passed = ((auth.api.getSession.mock.calls[0]! as unknown as [{ headers: Headers }])[0]).headers
     expect(passed).toBe(headers)
   })
 
