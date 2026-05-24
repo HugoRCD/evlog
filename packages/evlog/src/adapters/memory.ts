@@ -34,8 +34,10 @@ function parseMaxEvents(value: unknown): number | undefined {
     return n > 0 ? n : undefined
   }
   if (typeof value === 'string' && value) {
-    const n = Math.floor(Number.parseFloat(value))
-    if (!Number.isNaN(n) && n > 0) return n
+    const parsed = Number.parseFloat(value)
+    if (!Number.isFinite(parsed)) return undefined
+    const n = Math.floor(parsed)
+    return n > 0 ? n : undefined
   }
   return undefined
 }
