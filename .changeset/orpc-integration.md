@@ -5,7 +5,7 @@
 Add oRPC integration (`evlog/orpc`) with automatic wide-event logging. Two complementary primitives:
 
 - `withEvlog(handler)` — wraps `RPCHandler` / `OpenAPIHandler` from `@orpc/server/fetch`. Each matched request becomes one wide event with full pipeline support (drain, enrich, `include`/`exclude`, route-based service overrides, tail sampling). Excluded routes still receive a no-op `context.log` so procedures never crash on missing fields.
-- `evlog()` — procedure-level middleware (`os.use(evlog())`). Tags the wide event with `operation` (procedure path joined with `.`), forwards the request logger as `context.log`, and promotes the level to `error` when a procedure throws.
+- `evlog()` — procedure-level middleware (`os.use(evlog())`). Tags the wide event with `operation` (procedure path joined with `.`), forwards the request logger as `context.log`, promotes the level to `error` when a procedure throws, and bridges `createError()` / `defineErrorCatalog()` throws to `ORPCError` (code, status, message, plus `why`/`fix`/`link` in `data`).
 
 ```ts
 import { os } from '@orpc/server'

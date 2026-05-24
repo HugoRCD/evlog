@@ -10,8 +10,13 @@ const { storage, useLogger } = createLoggerStorage(
   'oRPC handler. Wrap your handler with `withEvlog()` from evlog/orpc.',
 )
 
+/** Options accepted by {@link withEvlog} for oRPC request instrumentation. */
 export type EvlogOrpcOptions = BaseEvlogOptions
 
+/**
+ * Access the current request-scoped logger outside oRPC context callbacks.
+ * Requires {@link withEvlog} on the handler.
+ */
 export { useLogger }
 
 /**

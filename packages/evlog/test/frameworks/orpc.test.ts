@@ -410,9 +410,14 @@ describe('evlog/orpc', () => {
     })
 
     it('lets the keep callback force-keep based on context', async () => {
+      initLogger({ env: { service: 'orpc-test' }, pretty: false, sampling: { rates: { info: 0 } } })
       const { drain, keep } = createPipelineSpies()
+      let sawPinged = false
       keep.mockImplementation((ctx) => {
-        if (ctx.context.pinged) ctx.shouldKeep = true
+        if (ctx.context.pinged) {
+          ctx.shouldKeep = true
+          sawPinged = true
+        }
       })
       const { client } = buildClient({ drain, keep })
 
@@ -420,6 +425,7 @@ describe('evlog/orpc', () => {
       await waitForDrainCalls(drain)
 
       expect(keep).toHaveBeenCalledOnce()
+      expect(sawPinged).toBe(true)
       expect(drain).toHaveBeenCalledOnce()
     })
 

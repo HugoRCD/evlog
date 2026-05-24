@@ -206,15 +206,25 @@ export function testUI(): string {
   </div>
 
   <script>
+    function escapeHtml(value) {
+      return value
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;')
+    }
+
     function syntaxHighlight(json) {
       return JSON.stringify(json, null, 2)
         .replace(/("(\\\\u[a-fA-F0-9]{4}|\\\\[^u]|[^\\\\"])*")(\\s*:)?/g, (match, str, _, colon) => {
-          if (colon) return '<span class="key">' + str + '</span>' + colon
-          return '<span class="string">' + str + '</span>'
+          const safe = escapeHtml(str)
+          if (colon) return '<span class="key">' + safe + '</span>' + colon
+          return '<span class="string">' + safe + '</span>'
         })
-        .replace(/\\b(true|false)\\b/g, '<span class="boolean">$1</span>')
+        .replace(/\\b(true|false)\\b/g, (_, value) => '<span class="boolean">' + escapeHtml(value) + '</span>')
         .replace(/\\bnull\\b/g, '<span class="null">null</span>')
-        .replace(/\\b(-?\\d+\\.?\\d*([eE][+-]?\\d+)?)\\b/g, '<span class="number">$1</span>')
+        .replace(/\\b(-?\\d+\\.?\\d*([eE][+-]?\\d+)?)\\b/g, (_, value) => '<span class="number">' + escapeHtml(value) + '</span>')
     }
 
     async function sendRequest(method, path, body) {
@@ -241,7 +251,10 @@ export function testUI(): string {
 
         const res = await fetch(path, opts)
         const ms = Math.round(performance.now() - start)
-        const data = await res.json()
+        const contentType = res.headers.get('content-type') || ''
+        const data = contentType.includes('application/json')
+          ? await res.json()
+          : await res.text()
 
         el.header.style.display = 'flex'
         el.status.textContent = res.status
@@ -249,7 +262,11 @@ export function testUI(): string {
         el.methodPath.textContent = method + ' ' + path
         el.timing.textContent = ms + 'ms'
         el.body.className = 'response-body'
-        el.body.innerHTML = syntaxHighlight(data)
+        if (typeof data === 'string') {
+          el.body.textContent = data
+        } else {
+          el.body.innerHTML = syntaxHighlight(data)
+        }
       } catch (err) {
         el.header.style.display = 'none'
         el.body.className = 'response-body'

@@ -46,7 +46,7 @@ interface AuthedUser {
   apiKey: string
 }
 
-const authed = base.use(async ({ context, next }) => {
+const authed = base.use(({ context, next }) => {
   const user: AuthedUser = { id: 'u-1', name: 'Alice', role: 'admin', apiKey: 'demo' }
   context.log.set({ auth: { ok: true, userId: user.id, role: user.role } })
   return next({
