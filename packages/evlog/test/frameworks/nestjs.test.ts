@@ -86,7 +86,7 @@ describe('evlog/nestjs', () => {
       module.configure(consumer)
 
       expect(apply).toHaveBeenCalledOnce()
-      expect(apply.mock.calls[0][0]).toBeTypeOf('function')
+      expect((apply.mock.calls[0] as unknown as [unknown])[0]).toBeTypeOf('function')
       expect(forRoutes).toHaveBeenCalledWith('*')
     })
   })
@@ -131,7 +131,7 @@ describe('evlog/nestjs', () => {
       const app = express()
       app.use(getMiddleware())
       app.get('/api/users', (req, res) => {
-        req.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+        req.log!.set({ user: { id: 'u-1' }, db: { queries: 3 } })
         res.json({ users: [] })
       })
 
@@ -152,7 +152,7 @@ describe('evlog/nestjs', () => {
       const app = express()
       app.use(getMiddleware())
       app.get('/api/fail', (req, res) => {
-        req.log.error(new Error('Something broke'))
+        req.log!.error(new Error('Something broke'))
         res.status(500).json({ error: 'fail' })
       })
 
@@ -187,7 +187,7 @@ describe('evlog/nestjs', () => {
       const app = express()
       app.use(getMiddleware({ include: ['/api/**'] }))
       app.get('/api/data', (req, res) => {
-        req.log.set({ data: true })
+        req.log!.set({ data: true })
         res.json({ ok: true })
       })
 
@@ -269,7 +269,7 @@ describe('evlog/nestjs', () => {
       const app = express()
       app.use(getMiddleware({ drain }))
       app.get('/api/test', (req, res) => {
-        req.log.set({ user: { id: 'u-1' } })
+        req.log!.set({ user: { id: 'u-1' } })
         res.json({ ok: true })
       })
 
@@ -341,7 +341,7 @@ describe('evlog/nestjs', () => {
       const app = express()
       app.use(getMiddleware({ keep, drain }))
       app.get('/api/test', (req, res) => {
-        req.log.set({ important: true })
+        req.log!.set({ important: true })
         res.json({ ok: true })
       })
 

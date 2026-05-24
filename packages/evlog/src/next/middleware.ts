@@ -7,7 +7,10 @@ type NextRequest = {
 }
 
 type NextResponse = {
-  headers: { set(name: string, value: string): void }
+  headers: {
+    set(name: string, value: string): void
+    get(name: string): string | null
+  }
 }
 
 type NextResponseStatic = {

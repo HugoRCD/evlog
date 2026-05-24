@@ -1,4 +1,5 @@
 import type { FastifyPluginCallback, FastifyRequest } from 'fastify'
+import type { RequestLogger } from '../types'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
@@ -13,8 +14,8 @@ export { useLogger }
 
 declare module 'fastify' {
   interface FastifyRequest {
-    // Overrides Fastify's built-in pino logger on the request with evlog's RequestLogger.
-    log: any
+    // @ts-expect-error intentionally overrides Fastify's built-in pino logger with evlog's RequestLogger
+    log: RequestLogger
   }
 }
 

@@ -13,7 +13,7 @@ import { nitro } from 'nitro/vite'
  * app's `vite` — assert once here instead of drowning in TS2769 chains. */
 const plugins = [
   devtools(),
-  nitro({ rollupConfig: { external: [/^@sentry\//] } }),
+  nitro(),
   tsconfigPaths({ projects: ['./tsconfig.json'] }),
   tailwindcss(),
   tanstackStart(),

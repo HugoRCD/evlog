@@ -15,7 +15,7 @@ function delay(ms = 1) {
   })
 }
 
-function request(app: Elysia, path: string, init?: RequestInit) {
+function request(app: { handle: (req: Request) => Promise<Response> }, path: string, init?: RequestInit) {
   return app.handle(new Request(`http://localhost${path}`, init)).then(async (response) => {
     // using Elysia.afterResponse is scheduled to run
     // after response is sent but not immediately

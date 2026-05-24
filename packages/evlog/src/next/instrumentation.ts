@@ -143,7 +143,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
           patching = false
         }
       }
-      return originalStdoutWrite(chunk, ...args as [])
+      return originalStdoutWrite(chunk as string, ...args as [])
     } as typeof process.stdout.write
 
     proc.stderr.write = function(chunk: unknown, ...args: unknown[]): boolean {
@@ -155,7 +155,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
           patching = false
         }
       }
-      return originalStderrWrite(chunk, ...args as [])
+      return originalStderrWrite(chunk as string, ...args as [])
     } as typeof process.stderr.write
   }
 

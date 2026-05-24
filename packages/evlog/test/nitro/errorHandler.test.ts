@@ -7,10 +7,10 @@ const mockSend = vi.fn()
 const mockGetRequestURL = vi.fn(() => ({ pathname: '/api/test' }))
 
 vi.mock('h3', () => ({
-  setResponseStatus: (...args: unknown[]) => mockSetResponseStatus(...args),
-  setResponseHeader: (...args: unknown[]) => mockSetResponseHeader(...args),
-  send: (...args: unknown[]) => mockSend(...args),
-  getRequestURL: (...args: unknown[]) => mockGetRequestURL(...args),
+  setResponseStatus: (...args: any[]) => mockSetResponseStatus(...args),
+  setResponseHeader: (...args: any[]) => mockSetResponseHeader(...args),
+  send: (...args: any[]) => mockSend(...args),
+  getRequestURL: (...args: any[]) => (mockGetRequestURL as (...a: any[]) => unknown)(...args),
 }))
 
 // Mock nitropack/runtime
@@ -45,7 +45,7 @@ describe('errorHandler', () => {
         },
       }
 
-      errorHandler(evlogError as Error, mockEvent)
+      errorHandler(evlogError as any, mockEvent as any, {} as any)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 402)
       expect(mockSetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'application/json')
@@ -79,7 +79,7 @@ describe('errorHandler', () => {
         cause: evlogError,
       }
 
-      errorHandler(wrapperError as Error, mockEvent)
+      errorHandler(wrapperError as any, mockEvent as any, {} as any)
 
       // HTTP status should come from evlogError, not wrapper
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 404)
@@ -95,7 +95,7 @@ describe('errorHandler', () => {
         message: 'Unknown error',
       }
 
-      errorHandler(evlogError as Error, mockEvent)
+      errorHandler(evlogError as any, mockEvent as any, {} as any)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
@@ -108,7 +108,7 @@ describe('errorHandler', () => {
         internal: { userId: 'u-internal', rawPolicy: 'deny:admin' },
       })
 
-      errorHandler(err, mockEvent)
+      errorHandler(err as any, mockEvent as any, {} as any)
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
       expect(sentBody.internal).toBeUndefined()
@@ -130,7 +130,7 @@ describe('errorHandler', () => {
         statusCode: 400,
       }
 
-      errorHandler(error as Error, mockEvent)
+      errorHandler(error as any, mockEvent as any, {} as any)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 400)
 
@@ -150,7 +150,7 @@ describe('errorHandler', () => {
         message: 'Generic error',
       }
 
-      errorHandler(error as Error, mockEvent)
+      errorHandler(error as any, mockEvent as any, {} as any)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
@@ -161,7 +161,7 @@ describe('errorHandler', () => {
         message: '',
       }
 
-      errorHandler(error as Error, mockEvent)
+      errorHandler(error as any, mockEvent as any, {} as any)
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
       expect(sentBody.message).toBe('Internal Server Error')
@@ -177,7 +177,7 @@ describe('errorHandler', () => {
         statusCode: 500,
       }
 
-      errorHandler(error as Error, mockEvent)
+      errorHandler(error as any, mockEvent as any, {} as any)
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
       expect(sentBody.message).toBe('Internal Server Error')
@@ -193,7 +193,7 @@ describe('errorHandler', () => {
         statusCode: 400,
       }
 
-      errorHandler(error as Error, mockEvent)
+      errorHandler(error as any, mockEvent as any, {} as any)
 
       const sentBody = JSON.parse(mockSend.mock.calls[0][1])
       expect(sentBody.message).toBe('Invalid email format')

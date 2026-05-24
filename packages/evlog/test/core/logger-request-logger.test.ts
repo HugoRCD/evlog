@@ -43,11 +43,11 @@ describe('createRequestLogger', () => {
   it('overwrites existing primitive keys with set()', () => {
     const logger = createRequestLogger({})
 
-    logger.set({ status: 'pending' })
-    logger.set({ status: 'complete' })
+    logger.set({ phase: 'pending' })
+    logger.set({ phase: 'complete' })
 
     const context = logger.getContext()
-    expect(context.status).toBe('complete')
+    expect(context.phase).toBe('complete')
   })
 
   it('deep merges nested objects with set()', () => {
@@ -222,9 +222,9 @@ describe('createRequestLogger', () => {
 
     const context = logger.getContext()
     expect(context.requestLogs).toHaveLength(3)
-    expect(context.requestLogs[0].message).toBe('First entry')
-    expect(context.requestLogs[1].message).toBe('Second entry')
-    expect(context.requestLogs[2].message).toBe('Third entry')
+    expect((context.requestLogs as Array<{ message: string }>)[0]!.message).toBe('First entry')
+    expect((context.requestLogs as Array<{ message: string }>)[1]!.message).toBe('Second entry')
+    expect((context.requestLogs as Array<{ message: string }>)[2]!.message).toBe('Third entry')
   })
 
   it('captures custom error properties (statusCode, data, cause)', () => {

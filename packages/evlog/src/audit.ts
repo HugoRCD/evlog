@@ -134,7 +134,7 @@ function decorateAudit(audit: AuditFields, timestamp: string): AuditFields {
  */
 export function withAuditMethods<T extends object = Record<string, unknown>>(logger: RequestLogger<T>): AuditableLogger<T> {
   const target = logger as AuditableLogger<T>
-  if (target.audit) return target
+  if ((target as { audit?: AuditMethod<T> }).audit) return target
 
   const audit = function audit(input: AuditInput): void {
     const fields = buildAuditFields(input)
@@ -424,11 +424,11 @@ export function defineAuditAction<TTargetType extends string | undefined = undef
   const targetType = options?.target
   return (input) => {
     const merged: AuditInput = {
-      ...input,
+      ...(input as AuditInput),
       action,
     }
     if (targetType && input.target && !input.target.type) {
-      merged.target = { ...input.target, type: targetType }
+      merged.target = { ...input.target, type: targetType } as AuditTarget
     }
     return merged
   }
@@ -511,7 +511,7 @@ function matchesAudit(event: AuditFields, matcher: AuditMatcher): boolean {
   if (matcher.outcome !== undefined && event.outcome !== matcher.outcome) return false
   if (matcher.actor) {
     for (const [k, v] of Object.entries(matcher.actor)) {
-      if ((event.actor as Record<string, unknown>)[k] !== v) return false
+      if ((event.actor as unknown as Record<string, unknown>)[k] !== v) return false
     }
   }
   if (matcher.target) {

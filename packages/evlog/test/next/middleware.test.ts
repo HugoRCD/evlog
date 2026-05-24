@@ -65,9 +65,9 @@ describe('evlogMiddleware', () => {
 
     expect(mockNextResponse.next).toHaveBeenCalled()
     const [[callArgs]] = mockNextResponse.next.mock.calls
-    expect(callArgs.request.headers).toBeInstanceOf(Headers)
+    expect(callArgs!.request!.headers).toBeInstanceOf(Headers)
 
-    const { headers } = callArgs.request
+    const { headers } = callArgs!.request!
     expect(headers.get('x-request-id')).toBeDefined()
     expect(headers.get('x-evlog-start')).toBeDefined()
   })
@@ -78,7 +78,7 @@ describe('evlogMiddleware', () => {
     await middleware(request as any)
 
     const [[callArgs2]] = mockNextResponse.next.mock.calls
-    const startTime = Number(callArgs2.request.headers.get('x-evlog-start'))
+    const startTime = Number(callArgs2!.request!.headers.get('x-evlog-start'))
     expect(startTime).toBeGreaterThan(0)
     expect(startTime).toBeLessThanOrEqual(Date.now())
   })
@@ -103,7 +103,7 @@ describe('evlogMiddleware', () => {
     await middleware(apiRequest as any)
     expect(mockNextResponse.next).toHaveBeenCalledTimes(1)
     const [[apiCallArgs]] = mockNextResponse.next.mock.calls
-    expect(apiCallArgs.request.headers.get('x-request-id')).toBeDefined()
+    expect(apiCallArgs!.request!.headers.get('x-request-id')).toBeDefined()
 
     vi.clearAllMocks()
 

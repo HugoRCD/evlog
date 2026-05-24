@@ -18,8 +18,8 @@ function createMockEvent(method = 'GET', path = '/api/test', headers: Record<str
   }
 }
 
-function createMockResolve(status = 200) {
-  return vi.fn(() => new Response(JSON.stringify({ ok: true }), { status }))
+function createMockResolve(status = 200): (event: any) => Promise<Response> {
+  return vi.fn((_ev: any) => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status })))
 }
 
 describe('evlog/sveltekit', () => {
