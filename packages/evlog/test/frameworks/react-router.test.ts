@@ -1,13 +1,18 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { RouterContextProvider } from 'react-router'
 import { initLogger } from '../../src/logger'
+import type { RequestLogger } from '../../src/types'
 import { evlog, loggerContext, useLogger } from '../../src/react-router/index'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
+  assertHttpEventEmitted,
   assertSensitiveHeadersFiltered,
   createPipelineSpies,
+  findEventViaDrain,
+  waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
 
 // Use the actual react-router context provider. `RouterContextProvider` is
 // the same class react-router instantiates per request server-side; passing
@@ -54,66 +59,58 @@ describe('evlog/react-router', () => {
   })
 
   it('emits event with correct method, path, and status', async () => {
-    const middleware = evlog()
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
     const context = createMockContext()
     const next = vi.fn(() => okResponse())
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({ request: createRequest('/api/users'), context }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.method).toBe('GET')
-    expect(event.path).toBe('/api/users')
-    expect(event.status).toBe(200)
-    expect(event.level).toBe('info')
+    const event = assertHttpEventEmitted(drain, {
+      path: '/api/users',
+      method: 'GET',
+      status: 200,
+      level: 'info',
+    })
     expect(event.duration).toBeDefined()
   })
 
   it('accumulates context set by loader', async () => {
-    const middleware = evlog()
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
     const context = createMockContext()
     const next = vi.fn(() => {
-      const logger = context.get(loggerContext) as any
-      logger.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+      useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return okResponse()
     })
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({ request: createRequest('/api/users'), context }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"user"'),
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
     )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.user.id).toBe('u-1')
-    expect(event.db.queries).toBe(3)
+    expect(event.user).toEqual({ id: 'u-1' })
+    expect(event.db).toEqual({ queries: 3 })
   })
 
   it('logs status 500 when handler throws', async () => {
-    const middleware = evlog()
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
     const context = createMockContext()
     const next = vi.fn(() => Promise.reject(new Error('Something broke')))
 
-    const errorSpy = vi.mocked(console.error)
     await expect(
       middleware({ request: createRequest('/api/fail'), context }, next),
     ).rejects.toThrow('Something broke')
+    await waitForDrainCalls(drain)
 
-    const lastCall = errorSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/fail"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.status).toBe(500)
-    expect(event.path).toBe('/api/fail')
+    assertHttpEventEmitted(drain, {
+      path: '/api/fail',
+      status: 500,
+    })
   })
 
   it('re-throws all errors from handler', async () => {
@@ -142,56 +139,51 @@ describe('evlog/react-router', () => {
   })
 
   it('logs routes matching include patterns', async () => {
-    const middleware = evlog({ include: ['/api/**'] })
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ include: ['/api/**'], drain })
     const context = createMockContext()
     const next = vi.fn(() => okResponse())
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({ request: createRequest('/api/data'), context }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
-    )
-    expect(lastCall).toBeDefined()
+    expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
   it('uses x-request-id header when present', async () => {
-    const middleware = evlog()
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
     const context = createMockContext()
     const next = vi.fn(() => okResponse())
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({
       request: createRequest('/api/test', {
         headers: { 'x-request-id': 'custom-req-id' },
       }),
       context,
     }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('custom-req-id'),
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/test'),
+      'event with x-request-id',
     )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
     expect(event.requestId).toBe('custom-req-id')
   })
 
   it('handles POST requests with correct method', async () => {
-    const middleware = evlog()
+    const { drain } = createPipelineSpies()
+    const middleware = evlog({ drain })
     const context = createMockContext()
     const next = vi.fn(() => okResponse())
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({
       request: createRequest('/api/checkout', { method: 'POST' }),
       context,
     }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
-    )
-    expect(lastCall).toBeDefined()
+    assertHttpEventEmitted(drain, { path: '/api/checkout', method: 'POST' })
   })
 
   it('excludes routes matching exclude patterns', async () => {
@@ -208,19 +200,22 @@ describe('evlog/react-router', () => {
   })
 
   it('applies route-based service override', async () => {
+    const { drain } = createPipelineSpies()
     const middleware = evlog({
       routes: { '/api/auth/**': { service: 'auth-service' } },
+      drain,
     })
     const context = createMockContext()
     const next = vi.fn(() => okResponse())
 
-    const consoleSpy = vi.mocked(console.info)
     await middleware({ request: createRequest('/api/auth/login'), context }, next)
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
+      'route service override event',
     )
-    expect(lastCall).toBeDefined()
+    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {
@@ -230,8 +225,7 @@ describe('evlog/react-router', () => {
       const middleware = evlog({ drain })
       const context = createMockContext()
       const next = vi.fn(() => {
-        const logger = context.get(loggerContext) as any
-        logger.set({ user: { id: 'u-1' } })
+        useLogger().set({ user: { id: 'u-1' } })
         return okResponse()
       })
 
@@ -273,10 +267,10 @@ describe('evlog/react-router', () => {
       }, next)
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -297,8 +291,9 @@ describe('evlog/react-router', () => {
         context,
       }, next)
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -310,8 +305,7 @@ describe('evlog/react-router', () => {
       const middleware = evlog({ keep, drain })
       const context = createMockContext()
       const next = vi.fn(() => {
-        const logger = context.get(loggerContext) as any
-        logger.set({ important: true })
+        useLogger().set({ important: true })
         return okResponse()
       })
 
@@ -328,8 +322,7 @@ describe('evlog/react-router', () => {
       const middleware = evlog({ drain })
       const context = createMockContext()
       const next = vi.fn(() => {
-        const logger = context.get(loggerContext) as any
-        logger.error(new Error('something broke'))
+        useLogger().error(new Error('something broke'))
         return Promise.resolve(new Response('error', { status: 500 }))
       })
 
@@ -384,7 +377,7 @@ describe('evlog/react-router', () => {
 
   describe('useLogger', () => {
     it('returns same logger in middleware context', async () => {
-      let loggerFromUseLogger: any
+      let loggerFromUseLogger: RequestLogger | undefined
 
       const middleware = evlog()
       const context = createMockContext()
@@ -404,7 +397,7 @@ describe('evlog/react-router', () => {
     })
 
     it('works across async boundaries', async () => {
-      let loggerFromAsync: any
+      let loggerFromAsync: RequestLogger | undefined
 
       const middleware = evlog()
       const context = createMockContext()
@@ -416,8 +409,7 @@ describe('evlog/react-router', () => {
 
       await middleware({ request: createRequest('/api/test'), context }, next)
 
-      expect(loggerFromAsync).toBeDefined()
-      expect(typeof loggerFromAsync.set).toBe('function')
+      expect(typeof defined(loggerFromAsync).set).toBe('function')
     })
   })
 })

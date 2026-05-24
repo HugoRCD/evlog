@@ -17,6 +17,7 @@ import {
 import type { AuditFields, DrainContext, EnrichContext, WideEvent } from '../../src/types'
 import { createLogger, createRequestLogger, initLogger } from '../../src/logger'
 import { resolveRedactConfig } from '../../src/redact'
+import { defined } from '../helpers/defined'
 
 function createDrainCtx(event: Partial<WideEvent> = {}): DrainContext {
   const wide: WideEvent = {
@@ -87,9 +88,8 @@ describe('log.audit() on createLogger', () => {
       actor: { type: 'user', id: 'u1' },
       target: { type: 'invoice', id: 'inv_1' },
     })
-    const event = log.emit()
-    expect(event).not.toBeNull()
-    const audit = event!.audit as AuditFields
+    const event = defined(log.emit(), 'emitted event')
+    const audit = event.audit as AuditFields
     expect(audit.action).toBe('invoice.refund')
     expect(audit.outcome).toBe('success')
     expect(audit.idempotencyKey).toMatch(/^[\da-f]{32}$/)
@@ -102,8 +102,8 @@ describe('log.audit() on createLogger', () => {
       actor: { type: 'user', id: 'u1' },
       target: { type: 'invoice', id: 'inv_1' },
     })
-    const event = log.emit()
-    const audit = event!.audit as AuditFields
+    const event = defined(log.emit(), 'emitted event')
+    const audit = event.audit as AuditFields
     expect(audit.outcome).toBe('denied')
     expect(audit.reason).toBe('Insufficient permissions')
   })
@@ -112,9 +112,8 @@ describe('log.audit() on createLogger', () => {
     initLogger({ pretty: false, redact: false, sampling: { rates: { info: 0 } } })
     const log = createLogger()
     log.set({ audit: buildAuditFields({ action: 'manual', actor: { type: 'system', id: 's' } }) })
-    const event = log.emit()
-    expect(event).not.toBeNull()
-    expect((event!.audit as AuditFields).action).toBe('manual')
+    const event = defined(log.emit(), 'emitted event')
+    expect((event.audit as AuditFields).action).toBe('manual')
   })
 
   it('createRequestLogger exposes the same audit method', () => {
@@ -125,12 +124,11 @@ describe('log.audit() on createLogger', () => {
 
 describe('standalone audit()', () => {
   it('emits an event tagged as audit and returns it', () => {
-    const event = audit({
+    const event = defined(audit({
       action: 'cron.cleanup',
       actor: { type: 'system', id: 'cron' },
-    })
-    expect(event).not.toBeNull()
-    expect((event!.audit as AuditFields).action).toBe('cron.cleanup')
+    }), 'audit event')
+    expect((event.audit as AuditFields).action).toBe('cron.cleanup')
   })
 
   it('is force-kept even when info sampling is at 0%', () => {
@@ -152,8 +150,9 @@ describe('withAudit()', () => {
     )
     await refund({ id: 'inv_1' }, { actor: { type: 'user', id: 'u1' } })
     expect(collector.events).toHaveLength(1)
-    expect(collector.events[0]!.outcome).toBe('success')
-    expect(collector.events[0]!.target).toEqual({ type: 'invoice', id: 'inv_1' })
+    const recorded = defined(collector.events[0], 'audit event')
+    expect(recorded.outcome).toBe('success')
+    expect(recorded.target).toEqual({ type: 'invoice', id: 'inv_1' })
     collector.restore()
   })
 
@@ -163,8 +162,9 @@ describe('withAudit()', () => {
       throw new AuditDeniedError('not allowed')
     })
     await expect(fn(null, { actor: { type: 'user', id: 'u1' } })).rejects.toThrow('not allowed')
-    expect(collector.events[0]!.outcome).toBe('denied')
-    expect(collector.events[0]!.reason).toBe('not allowed')
+    const denied = defined(collector.events[0], 'audit event')
+    expect(denied.outcome).toBe('denied')
+    expect(denied.reason).toBe('not allowed')
     collector.restore()
   })
 
@@ -176,7 +176,7 @@ describe('withAudit()', () => {
       throw err
     })
     await expect(fn(null, { actor: { type: 'user', id: 'u1' } })).rejects.toThrow('forbidden')
-    expect(collector.events[0]!.outcome).toBe('denied')
+    expect(defined(collector.events[0], 'audit event').outcome).toBe('denied')
     collector.restore()
   })
 
@@ -186,8 +186,9 @@ describe('withAudit()', () => {
       throw new Error('boom')
     })
     await expect(fn(null, { actor: { type: 'user', id: 'u1' } })).rejects.toThrow('boom')
-    expect(collector.events[0]!.outcome).toBe('failure')
-    expect(collector.events[0]!.reason).toBe('boom')
+    const recorded = defined(collector.events[0], 'audit event')
+    expect(recorded.outcome).toBe('failure')
+    expect(recorded.reason).toBe('boom')
     collector.restore()
   })
 })
@@ -319,8 +320,10 @@ describe('signed() — hmac', () => {
     const ctx2 = createDrainCtx({ audit: { action: 'a', actor: { type: 'user', id: 'u1' }, outcome: 'success' } })
     await drain(ctx1)
     await drain(ctx2)
-    expect((calls[0]!.audit as AuditFields).signature).toBeDefined()
-    expect((calls[0]!.audit as AuditFields).signature).toBe((calls[1]!.audit as AuditFields).signature)
+    const firstAudit = defined(defined(calls[0], 'first event').audit, 'first audit') as AuditFields
+    const secondAudit = defined(defined(calls[1], 'second event').audit, 'second audit') as AuditFields
+    expect(firstAudit.signature).toBeDefined()
+    expect(firstAudit.signature).toBe(secondAudit.signature)
   })
 
   it('passes through events without audit', async () => {
@@ -340,9 +343,9 @@ describe('signed() — hash-chain', () => {
     await drain(make())
     await drain(make())
 
-    const a1 = calls[0]!.audit as AuditFields
-    const a2 = calls[1]!.audit as AuditFields
-    const a3 = calls[2]!.audit as AuditFields
+    const a1 = defined(defined(calls[0], 'audit event 1').audit, 'audit 1') as AuditFields
+    const a2 = defined(defined(calls[1], 'audit event 2').audit, 'audit 2') as AuditFields
+    const a3 = defined(defined(calls[2], 'audit event 3').audit, 'audit 3') as AuditFields
     expect(a1.prevHash).toBeUndefined()
     expect(a2.prevHash).toBe(a1.hash)
     expect(a3.prevHash).toBe(a2.hash)
@@ -377,14 +380,14 @@ describe('signed() — hash-chain', () => {
       state: { load: () => 'previous-hash-from-disk', save: () => {} },
     })
     await drain(createDrainCtx({ audit: { action: 'a', actor: { type: 'user', id: 'u1' }, outcome: 'success' } }))
-    expect((calls[0]!.audit as AuditFields).prevHash).toBe('previous-hash-from-disk')
+    expect((defined(defined(calls[0], 'audit event').audit, 'audit') as AuditFields).prevHash).toBe('previous-hash-from-disk')
   })
 })
 
 describe('idempotency key', () => {
   it('is stable across identical events in the same second', () => {
-    const e1 = audit({ action: 'a', actor: { type: 'user', id: 'u1' }, target: { type: 't', id: 'r1' } })!
-    const e2 = audit({ action: 'a', actor: { type: 'user', id: 'u1' }, target: { type: 't', id: 'r1' } })!
+    const e1 = defined(audit({ action: 'a', actor: { type: 'user', id: 'u1' }, target: { type: 't', id: 'r1' } }), 'audit event 1')
+    const e2 = defined(audit({ action: 'a', actor: { type: 'user', id: 'u1' }, target: { type: 't', id: 'r1' } }), 'audit event 2')
     const t1 = (e1.timestamp as string).slice(0, 19)
     const t2 = (e2.timestamp as string).slice(0, 19)
     if (t1 === t2) {
@@ -418,12 +421,12 @@ describe('end-to-end: audit + auditOnly + global drain', () => {
 
 describe('auditRedactPreset', () => {
   it('drops authorization headers', () => {
-    const config = resolveRedactConfig(auditRedactPreset)!
+    const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
     expect(config.paths).toContain('headers.authorization')
   })
 
   it('drops password fields under audit.changes', () => {
-    const config = resolveRedactConfig(auditRedactPreset)!
+    const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
     expect(config.paths).toContain('audit.changes.before.password')
     expect(config.paths).toContain('audit.changes.after.password')
   })

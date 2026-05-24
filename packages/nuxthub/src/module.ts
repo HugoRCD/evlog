@@ -5,6 +5,12 @@ import { consola } from 'consola'
 import type { NitroConfig } from 'nitropack'
 import { name, version } from '../package.json'
 import { retentionToCron } from './runtime/utils/retention'
+import { getNuxtEvlogConfig } from './config'
+
+interface VercelConfig {
+  crons?: Array<{ path: string, schedule: string }>
+  [key: string]: unknown
+}
 
 export default defineNuxtModule({
   meta: {
@@ -19,19 +25,20 @@ export default defineNuxtModule({
     if (typeof shouldSetup !== 'boolean' || !shouldSetup) return
 
     const vercelJsonPath = resolve(nuxt.options.rootDir, 'vercel.json')
-    let config: Record<string, any> = {}
+    let config: VercelConfig = {}
     if (existsSync(vercelJsonPath)) {
-      config = JSON.parse(await fsp.readFile(vercelJsonPath, 'utf-8'))
+      config = JSON.parse(await fsp.readFile(vercelJsonPath, 'utf-8')) as VercelConfig
     }
 
-    const evlogConfig = (nuxt.options as any).evlog || {}
+    const evlogConfig = getNuxtEvlogConfig(nuxt)
     const retention = evlogConfig.retention ?? '7d'
     const cron = retentionToCron(retention)
 
     const crons: Array<{ path: string, schedule: string }> = config.crons || []
     const existing = crons.findIndex(c => c.path === '/api/_cron/evlog-cleanup')
     if (existing >= 0) {
-      crons[existing]!.schedule = cron
+      const entry = crons[existing]
+      if (entry) entry.schedule = cron
     } else {
       crons.push({ path: '/api/_cron/evlog-cleanup', schedule: cron })
     }
@@ -65,7 +72,7 @@ export default defineNuxtModule({
     })
 
     // Read nuxthub options from evlog config key
-    const evlogConfig = (nuxt.options as any).evlog || {}
+    const evlogConfig = getNuxtEvlogConfig(nuxt)
     const retention: string = evlogConfig.retention ?? '7d'
 
     // Extend NuxtHub DB schema with dialect-specific evlog_events table

@@ -1,9 +1,9 @@
 import http from 'node:http'
-import type { AddressInfo } from 'node:net'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import express from 'express'
 import request from 'supertest'
 import { initLogger } from '../../src/logger'
+import type { RequestLogger } from '../../src/types'
 import { evlog, useLogger } from '../../src/express/index'
 import {
   assertDrainCalledWith,
@@ -14,6 +14,7 @@ import {
   findEventViaDrain,
   waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
 import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
 
 describeStandardHttpMatrix({
@@ -88,26 +89,28 @@ describe('evlog/express', () => {
     const { drain } = createPipelineSpies()
     const app = express()
     app.use(evlog({ drain }))
-    app.get('/api/users', (req, res) => {
-      req.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+    app.get('/api/users', (_req, res) => {
+      useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
       res.json({ users: [] })
     })
 
     await request(app).get('/api/users')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/users')
-    expect(event).toBeDefined()
-    expect((event!.user as { id: string }).id).toBe('u-1')
-    expect((event!.db as { queries: number }).queries).toBe(3)
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
+    )
+    expect(event.user).toEqual({ id: 'u-1' })
+    expect(event.db).toEqual({ queries: 3 })
   })
 
   it('logs error status when handler sends error response', async () => {
     const { drain } = createPipelineSpies()
     const app = express()
     app.use(evlog({ drain }))
-    app.get('/api/fail', (req, res) => {
-      req.log.error(new Error('Something broke'))
+    app.get('/api/fail', (_req, res) => {
+      useLogger().error(new Error('Something broke'))
       res.status(500).json({ error: 'fail' })
     })
 
@@ -139,8 +142,8 @@ describe('evlog/express', () => {
     const { drain } = createPipelineSpies()
     const app = express()
     app.use(evlog({ include: ['/api/**'], drain }))
-    app.get('/api/data', (req, res) => {
-      req.log.set({ data: true })
+    app.get('/api/data', (_req, res) => {
+      useLogger().set({ data: true })
       res.json({ ok: true })
     })
 
@@ -159,9 +162,11 @@ describe('evlog/express', () => {
     await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/test')
-    expect(event).toBeDefined()
-    expect(event!.requestId).toBe('custom-req-id')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/test'),
+      'event with x-request-id',
+    )
+    expect(event.requestId).toBe('custom-req-id')
   })
 
   it('handles POST requests with correct method', async () => {
@@ -202,9 +207,11 @@ describe('evlog/express', () => {
     await request(app).get('/api/auth/login')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/auth/login')
-    expect(event).toBeDefined()
-    expect(event!.service).toBe('auth-service')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
+      'route service override event',
+    )
+    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {
@@ -213,8 +220,8 @@ describe('evlog/express', () => {
 
       const app = express()
       app.use(evlog({ drain }))
-      app.get('/api/test', (req, res) => {
-        req.log.set({ user: { id: 'u-1' } })
+      app.get('/api/test', (_req, res) => {
+        useLogger().set({ user: { id: 'u-1' } })
         res.json({ ok: true })
       })
 
@@ -254,10 +261,10 @@ describe('evlog/express', () => {
         .set('x-custom', 'value')
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -273,8 +280,9 @@ describe('evlog/express', () => {
         .set('cookie', 'session=abc')
         .set('x-safe', 'visible')
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -285,8 +293,8 @@ describe('evlog/express', () => {
 
       const app = express()
       app.use(evlog({ keep, drain }))
-      app.get('/api/test', (req, res) => {
-        req.log.set({ important: true })
+      app.get('/api/test', (_req, res) => {
+        useLogger().set({ important: true })
         res.json({ ok: true })
       })
 
@@ -302,8 +310,8 @@ describe('evlog/express', () => {
 
       const app = express()
       app.use(evlog({ drain }))
-      app.get('/api/fail', (req, res) => {
-        req.log.error(new Error('something broke'))
+      app.get('/api/fail', (_req, res) => {
+        useLogger().error(new Error('something broke'))
         res.status(500).json({ error: 'fail' })
       })
 
@@ -363,7 +371,7 @@ describe('evlog/express', () => {
       const app = express()
       app.use(evlog({ drain }))
 
-      let loggerFromService: unknown
+      let loggerFromService: RequestLogger | undefined
       function serviceFunction() {
         loggerFromService = useLogger()
         useLogger().set({ fromService: true })
@@ -378,7 +386,7 @@ describe('evlog/express', () => {
       await waitForDrainCalls(drain)
 
       expect(loggerFromService).toBeDefined()
-      expect(typeof (loggerFromService as Record<string, unknown>).set).toBe('function')
+      expect(typeof defined(loggerFromService).set).toBe('function')
 
       const event = findEventViaDrain(drain, e => e.fromService === true)
       expect(event).toBeDefined()
@@ -390,7 +398,7 @@ describe('evlog/express', () => {
 
       let isSame = false
       app.get('/api/test', (req, res) => {
-        isSame = useLogger() === req.log
+        isSame = useLogger() === defined(req.log, 'req.log in middleware')
         res.json({ ok: true })
       })
 
@@ -439,7 +447,7 @@ describe('evlog/express', () => {
         if (!address || typeof address === 'string') {
           throw new Error('Failed to bind test server to an ephemeral port')
         }
-        const { port } = address as AddressInfo
+        const { port } = address
         const req = http.request({ host: '127.0.0.1', port, path, method: 'GET' })
         req.on('error', () => {})
         req.end()
@@ -455,21 +463,23 @@ describe('evlog/express', () => {
       const { drain } = createPipelineSpies()
       const app = express()
       app.use(evlog({ drain }))
-      app.get('/api/slow', async (req, res) => {
-        req.log.set({ step: 'before-sleep' })
+      app.get('/api/slow', async (_req, res) => {
+        useLogger().set({ step: 'before-sleep' })
         await new Promise(resolve => setTimeout(resolve, 100))
-        req.log.set({ step: 'after-sleep' })
+        useLogger().set({ step: 'after-sleep' })
         res.json({ ok: true })
       })
 
       await abortMidRequest(app, '/api/slow', 20)
       await waitForDrainCalls(drain)
 
-      const event = findEventViaDrain(drain, e => e.path === '/api/slow')
-      expect(event).toBeDefined()
-      expect(event!.connectionClosed).toBe(true)
-      expect(event!.method).toBe('GET')
-      expect(event!.step).toBe('before-sleep')
+      const event = defined(
+        findEventViaDrain(drain, e => e.path === '/api/slow'),
+        'connectionClosed event',
+      )
+      expect(event.connectionClosed).toBe(true)
+      expect(event.method).toBe('GET')
+      expect(event.step).toBe('before-sleep')
     })
 
     it('does not flag connectionClosed when the response completes normally', async () => {
@@ -481,10 +491,12 @@ describe('evlog/express', () => {
       await request(app).get('/api/fast')
       await waitForDrainCalls(drain)
 
-      const event = findEventViaDrain(drain, e => e.path === '/api/fast')
-      expect(event).toBeDefined()
-      expect(event!.connectionClosed).toBeUndefined()
-      expect(event!.status).toBe(200)
+      const event = defined(
+        findEventViaDrain(drain, e => e.path === '/api/fast'),
+        'normal completion event',
+      )
+      expect(event.connectionClosed).toBeUndefined()
+      expect(event.status).toBe(200)
     })
 
     it('runs drain exactly once when the client aborts mid-handler', async () => {

@@ -62,7 +62,9 @@ function ts() {
 }
 
 function addLog() {
-  const t = logTemplates[logId % logTemplates.length]!
+  const index = logId % logTemplates.length
+  const t = logTemplates[index]
+  if (!t) return
   chaosLogs.value.push({ id: logId++, ts: ts(), level: t.level, msg: t.msg, line: lineNum++ })
   if (chaosLogs.value.length > 13) chaosLogs.value.shift()
 
@@ -97,7 +99,7 @@ function resolve() {
       count++
       visibleFields.value = count
       if (count >= wideEventFields.length) {
-        clearInterval(fieldInterval!)
+        if (fieldInterval) clearInterval(fieldInterval)
       }
     }, 100)
   }, 700)

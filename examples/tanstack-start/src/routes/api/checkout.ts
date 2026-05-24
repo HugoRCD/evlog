@@ -1,7 +1,7 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useRequest } from 'nitro/context'
 import { createError } from 'evlog'
-import type { RequestLogger } from 'evlog'
+import { requireRequestLogger } from '@/utils/require-request-logger'
 
 export const Route = createFileRoute('/api/checkout')({
   server: {
@@ -11,7 +11,7 @@ export const Route = createFileRoute('/api/checkout')({
         if (!req.context) {
           throw new Error('Missing Nitro request context')
         }
-        const log = req.context.log as RequestLogger
+        const log = requireRequestLogger(req.context)
 
         const body = await request.json() as {
           userId: string

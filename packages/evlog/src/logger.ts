@@ -298,9 +298,9 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) {
     return String(value)
   }
-  if (typeof value === 'object') {
+  if (isPlainObject(value)) {
     const pairs: string[] = []
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    for (const [k, v] of Object.entries(value)) {
       if (v !== undefined && v !== null) {
         if (typeof v === 'object') {
           pairs.push(`${k}=${JSON.stringify(v)}`)
@@ -326,6 +326,48 @@ interface TreeEntry {
   children?: string[]
 }
 
+function asNumber(value: unknown): number | undefined {
+  return typeof value === 'number' ? value : undefined
+}
+
+function asStringArray(value: unknown): string[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.every(item => typeof item === 'string') ? value : undefined
+}
+
+interface ToolUsageEntry {
+  name: string
+  durationMs: number
+  success: boolean
+  error?: string
+}
+
+function isToolUsageEntry(value: unknown): value is ToolUsageEntry {
+  return isPlainObject(value)
+    && typeof value.name === 'string'
+    && typeof value.durationMs === 'number'
+    && typeof value.success === 'boolean'
+}
+
+function asToolUsageArray(value: unknown): ToolUsageEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.every(isToolUsageEntry) ? value : undefined
+}
+
+interface ToolCallEntry {
+  name: string
+  input: unknown
+}
+
+function isToolCallEntry(value: unknown): value is ToolCallEntry {
+  return isPlainObject(value) && typeof value.name === 'string' && 'input' in value
+}
+
+function asToolCallArray(value: unknown): ToolCallEntry[] | undefined {
+  if (!Array.isArray(value)) return undefined
+  return value.every(isToolCallEntry) ? value : undefined
+}
+
 function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
   const entries: TreeEntry[] = []
 
@@ -336,14 +378,18 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
     if (ai.provider) m += ` (${ai.provider})`
     headerParts.push(m)
   }
-  if (ai.calls) headerParts.push(`${ai.calls} call${(ai.calls as number) > 1 ? 's' : ''}`)
-  if (ai.steps && (ai.steps as number) > 1) headerParts.push(`${ai.steps} steps`)
+  if (ai.calls) {
+    const calls = asNumber(ai.calls)
+    if (calls !== undefined) headerParts.push(`${calls} call${calls > 1 ? 's' : ''}`)
+  }
+  const steps = asNumber(ai.steps)
+  if (steps !== undefined && steps > 1) headerParts.push(`${steps} steps`)
   entries.push({ key: 'ai', value: headerParts.join(' · ') })
 
   // Tokens
-  const inputTokens = ai.inputTokens as number | undefined
-  const outputTokens = ai.outputTokens as number | undefined
-  const totalTokens = ai.totalTokens as number | undefined
+  const inputTokens = asNumber(ai.inputTokens)
+  const outputTokens = asNumber(ai.outputTokens)
+  const totalTokens = asNumber(ai.totalTokens)
   if (inputTokens !== undefined && outputTokens !== undefined) {
     let tokLine = `${inputTokens} in → ${outputTokens} out`
     if (totalTokens) tokLine += ` (${totalTokens} total)`
@@ -356,9 +402,9 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
   }
 
   // Streaming
-  const msFirst = ai.msToFirstChunk as number | undefined
-  const msFinish = ai.msToFinish as number | undefined
-  const tps = ai.tokensPerSecond as number | undefined
+  const msFirst = asNumber(ai.msToFirstChunk)
+  const msFinish = asNumber(ai.msToFinish)
+  const tps = asNumber(ai.tokensPerSecond)
   if (msFirst !== undefined || msFinish !== undefined) {
     const parts: string[] = []
     if (msFirst !== undefined) parts.push(`${formatDuration(msFirst)} to first chunk`)
@@ -369,27 +415,30 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
   }
 
   // Cost
-  if (ai.estimatedCost !== undefined) {
-    entries.push({ key: 'ai.cost', value: formatCost(ai.estimatedCost as number) })
+  const estimatedCost = asNumber(ai.estimatedCost)
+  if (estimatedCost !== undefined) {
+    entries.push({ key: 'ai.cost', value: formatCost(estimatedCost) })
   }
 
   // Total duration
-  if (ai.totalDurationMs !== undefined) {
-    entries.push({ key: 'ai.totalDuration', value: formatDuration(ai.totalDurationMs as number) })
+  const totalDurationMs = asNumber(ai.totalDurationMs)
+  if (totalDurationMs !== undefined) {
+    entries.push({ key: 'ai.totalDuration', value: formatDuration(totalDurationMs) })
   }
 
   // Tools — merged from toolCalls (middleware) + tools (telemetry)
-  const toolCalls = ai.toolCalls as unknown[] | undefined
-  const tools = ai.tools as Array<{ name: string, durationMs: number, success: boolean, error?: string }> | undefined
-  const hasInputs = toolCalls?.length ? typeof toolCalls[0] === 'object' : false
+  const toolCalls = Array.isArray(ai.toolCalls) ? ai.toolCalls : undefined
+  const tools = asToolUsageArray(ai.tools)
+  const toolCallEntries = toolCalls ? asToolCallArray(toolCalls) : undefined
+  const hasInputs = toolCallEntries !== undefined && toolCallEntries.length > 0
 
   if (tools?.length) {
     const children = tools.map((t, idx) => {
       const mark = t.success ? '✓' : '✗'
       let line = `${t.name} ${formatDuration(t.durationMs)} ${mark}`
       if (t.error) line += ` ${t.error}`
-      if (hasInputs && toolCalls && idx < toolCalls.length) {
-        const tc = toolCalls[idx] as { input: unknown }
+      if (hasInputs && toolCallEntries && idx < toolCallEntries.length) {
+        const tc = toolCallEntries[idx]
         const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
         const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
         line += ` ${truncated}`
@@ -398,36 +447,40 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
     })
     entries.push({ key: 'ai.tools', value: '', children })
   } else if (toolCalls?.length) {
-    if (hasInputs) {
-      const children = (toolCalls as Array<{ name: string, input: unknown }>).map((tc) => {
+    if (toolCallEntries?.length) {
+      const children = toolCallEntries.map((tc) => {
         const inputStr = typeof tc.input === 'string' ? tc.input : JSON.stringify(tc.input)
         const truncated = inputStr.length > 100 ? `${inputStr.slice(0, 100)}…` : inputStr
         return `${tc.name}(${truncated})`
       })
       entries.push({ key: 'ai.tools', value: '', children })
     } else {
-      entries.push({ key: 'ai.tools', value: (toolCalls as string[]).join(', ') })
+      const names = asStringArray(toolCalls)
+      if (names?.length) entries.push({ key: 'ai.tools', value: names.join(', ') })
     }
   }
 
   // Steps
-  const stepsUsage = ai.stepsUsage as Array<Record<string, unknown>> | undefined
+  const stepsUsage = Array.isArray(ai.stepsUsage)
+    ? ai.stepsUsage.filter(isPlainObject)
+    : undefined
   if (stepsUsage?.length) {
-    const allSameModel = stepsUsage.every(s => s.model === stepsUsage[0]!.model)
+    const firstModel = stepsUsage[0]?.model
+    const allSameModel = firstModel !== undefined && stepsUsage.every(s => s.model === firstModel)
     const children = stepsUsage.map((s) => {
-      const prefix = allSameModel ? '' : `${s.model} `
+      const prefix = allSameModel ? '' : `${String(s.model)} `
       let line = `${prefix}${s.inputTokens} in → ${s.outputTokens} out`
-      const stepTools = s.toolCalls as string[] | undefined
+      const stepTools = asStringArray(s.toolCalls)
       if (stepTools?.length) line += ` [${stepTools.join(', ')}]`
       return line
     })
     entries.push({ key: 'ai.steps', value: '', children })
-  } else if (ai.steps && (ai.steps as number) > 1) {
-    entries.push({ key: 'ai.steps', value: String(ai.steps) })
+  } else if (steps !== undefined && steps > 1) {
+    entries.push({ key: 'ai.steps', value: String(steps) })
   }
 
   // Embedding
-  const embedding = ai.embedding as Record<string, unknown> | undefined
+  const embedding = isPlainObject(ai.embedding) ? ai.embedding : undefined
   if (embedding) {
     const parts: string[] = []
     if (embedding.model) parts.push(String(embedding.model))
@@ -446,19 +499,20 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
 
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
   const { timestamp, level, service, environment, version, ...rest } = event
-  const ts = (timestamp as string).slice(11, 23)
+  const ts = typeof timestamp === 'string' ? timestamp.slice(11, 23) : ''
+  const levelLabel = typeof level === 'string' ? level : 'info'
   const browser = isBrowser()
 
   const parts: string[] = []
   const styles: string[] = []
 
   if (browser) {
-    const lc = getCssLevelColor(level as string)
-    parts.push(`%c${ts}%c %c${(level as string).toUpperCase()}%c %c[${escapeFormatString(String(service))}]%c`)
+    const lc = getCssLevelColor(levelLabel)
+    parts.push(`%c${ts}%c %c${levelLabel.toUpperCase()}%c %c[${escapeFormatString(String(service))}]%c`)
     styles.push(cssColors.dim, cssColors.reset, lc, cssColors.reset, cssColors.cyan, cssColors.reset)
   } else {
-    const lc = getLevelColor(level as string)
-    parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${(level as string).toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
+    const lc = getLevelColor(levelLabel)
+    parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
   }
 
   if (rest.method && rest.path) {
@@ -468,9 +522,10 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
   }
 
   if (rest.status) {
+    const statusCode = asNumber(rest.status) ?? Number(rest.status)
     const sc = browser
-      ? ((rest.status as number) >= 400 ? cssColors.red : cssColors.green)
-      : ((rest.status as number) >= 400 ? colors.red : colors.green)
+      ? (statusCode >= 400 ? cssColors.red : cssColors.green)
+      : (statusCode >= 400 ? colors.red : colors.green)
     if (browser) {
       parts.push(` %c${rest.status}%c`)
       styles.push(sc, cssColors.reset)
@@ -492,8 +547,8 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
 
   console.log(parts.join(''), ...styles)
 
-  const aiData = rest.ai as Record<string, unknown> | undefined
-  if (aiData && typeof aiData === 'object') {
+  const aiData = isPlainObject(rest.ai) ? rest.ai : undefined
+  if (aiData) {
     delete rest.ai
   }
 
@@ -505,8 +560,10 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
   ]
 
   for (let i = 0; i < allEntries.length; i++) {
-    const entry = allEntries[i]!
-    const hasChildren = entry.children && entry.children.length > 0
+    const entry = allEntries[i]
+    if (!entry) continue
+    const { children } = entry
+    const hasChildren = children !== undefined && children.length > 0
     const isLast = i === allEntries.length - 1 && !hasChildren
     const prefix = isLast ? '└─' : '├─'
 
@@ -518,12 +575,13 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
       console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${entry.key}:${colors.reset}${val}`)
     }
 
-    if (hasChildren) {
+    if (hasChildren && children) {
       const isLastEntry = i === allEntries.length - 1
       const connector = isLastEntry ? ' ' : '│'
-      for (let j = 0; j < entry.children!.length; j++) {
-        const child = entry.children![j]!
-        const isLastChild = j === entry.children!.length - 1
+      for (let j = 0; j < children.length; j++) {
+        const child = children[j]
+        if (child === undefined) continue
+        const isLastChild = j === children.length - 1
         const childPrefix = isLastChild ? '└─' : '├─'
         if (browser) {
           console.log(`  %c${connector}  ${childPrefix}%c ${escapeFormatString(child)}`, cssColors.dim, cssColors.reset)

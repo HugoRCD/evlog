@@ -11,6 +11,7 @@ import {
   findEventViaDrain,
   waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
 
 describe('evlog/hono', () => {
   beforeEach(() => {
@@ -73,10 +74,12 @@ describe('evlog/hono', () => {
     await app.request('/api/users')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/users')
-    expect(event).toBeDefined()
-    expect((event!.user as { id: string }).id).toBe('u-1')
-    expect((event!.db as { queries: number }).queries).toBe(3)
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
+    )
+    expect(event.user).toEqual({ id: 'u-1' })
+    expect(event.db).toEqual({ queries: 3 })
   })
 
   it('logs status 500 when handler throws and Hono handles the error', async () => {
@@ -153,9 +156,11 @@ describe('evlog/hono', () => {
     })
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/test')
-    expect(event).toBeDefined()
-    expect(event!.requestId).toBe('custom-req-id')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/test'),
+      'event with x-request-id',
+    )
+    expect(event.requestId).toBe('custom-req-id')
   })
 
   it('handles POST requests with correct method', async () => {
@@ -200,9 +205,11 @@ describe('evlog/hono', () => {
     await app.request('/api/auth/login')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/auth/login')
-    expect(event).toBeDefined()
-    expect(event!.service).toBe('auth-service')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/auth/login'),
+      'route service override event',
+    )
+    expect(event.service).toBe('auth-service')
   })
 
   describe('drain / enrich / keep', () => {
@@ -251,10 +258,10 @@ describe('evlog/hono', () => {
       })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -272,8 +279,9 @@ describe('evlog/hono', () => {
         },
       })
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {

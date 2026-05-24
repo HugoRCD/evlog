@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from '../../src/error'
 import { createLogger, createRequestLogger, getEnvironment, initLogger, isEnabled, log } from '../../src/logger'
 import { withFakeTimers } from '../helpers/timers'
+import { defined } from '../helpers/defined'
 
 describe('initLogger', () => {
   beforeEach(() => {
@@ -238,9 +239,8 @@ describe('createLogger', () => {
     logger.warn('Slow downstream query')
 
     const context = logger.getContext()
-    expect(context.requestLogs).toHaveLength(2)
-    expect((context.requestLogs as Array<{ message: string }>)[0]!.message).toBe('Extracting data')
-    expect((context.requestLogs as Array<{ message: string }>)[1]!.message).toBe('Slow downstream query')
+    const logs = defined(context.requestLogs, 'requestLogs') as Array<{ message: string }>
+    expect(logs.map(entry => entry.message)).toEqual(['Extracting data', 'Slow downstream query'])
   })
 
   it('returns WideEvent on emit', () => {

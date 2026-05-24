@@ -63,10 +63,9 @@ const titleStyle = computed(() => {
 const titleBloomDuplicate = computed(() => titleLen.value <= 32)
 
 const titleStyleBloom = computed(() => {
-  const s = { ...titleStyle.value }
-  delete (s as Record<string, unknown>).textShadow
+  const { textShadow: _textShadow, ...rest } = titleStyle.value
   return {
-    ...s,
+    ...rest,
     color: 'rgba(255,255,255,0.92)',
   }
 })

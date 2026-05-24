@@ -1,19 +1,19 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { H3Event } from 'h3'
+import { defined } from '../helpers/defined'
 
-// Mock h3 functions
 const mockSetResponseStatus = vi.fn()
 const mockSetResponseHeader = vi.fn()
 const mockSend = vi.fn()
 const mockGetRequestURL = vi.fn(() => ({ pathname: '/api/test' }))
 
 vi.mock('h3', () => ({
-  setResponseStatus: (...args: any[]) => mockSetResponseStatus(...args),
-  setResponseHeader: (...args: any[]) => mockSetResponseHeader(...args),
-  send: (...args: any[]) => mockSend(...args),
-  getRequestURL: (...args: any[]) => (mockGetRequestURL as (...a: any[]) => unknown)(...args),
+  setResponseStatus: (event: H3Event, status: number) => mockSetResponseStatus(event, status),
+  setResponseHeader: (event: H3Event, name: string, value: string) => mockSetResponseHeader(event, name, value),
+  send: (event: H3Event, body: string) => mockSend(event, body),
+  getRequestURL: (event: H3Event, options?: { xForwardedHost?: boolean }) => mockGetRequestURL(event, options),
 }))
 
-// Mock nitropack/runtime
 vi.mock('nitropack/runtime', () => ({
   defineNitroErrorHandler: <T>(handler: T) => handler,
 }))
@@ -21,9 +21,13 @@ vi.mock('nitropack/runtime', () => ({
 import { createError } from '../../src/error'
 import errorHandler from '../../src/nitro/errorHandler'
 
-describe('errorHandler', () => {
-  const mockEvent = { node: { req: {}, res: {} } }
+const mockEvent = { node: { req: {}, res: {} } } as H3Event
 
+function invokeErrorHandler(error: Error) {
+  errorHandler(error, mockEvent, { defaultHandler: vi.fn() })
+}
+
+describe('errorHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('NODE_ENV', 'development')
@@ -31,9 +35,8 @@ describe('errorHandler', () => {
 
   describe('EvlogError handling', () => {
     it('serializes EvlogError with all data fields', () => {
-      const evlogError = {
+      const evlogError = Object.assign(new Error('Payment failed'), {
         name: 'EvlogError',
-        message: 'Payment failed',
         status: 402,
         statusText: 'Payment failed',
         statusCode: 402,
@@ -43,14 +46,14 @@ describe('errorHandler', () => {
           fix: 'Try another card',
           link: 'https://docs.example.com',
         },
-      }
+      })
 
-      errorHandler(evlogError as any, mockEvent as any, {} as any)
+      invokeErrorHandler(evlogError)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 402)
       expect(mockSetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'application/json')
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.statusCode).toBe(402)
       expect(sentBody.message).toBe('Payment failed')
       expect(sentBody.url).toBe('/api/test')
@@ -63,39 +66,30 @@ describe('errorHandler', () => {
     })
 
     it('derives HTTP status from evlogError when in error.cause', () => {
-      const evlogError = {
+      const evlogError = Object.assign(new Error('Not found'), {
         name: 'EvlogError',
-        message: 'Not found',
         status: 404,
         statusText: 'Not found',
         statusCode: 404,
         statusMessage: 'Not found',
         data: { why: 'Resource does not exist' },
-      }
+      })
 
-      const wrapperError = {
-        name: 'Error',
-        message: 'Wrapper error',
-        cause: evlogError,
-      }
+      const wrapperError = Object.assign(new Error('Wrapper error'), { cause: evlogError })
 
-      errorHandler(wrapperError as any, mockEvent as any, {} as any)
+      invokeErrorHandler(wrapperError)
 
-      // HTTP status should come from evlogError, not wrapper
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 404)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.statusCode).toBe(404)
       expect(sentBody.data).toEqual({ why: 'Resource does not exist' })
     })
 
     it('defaults to 500 when no status on evlogError', () => {
-      const evlogError = {
-        name: 'EvlogError',
-        message: 'Unknown error',
-      }
+      const evlogError = Object.assign(new Error('Unknown error'), { name: 'EvlogError' })
 
-      errorHandler(evlogError as any, mockEvent as any, {} as any)
+      invokeErrorHandler(evlogError)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
@@ -108,9 +102,9 @@ describe('errorHandler', () => {
         internal: { userId: 'u-internal', rawPolicy: 'deny:admin' },
       })
 
-      errorHandler(err as any, mockEvent as any, {} as any)
+      invokeErrorHandler(err)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.internal).toBeUndefined()
       expect(JSON.stringify(sentBody)).not.toContain('u-internal')
       expect(JSON.stringify(sentBody)).not.toContain('rawPolicy')
@@ -124,46 +118,37 @@ describe('errorHandler', () => {
 
   describe('non-EvlogError handling', () => {
     it('uses Nitro-compatible format for standard errors', () => {
-      const error = {
-        name: 'Error',
-        message: 'Something went wrong',
+      const error = Object.assign(new Error('Something went wrong'), {
         statusCode: 400,
-      }
+      })
 
-      errorHandler(error as any, mockEvent as any, {} as any)
+      invokeErrorHandler(error)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 400)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.statusCode).toBe(400)
       expect(sentBody.statusMessage).toBe('Something went wrong')
       expect(sentBody.message).toBe('Something went wrong')
       expect(sentBody.url).toBe('/api/test')
       expect(sentBody.error).toBe(true)
-      // Should NOT include extended fields
       expect(sentBody.data).toBeUndefined()
     })
 
     it('defaults to 500 for errors without status', () => {
-      const error = {
-        name: 'Error',
-        message: 'Generic error',
-      }
+      const error = new Error('Generic error')
 
-      errorHandler(error as any, mockEvent as any, {} as any)
+      invokeErrorHandler(error)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
 
     it('uses "Internal Server Error" when no message', () => {
-      const error = {
-        name: 'Error',
-        message: '',
-      }
+      const error = new Error('')
 
-      errorHandler(error as any, mockEvent as any, {} as any)
+      invokeErrorHandler(error)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
     })
@@ -171,15 +156,13 @@ describe('errorHandler', () => {
     it('sanitizes 5xx error messages in production', () => {
       vi.stubEnv('NODE_ENV', 'production')
 
-      const error = {
-        name: 'Error',
-        message: 'Database connection failed: password invalid',
+      const error = Object.assign(new Error('Database connection failed: password invalid'), {
         statusCode: 500,
-      }
+      })
 
-      errorHandler(error as any, mockEvent as any, {} as any)
+      invokeErrorHandler(error)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
     })
@@ -187,15 +170,13 @@ describe('errorHandler', () => {
     it('preserves 4xx error messages in production', () => {
       vi.stubEnv('NODE_ENV', 'production')
 
-      const error = {
-        name: 'Error',
-        message: 'Invalid email format',
+      const error = Object.assign(new Error('Invalid email format'), {
         statusCode: 400,
-      }
+      })
 
-      errorHandler(error as any, mockEvent as any, {} as any)
+      invokeErrorHandler(error)
 
-      const sentBody = JSON.parse(mockSend.mock.calls[0][1])
+      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Invalid email format')
       expect(sentBody.statusMessage).toBe('Invalid email format')
     })

@@ -32,11 +32,16 @@ export interface AuditInput {
  * Used by `idempotencyKey` and `hash-chain` so the same logical event always
  * produces the same digest, regardless of how object keys were added.
  */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  const keys = Object.keys(value as Record<string, unknown>).sort()
-  return `{${keys.map(k => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`
+  if (!isPlainObject(value)) return JSON.stringify(value)
+  const keys = Object.keys(value).sort()
+  return `{${keys.map(k => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`
 }
 
 /**

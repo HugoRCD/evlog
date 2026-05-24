@@ -1,13 +1,13 @@
 import { createFileRoute } from '@tanstack/react-router'
 import { useRequest } from 'nitro/context'
-import type { RequestLogger } from 'evlog'
+import { requireRequestLogger } from '@/utils/require-request-logger'
 
 export const Route = createFileRoute('/api/hello')({
   server: {
     handlers: {
       GET: async () => {
         const req = useRequest()
-        const log = req?.context?.log as RequestLogger
+        const log = requireRequestLogger(req?.context)
 
         log.set({
           user: { id: 'user_789', plan: 'enterprise', role: 'admin' },
