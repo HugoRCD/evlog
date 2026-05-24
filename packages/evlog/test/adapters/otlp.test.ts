@@ -430,9 +430,21 @@ describe('otlp adapter', () => {
       headers: {},
     })
 
-    afterEach(() => {
+    let origNuxtOtlpEndpoint: string | undefined
+    let origOtlpEndpoint: string | undefined
+
+    beforeEach(() => {
+      origNuxtOtlpEndpoint = process.env.NUXT_OTLP_ENDPOINT
+      origOtlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
       delete process.env.NUXT_OTLP_ENDPOINT
       delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+    })
+
+    afterEach(() => {
+      if (origNuxtOtlpEndpoint === undefined) delete process.env.NUXT_OTLP_ENDPOINT
+      else process.env.NUXT_OTLP_ENDPOINT = origNuxtOtlpEndpoint
+      if (origOtlpEndpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origOtlpEndpoint
     })
 
     it('returns a callable drain that posts events', async () => {

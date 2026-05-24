@@ -115,9 +115,21 @@ describe('hyperdx adapter', () => {
       headers: {},
     })
 
-    afterEach(() => {
+    let origNuxtHyperdxApiKey: string | undefined
+    let origHyperdxApiKey: string | undefined
+
+    beforeEach(() => {
+      origNuxtHyperdxApiKey = process.env.NUXT_HYPERDX_API_KEY
+      origHyperdxApiKey = process.env.HYPERDX_API_KEY
       delete process.env.NUXT_HYPERDX_API_KEY
       delete process.env.HYPERDX_API_KEY
+    })
+
+    afterEach(() => {
+      if (origNuxtHyperdxApiKey === undefined) delete process.env.NUXT_HYPERDX_API_KEY
+      else process.env.NUXT_HYPERDX_API_KEY = origNuxtHyperdxApiKey
+      if (origHyperdxApiKey === undefined) delete process.env.HYPERDX_API_KEY
+      else process.env.HYPERDX_API_KEY = origHyperdxApiKey
     })
 
     it('returns a callable drain that posts events', async () => {

@@ -312,7 +312,8 @@ describe('fs adapter', () => {
     it('uses default dir when no config is provided', async () => {
       const drain = createFsDrain()
       await drain(createDrainContext())
-      expect(mockedAppendFile).toHaveBeenCalled()
+      const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
+      expect(filePath).toBe(join('.evlog/logs', '2026-03-14.jsonl'))
     })
   })
 })

@@ -305,9 +305,21 @@ describe('sentry adapter', () => {
       headers: {},
     })
 
-    afterEach(() => {
+    let origNuxtSentryDsn: string | undefined
+    let origSentryDsn: string | undefined
+
+    beforeEach(() => {
+      origNuxtSentryDsn = process.env.NUXT_SENTRY_DSN
+      origSentryDsn = process.env.SENTRY_DSN
       delete process.env.NUXT_SENTRY_DSN
       delete process.env.SENTRY_DSN
+    })
+
+    afterEach(() => {
+      if (origNuxtSentryDsn === undefined) delete process.env.NUXT_SENTRY_DSN
+      else process.env.NUXT_SENTRY_DSN = origNuxtSentryDsn
+      if (origSentryDsn === undefined) delete process.env.SENTRY_DSN
+      else process.env.SENTRY_DSN = origSentryDsn
     })
 
     it('returns a callable drain that posts events', async () => {

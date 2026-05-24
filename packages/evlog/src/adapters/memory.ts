@@ -29,9 +29,12 @@ function getOrCreateStore(name: string): WideEvent[] {
 }
 
 function parseMaxEvents(value: unknown): number | undefined {
-  if (typeof value === 'number' && Number.isFinite(value) && value > 0) return Math.floor(value)
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    const n = Math.floor(value)
+    return n > 0 ? n : undefined
+  }
   if (typeof value === 'string' && value) {
-    const n = Number.parseInt(value, 10)
+    const n = Math.floor(Number.parseFloat(value))
     if (!Number.isNaN(n) && n > 0) return n
   }
   return undefined

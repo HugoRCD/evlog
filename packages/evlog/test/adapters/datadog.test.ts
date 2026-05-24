@@ -318,10 +318,26 @@ describe('datadog adapter', () => {
       headers: {},
     })
 
-    afterEach(() => {
+    let origNuxtDatadogApiKey: string | undefined
+    let origDatadogApiKey: string | undefined
+    let origDdApiKey: string | undefined
+
+    beforeEach(() => {
+      origNuxtDatadogApiKey = process.env.NUXT_DATADOG_API_KEY
+      origDatadogApiKey = process.env.DATADOG_API_KEY
+      origDdApiKey = process.env.DD_API_KEY
       delete process.env.NUXT_DATADOG_API_KEY
       delete process.env.DATADOG_API_KEY
       delete process.env.DD_API_KEY
+    })
+
+    afterEach(() => {
+      if (origNuxtDatadogApiKey === undefined) delete process.env.NUXT_DATADOG_API_KEY
+      else process.env.NUXT_DATADOG_API_KEY = origNuxtDatadogApiKey
+      if (origDatadogApiKey === undefined) delete process.env.DATADOG_API_KEY
+      else process.env.DATADOG_API_KEY = origDatadogApiKey
+      if (origDdApiKey === undefined) delete process.env.DD_API_KEY
+      else process.env.DD_API_KEY = origDdApiKey
     })
 
     it('returns a callable drain that posts events', async () => {
