@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { clearMemoryLogs, createMemoryDrain, readMemoryLogs, writeToMemory } from '../../src/adapters/memory'
+import { clearMemoryLogs, createMemoryDrain, parseReadMemoryLogsQuery, readMemoryLogs, writeToMemory } from '../../src/adapters/memory'
 
 const createTestEvent = (overrides?: Partial<WideEvent>): WideEvent => ({
   timestamp: '2026-03-14T10:00:00.000Z',
@@ -199,6 +199,29 @@ describe('readMemoryLogs', () => {
     expect(limited.map(e => e.requestId)).toEqual(['r3', 'r4'])
   })
 
+  it('returns an empty array when limit is 0', () => {
+    populate()
+
+    expect(readMemoryLogs({ limit: 0 })).toHaveLength(0)
+  })
+
+  it('returns an empty array when limit is negative', () => {
+    populate()
+
+    expect(readMemoryLogs({ limit: -1 })).toHaveLength(0)
+  })
+
+  it('does not create a store entry when reading from an unknown store', () => {
+    const storesBefore = readMemoryLogs({ store: 'never-written' })
+    expect(storesBefore).toHaveLength(0)
+
+    writeToMemory([createTestEvent()], { store: 'default', maxEvents: 1000 })
+    clearMemoryLogs('default')
+
+    // The 'never-written' store should not exist in the map — clearing it is a no-op
+    expect(() => clearMemoryLogs('never-written')).not.toThrow()
+  })
+
   it('returns a snapshot (mutations to result do not affect the store)', () => {
     populate()
 
@@ -228,5 +251,71 @@ describe('clearMemoryLogs', () => {
 
   it('is a no-op on a store that was never written to', () => {
     expect(() => clearMemoryLogs('nonexistent')).not.toThrow()
+  })
+})
+
+describe('parseReadMemoryLogsQuery', () => {
+  it('returns empty options for an empty query', () => {
+    expect(parseReadMemoryLogsQuery({})).toEqual({})
+  })
+
+  it('passes store and string timestamp params through', () => {
+    const result = parseReadMemoryLogsQuery({
+      store: 'api',
+      since: '2026-01-01T00:00:00.000Z',
+      until: '2026-12-31T23:59:59.999Z',
+    })
+    expect(result).toEqual({
+      store: 'api',
+      since: '2026-01-01T00:00:00.000Z',
+      until: '2026-12-31T23:59:59.999Z',
+    })
+  })
+
+  it('coerces a single level string', () => {
+    expect(parseReadMemoryLogsQuery({ level: 'error' })).toEqual({ level: 'error' })
+  })
+
+  it('coerces comma-separated levels into an array', () => {
+    expect(parseReadMemoryLogsQuery({ level: 'error,warn' })).toEqual({ level: ['error', 'warn'] })
+  })
+
+  it('coerces an array of level strings', () => {
+    expect(parseReadMemoryLogsQuery({ level: ['error', 'warn'] })).toEqual({ level: ['error', 'warn'] })
+  })
+
+  it('ignores unknown level values', () => {
+    expect(parseReadMemoryLogsQuery({ level: 'critical,error' })).toEqual({ level: 'error' })
+  })
+
+  it('omits level when all values are invalid', () => {
+    expect(parseReadMemoryLogsQuery({ level: 'critical,verbose' })).toEqual({})
+  })
+
+  it('coerces limit to a number', () => {
+    expect(parseReadMemoryLogsQuery({ limit: '50' })).toEqual({ limit: 50 })
+  })
+
+  it('ignores a non-numeric limit', () => {
+    expect(parseReadMemoryLogsQuery({ limit: 'all' })).toEqual({})
+  })
+
+  it('passes a zero limit through (readMemoryLogs will return [])', () => {
+    expect(parseReadMemoryLogsQuery({ limit: '0' })).toEqual({ limit: 0 })
+  })
+
+  it('ignores empty string values', () => {
+    expect(parseReadMemoryLogsQuery({ store: '', since: '' })).toEqual({})
+  })
+
+  it('end-to-end: filters events via parsed query', () => {
+    const cfg = { store: 'default', maxEvents: 1000 }
+    writeToMemory([createTestEvent({ level: 'error', action: 'e1' })], cfg)
+    writeToMemory([createTestEvent({ level: 'info', action: 'i1' })], cfg)
+
+    const opts = parseReadMemoryLogsQuery({ level: 'error', limit: '10' })
+    const events = readMemoryLogs(opts)
+    expect(events).toHaveLength(1)
+    expect(events[0]!.level).toBe('error')
   })
 })

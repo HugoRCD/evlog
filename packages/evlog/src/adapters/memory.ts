@@ -62,7 +62,7 @@ export function createMemoryDrain(overrides?: Partial<MemoryConfig>) {
   return defineDrain<MemoryConfig>({
     name: 'memory',
     resolve: () => config,
-    send: async (events, cfg) => writeToMemory(events, cfg),
+    send: (events, cfg) => Promise.resolve(writeToMemory(events, cfg)),
   })
 }
 
@@ -112,7 +112,7 @@ function normalizeTimestamp(value: Date | string | undefined): number | undefine
  */
 export function readMemoryLogs(options: ReadMemoryLogsOptions = {}): WideEvent[] {
   const storeName = options.store ?? DEFAULT_STORE
-  const events = [...getOrCreateStore(storeName)]
+  const events = [...(stores.get(storeName) ?? [])]
 
   const sinceMs = normalizeTimestamp(options.since)
   const untilMs = normalizeTimestamp(options.until)
@@ -133,8 +133,9 @@ export function readMemoryLogs(options: ReadMemoryLogsOptions = {}): WideEvent[]
     return true
   })
 
-  if (options.limit !== undefined && filtered.length > options.limit) {
-    return filtered.slice(-options.limit)
+  if (options.limit !== undefined) {
+    if (options.limit <= 0) return []
+    if (filtered.length > options.limit) return filtered.slice(-options.limit)
   }
   return filtered
 }
@@ -151,4 +152,53 @@ export function readMemoryLogs(options: ReadMemoryLogsOptions = {}): WideEvent[]
 export function clearMemoryLogs(store = DEFAULT_STORE): void {
   const s = stores.get(store)
   if (s) s.length = 0
+}
+
+const VALID_LEVELS = new Set<LogLevel>(['info', 'error', 'warn', 'debug'])
+
+/**
+ * Parse a flat query-string object (e.g. from `c.req.query()` in Hono, or
+ * `req.query` in Express) into {@link ReadMemoryLogsOptions} with proper type
+ * coercion.
+ *
+ * This lets agents discover and pass filter parameters through HTTP query
+ * strings directly:
+ *
+ * @example
+ * ```ts
+ * // Hono — zero glue
+ * app.get('/_evlog/logs', (c) =>
+ *   c.json(readMemoryLogs(parseReadMemoryLogsQuery(c.req.query()))))
+ *
+ * // Express
+ * app.get('/_evlog/logs', (req, res) =>
+ *   res.json(readMemoryLogs(parseReadMemoryLogsQuery(req.query as Record<string, string>))))
+ * ```
+ *
+ * Supported query params: `store`, `since`, `until`, `level` (comma-separated),
+ * `limit`. The `filter` predicate cannot be expressed as a query param.
+ */
+export function parseReadMemoryLogsQuery(
+  query: Record<string, string | string[] | undefined>,
+): ReadMemoryLogsOptions {
+  const opts: ReadMemoryLogsOptions = {}
+  const { store, since, until, level, limit } = query
+
+  if (typeof store === 'string' && store) opts.store = store
+  if (typeof since === 'string' && since) opts.since = since
+  if (typeof until === 'string' && until) opts.until = until
+
+  if (level !== undefined) {
+    const raw = Array.isArray(level) ? level : level.split(',')
+    const levels = raw.map((l) => l.trim()).filter((l): l is LogLevel => VALID_LEVELS.has(l as LogLevel))
+    if (levels.length === 1) [opts.level] = levels
+    else if (levels.length > 1) opts.level = levels
+  }
+
+  if (typeof limit === 'string') {
+    const n = Number.parseInt(limit, 10)
+    if (!Number.isNaN(n)) opts.limit = n
+  }
+
+  return opts
 }

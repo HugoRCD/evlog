@@ -125,6 +125,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
   "./memory": [
     "clearMemoryLogs",
     "createMemoryDrain",
+    "parseReadMemoryLogsQuery",
     "readMemoryLogs",
     "writeToMemory",
   ],
