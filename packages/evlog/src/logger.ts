@@ -366,7 +366,20 @@ interface ToolCallEntry {
 
 function serializeToolInput(input: unknown): string {
   if (typeof input === 'string') return input
-  return JSON.stringify(input) ?? ''
+  const seen = new WeakSet<object>()
+  try {
+    const serialized = JSON.stringify(input, (_key, value) => {
+      if (typeof value === 'bigint') return value.toString()
+      if (typeof value === 'object' && value !== null) {
+        if (seen.has(value)) return '[Circular]'
+        seen.add(value)
+      }
+      return value
+    })
+    return serialized ?? ''
+  } catch {
+    return '[unserializable tool input]'
+  }
 }
 
 function isToolCallEntry(value: unknown): value is ToolCallEntry {

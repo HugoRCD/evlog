@@ -1150,3 +1150,29 @@ describe('silent option', () => {
     expect(ctx.event.message).toBe('User logged in')
   })
 })
+
+describe('pretty-print tool input serialization', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    initLogger({ pretty: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('does not throw on BigInt or circular tool inputs', () => {
+    const circular: Record<string, unknown> = { a: 1 }
+    circular.self = circular
+    const logger = createRequestLogger({ method: 'GET', path: '/ai', requestId: 'r1' })
+    logger.set({
+      ai: {
+        toolCalls: [
+          { name: 'big', input: { n: 1n } },
+          { name: 'circ', input: circular },
+        ],
+      },
+    })
+    expect(() => logger.emit()).not.toThrow()
+  })
+})
