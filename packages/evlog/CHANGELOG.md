@@ -1,5 +1,91 @@
 # evlog
 
+## 2.18.0
+
+### Minor Changes
+
+- [#351](https://github.com/HugoRCD/evlog/pull/351) [`ee997b3`](https://github.com/HugoRCD/evlog/commit/ee997b311b4b59cf319c0fbd5efae4a7ac10e30c) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/memory` — an in-memory ring buffer drain that works in any runtime, including Cloudflare Workers (workerd) where Node's `fs` module is unavailable.
+
+  ```ts
+  import {
+    createMemoryDrain,
+    readMemoryLogs,
+    clearMemoryLogs,
+    parseReadMemoryLogsQuery,
+  } from "evlog/memory";
+
+  // Wire the drain
+  app.use(evlog({ drain: createMemoryDrain() }));
+
+  // Expose a dev-only endpoint — agents can filter via query params
+  app.get("/_evlog/logs", (c) =>
+    c.json(readMemoryLogs(parseReadMemoryLogsQuery(c.req.query()))),
+  );
+  ```
+
+  Key features:
+  - **Zero runtime dependencies** — pure in-memory, no `fs`, no network
+  - **Bounded ring buffer** — configurable `maxEvents` (default `1000`) prevents unbounded memory growth
+  - **Named stores** — isolate buffers per service or test suite via the `store` option
+  - **Filtering API** — `readMemoryLogs` accepts `since`, `until`, `level`, `filter`, and `limit` options, matching the `readFsLogs` interface
+  - **`parseReadMemoryLogsQuery(query)`** — coerce HTTP query-string params (`Record<string, string>`) into typed `ReadMemoryLogsOptions`; works with Hono, h3/Nitro, Express, Fastify, Next.js, Elysia, NestJS
+  - **`clearMemoryLogs(store?)`** — reset a store, useful in tests
+  - **Environment variables** — `NUXT_EVLOG_MEMORY_STORE` / `EVLOG_MEMORY_STORE`, `NUXT_EVLOG_MEMORY_MAX_EVENTS` / `EVLOG_MEMORY_MAX_EVENTS` (via `resolveAdapterConfig`)
+  - **Nuxt module** — `ModuleOptions.axiom` now documents `apiKey` as the canonical field; legacy `token` remains as a deprecated alias until the next major release
+
+  Closes [#349](https://github.com/HugoRCD/evlog/issues/349).
+
+- [#344](https://github.com/HugoRCD/evlog/pull/344) [`5bc3c73`](https://github.com/HugoRCD/evlog/commit/5bc3c73c9ed414b53c616b9f20de8b2b981dc145) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add oRPC integration (`evlog/orpc`) with automatic wide-event logging. Two complementary primitives:
+  - `withEvlog(handler)` — wraps `RPCHandler` / `OpenAPIHandler` from `@orpc/server/fetch`. Each matched request becomes one wide event with full pipeline support (drain, enrich, `include`/`exclude`, route-based service overrides, tail sampling). Excluded routes still receive a no-op `context.log` so procedures never crash on missing fields.
+  - `evlog()` — procedure-level middleware (`os.use(evlog())`). Tags the wide event with `operation` (procedure path joined with `.`), forwards the request logger as `context.log`, promotes the level to `error` when a procedure throws, and bridges `createError()` / `defineErrorCatalog()` throws to `ORPCError` (code, status, message, plus `why`/`fix`/`link` in `data`).
+
+  ```ts
+  import { os } from "@orpc/server";
+  import { RPCHandler } from "@orpc/server/fetch";
+  import { evlog, withEvlog, type EvlogOrpcContext } from "evlog/orpc";
+
+  const base = os.$context<EvlogOrpcContext>().use(evlog());
+
+  const router = {
+    ping: base.handler(({ context }) => {
+      context.log.set({ pinged: true });
+      return { ok: true };
+    }),
+  };
+
+  const handler = withEvlog(new RPCHandler(router));
+
+  export default async function fetch(request: Request) {
+    const { matched, response } = await handler.handle(request, {
+      prefix: "/rpc",
+    });
+    return matched ? response : new Response("Not Found", { status: 404 });
+  }
+  ```
+
+  `useLogger()` is exposed for off-context access (utility modules / deep service functions). `EvlogOrpcContext` is the type to plug into `os.$context()` for typed access.
+
+  Closes [#297](https://github.com/HugoRCD/evlog/issues/297).
+
+- [#339](https://github.com/HugoRCD/evlog/pull/339) [`31b6b31`](https://github.com/HugoRCD/evlog/commit/31b6b310b1f0a9d0919888d49664927ad0f2f146) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `log.setLevel(level)` to promote the wide event level explicitly without touching the `error` context.
+
+  `log.error(err)` populates `error: { name, message, stack, ... }` from the thrown value. When you want to mark the event as `error` (or `warn`) while controlling the `error` field yourself — typed error codes, no stack, custom shapes — call `log.setLevel('error' | 'warn' | 'info' | 'debug')` and pair it with `log.set({ error: { code: 'PAYMENT_DECLINED' } })`. The explicit level wins over the level computed from `.error()` / `.warn()`.
+
+  ```ts
+  log.setLevel("error");
+  log.set({
+    error: { code: "PAYMENT_DECLINED", reason: "insufficient_funds" },
+  });
+  ```
+
+  Closes [#301](https://github.com/HugoRCD/evlog/issues/301).
+
+### Patch Changes
+
+- [#348](https://github.com/HugoRCD/evlog/pull/348) [`6d4d87c`](https://github.com/HugoRCD/evlog/commit/6d4d87c1c4997021501900e0a8a3d4c8f95e7ce5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix `evlog/nitro` and `evlog/nitro/v3` on Windows. The module passed native `path.resolve()` paths to `nitro.options.plugins` and `nitro.options.errorHandler`. Nitro raw-interpolates those into the `#nitro/virtual/plugins` and `#nitro/virtual/error-handler` JS string literals, so Windows backslashes were parsed as escape sequences (`\n`, `\v`, …) and broke module resolution — surfacing as `Cannot find module … imported from '#nitro/virtual/error-handler'`. Paths are now normalized to forward slashes before being handed to Nitro.
+
+  Closes [#345](https://github.com/HugoRCD/evlog/issues/345).
+
 ## 2.17.0
 
 ### Minor Changes
