@@ -24,6 +24,7 @@
     "hono",
     "elysia",
     "nestjs",
+    "orpc",
     "sveltekit",
     "react-router",
     "vite",
@@ -175,6 +176,11 @@
       "import": "./dist/nestjs/index.mjs",
       "default": "./dist/nestjs/index.mjs"
     },
+    "./orpc": {
+      "types": "./dist/orpc/index.d.mts",
+      "import": "./dist/orpc/index.mjs",
+      "default": "./dist/orpc/index.mjs"
+    },
     "./react-router": {
       "types": "./dist/react-router/index.d.mts",
       "import": "./dist/react-router/index.mjs",
@@ -299,6 +305,9 @@
       "nestjs": [
         "./dist/nestjs/index.d.mts"
       ],
+      "orpc": [
+        "./dist/orpc/index.d.mts"
+      ],
       "react-router": [
         "./dist/react-router/index.d.mts"
       ],
@@ -353,6 +362,8 @@
     "@nuxt/devtools": "^3.2.4",
     "@nuxt/schema": "^4.4.2",
     "@nuxt/test-utils": "^4.0.3",
+    "@orpc/client": "^1.14.2",
+    "@orpc/server": "^1.14.2",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@sveltejs/kit": "^2.59.0",
@@ -388,6 +399,7 @@
   "peerDependencies": {
     "@nestjs/common": ">=11.1.19",
     "@nuxt/kit": "^4.4.2",
+    "@orpc/server": ">=1.14.0",
     "@tanstack/start-client-core": "^1.167.20",
     "ai": ">=6.0.168",
     "elysia": ">=1.4.28",
@@ -438,6 +450,9 @@
       "optional": true
     },
     "@nestjs/common": {
+      "optional": true
+    },
+    "@orpc/server": {
       "optional": true
     },
     "react-router": {

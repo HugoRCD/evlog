@@ -43,6 +43,7 @@ scope.
 - next (Next.js integration)
 - nitro (Nitro plugin)
 - nuxt (Nuxt module)
+- orpc (oRPC integration)
 - otlp (OTLP drain adapter)
 - playground (the playground app)
 - posthog (PostHog drain adapter)

@@ -528,6 +528,38 @@ log.set({ users: { count: 42 } })
 
 See the full [nestjs example](https://github.com/HugoRCD/evlog/tree/main/examples/nestjs) for a complete working project.
 
+## oRPC
+
+```typescript
+// server/orpc.ts
+import { os } from '@orpc/server'
+import { RPCHandler } from '@orpc/server/fetch'
+import { initLogger } from 'evlog'
+import { evlog, withEvlog, type EvlogOrpcContext } from 'evlog/orpc'
+
+initLogger({ env: { service: 'orpc-api' } })
+
+const base = os.$context<EvlogOrpcContext>().use(evlog())
+
+const router = {
+  ping: base.handler(({ context }) => {
+    context.log.set({ pinged: true })
+    return { ok: true }
+  }),
+}
+
+const handler = withEvlog(new RPCHandler(router))
+
+export default async function fetch(request: Request) {
+  const { matched, response } = await handler.handle(request, { prefix: '/rpc' })
+  return matched ? response : new Response('Not Found', { status: 404 })
+}
+```
+
+`withEvlog()` wraps the handler and emits one wide event per request; `os.use(evlog())` exposes `context.log` to procedures and tags each event with the procedure path as `operation`. Use `useLogger()` from `evlog/orpc` to access the logger off-context.
+
+See the full [orpc example](https://github.com/HugoRCD/evlog/tree/main/examples/orpc) for a complete working project.
+
 ## Browser
 
 Use the `log` API on the client side for structured browser logging:
@@ -1357,6 +1389,7 @@ try {
 | **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([example](./examples/hono)) |
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
+| **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |

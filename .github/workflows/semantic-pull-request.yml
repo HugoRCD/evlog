@@ -42,6 +42,7 @@ jobs:
             next
             nitro
             nuxt
+            orpc
             otlp
             playground
             posthog
