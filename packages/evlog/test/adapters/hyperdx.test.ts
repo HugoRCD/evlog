@@ -5,6 +5,7 @@ import {
   sendBatchToHyperDX,
   sendToHyperDX,
   toHyperDXOTLPConfig,
+  createHyperDXDrain,
 } from '../../src/adapters/hyperdx'
 
 describe('hyperdx adapter', () => {
@@ -103,6 +104,47 @@ describe('hyperdx adapter', () => {
   describe('sendBatchToHyperDX', () => {
     it('no-ops on empty batch', async () => {
       await sendBatchToHyperDX([], { apiKey: 'k' })
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('createHyperDXDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    let origNuxtHyperdxApiKey: string | undefined
+    let origHyperdxApiKey: string | undefined
+
+    beforeEach(() => {
+      origNuxtHyperdxApiKey = process.env.NUXT_HYPERDX_API_KEY
+      origHyperdxApiKey = process.env.HYPERDX_API_KEY
+      delete process.env.NUXT_HYPERDX_API_KEY
+      delete process.env.HYPERDX_API_KEY
+    })
+
+    afterEach(() => {
+      if (origNuxtHyperdxApiKey === undefined) delete process.env.NUXT_HYPERDX_API_KEY
+      else process.env.NUXT_HYPERDX_API_KEY = origNuxtHyperdxApiKey
+      if (origHyperdxApiKey === undefined) delete process.env.HYPERDX_API_KEY
+      else process.env.HYPERDX_API_KEY = origHyperdxApiKey
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createHyperDXDrain({ apiKey: 'test-key' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when apiKey is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createHyperDXDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/hyperdx] Missing apiKey'),
+      )
       expect(fetchSpy).not.toHaveBeenCalled()
     })
   })

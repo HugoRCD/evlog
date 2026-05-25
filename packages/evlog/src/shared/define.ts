@@ -1,6 +1,5 @@
-import type { DrainContext, EnrichContext, EnvironmentContext, LoggerConfig, RedactConfig, SamplingConfig, TailSamplingContext } from '../types'
+import type { EnvironmentContext, LoggerConfig, SamplingConfig } from '../types'
 import type { BaseEvlogOptions } from './middleware'
-import type { EvlogPlugin } from './plugin'
 
 /**
  * Single-config shape accepted everywhere evlog is bootstrapped: at
@@ -71,7 +70,7 @@ export function toLoggerConfig(config: EvlogConfig): LoggerConfig {
   if (config.minLevel !== undefined) out.minLevel = config.minLevel
   if (config.stringify !== undefined) out.stringify = config.stringify
   if (config.silent !== undefined) out.silent = config.silent
-  if (config.redact !== undefined) out.redact = config.redact as boolean | RedactConfig | undefined
+  if (config.redact !== undefined) out.redact = config.redact
   if (config.drain) out.drain = config.drain
   if (config.plugins) out.plugins = config.plugins
   return out
@@ -83,10 +82,10 @@ export function toMiddlewareOptions<T extends BaseEvlogOptions>(config: EvlogCon
   if (config.include) out.include = config.include
   if (config.exclude) out.exclude = config.exclude
   if (config.routes) out.routes = config.routes
-  if (config.drain) out.drain = config.drain as (ctx: DrainContext) => void | Promise<void>
-  if (config.enrich) out.enrich = config.enrich as (ctx: EnrichContext) => void | Promise<void>
-  if (config.keep) out.keep = config.keep as (ctx: TailSamplingContext) => void | Promise<void>
-  if (config.redact !== undefined) out.redact = config.redact as boolean | RedactConfig | undefined
-  if (config.plugins) out.plugins = config.plugins as EvlogPlugin[]
+  if (config.drain) out.drain = config.drain
+  if (config.enrich) out.enrich = config.enrich
+  if (config.keep) out.keep = config.keep
+  if (config.redact !== undefined) out.redact = config.redact
+  if (config.plugins) out.plugins = config.plugins
   return out as T
 }

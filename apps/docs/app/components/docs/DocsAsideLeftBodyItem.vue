@@ -16,7 +16,9 @@ const route = useRoute()
 function getFirstPagePath(item: ContentNavigationItem): string {
   let current = item
   while (current.children?.length) {
-    current = current.children[0]!
+    const [first] = current.children
+    if (!first) break
+    current = first
   }
   return current.path
 }
@@ -46,8 +48,8 @@ const headerClasses = 'text-default font-medium hover:text-primary'
       ]"
     >
       <UIcon
-        v-if="item.icon"
-        :name="(item.icon as string)"
+        v-if="typeof item.icon === 'string'"
+        :name="item.icon"
         class="size-4 shrink-0"
       />
       <span class="truncate">{{ item.title }}</span>
@@ -58,8 +60,8 @@ const headerClasses = 'text-default font-medium hover:text-primary'
     >
       <DocsAsideLeftBodyItem
         v-for="(child, index) in item.children"
-        :key="(child as ContentNavigationItem).path ?? `${item.path}-${index}`"
-        :item="(child as ContentNavigationItem)"
+        :key="child.path ?? `${item.path}-${index}`"
+        :item="child"
         :level="level + 1"
       />
     </ul>

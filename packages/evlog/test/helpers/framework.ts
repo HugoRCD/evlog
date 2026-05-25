@@ -1,5 +1,6 @@
 import { vi, expect } from 'vitest'
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../../src/types'
+import { defined, getDrainCallArg } from './defined'
 
 /**
  * Wait for a drain spy to be called at least `count` times. Wraps `vi.waitFor`
@@ -26,9 +27,9 @@ export async function waitForDrainCalls(
  */
 export function createPipelineSpies() {
   return {
-    drain: vi.fn<[DrainContext], void | Promise<void>>(),
-    enrich: vi.fn<[EnrichContext], void | Promise<void>>(),
-    keep: vi.fn<[TailSamplingContext], void | Promise<void>>(),
+    drain: vi.fn<(ctx: DrainContext) => void | Promise<void>>(),
+    enrich: vi.fn<(ctx: EnrichContext) => void | Promise<void>>(),
+    keep: vi.fn<(ctx: TailSamplingContext) => void | Promise<void>>(),
   }
 }
 
@@ -46,8 +47,8 @@ export function findEventViaDrain(
   predicate: (event: WideEvent) => boolean,
 ): WideEvent | undefined {
   for (const call of drainFn.mock.calls) {
-    const ctx = call[0] as DrainContext | undefined
-    if (ctx?.event && predicate(ctx.event)) return ctx.event
+    const ctx = getDrainCallArg(call)
+    if (ctx.event && predicate(ctx.event)) return ctx.event
   }
   return undefined
 }
@@ -62,8 +63,8 @@ export function findContextViaDrain(
   predicate: (event: WideEvent) => boolean,
 ): DrainContext | undefined {
   for (const call of drainFn.mock.calls) {
-    const ctx = call[0] as DrainContext | undefined
-    if (ctx?.event && predicate(ctx.event)) return ctx
+    const ctx = getDrainCallArg(call)
+    if (ctx.event && predicate(ctx.event)) return ctx
   }
   return undefined
 }
@@ -81,19 +82,20 @@ export function assertDrainCalledWith(
   },
 ) {
   expect(drainFn).toHaveBeenCalled()
-  const ctx = drainFn.mock.calls[0][0] as DrainContext
-  expect(ctx.event).toBeDefined()
-  expect(ctx.event.path).toBe(expected.path)
-  expect(ctx.request).toBeDefined()
-  expect(ctx.request!.path).toBe(expected.path)
+  const call = defined(drainFn.mock.calls[0], 'first drain call')
+  const ctx = getDrainCallArg(call)
+  const event = defined(ctx.event, 'drained event')
+  expect(event.path).toBe(expected.path)
+  const request = defined(ctx.request, 'drain request context')
+  expect(request.path).toBe(expected.path)
 
   if (expected.method) {
-    expect(ctx.event.method).toBe(expected.method)
-    expect(ctx.request!.method).toBe(expected.method)
+    expect(event.method).toBe(expected.method)
+    expect(request.method).toBe(expected.method)
   }
-  if (expected.level) expect(ctx.event.level).toBe(expected.level)
-  if (expected.status) expect(ctx.event.status).toBe(expected.status)
-  expect(ctx.request!.requestId).toBeDefined()
+  if (expected.level) expect(event.level).toBe(expected.level)
+  if (expected.status) expect(event.status).toBe(expected.status)
+  expect(request.requestId).toBeDefined()
 }
 
 /**
@@ -106,12 +108,14 @@ export function assertHttpEventEmitted(
   expected: { path: string, method?: string, status?: number, level?: string },
 ): WideEvent {
   expect(drainFn).toHaveBeenCalled()
-  const event = findEventViaDrain(drainFn, e => e.path === expected.path)
-  expect(event, `no drained event matched path=${expected.path}`).toBeDefined()
-  if (expected.method) expect(event!.method).toBe(expected.method)
-  if (expected.status) expect(event!.status).toBe(expected.status)
-  if (expected.level) expect(event!.level).toBe(expected.level)
-  return event!
+  const event = defined(
+    findEventViaDrain(drainFn, e => e.path === expected.path),
+    `no drained event matched path=${expected.path}`,
+  )
+  if (expected.method) expect(event.method).toBe(expected.method)
+  if (expected.status) expect(event.status).toBe(expected.status)
+  if (expected.level) expect(event.level).toBe(expected.level)
+  return event
 }
 
 /**

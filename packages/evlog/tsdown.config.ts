@@ -32,6 +32,7 @@ export default defineConfig({
     'adapters/hyperdx': 'src/adapters/hyperdx.ts',
     'adapters/datadog': 'src/adapters/datadog.ts',
     'adapters/fs': 'src/adapters/fs.ts',
+    'adapters/memory': 'src/adapters/memory.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
     'stream': 'src/stream.ts',

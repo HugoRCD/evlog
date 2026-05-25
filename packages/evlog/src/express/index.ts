@@ -15,7 +15,7 @@ export { useLogger }
 
 declare module 'express-serve-static-core' {
   interface Request {
-    log: RequestLogger
+    log?: RequestLogger
   }
 }
 

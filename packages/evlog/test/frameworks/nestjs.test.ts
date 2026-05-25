@@ -1,37 +1,81 @@
 import http from 'node:http'
-import type { AddressInfo } from 'node:net'
+import type { MiddlewareConsumer } from '@nestjs/common'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import express from 'express'
+import express, { type RequestHandler } from 'express'
 import request from 'supertest'
 import { initLogger } from '../../src/logger'
 import { EvlogModule, useLogger } from '../../src/nestjs/index'
 import type { EvlogNestJSOptions } from '../../src/nestjs/index'
+import type { RequestLogger } from '../../src/types'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
+  assertHttpEventEmitted,
   assertSensitiveHeadersFiltered,
   createPipelineSpies,
+  findEventViaDrain,
+  waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+type MiddlewareProxyStub = {
+  forRoutes: (...routes: unknown[]) => MiddlewareConsumer
+  exclude: (...routes: unknown[]) => MiddlewareProxyStub
+}
+
+/** Minimal {@link MiddlewareConsumer} stub that captures the applied middleware. */
+function createMiddlewareConsumerCapture(onApply: (mw: RequestHandler) => void): MiddlewareConsumer {
+  const proxy: MiddlewareProxyStub = {
+    forRoutes: () => consumer,
+    exclude: () => proxy,
+  }
+
+  const consumer = {
+    apply: ((mw: unknown) => {
+      onApply(mw as RequestHandler)
+      return proxy
+    }) as MiddlewareConsumer['apply'],
+  } satisfies Pick<MiddlewareConsumer, 'apply'>
+
+  return consumer as MiddlewareConsumer
+}
 
 /**
  * Extract the middleware function from EvlogModule.configure() for testing.
  * This lets us test the actual middleware pipeline through the NestJS module API
  * without needing the full NestJS runtime.
  */
-function getMiddleware(options: EvlogNestJSOptions = {}): any {
-  let middleware: any
-  const consumer = {
-    apply: (mw: any) => {
-      middleware = mw
-      return { forRoutes: () => {} }
-    },
-  }
+function getMiddleware(options: EvlogNestJSOptions = {}): RequestHandler {
+  let middleware: RequestHandler | undefined
 
   EvlogModule.forRoot(options)
   const module = new EvlogModule()
-  module.configure(consumer as any)
-  return middleware
+  module.configure(createMiddlewareConsumerCapture((mw) => {
+    middleware = mw
+  }))
+  return defined(middleware, 'evlog middleware from configure()')
 }
+
+describeStandardHttpMatrix({
+  name: 'nestjs',
+  mount(options) {
+    const app = express()
+    app.use(getMiddleware(options))
+    app.get('/api/users', (_req, res) => res.json({ users: [] }))
+    return Promise.resolve({
+      async fire(req) {
+        const method = (req.method || 'GET').toLowerCase()
+        const agent = method === 'post'
+          ? request(app).post(req.path)
+          : request(app).get(req.path)
+        for (const [k, v] of Object.entries(req.headers || {})) agent.set(k, v)
+        const res = await agent
+        return { status: res.status }
+      },
+    })
+  },
+})
 
 describe('evlog/nestjs', () => {
   beforeEach(() => {
@@ -63,7 +107,7 @@ describe('evlog/nestjs', () => {
       expect(result).toHaveProperty('module', EvlogModule)
       expect(result).toHaveProperty('global', true)
       expect(result.providers).toBeDefined()
-      expect(result.providers!.length).toBe(1)
+      expect(defined(result.providers).length).toBe(1)
     })
 
     it('forRootAsync() includes imports when provided', () => {
@@ -78,15 +122,19 @@ describe('evlog/nestjs', () => {
 
     it('configure() applies middleware via consumer', () => {
       const forRoutes = vi.fn()
-      const apply = vi.fn(() => ({ forRoutes }))
-      const consumer = { apply } as any
+      const proxy: MiddlewareProxyStub = {
+        forRoutes,
+        exclude: vi.fn(() => proxy),
+      }
+      const apply = vi.fn<(mw: unknown) => MiddlewareProxyStub>(() => proxy)
+      const consumer = { apply: apply as MiddlewareConsumer['apply'] } satisfies Pick<MiddlewareConsumer, 'apply'>
 
       EvlogModule.forRoot()
       const module = new EvlogModule()
-      module.configure(consumer)
+      module.configure(consumer as MiddlewareConsumer)
 
       expect(apply).toHaveBeenCalledOnce()
-      expect(apply.mock.calls[0][0]).toBeTypeOf('function')
+      expect(defined(apply.mock.calls[0], 'apply call')[0]).toBeTypeOf('function')
       expect(forRoutes).toHaveBeenCalledWith('*')
     })
   })
@@ -98,7 +146,7 @@ describe('evlog/nestjs', () => {
 
       let hasLogger = false
       app.get('/api/test', (req, res) => {
-        hasLogger = req.log !== undefined && typeof req.log.set === 'function'
+        hasLogger = req.log !== undefined && typeof defined(req.log).set === 'function'
         res.json({ ok: true })
       })
 
@@ -106,67 +154,43 @@ describe('evlog/nestjs', () => {
       expect(hasLogger).toBe(true)
     })
 
-    it('emits event with correct method, path, and status', async () => {
-      const app = express()
-      app.use(getMiddleware())
-      app.get('/api/users', (_req, res) => res.json({ users: [] }))
-
-      const consoleSpy = vi.mocked(console.info)
-      await request(app).get('/api/users')
-
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-      )
-      expect(lastCall).toBeDefined()
-
-      const event = JSON.parse(lastCall![0] as string)
-      expect(event.method).toBe('GET')
-      expect(event.path).toBe('/api/users')
-      expect(event.status).toBe(200)
-      expect(event.level).toBe('info')
-      expect(event.duration).toBeDefined()
-    })
-
     it('accumulates context set by route handler', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
-      app.get('/api/users', (req, res) => {
-        req.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+      app.use(getMiddleware({ drain }))
+      app.get('/api/users', (_req, res) => {
+        useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
         res.json({ users: [] })
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app).get('/api/users')
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"user"'),
+      const event = defined(
+        findEventViaDrain(drain, e => e.path === '/api/users'),
+        'accumulated context event',
       )
-      expect(lastCall).toBeDefined()
-
-      const event = JSON.parse(lastCall![0] as string)
-      expect(event.user.id).toBe('u-1')
-      expect(event.db.queries).toBe(3)
+      expect(event.user).toEqual({ id: 'u-1' })
+      expect(event.db).toEqual({ queries: 3 })
     })
 
     it('logs error status when handler sends error response', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
-      app.get('/api/fail', (req, res) => {
-        req.log.error(new Error('Something broke'))
+      app.use(getMiddleware({ drain }))
+      app.get('/api/fail', (_req, res) => {
+        useLogger().error(new Error('Something broke'))
         res.status(500).json({ error: 'fail' })
       })
 
-      const errorSpy = vi.mocked(console.error)
       await request(app).get('/api/fail')
+      await waitForDrainCalls(drain)
 
-      const lastCall = errorSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"level":"error"'),
-      )
-      expect(lastCall).toBeDefined()
-
-      const event = JSON.parse(lastCall![0] as string)
-      expect(event.level).toBe('error')
-      expect(event.status).toBe(500)
+      assertHttpEventEmitted(drain, {
+        path: '/api/fail',
+        level: 'error',
+        status: 500,
+      })
     })
 
     it('skips routes not matching include patterns', async () => {
@@ -184,51 +208,30 @@ describe('evlog/nestjs', () => {
     })
 
     it('logs routes matching include patterns', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware({ include: ['/api/**'] }))
-      app.get('/api/data', (req, res) => {
-        req.log.set({ data: true })
+      app.use(getMiddleware({ include: ['/api/**'], drain }))
+      app.get('/api/data', (_req, res) => {
+        useLogger().set({ data: true })
         res.json({ ok: true })
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app).get('/api/data')
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
-      )
-      expect(lastCall).toBeDefined()
-    })
-
-    it('uses x-request-id header when present', async () => {
-      const app = express()
-      app.use(getMiddleware())
-      app.get('/api/test', (_req, res) => res.json({ ok: true }))
-
-      const consoleSpy = vi.mocked(console.info)
-      await request(app).get('/api/test').set('x-request-id', 'custom-req-id')
-
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('custom-req-id'),
-      )
-      expect(lastCall).toBeDefined()
-
-      const event = JSON.parse(lastCall![0] as string)
-      expect(event.requestId).toBe('custom-req-id')
+      expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
     })
 
     it('handles POST requests with correct method', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
+      app.use(getMiddleware({ drain }))
       app.post('/api/checkout', (_req, res) => res.json({ ok: true }))
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app).post('/api/checkout')
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
-      )
-      expect(lastCall).toBeDefined()
+      assertHttpEventEmitted(drain, { path: '/api/checkout', method: 'POST' })
     })
 
     it('excludes routes matching exclude patterns', async () => {
@@ -244,22 +247,6 @@ describe('evlog/nestjs', () => {
       await request(app).get('/_internal/probe')
       expect(logValue).toBeUndefined()
     })
-
-    it('applies route-based service override', async () => {
-      const app = express()
-      app.use(getMiddleware({
-        routes: { '/api/auth/**': { service: 'auth-service' } },
-      }))
-      app.get('/api/auth/login', (_req, res) => res.json({ ok: true }))
-
-      const consoleSpy = vi.mocked(console.info)
-      await request(app).get('/api/auth/login')
-
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
-      )
-      expect(lastCall).toBeDefined()
-    })
   })
 
   describe('drain / enrich / keep', () => {
@@ -268,8 +255,8 @@ describe('evlog/nestjs', () => {
 
       const app = express()
       app.use(getMiddleware({ drain }))
-      app.get('/api/test', (req, res) => {
-        req.log.set({ user: { id: 'u-1' } })
+      app.get('/api/test', (_req, res) => {
+        useLogger().set({ user: { id: 'u-1' } })
         res.json({ ok: true })
       })
 
@@ -309,10 +296,10 @@ describe('evlog/nestjs', () => {
         .set('x-custom', 'value')
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -328,8 +315,9 @@ describe('evlog/nestjs', () => {
         .set('cookie', 'session=abc')
         .set('x-safe', 'visible')
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -340,8 +328,8 @@ describe('evlog/nestjs', () => {
 
       const app = express()
       app.use(getMiddleware({ keep, drain }))
-      app.get('/api/test', (req, res) => {
-        req.log.set({ important: true })
+      app.get('/api/test', (_req, res) => {
+        useLogger().set({ important: true })
         res.json({ ok: true })
       })
 
@@ -379,6 +367,7 @@ describe('evlog/nestjs', () => {
       const res = await request(app).get('/api/test')
       expect(res.status).toBe(200)
       expect(enrich).toHaveBeenCalledOnce()
+      await waitForDrainCalls(drain)
       expect(drain).toHaveBeenCalledOnce()
     })
 
@@ -398,10 +387,11 @@ describe('evlog/nestjs', () => {
 
   describe('useLogger()', () => {
     it('returns the request-scoped logger from anywhere in the call stack', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
+      app.use(getMiddleware({ drain }))
 
-      let loggerFromService: unknown
+      let loggerFromService: RequestLogger | undefined
       function serviceFunction() {
         loggerFromService = useLogger()
         useLogger().set({ fromService: true })
@@ -412,16 +402,14 @@ describe('evlog/nestjs', () => {
         res.json({ ok: true })
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app).get('/api/test')
+      await waitForDrainCalls(drain)
 
       expect(loggerFromService).toBeDefined()
-      expect(typeof (loggerFromService as Record<string, unknown>).set).toBe('function')
+      expect(typeof defined(loggerFromService).set).toBe('function')
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"fromService":true'),
-      )
-      expect(lastCall).toBeDefined()
+      const event = findEventViaDrain(drain, e => e.fromService === true)
+      expect(event).toBeDefined()
     })
 
     it('returns the same logger as req.log', async () => {
@@ -430,7 +418,7 @@ describe('evlog/nestjs', () => {
 
       let isSame = false
       app.get('/api/test', (req, res) => {
-        isSame = useLogger() === req.log
+        isSame = useLogger() === defined(req.log, 'req.log in middleware')
         res.json({ ok: true })
       })
 
@@ -443,8 +431,9 @@ describe('evlog/nestjs', () => {
     })
 
     it('works across async boundaries', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
+      app.use(getMiddleware({ drain }))
 
       async function asyncService() {
         await new Promise(resolve => setTimeout(resolve, 5))
@@ -456,13 +445,11 @@ describe('evlog/nestjs', () => {
         res.json({ ok: true })
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app).get('/api/test')
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"asyncWork":"done"'),
-      )
-      expect(lastCall).toBeDefined()
+      const event = findEventViaDrain(drain, e => e.asyncWork === 'done')
+      expect(event).toBeDefined()
     })
   })
 
@@ -488,24 +475,23 @@ describe('evlog/nestjs', () => {
     }
 
     it('emits the wide event with connectionClosed=true when the client aborts mid-handler', async () => {
+      const { drain } = createPipelineSpies()
       const app = express()
-      app.use(getMiddleware())
-      app.get('/api/slow', async (req, res) => {
-        req.log!.set({ step: 'before-sleep' })
+      app.use(getMiddleware({ drain }))
+      app.get('/api/slow', async (_req, res) => {
+        useLogger().set({ step: 'before-sleep' })
         await new Promise(resolve => setTimeout(resolve, 100))
-        req.log!.set({ step: 'after-sleep' })
+        useLogger().set({ step: 'after-sleep' })
         res.json({ ok: true })
       })
 
-      const consoleSpy = vi.mocked(console.info)
       await abortMidRequest(app, '/api/slow', 20)
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"path":"/api/slow"'),
+      const event = defined(
+        findEventViaDrain(drain, e => e.path === '/api/slow'),
+        'connectionClosed event',
       )
-      expect(lastCall).toBeDefined()
-
-      const event = JSON.parse(lastCall![0] as string)
       expect(event.connectionClosed).toBe(true)
       expect(event.method).toBe('GET')
       expect(event.path).toBe('/api/slow')
@@ -513,7 +499,7 @@ describe('evlog/nestjs', () => {
     })
 
     it('runs drain exactly once when the client aborts mid-handler', async () => {
-      const drain = vi.fn()
+      const { drain } = createPipelineSpies()
 
       const app = express()
       app.use(getMiddleware({ drain }))

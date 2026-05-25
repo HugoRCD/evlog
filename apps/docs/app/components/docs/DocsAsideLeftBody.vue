@@ -9,8 +9,6 @@
  * visible at all times, so we render a flat recursive nav and skip the
  * accordion entirely.
  */
-import type { ContentNavigationItem } from '@nuxt/content'
-
 const { sidebarNavigation } = useSubNavigation()
 </script>
 
@@ -19,8 +17,8 @@ const { sidebarNavigation } = useSubNavigation()
     <ul class="flex flex-col">
       <DocsAsideLeftBodyItem
         v-for="(item, index) in sidebarNavigation"
-        :key="(item as ContentNavigationItem).path ?? `root-${index}`"
-        :item="(item as ContentNavigationItem)"
+        :key="item.path ?? `root-${index}`"
+        :item
         :level="0"
       />
     </ul>

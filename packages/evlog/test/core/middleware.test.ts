@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initLogger } from '../../src/logger'
 import { createMiddlewareLogger } from '../../src/shared/middleware'
+import { defined } from '../helpers/defined'
 
 describe('createMiddlewareLogger', () => {
   beforeEach(() => {
@@ -95,14 +96,13 @@ describe('createMiddlewareLogger', () => {
     })
 
     logger.set({ cart: { items: 3 } })
-    const event = await finish({ status: 200 })
+    const event = defined(await finish({ status: 200 }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect(event!.status).toBe(200)
-    expect(event!.method).toBe('POST')
-    expect(event!.path).toBe('/api/checkout')
-    expect(event!.duration).toBeDefined()
-    expect(event!.level).toBe('info')
+    expect(event.status).toBe(200)
+    expect(event.method).toBe('POST')
+    expect(event.path).toBe('/api/checkout')
+    expect(event.duration).toBeDefined()
+    expect(event.level).toBe('info')
   })
 
   it('finish() with error captures error and sets error status', async () => {
@@ -113,13 +113,12 @@ describe('createMiddlewareLogger', () => {
     })
 
     const error = Object.assign(new Error('Payment failed'), { status: 402 })
-    const event = await finish({ error })
+    const event = defined(await finish({ error }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect(event!.status).toBe(402)
-    expect(event!.level).toBe('error')
-    expect(event!.error).toBeDefined()
-    expect((event!.error as Record<string, unknown>).message).toBe('Payment failed')
+    expect(event.status).toBe(402)
+    expect(event.level).toBe('error')
+    expect(event.error).toBeDefined()
+    expect((event.error as Record<string, unknown>).message).toBe('Payment failed')
   })
 
   it('finish() with error defaults to status 500', async () => {
@@ -128,10 +127,9 @@ describe('createMiddlewareLogger', () => {
       path: '/api/fail',
     })
 
-    const event = await finish({ error: new Error('crash') })
+    const event = defined(await finish({ error: new Error('crash') }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect(event!.status).toBe(500)
+    expect(event.status).toBe(500)
   })
 
   it('finish() calls keep callback for tail sampling', async () => {
@@ -189,11 +187,10 @@ describe('createMiddlewareLogger', () => {
     logger.set({ user: { id: 'u-1' } })
     logger.set({ db: { queries: 3 } })
 
-    const event = await finish({ status: 200 })
+    const event = defined(await finish({ status: 200 }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect((event!.user as Record<string, unknown>).id).toBe('u-1')
-    expect((event!.db as Record<string, unknown>).queries).toBe(3)
+    expect((event.user as Record<string, unknown>).id).toBe('u-1')
+    expect((event.db as Record<string, unknown>).queries).toBe(3)
   })
 
   it('finish() includes duration', async () => {
@@ -202,11 +199,10 @@ describe('createMiddlewareLogger', () => {
       path: '/api/slow',
     })
 
-    const event = await finish({ status: 200 })
+    const event = defined(await finish({ status: 200 }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect(event!.duration).toBeDefined()
-    expect(typeof event!.duration).toBe('string')
+    expect(event.duration).toBeDefined()
+    expect(typeof event.duration).toBe('string')
   })
 
   it('finish() with warn level when logger has warnings', async () => {
@@ -216,10 +212,9 @@ describe('createMiddlewareLogger', () => {
     })
 
     logger.warn('Deprecated endpoint')
-    const event = await finish({ status: 200 })
+    const event = defined(await finish({ status: 200 }), 'finish event')
 
-    expect(event).not.toBeNull()
-    expect(event!.level).toBe('warn')
+    expect(event.level).toBe('warn')
   })
 
   describe('built-in drain/enrich pipeline', () => {

@@ -10,9 +10,11 @@ Goals: fast (full suite < 2s locally), deterministic, no fake-greens, no console
 | A drain spy was called within a few microtasks of a request returning | `await waitForDrainCalls(drain)` before drilling into `drain.mock.calls` |
 | A specific event field is set after `log.set(...)` | `findEventViaDrain(drain, e => e.path === ...)` then assert on the returned event |
 | A duration / threshold-based behavior | `vi.useFakeTimers()` + `vi.advanceTimersByTime(N)` + `vi.useRealTimers()` (do *not* `await new Promise(setTimeout)`) |
+| Narrowing after `expect(x).toBeDefined()` | `defined(x, 'label')` from `helpers/defined.ts` — not `x!` |
+| Accessing the request logger inside a route handler test | `useLogger()` — not `req.log!` (keep one test per framework that asserts `req.log` is attached) |
 | An adapter posts the right URL / body / headers | `mockFetch()` from `helpers/fetch.ts` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` |
 | A wide event factory for adapter tests | `makeWideEvent(overrides?)` from `helpers/events.ts` |
-| The sweep of HTTP framework specs ("emits event", "x-request-id", "route service") | `describeStandardHttpMatrix({ name, mount })` from `helpers/frameworkMatrix.ts` |
+| The sweep of HTTP framework specs ("emits event", "x-request-id", "route service") | `describeStandardHttpMatrix({ name, mount })` from `helpers/frameworkMatrix.ts` — wired in all seven HTTP framework test files |
 
 ## Framework runtime fidelity
 
@@ -53,6 +55,7 @@ the real-runtime version catches integration regressions.
 3. `await new Promise(r => setTimeout(r, N))` for timing assertions. Use fake timers; `setTimeout` couples the test to wall-clock and CI load.
 4. `expect(x).toBeDefined()` as the *only* assertion. Always drill at least one level deeper.
 5. Adding a new export to `package.json` without updating `tsdown.config.ts` and re-running `pnpm test` so `api-surface.test.ts` snapshots the new surface.
+6. Non-null assertions (`!`) and type casts (`as`) when a helper or guard can express the same intent — use `defined()`, `getDrainCallArg()`, `useLogger()`, or `expect(...).toEqual(...)`.
 
 ## File layout
 
@@ -64,6 +67,7 @@ test/
     events.ts              # makeEvent / makeWideEvent / makeContext / makeError
     fetch.ts               # mockFetch / getFetchCall / getFetchJson / getFetchHeaders
     framework.ts           # createPipelineSpies / assertHttpEventEmitted / waitForDrainCalls / findEventViaDrain / ...
+    defined.ts             # defined() / getDrainCallArg() — type-safe narrowing without `!`
     frameworkMatrix.ts     # describeStandardHttpMatrix(adapter)
     slowReporter.ts        # CI-only reporter for tests > EVLOG_SLOW_TEST_BUDGET_MS (default 500ms)
     timers.ts              # withFakeTimers / flushMicrotasks
@@ -108,7 +112,6 @@ test/
   nitro-v3/                # Nitro v3 (separate; full fixture build + dev-server)
     barrel-exports.test.ts
     cloudflare-durable-build.test.ts  # gated on dist/, ~120s timeout
-    module.test.ts
     nitro-v3.test.ts                  # real createNitro + listen + fetch
     fixture/                          # nitro app used by nitro-v3.test.ts
 

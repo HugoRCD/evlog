@@ -73,7 +73,7 @@ describe('defineStreamedInstrumentation', () => {
     await register()
 
     expect(createInstrumentation).toHaveBeenCalled()
-    const lastCall = createInstrumentation.mock.calls.at(-1)![0] as { drain?: (ctx: unknown) => Promise<void> }
+    const lastCall = ((createInstrumentation.mock.calls.at(-1)!) as unknown as [unknown])[0] as unknown as { drain?: (ctx: unknown) => Promise<void> }
     const composed = lastCall.drain
     expect(composed).toBeDefined()
 
@@ -88,7 +88,7 @@ describe('defineStreamedInstrumentation', () => {
     const { register } = defineStreamedInstrumentation({ drain: userDrain })
     await register()
 
-    const lastCall = createInstrumentation.mock.calls.at(-1)![0] as { drain?: (ctx: unknown) => Promise<void> }
+    const lastCall = ((createInstrumentation.mock.calls.at(-1)!) as unknown as [unknown])[0] as unknown as { drain?: (ctx: unknown) => Promise<void> }
     const composed = lastCall.drain
     expect(composed).toBe(userDrain)
   })
@@ -100,7 +100,7 @@ describe('defineStreamedInstrumentation', () => {
     const { register } = defineStreamedInstrumentation({ stream: true })
     await register()
 
-    const lastCall = createInstrumentation.mock.calls.at(-1)![0] as { drain?: (ctx: unknown) => Promise<void> }
+    const lastCall = ((createInstrumentation.mock.calls.at(-1)!) as unknown as [unknown])[0] as unknown as { drain?: (ctx: unknown) => Promise<void> }
     const composed = lastCall.drain
     expect(composed).toBeDefined()
 
@@ -112,7 +112,7 @@ describe('defineStreamedInstrumentation', () => {
     const { register } = defineStreamedInstrumentation()
     await register()
 
-    const lastCall = createInstrumentation.mock.calls.at(-1)![0] as { drain?: unknown }
+    const lastCall = ((createInstrumentation.mock.calls.at(-1)!) as unknown as [unknown])[0] as unknown as { drain?: unknown }
     expect(lastCall.drain).toBeUndefined()
   })
 

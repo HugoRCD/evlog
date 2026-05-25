@@ -27,6 +27,6 @@ export default defineEventHandler(async (event) => {
     const result = await refundInvoice({ id }, { actor: { type: 'user', id: 'usr_42' } })
     return { ok: true, scenario, result }
   } catch (err) {
-    return { ok: false, scenario, error: (err as Error).message }
+    return { ok: false, scenario, error: err instanceof Error ? err.message : String(err) }
   }
 })

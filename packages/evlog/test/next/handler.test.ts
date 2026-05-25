@@ -60,7 +60,7 @@ describe('withEvlog', () => {
   it('captures response status from Response object', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       return new Response('created', { status: 201 })
     })
 
@@ -76,7 +76,7 @@ describe('withEvlog', () => {
   it('allows setting context via the logger', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       const logger = evlogStorage.getStore()!
       logger.set({ user: { id: '123', plan: 'enterprise' } })
       logger.set({ cart: { items: 5 } })
@@ -96,7 +96,7 @@ describe('withEvlog', () => {
   it('captures errors and re-throws them', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       throw new Error('Something broke')
     })
 
@@ -115,7 +115,7 @@ describe('withEvlog', () => {
   it('extracts error status from error object', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       const error = new Error('Not found') as Error & { status: number }
       error.status = 404
       throw error
@@ -133,7 +133,7 @@ describe('withEvlog', () => {
     const drainMock = vi.fn()
     const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       return new Response('ok')
     })
 
@@ -162,7 +162,7 @@ describe('withEvlog', () => {
       },
     })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
     const request = new Request('http://localhost/api/test', { method: 'GET' })
     await handler(request)
 
@@ -177,7 +177,7 @@ describe('withEvlog', () => {
       drain: drainMock,
     })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
 
     await handler(new Request('http://localhost/api/health', { method: 'GET' }))
     expect(drainMock).not.toHaveBeenCalled()
@@ -193,7 +193,7 @@ describe('withEvlog', () => {
       },
     })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
     await handler(new Request('http://localhost/api/auth/login', { method: 'POST' }))
 
     const [[output]] = consoleSpy.mock.calls
@@ -204,7 +204,7 @@ describe('withEvlog', () => {
   it('reuses x-request-id header from middleware', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
 
     const request = new Request('http://localhost/api/test', {
       method: 'GET',
@@ -237,7 +237,7 @@ describe('withEvlog', () => {
   it('passes through when logging is disabled', async () => {
     const withEvlog = createWithEvlog({ enabled: false, pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       const store = evlogStorage.getStore()
       // Logger exists but is a noop when disabled
       return new Response('ok')
@@ -253,7 +253,7 @@ describe('withEvlog', () => {
   it('generates a requestId when none is provided', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
     await handler(new Request('http://localhost/api/test', { method: 'GET' }))
 
     const [[output]] = consoleSpy.mock.calls
@@ -266,7 +266,7 @@ describe('withEvlog', () => {
   it('includes duration in emitted event', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       return new Response('ok')
     })
 
@@ -285,7 +285,7 @@ describe('withEvlog', () => {
       },
     })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
     // Should not throw even when drain fails
     await expect(handler(new Request('http://localhost/api/test'))).resolves.toBeInstanceOf(Response)
   })
@@ -306,7 +306,7 @@ describe('withEvlog', () => {
       drain: drainMock,
     })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       const logger = evlogStorage.getStore()!
       logger.set({ user: { premium: true } })
       return new Response('ok')
@@ -333,7 +333,7 @@ describe('withEvlog', () => {
       drain: drainMock,
     })
 
-    const handler = withEvlog(() => {
+    const handler = withEvlog((_: Request) => {
       throw new Error('Server error')
     })
 
@@ -347,7 +347,7 @@ describe('withEvlog', () => {
     const drainMock = vi.fn()
     const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
 
-    const handler = withEvlog(() => new Response('ok'))
+    const handler = withEvlog((_: Request) => new Response('ok'))
 
     const request = new Request('http://localhost/api/test', {
       method: 'GET',

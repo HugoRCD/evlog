@@ -65,7 +65,7 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
 
 let warnedAboutToken = false
 
-function applyApiKeyAlias(config: ResolvedAxiomConfig): ResolvedAxiomConfig {
+function applyApiKeyAlias(config: Partial<ResolvedAxiomConfig>): Partial<ResolvedAxiomConfig> {
   if (!config.apiKey && config.token) {
     if (!warnedAboutToken) {
       warnedAboutToken = true

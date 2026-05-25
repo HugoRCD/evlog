@@ -1,26 +1,47 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initLogger } from '../../src/logger'
+import type { RequestLogger } from '../../src/types'
 import { evlog, evlogHandleError, createEvlogHooks, useLogger } from '../../src/sveltekit/index'
 import { EvlogError } from '../../src/error'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
+  assertHttpEventEmitted,
   assertSensitiveHeadersFiltered,
   createPipelineSpies,
+  findEventViaDrain,
+  waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
 
 function createMockEvent(method = 'GET', path = '/api/test', headers: Record<string, string> = {}) {
   const reqHeaders = new Headers(headers)
   return {
     request: new Request(`http://localhost${path}`, { method, headers: reqHeaders }),
     url: new URL(`http://localhost${path}`),
-    locals: {} as Record<string, any>,
+    locals: {} as Record<string, unknown>,
   }
 }
 
-function createMockResolve(status = 200) {
-  return vi.fn(() => new Response(JSON.stringify({ ok: true }), { status }))
+function createMockResolve(status = 200): (event: ReturnType<typeof createMockEvent>) => Promise<Response> {
+  return vi.fn((_ev) => Promise.resolve(new Response(JSON.stringify({ ok: true }), { status })))
 }
+
+describeStandardHttpMatrix({
+  name: 'sveltekit',
+  mount(options) {
+    const handle = evlog(options)
+    return Promise.resolve({
+      async fire(req) {
+        const event = createMockEvent(req.method || 'GET', req.path, req.headers || {})
+        const resolve = createMockResolve()
+        await handle({ event, resolve })
+        return { status: 200 }
+      },
+    })
+  },
+})
 
 describe('evlog/sveltekit', () => {
   beforeEach(() => {
@@ -52,65 +73,41 @@ describe('evlog/sveltekit', () => {
     expect(typeof event.locals.log.warn).toBe('function')
   })
 
-  it('emits event with correct method, path, and status', async () => {
-    const handle = evlog()
-    const event = createMockEvent('GET', '/api/users')
-    const resolve = createMockResolve()
-
-    const consoleSpy = vi.mocked(console.info)
-    await handle({ event, resolve })
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const emitted = JSON.parse(lastCall![0] as string)
-    expect(emitted.method).toBe('GET')
-    expect(emitted.path).toBe('/api/users')
-    expect(emitted.status).toBe(200)
-    expect(emitted.level).toBe('info')
-    expect(emitted.duration).toBeDefined()
-  })
-
   it('accumulates context set by route handler', async () => {
-    const handle = evlog()
+    const { drain } = createPipelineSpies()
+    const handle = evlog({ drain })
     const event = createMockEvent('GET', '/api/users')
-    const resolve = vi.fn((ev: any) => {
-      ev.locals.log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+    const resolve = vi.fn(() => {
+      useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
       return new Response(JSON.stringify({ users: [] }), { status: 200 })
     })
 
-    const consoleSpy = vi.mocked(console.info)
     await handle({ event, resolve })
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"user"'),
+    const emitted = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
     )
-    expect(lastCall).toBeDefined()
-
-    const emitted = JSON.parse(lastCall![0] as string)
-    expect(emitted.user.id).toBe('u-1')
-    expect(emitted.db.queries).toBe(3)
+    expect(emitted.user).toEqual({ id: 'u-1' })
+    expect(emitted.db).toEqual({ queries: 3 })
   })
 
   it('logs error status when handler throws', async () => {
-    const handle = evlog()
+    const { drain } = createPipelineSpies()
+    const handle = evlog({ drain })
     const event = createMockEvent('GET', '/api/fail')
     const resolve = vi.fn(() => {
       throw new Error('Something broke')
     })
 
-    const errorSpy = vi.mocked(console.error)
     await expect(handle({ event, resolve })).rejects.toThrow('Something broke')
+    await waitForDrainCalls(drain)
 
-    const lastCall = errorSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"level":"error"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const emitted = JSON.parse(lastCall![0] as string)
-    expect(emitted.level).toBe('error')
+    assertHttpEventEmitted(drain, {
+      path: '/api/fail',
+      level: 'error',
+    })
   })
 
   it('returns structured JSON response for thrown EvlogError', async () => {
@@ -149,7 +146,7 @@ describe('evlog/sveltekit', () => {
     await handle({ event, resolve })
 
     expect(drain).toHaveBeenCalledOnce()
-    const [[drainCtx]] = drain.mock.calls
+    const drainCtx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
     expect(drainCtx.event.level).toBe('error')
     expect(drainCtx.event.status).toBe(402)
   })
@@ -210,48 +207,27 @@ describe('evlog/sveltekit', () => {
   })
 
   it('logs routes matching include patterns', async () => {
-    const handle = evlog({ include: ['/api/**'] })
+    const { drain } = createPipelineSpies()
+    const handle = evlog({ include: ['/api/**'], drain })
     const event = createMockEvent('GET', '/api/data')
     const resolve = createMockResolve()
 
-    const consoleSpy = vi.mocked(console.info)
     await handle({ event, resolve })
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
-
-  it('uses x-request-id header when present', async () => {
-    const handle = evlog()
-    const event = createMockEvent('GET', '/api/test', { 'x-request-id': 'custom-req-id' })
-    const resolve = createMockResolve()
-
-    const consoleSpy = vi.mocked(console.info)
-    await handle({ event, resolve })
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('custom-req-id'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const emitted = JSON.parse(lastCall![0] as string)
-    expect(emitted.requestId).toBe('custom-req-id')
+    expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
   it('handles POST requests with correct method', async () => {
-    const handle = evlog()
+    const { drain } = createPipelineSpies()
+    const handle = evlog({ drain })
     const event = createMockEvent('POST', '/api/checkout')
     const resolve = createMockResolve()
 
-    const consoleSpy = vi.mocked(console.info)
     await handle({ event, resolve })
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
-    )
-    expect(lastCall).toBeDefined()
+    assertHttpEventEmitted(drain, { path: '/api/checkout', method: 'POST' })
   })
 
   it('excludes routes matching exclude patterns', async () => {
@@ -264,30 +240,14 @@ describe('evlog/sveltekit', () => {
     expect(event.locals.log).toBeUndefined()
   })
 
-  it('applies route-based service override', async () => {
-    const handle = evlog({
-      routes: { '/api/auth/**': { service: 'auth-service' } },
-    })
-    const event = createMockEvent('GET', '/api/auth/login')
-    const resolve = createMockResolve()
-
-    const consoleSpy = vi.mocked(console.info)
-    await handle({ event, resolve })
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
-
   describe('drain / enrich / keep', () => {
     it('calls drain with emitted event (shared helpers)', async () => {
       const { drain } = createPipelineSpies()
 
       const handle = evlog({ drain })
       const event = createMockEvent('GET', '/api/test')
-      const resolve = vi.fn((ev: any) => {
-        ev.locals.log.set({ user: { id: 'u-1' } })
+      const resolve = vi.fn(() => {
+        useLogger().set({ user: { id: 'u-1' } })
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
 
@@ -327,10 +287,10 @@ describe('evlog/sveltekit', () => {
       await handle({ event, resolve })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -346,8 +306,9 @@ describe('evlog/sveltekit', () => {
 
       await handle({ event, resolve })
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -358,8 +319,8 @@ describe('evlog/sveltekit', () => {
 
       const handle = evlog({ keep, drain })
       const event = createMockEvent('GET', '/api/test')
-      const resolve = vi.fn((ev: any) => {
-        ev.locals.log.set({ important: true })
+      const resolve = vi.fn(() => {
+        useLogger().set({ important: true })
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
 
@@ -416,9 +377,10 @@ describe('evlog/sveltekit', () => {
 
   describe('useLogger()', () => {
     it('returns the request-scoped logger from anywhere in the call stack', async () => {
-      const handle = evlog()
+      const { drain } = createPipelineSpies()
+      const handle = evlog({ drain })
 
-      let loggerFromService: unknown
+      let loggerFromService: RequestLogger | undefined
       const resolve = vi.fn(() => {
         loggerFromService = useLogger()
         useLogger().set({ fromService: true })
@@ -426,16 +388,11 @@ describe('evlog/sveltekit', () => {
       })
 
       const event = createMockEvent('GET', '/api/test')
-      const consoleSpy = vi.mocked(console.info)
       await handle({ event, resolve })
+      await waitForDrainCalls(drain)
 
-      expect(loggerFromService).toBeDefined()
-      expect(typeof (loggerFromService as Record<string, unknown>).set).toBe('function')
-
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"fromService":true'),
-      )
-      expect(lastCall).toBeDefined()
+      expect(typeof defined(loggerFromService).set).toBe('function')
+      expect(findEventViaDrain(drain, e => e.fromService === true)).toBeDefined()
     })
 
     it('returns the same logger as event.locals.log', async () => {
@@ -444,7 +401,7 @@ describe('evlog/sveltekit', () => {
       let isSame = false
       const event = createMockEvent('GET', '/api/test')
       const resolve = vi.fn(() => {
-        isSame = useLogger() === event.locals.log
+        isSame = useLogger() === defined(event.locals.log, 'event.locals.log in resolve')
         return new Response(JSON.stringify({ ok: true }), { status: 200 })
       })
 
@@ -457,7 +414,8 @@ describe('evlog/sveltekit', () => {
     })
 
     it('works across async boundaries', async () => {
-      const handle = evlog()
+      const { drain } = createPipelineSpies()
+      const handle = evlog({ drain })
 
       async function asyncService() {
         await new Promise(resolve => setTimeout(resolve, 5))
@@ -470,13 +428,10 @@ describe('evlog/sveltekit', () => {
       })
 
       const event = createMockEvent('GET', '/api/test')
-      const consoleSpy = vi.mocked(console.info)
       await handle({ event, resolve })
+      await waitForDrainCalls(drain)
 
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"asyncWork":"done"'),
-      )
-      expect(lastCall).toBeDefined()
+      expect(findEventViaDrain(drain, e => e.asyncWork === 'done')).toBeDefined()
     })
   })
 
@@ -524,14 +479,16 @@ describe('evlog/sveltekit', () => {
         link: 'https://docs.example.com/payments',
       })
 
-      const result = handleError({ error, event, status: 402, message: 'Payment failed' })
+      const result = defined(
+        handleError({ error, event, status: 402, message: 'Payment failed' }),
+        'EvlogError handleError result',
+      )
 
-      expect(result).toBeDefined()
-      expect((result as any).message).toBe('Payment failed')
-      expect((result as any).status).toBe(402)
-      expect((result as any).why).toBe('Card declined')
-      expect((result as any).fix).toBe('Try another card')
-      expect((result as any).link).toBe('https://docs.example.com/payments')
+      expect(result.message).toBe('Payment failed')
+      expect(result.status).toBe(402)
+      expect(result.why).toBe('Card declined')
+      expect(result.fix).toBe('Try another card')
+      expect(result.link).toBe('https://docs.example.com/payments')
     })
 
     it('returns generic response for non-EvlogError', () => {
@@ -550,17 +507,19 @@ describe('evlog/sveltekit', () => {
         },
       }
 
-      const result = handleError({
-        error: new Error('Something broke'),
-        event,
-        status: 500,
-        message: 'Internal Error',
-      })
+      const result = defined(
+        handleError({
+          error: new Error('Something broke'),
+          event,
+          status: 500,
+          message: 'Internal Error',
+        }),
+        'generic handleError result',
+      )
 
-      expect(result).toBeDefined()
-      expect((result as any).message).toBe('Internal Error')
-      expect((result as any).status).toBe(500)
-      expect((result as any).why).toBeUndefined()
+      expect(result.message).toBe('Internal Error')
+      expect(result.status).toBe(500)
+      expect(result.why).toBeUndefined()
     })
 
     it('handles missing logger gracefully', () => {
@@ -568,15 +527,17 @@ describe('evlog/sveltekit', () => {
       const event = createMockEvent('GET', '/api/fail')
       // No locals.log set
 
-      const result = handleError({
-        error: new Error('crash'),
-        event,
-        status: 500,
-        message: 'Internal Error',
-      })
+      const result = defined(
+        handleError({
+          error: new Error('crash'),
+          event,
+          status: 500,
+          message: 'Internal Error',
+        }),
+        'handleError result without logger',
+      )
 
-      expect(result).toBeDefined()
-      expect((result as any).message).toBe('Internal Error')
+      expect(result.message).toBe('Internal Error')
     })
   })
 
@@ -621,8 +582,11 @@ describe('evlog/sveltekit', () => {
         why: 'Card declined',
       })
 
-      const result = handleError({ error, event, status: 402, message: 'Payment failed' })
-      expect((result as any).why).toBe('Card declined')
+      const result = defined(
+        handleError({ error, event, status: 402, message: 'Payment failed' }),
+        'createEvlogHooks handleError result',
+      )
+      expect(result.why).toBe('Card declined')
     })
   })
 })

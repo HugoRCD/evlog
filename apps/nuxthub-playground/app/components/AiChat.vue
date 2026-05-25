@@ -37,16 +37,12 @@ function askQuick(question: string) {
 
 const isLoading = computed(() => chat.status === 'streaming' || chat.status === 'submitted')
 
-function isToolPart(part: any): boolean {
-  return typeof part.type === 'string' && (part.type.startsWith('tool-') || part.type === 'dynamic-tool')
-}
-
-function getToolInput(part: any): { query?: string } {
-  return part.input ?? {}
-}
-
-function getToolOutput(part: any): { count?: number, error?: string } | undefined {
-  return part.output
+interface ToolPart {
+  type: string
+  state?: string
+  errorText?: string
+  input?: { query?: string }
+  output?: { count?: number, error?: string }
 }
 
 interface AiMessageMetadata {
@@ -56,10 +52,33 @@ interface AiMessageMetadata {
   finishReason?: string
 }
 
-function getAiMetadata(message: any): AiMessageMetadata | undefined {
-  const meta = message?.metadata as AiMessageMetadata | undefined
+interface ChatMessage {
+  metadata?: AiMessageMetadata
+}
+
+function isToolPart(part: { type: string }): part is ToolPart {
+  return part.type.startsWith('tool-') || part.type === 'dynamic-tool'
+}
+
+function getToolInput(part: ToolPart): { query?: string } {
+  return part.input ?? {}
+}
+
+function getToolOutput(part: ToolPart): { count?: number, error?: string } | undefined {
+  return part.output
+}
+
+function getAiMetadata(message: ChatMessage): AiMessageMetadata | undefined {
+  const meta = message.metadata
   if (!meta || (meta.calls === undefined && meta.totalTokens === undefined)) return undefined
   return meta
+}
+
+function setQuickButtonHover(event: MouseEvent, active: boolean) {
+  const el = event.currentTarget
+  if (!(el instanceof HTMLElement)) return
+  el.style.borderColor = active ? '#3182ce' : '#e2e8f0'
+  el.style.background = active ? '#ebf8ff' : '#fff'
 }
 
 function formatCost(cost: number | undefined): string {
@@ -97,13 +116,13 @@ function formatCost(cost: number | undefined): string {
           v-if="message.role === 'assistant' && getAiMetadata(message)"
           style="flex-shrink: 0; align-self: flex-start; max-width: 85%; padding: 0.3rem 0.55rem; border-radius: 6px; font-size: 0.7rem; color: #4a5568; background: #edf2f7; border: 1px solid #e2e8f0; font-family: monospace; display: inline-flex; gap: 0.5rem; flex-wrap: wrap;"
         >
-          <span>step {{ getAiMetadata(message)!.calls }}</span>
+          <span>step {{ getAiMetadata(message)?.calls }}</span>
           <span>·</span>
-          <span>{{ getAiMetadata(message)!.totalTokens }} tokens</span>
+          <span>{{ getAiMetadata(message)?.totalTokens }} tokens</span>
           <span>·</span>
-          <span>{{ formatCost(getAiMetadata(message)!.estimatedCost) }}</span>
-          <span v-if="getAiMetadata(message)!.finishReason">·</span>
-          <span v-if="getAiMetadata(message)!.finishReason">{{ getAiMetadata(message)!.finishReason }}</span>
+          <span>{{ formatCost(getAiMetadata(message)?.estimatedCost) }}</span>
+          <span v-if="getAiMetadata(message)?.finishReason">·</span>
+          <span v-if="getAiMetadata(message)?.finishReason">{{ getAiMetadata(message)?.finishReason }}</span>
         </div>
         <template v-for="(part, pi) in message.parts" :key="`${message.id}-${part.type}-${pi}`">
           <!-- User text -->
@@ -136,9 +155,9 @@ function formatCost(cost: number | undefined): string {
               {{ getToolInput(part).query || JSON.stringify(getToolInput(part)) }}
             </div>
             <div style="padding: 0.3rem 0.65rem; font-size: 0.75rem;">
-              <span v-if="(part as any).state === 'output-error'" style="color: #e53e3e;">Error: {{ (part as any).errorText }}</span>
-              <span v-else-if="getToolOutput(part)?.error" style="color: #e53e3e;">Error: {{ getToolOutput(part)!.error }}</span>
-              <span v-else-if="(part as any).state === 'output-available'" style="color: #38a169;">{{ getToolOutput(part)?.count ?? 0 }} row{{ (getToolOutput(part)?.count ?? 0) !== 1 ? 's' : '' }} returned</span>
+              <span v-if="part.state === 'output-error'" style="color: #e53e3e;">Error: {{ part.errorText }}</span>
+              <span v-else-if="getToolOutput(part)?.error" style="color: #e53e3e;">Error: {{ getToolOutput(part)?.error }}</span>
+              <span v-else-if="part.state === 'output-available'" style="color: #38a169;">{{ getToolOutput(part)?.count ?? 0 }} row{{ (getToolOutput(part)?.count ?? 0) !== 1 ? 's' : '' }} returned</span>
               <span v-else style="color: #a0aec0; display: inline-flex; align-items: center; gap: 0.3rem;">
                 <span style="display: inline-block; width: 6px; height: 6px; border-radius: 50%; background: #d69e2e; animation: pulse 1s infinite;" />
                 Querying...
@@ -154,8 +173,8 @@ function formatCost(cost: number | undefined): string {
         v-for="q in quickQuestions"
         :key="q"
         style="padding: 0.3rem 0.6rem; font-size: 0.78rem; background: #fff; border: 1px solid #e2e8f0; border-radius: 999px; color: #4a5568; cursor: pointer; transition: border-color 0.15s, background 0.15s;"
-        @mouseenter="($event.target as HTMLElement).style.borderColor = '#3182ce'; ($event.target as HTMLElement).style.background = '#ebf8ff'"
-        @mouseleave="($event.target as HTMLElement).style.borderColor = '#e2e8f0'; ($event.target as HTMLElement).style.background = '#fff'"
+        @mouseenter="setQuickButtonHover($event, true)"
+        @mouseleave="setQuickButtonHover($event, false)"
         @click="askQuick(q)"
       >
         {{ q }}

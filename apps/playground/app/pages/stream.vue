@@ -45,9 +45,31 @@ function pushEvent(event: WideEvent) {
   events.value = [event, ...events.value].slice(0, 500)
 }
 
+function pickStringField(obj: WideEvent, key: string): string | undefined {
+  const value = obj[key]
+  return typeof value === 'string' ? value : undefined
+}
+
 function actionLabel(event: WideEvent) {
-  const e = event as Record<string, unknown>
-  return (e.action as string) ?? (e.message as string) ?? (e.path as string) ?? ''
+  return pickStringField(event, 'action')
+    ?? pickStringField(event, 'message')
+    ?? pickStringField(event, 'path')
+    ?? ''
+}
+
+function isHelloPayload(data: unknown): data is NonNullable<typeof helloPayload.value> {
+  return typeof data === 'object'
+    && data !== null
+    && 'evlogVersion' in data
+    && typeof Reflect.get(data, 'evlogVersion') === 'string'
+}
+
+function isWideEvent(data: unknown): data is WideEvent {
+  return typeof data === 'object'
+    && data !== null
+    && 'timestamp' in data
+    && 'level' in data
+    && 'service' in data
 }
 
 function eventMatches(event: WideEvent) {
@@ -173,11 +195,15 @@ async function connect() {
     }
     if (envelope.evlog !== '1') return
     if (envelope.type === 'hello') {
-      helloPayload.value = envelope.data as typeof helloPayload.value
+      if (isHelloPayload(envelope.data)) {
+        helloPayload.value = envelope.data
+      }
       return
     }
     if (envelope.type === 'event' || envelope.type === 'replay') {
-      pushEvent(envelope.data as WideEvent)
+      if (isWideEvent(envelope.data)) {
+        pushEvent(envelope.data)
+      }
     }
   }
 
@@ -397,7 +423,7 @@ onBeforeUnmount(() => {
                   {{ event.service }}
                 </td>
                 <td class="px-3 py-1.5 text-[11px] tabular-nums text-muted">
-                  {{ (event as Record<string, unknown>).status ?? '' }}
+                  {{ typeof event.status === 'number' ? event.status : '' }}
                 </td>
                 <td class="px-3 py-1.5 text-[11px] truncate">
                   {{ actionLabel(event) }}

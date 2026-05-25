@@ -1,6 +1,21 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { describe, expect, it } from 'vitest'
+import type { RequestLogger } from '../../src/types'
+import { defined } from '../helpers/defined'
 import { evlogStorage, useLogger } from '../../src/next/storage'
+
+function createMockLogger(overrides: Partial<RequestLogger & { id?: number }> = {}): RequestLogger {
+  return {
+    set: () => {},
+    setLevel: () => {},
+    error: () => {},
+    info: () => {},
+    warn: () => {},
+    emit: () => null,
+    getContext: () => ({}),
+    ...overrides,
+  }
+}
 
 describe('evlogStorage', () => {
   it('is an AsyncLocalStorage instance', () => {
@@ -12,15 +27,7 @@ describe('evlogStorage', () => {
   })
 
   it('stores and retrieves a logger inside a run context', () => {
-    const mockLogger = {
-      set: () => {},
-      setLevel: () => {},
-      error: () => {},
-      info: () => {},
-      warn: () => {},
-      emit: () => null,
-      getContext: () => ({}),
-    }
+    const mockLogger = createMockLogger()
 
     evlogStorage.run(mockLogger, () => {
       expect(evlogStorage.getStore()).toBe(mockLogger)
@@ -28,21 +35,23 @@ describe('evlogStorage', () => {
   })
 
   it('isolates stores across concurrent runs', async () => {
-    const logger1 = { id: 1, set: () => {}, setLevel: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
-    const logger2 = { id: 2, set: () => {}, setLevel: () => {}, error: () => {}, info: () => {}, warn: () => {}, emit: () => null, getContext: () => ({}) }
+    const logger1 = createMockLogger({ id: 1 })
+    const logger2 = createMockLogger({ id: 2 })
 
     const results: number[] = []
 
     await Promise.all([
       new Promise<void>((resolve) => {
-        evlogStorage.run(logger1 as any, () => {
-          results.push((evlogStorage.getStore() as any).id)
+        evlogStorage.run(logger1, () => {
+          const store = defined(evlogStorage.getStore(), 'logger1 store') as RequestLogger & { id?: number }
+          results.push(defined(store.id, 'logger1 id'))
           resolve()
         })
       }),
       new Promise<void>((resolve) => {
-        evlogStorage.run(logger2 as any, () => {
-          results.push((evlogStorage.getStore() as any).id)
+        evlogStorage.run(logger2, () => {
+          const store = defined(evlogStorage.getStore(), 'logger2 store') as RequestLogger & { id?: number }
+          results.push(defined(store.id, 'logger2 id'))
           resolve()
         })
       }),
@@ -59,15 +68,7 @@ describe('useLogger', () => {
   })
 
   it('returns the logger from the current AsyncLocalStorage context', () => {
-    const mockLogger = {
-      set: () => {},
-      setLevel: () => {},
-      error: () => {},
-      info: () => {},
-      warn: () => {},
-      emit: () => null,
-      getContext: () => ({}),
-    }
+    const mockLogger = createMockLogger()
 
     evlogStorage.run(mockLogger, () => {
       const logger = useLogger()

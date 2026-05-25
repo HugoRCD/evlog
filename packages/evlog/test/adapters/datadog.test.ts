@@ -8,6 +8,7 @@ import {
   sendBatchToDatadog,
   sendToDatadog,
   toDatadogLog,
+  createDatadogDrain,
 } from '../../src/adapters/datadog'
 
 describe('datadog adapter', () => {
@@ -307,6 +308,52 @@ describe('datadog adapter', () => {
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 12000)
+    })
+  })
+
+  describe('createDatadogDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    let origNuxtDatadogApiKey: string | undefined
+    let origDatadogApiKey: string | undefined
+    let origDdApiKey: string | undefined
+
+    beforeEach(() => {
+      origNuxtDatadogApiKey = process.env.NUXT_DATADOG_API_KEY
+      origDatadogApiKey = process.env.DATADOG_API_KEY
+      origDdApiKey = process.env.DD_API_KEY
+      delete process.env.NUXT_DATADOG_API_KEY
+      delete process.env.DATADOG_API_KEY
+      delete process.env.DD_API_KEY
+    })
+
+    afterEach(() => {
+      if (origNuxtDatadogApiKey === undefined) delete process.env.NUXT_DATADOG_API_KEY
+      else process.env.NUXT_DATADOG_API_KEY = origNuxtDatadogApiKey
+      if (origDatadogApiKey === undefined) delete process.env.DATADOG_API_KEY
+      else process.env.DATADOG_API_KEY = origDatadogApiKey
+      if (origDdApiKey === undefined) delete process.env.DD_API_KEY
+      else process.env.DD_API_KEY = origDdApiKey
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createDatadogDrain({ apiKey: 'dd-key' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when apiKey is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createDatadogDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/datadog] Missing API key'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })

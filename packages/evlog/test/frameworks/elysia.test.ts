@@ -5,9 +5,32 @@ import { evlog, useLogger } from '../../src/elysia/index'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
+  assertHttpEventEmitted,
   assertSensitiveHeadersFiltered,
   createPipelineSpies,
+  findEventViaDrain,
+  waitForDrainCalls,
 } from '../helpers/framework'
+import { defined, getDrainCallArg } from '../helpers/defined'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+describeStandardHttpMatrix({
+  name: 'elysia',
+  mount(options) {
+    const app = new Elysia()
+    app.use(evlog(options))
+    app.get('/api/users', () => ({ users: [] }))
+    return Promise.resolve({
+      async fire(req) {
+        const res = await app.handle(new Request(`http://localhost${req.path}`, {
+          method: req.method || 'GET',
+          headers: req.headers,
+        }))
+        return { status: res.status }
+      },
+    })
+  },
+})
 
 function delay(ms = 1) {
   return new Promise((resolve) => {
@@ -15,7 +38,7 @@ function delay(ms = 1) {
   })
 }
 
-function request(app: Elysia, path: string, init?: RequestInit) {
+function request(app: { handle: (req: Request) => Promise<Response> }, path: string, init?: RequestInit) {
   return app.handle(new Request(`http://localhost${path}`, init)).then(async (response) => {
     // using Elysia.afterResponse is scheduled to run
     // after response is sent but not immediately
@@ -55,87 +78,59 @@ describe('evlog/elysia', () => {
     expect(hasLogger).toBe(true)
   })
 
-  it('emits event with correct method, path, and status', async () => {
-    const app = new Elysia()
-      .use(evlog())
-      .get('/api/users', () => ({ users: [] }))
-
-    const consoleSpy = vi.mocked(console.info)
-    await request(app, '/api/users')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.method).toBe('GET')
-    expect(event.path).toBe('/api/users')
-    expect(event.status).toBe(200)
-    expect(event.level).toBe('info')
-    expect(event.duration).toBeDefined()
-  })
-
   it('emits event with correct status when using Elysia.status', async () => {
+    const { drain } = createPipelineSpies()
     const app = new Elysia()
-      .use(evlog())
+      .use(evlog({ drain }))
       .get('/api/users', ({ status }) => status(422, ({ users: [] })))
 
-    const consoleSpy = vi.mocked(console.info)
     await request(app, '/api/users')
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/users"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.method).toBe('GET')
-    expect(event.path).toBe('/api/users')
-    expect(event.status).toBe(422)
-    expect(event.level).toBe('info')
+    const event = assertHttpEventEmitted(drain, {
+      path: '/api/users',
+      method: 'GET',
+      status: 422,
+      level: 'info',
+    })
     expect(event.duration).toBeDefined()
   })
 
   it('accumulates context set by route handler', async () => {
+    const { drain } = createPipelineSpies()
     const app = new Elysia()
-      .use(evlog())
-      .get('/api/users', ({ log }) => {
-        log.set({ user: { id: 'u-1' }, db: { queries: 3 } })
+      .use(evlog({ drain }))
+      .get('/api/users', () => {
+        useLogger().set({ user: { id: 'u-1' }, db: { queries: 3 } })
         return { users: [] }
       })
 
-    const consoleSpy = vi.mocked(console.info)
     await request(app, '/api/users')
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"user"'),
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'accumulated context event',
     )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.user.id).toBe('u-1')
-    expect(event.db.queries).toBe(3)
+    expect(event.user).toEqual({ id: 'u-1' })
+    expect(event.db).toEqual({ queries: 3 })
   })
 
   it('logs error context when handler throws', async () => {
+    const { drain } = createPipelineSpies()
     const app = new Elysia()
-      .use(evlog())
+      .use(evlog({ drain }))
       .get('/api/fail', () => {
         throw new Error('Something broke')
       })
 
-    const errorSpy = vi.mocked(console.error)
     await request(app, '/api/fail')
+    await waitForDrainCalls(drain)
 
-    const lastCall = errorSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/fail"'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.path).toBe('/api/fail')
-    expect(event.level).toBe('error')
+    assertHttpEventEmitted(drain, {
+      path: '/api/fail',
+      level: 'error',
+    })
   })
 
   it('skips routes not matching include patterns', async () => {
@@ -150,53 +145,30 @@ describe('evlog/elysia', () => {
   })
 
   it('logs routes matching include patterns', async () => {
+    const { drain } = createPipelineSpies()
     const app = new Elysia()
-      .use(evlog({ include: ['/api/**'] }))
-      .get('/api/data', ({ log }) => {
-        log.set({ data: true })
+      .use(evlog({ include: ['/api/**'], drain }))
+      .get('/api/data', () => {
+        useLogger().set({ data: true })
         return { ok: true }
       })
 
-    const consoleSpy = vi.mocked(console.info)
     await request(app, '/api/data')
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"path":"/api/data"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
-
-  it('uses x-request-id header when present', async () => {
-    const app = new Elysia()
-      .use(evlog())
-      .get('/api/test', () => ({ ok: true }))
-
-    const consoleSpy = vi.mocked(console.info)
-    await request(app, '/api/test', {
-      headers: { 'x-request-id': 'custom-req-id' },
-    })
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('custom-req-id'),
-    )
-    expect(lastCall).toBeDefined()
-
-    const event = JSON.parse(lastCall![0] as string)
-    expect(event.requestId).toBe('custom-req-id')
+    expect(findEventViaDrain(drain, e => e.path === '/api/data')).toBeDefined()
   })
 
   it('handles POST requests with correct method', async () => {
+    const { drain } = createPipelineSpies()
     const app = new Elysia()
-      .use(evlog())
+      .use(evlog({ drain }))
       .post('/api/checkout', () => ({ ok: true }))
 
-    const consoleSpy = vi.mocked(console.info)
     await request(app, '/api/checkout', { method: 'POST' })
+    await waitForDrainCalls(drain)
 
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"method":"POST"'),
-    )
-    expect(lastCall).toBeDefined()
+    assertHttpEventEmitted(drain, { path: '/api/checkout', method: 'POST' })
   })
 
   it('excludes routes matching exclude patterns', async () => {
@@ -210,30 +182,14 @@ describe('evlog/elysia', () => {
     expect(drain).not.toHaveBeenCalled()
   })
 
-  it('applies route-based service override', async () => {
-    const app = new Elysia()
-      .use(evlog({
-        routes: { '/api/auth/**': { service: 'auth-service' } },
-      }))
-      .get('/api/auth/login', () => ({ ok: true }))
-
-    const consoleSpy = vi.mocked(console.info)
-    await request(app, '/api/auth/login')
-
-    const lastCall = consoleSpy.mock.calls.find(call =>
-      typeof call[0] === 'string' && call[0].includes('"service":"auth-service"'),
-    )
-    expect(lastCall).toBeDefined()
-  })
-
   describe('drain / enrich / keep', () => {
     it('calls drain with emitted event (shared helpers)', async () => {
       const { drain } = createPipelineSpies()
 
       const app = new Elysia()
         .use(evlog({ drain }))
-        .get('/api/test', ({ log }) => {
-          log.set({ user: { id: 'u-1' } })
+        .get('/api/test', () => {
+          useLogger().set({ user: { id: 'u-1' } })
           return { ok: true }
         })
 
@@ -272,10 +228,10 @@ describe('evlog/elysia', () => {
       })
 
       expect(enrich).toHaveBeenCalledOnce()
-      const [[ctx]] = enrich.mock.calls
-      expect(ctx.response!.status).toBe(200)
-      expect(ctx.headers!['user-agent']).toBe('test-bot/1.0')
-      expect(ctx.headers!['x-custom']).toBe('value')
+      const ctx = defined(enrich.mock.calls[0]?.[0], 'enrich context')
+      expect(ctx.response?.status).toBe(200)
+      expect(ctx.headers?.['user-agent']).toBe('test-bot/1.0')
+      expect(ctx.headers?.['x-custom']).toBe('value')
     })
 
     it('filters sensitive headers (shared helpers)', async () => {
@@ -293,8 +249,9 @@ describe('evlog/elysia', () => {
         },
       })
 
-      assertSensitiveHeadersFiltered(drain.mock.calls[0][0])
-      expect(drain.mock.calls[0][0].headers!['x-safe']).toBe('visible')
+      const ctx = getDrainCallArg(defined(drain.mock.calls[0], 'drain call'))
+      assertSensitiveHeadersFiltered(ctx)
+      expect(ctx.headers?.['x-safe']).toBe('visible')
     })
 
     it('calls keep callback for tail sampling', async () => {
@@ -305,8 +262,8 @@ describe('evlog/elysia', () => {
 
       const app = new Elysia()
         .use(evlog({ keep, drain }))
-        .get('/api/test', ({ log }) => {
-          log.set({ important: true })
+        .get('/api/test', () => {
+          useLogger().set({ important: true })
           return { ok: true }
         })
 
@@ -396,29 +353,23 @@ describe('evlog/elysia', () => {
     })
 
     it('works across async boundaries', async () => {
-      let captured = false
+      const { drain } = createPipelineSpies()
 
       function serviceFunction() {
-        const log = useLogger()
-        log.set({ fromService: true })
-        captured = true
+        useLogger().set({ fromService: true })
       }
 
       const app = new Elysia()
-        .use(evlog())
+        .use(evlog({ drain }))
         .get('/api/test', async () => {
           await serviceFunction()
           return { ok: true }
         })
 
-      const consoleSpy = vi.mocked(console.info)
       await request(app, '/api/test')
+      await waitForDrainCalls(drain)
 
-      expect(captured).toBe(true)
-      const lastCall = consoleSpy.mock.calls.find(call =>
-        typeof call[0] === 'string' && call[0].includes('"fromService":true'),
-      )
-      expect(lastCall).toBeDefined()
+      expect(findEventViaDrain(drain, e => e.fromService === true)).toBeDefined()
     })
   })
 })

@@ -1,133 +1,113 @@
-import { parse } from 'acorn'
 import { describe, expect, it } from 'vitest'
+import { defined } from '../helpers/defined'
+import { runPluginTransform } from '../helpers/vite'
 import { createAutoImportsPlugin } from '../../src/vite/auto-imports'
 
-function createTransformContext() {
-  return {
-    parse(code: string) {
-      return parse(code, { ecmaVersion: 'latest', sourceType: 'module' })
-    },
-  }
-}
-
-function autoImportTransform(code: string, id = 'src/app.ts', options = {}) {
+async function autoImportTransform(code: string, id = 'src/app.ts', options = {}) {
   const plugin = createAutoImportsPlugin(options)
-  const ctx = createTransformContext()
-  const t = (plugin as any).transform
-  const handler = typeof t === 'function' ? t : t.handler
-  return handler.call(ctx, code, id)
+  return await runPluginTransform(plugin, code, id)
 }
 
 describe('vite auto-imports plugin', () => {
-  it('adds import for log when log.info() is used', () => {
+  it('adds import for log when log.info() is used', async () => {
     const code = `log.info('auth', 'User logged in')`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('import { log } from \'evlog\'')
   })
 
-  it('adds import for log when log.error() is used', () => {
+  it('adds import for log when log.error() is used', async () => {
     const code = `log.error({ action: 'payment', error: 'declined' })`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('import { log } from \'evlog\'')
   })
 
-  it('adds import for createEvlogError when called', () => {
+  it('adds import for createEvlogError when called', async () => {
     const code = `throw createEvlogError({ message: 'test', status: 400 })`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('import { createEvlogError } from \'evlog\'')
   })
 
-  it('adds import for parseError when called', () => {
+  it('adds import for parseError when called', async () => {
     const code = `const err = parseError(caught)`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('import { parseError } from \'evlog\'')
   })
 
-  it('does not add import if already imported from evlog', () => {
+  it('does not add import if already imported from evlog', async () => {
     const code = `import { log } from 'evlog'\nlog.info('test', 'msg')`
-    const result = autoImportTransform(code)
+    const result = await autoImportTransform(code)
     expect(result).toBeUndefined()
   })
 
-  it('does not add import if already imported from #imports', () => {
+  it('does not add import if already imported from #imports', async () => {
     const code = `import { log } from '#imports'\nlog.info('test', 'msg')`
-    const result = autoImportTransform(code)
+    const result = await autoImportTransform(code)
     expect(result).toBeUndefined()
   })
 
-  it('does not add import for locally declared log variable', () => {
+  it('does not add import for locally declared log variable', async () => {
     const code = `const log = console\nlog.info('test')`
-    const result = autoImportTransform(code)
+    const result = await autoImportTransform(code)
     expect(result).toBeUndefined()
   })
 
-  it('does not add import for imported log from other library', () => {
+  it('does not add import for imported log from other library', async () => {
     const code = `import { log } from 'other-lib'\nlog.info('test')`
-    const result = autoImportTransform(code)
+    const result = await autoImportTransform(code)
     expect(result).toBeUndefined()
   })
 
-  it('adds multiple imports when needed', () => {
+  it('adds multiple imports when needed', async () => {
     const code = `log.info('test', 'msg')\nthrow createEvlogError('error')`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('log')
     expect(result.code).toContain('createEvlogError')
   })
 
-  it('skips node_modules files', () => {
+  it('skips node_modules files', async () => {
     const code = `log.info('test', 'msg')`
-    const result = autoImportTransform(code, 'node_modules/lib/index.js')
+    const result = await autoImportTransform(code, 'node_modules/lib/index.js')
     expect(result).toBeUndefined()
   })
 
-  it('returns undefined when no symbols are used', () => {
+  it('returns undefined when no symbols are used', async () => {
     const code = `const x = 1 + 2`
-    const result = autoImportTransform(code)
+    const result = await autoImportTransform(code)
     expect(result).toBeUndefined()
   })
 
-  it('respects custom imports list', () => {
+  it('respects custom imports list', async () => {
     const code = `log.info('test', 'msg')\nthrow createEvlogError('error')`
-    const result = autoImportTransform(code, 'src/app.ts', { imports: ['log'] })
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code, 'src/app.ts', { imports: ['log'] }), 'auto-import result')
     expect(result.code).toContain('import { log } from \'evlog\'')
     expect(result.code).not.toContain('import { createEvlogError')
   })
 
-  it('generates sourcemap', () => {
+  it('generates sourcemap', async () => {
     const code = `log.info('test', 'msg')`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.map).toBeTruthy()
   })
 
-  it('adds import for setIdentity from evlog/client', () => {
+  it('adds import for setIdentity from evlog/client', async () => {
     const code = `setIdentity({ userId: '123' })`
-    const result = autoImportTransform(code, 'src/app.ts', {
+    const result = defined(await autoImportTransform(code, 'src/app.ts', {
       imports: ['setIdentity'],
-    })
-    expect(result).toBeTruthy()
+    }), 'auto-import result')
     expect(result.code).toContain('import { setIdentity } from \'evlog/client\'')
   })
 
-  it('adds import for clearIdentity from evlog/client', () => {
+  it('adds import for clearIdentity from evlog/client', async () => {
     const code = `clearIdentity()`
-    const result = autoImportTransform(code, 'src/app.ts', {
+    const result = defined(await autoImportTransform(code, 'src/app.ts', {
       imports: ['clearIdentity'],
-    })
-    expect(result).toBeTruthy()
+    }), 'auto-import result')
     expect(result.code).toContain('import { clearIdentity } from \'evlog/client\'')
   })
 
-  it('groups log and parseError in same evlog import', () => {
+  it('groups log and parseError in same evlog import', async () => {
     const code = `log.info('test', 'msg')\nconst e = parseError(err)`
-    const result = autoImportTransform(code)
-    expect(result).toBeTruthy()
+    const result = defined(await autoImportTransform(code), 'auto-import result')
     expect(result.code).toContain('import { log, parseError } from \'evlog\'')
   })
 })

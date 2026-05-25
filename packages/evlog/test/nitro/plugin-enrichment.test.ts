@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
-import type { DrainContext, EnrichContext, RequestLogger, ServerEvent, WideEvent } from '../../src/types'
+import type { DrainContext, EnrichContext, ServerEvent, WideEvent } from '../../src/types'
+import { defined } from '../helpers/defined'
 import { filterSafeHeaders } from '../../src/utils'
 import { createRequestLogger, initLogger } from '../../src/logger'
 
@@ -8,7 +9,7 @@ vi.mock('h3', () => ({
   getHeaders: vi.fn(),
 }))
 
-function getSafeHeaders(allHeaders: Record<string, string>): Record<string, string> {
+function getSafeHeaders(allHeaders: Partial<Record<string, string | undefined>>): Record<string, string> {
   return filterSafeHeaders(allHeaders)
 }
 
@@ -173,11 +174,11 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     const mockHooks = {
       callHook: vi.fn().mockImplementation((hookName: string, ctx: EnrichContext | DrainContext) => {
         if (hookName === 'evlog:enrich') {
-          (ctx as EnrichContext).event.enriched = true
-          ;(ctx as EnrichContext).event.customField = 'added-by-enricher'
+          ctx.event.enriched = true
+          ctx.event.customField = 'added-by-enricher'
         }
         if (hookName === 'evlog:drain') {
-          drainEvent = (ctx as DrainContext).event
+          drainEvent = ctx.event
         }
         return Promise.resolve()
       }),
@@ -198,9 +199,9 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
 
     await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
 
-    expect(drainEvent).not.toBeNull()
-    expect(drainEvent!.enriched).toBe(true)
-    expect(drainEvent!.customField).toBe('added-by-enricher')
+    const drained = defined(drainEvent, 'drainEvent')
+    expect(drained.enriched).toBe(true)
+    expect(drained.customField).toBe('added-by-enricher')
   })
 
   it('passes headers to both enrich and drain hooks', async () => {
@@ -215,10 +216,10 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     const mockHooks = {
       callHook: vi.fn().mockImplementation((hookName: string, ctx: EnrichContext | DrainContext) => {
         if (hookName === 'evlog:enrich') {
-          enrichHeaders = (ctx as EnrichContext).headers
+          enrichHeaders = ctx.headers
         }
         if (hookName === 'evlog:drain') {
-          drainHeaders = (ctx as DrainContext).headers
+          drainHeaders = ctx.headers
         }
         return Promise.resolve()
       }),

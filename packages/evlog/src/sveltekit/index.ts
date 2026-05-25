@@ -19,7 +19,7 @@ export { useLogger }
  */
 type SvelteKitHandle = (input: {
   event: { request: Request; url: URL; locals: Record<string, any> }
-  resolve: (event: any) => Promise<Response>
+  resolve: (...args: any[]) => Response | Promise<Response>
 }) => Promise<Response>
 
 /**
@@ -38,6 +38,61 @@ type MaybePromise<T> = T | Promise<T>
 interface AppError {
   message: string
   [key: string]: unknown
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
+}
+
+function isRequestLogger(value: unknown): value is RequestLogger {
+  return isPlainObject(value)
+    && typeof value.error === 'function'
+    && typeof value.emit === 'function'
+}
+
+interface ContextEvlogError {
+  name: 'EvlogError'
+  status: number
+  message: string
+  why?: string
+  fix?: string
+  link?: string
+  code?: string
+}
+
+function isContextEvlogError(value: unknown): value is Record<string, unknown> & ContextEvlogError {
+  return isPlainObject(value)
+    && value.name === 'EvlogError'
+    && typeof value.status === 'number'
+    && typeof value.message === 'string'
+}
+
+function evlogErrorFromContext(errorData: Record<string, unknown>): EvlogError {
+  const nested = isPlainObject(errorData.data) ? errorData.data : undefined
+  const readString = (key: string): string | undefined => {
+    const direct = errorData[key]
+    if (typeof direct === 'string') return direct
+    const fromNested = nested?.[key]
+    return typeof fromNested === 'string' ? fromNested : undefined
+  }
+  return new EvlogError({
+    message: String(errorData.message),
+    status: errorData.status as number,
+    code: readString('code'),
+    why: readString('why'),
+    fix: readString('fix'),
+    link: readString('link'),
+  })
+}
+
+function readEvlogResponseData(response: Record<string, unknown>): { why?: string, fix?: string, link?: string } {
+  const { data } = response
+  if (!isPlainObject(data)) return {}
+  return {
+    why: typeof data.why === 'string' ? data.why : undefined,
+    fix: typeof data.fix === 'string' ? data.fix : undefined,
+    link: typeof data.link === 'string' ? data.link : undefined,
+  }
 }
 
 /**
@@ -98,11 +153,11 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
         // If handleError already logged an EvlogError with a specific status,
         // return a structured JSON response instead of SvelteKit's generic 500.
         const ctx = logger.getContext()
-        const errorData = ctx.error as { name?: string; status?: number; message?: string; data?: unknown } | undefined
-        if (response.status >= 500 && errorData?.name === 'EvlogError' && errorData.status) {
+        const errorData = ctx.error
+        if (response.status >= 500 && isContextEvlogError(errorData)) {
           const { status } = errorData
           await finish({ status })
-          const body = serializeEvlogErrorResponse(errorData as EvlogError, event.url.pathname)
+          const body = serializeEvlogErrorResponse(evlogErrorFromContext(errorData), event.url.pathname)
           return new Response(JSON.stringify(body), {
             status,
             headers: { 'content-type': 'application/json' },
@@ -112,7 +167,7 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
         await finish({ status: response.status })
         return response
       } catch (error) {
-        await finish({ error: error as Error })
+        await finish({ error: error instanceof Error ? error : new Error(String(error)) })
 
         // Return structured JSON for EvlogError (like NextJS withEvlog / Nuxt errorHandler)
         if (error instanceof EvlogError) {
@@ -148,7 +203,7 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
  */
 export function evlogHandleError(): SvelteKitHandleServerError {
   return ({ error, event, status, message }) => {
-    const logger = event.locals.log as RequestLogger | undefined
+    const logger = isRequestLogger(event.locals.log) ? event.locals.log : undefined
 
     if (logger && error instanceof Error) {
       logger.error(error)
@@ -160,15 +215,13 @@ export function evlogHandleError(): SvelteKitHandleServerError {
       const errorStatus = extractErrorStatus(evlogError)
       const response = serializeEvlogErrorResponse(evlogError, event.url.pathname)
       return {
-        message: response.message as string,
+        message: typeof response.message === 'string' ? response.message : message,
         status: errorStatus,
-        why: (response.data as { why?: string })?.why,
-        fix: (response.data as { fix?: string })?.fix,
-        link: (response.data as { link?: string })?.link,
-      } as AppError
+        ...readEvlogResponseData(response),
+      }
     }
 
-    return { message, status } as AppError
+    return { message, status }
   }
 }
 

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { sendBatchToSentry, sendToSentry, toSentryLog } from '../../src/adapters/sentry'
+import { sendBatchToSentry, sendToSentry, toSentryLog, createSentryDrain } from '../../src/adapters/sentry'
 
 describe('sentry adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -295,6 +295,47 @@ describe('sentry adapter', () => {
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
+    })
+  })
+
+  describe('createSentryDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    let origNuxtSentryDsn: string | undefined
+    let origSentryDsn: string | undefined
+
+    beforeEach(() => {
+      origNuxtSentryDsn = process.env.NUXT_SENTRY_DSN
+      origSentryDsn = process.env.SENTRY_DSN
+      delete process.env.NUXT_SENTRY_DSN
+      delete process.env.SENTRY_DSN
+    })
+
+    afterEach(() => {
+      if (origNuxtSentryDsn === undefined) delete process.env.NUXT_SENTRY_DSN
+      else process.env.NUXT_SENTRY_DSN = origNuxtSentryDsn
+      if (origSentryDsn === undefined) delete process.env.SENTRY_DSN
+      else process.env.SENTRY_DSN = origSentryDsn
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createSentryDrain({ dsn: 'https://public@o123.ingest.sentry.io/456' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when dsn is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createSentryDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/sentry] Missing DSN'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 })

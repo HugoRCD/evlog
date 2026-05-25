@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createError } from '../../src/error'
 import { createRequestLogger, initLogger } from '../../src/logger'
+import type { FieldContext } from '../../src/types'
 import { withFakeTimers } from '../helpers/timers'
+import { defined } from '../helpers/defined'
 
 describe('createRequestLogger', () => {
   let infoSpy: ReturnType<typeof vi.spyOn>
@@ -43,11 +45,11 @@ describe('createRequestLogger', () => {
   it('overwrites existing primitive keys with set()', () => {
     const logger = createRequestLogger({})
 
-    logger.set({ status: 'pending' })
-    logger.set({ status: 'complete' })
+    logger.set({ phase: 'pending' })
+    logger.set({ phase: 'complete' })
 
     const context = logger.getContext()
-    expect(context.status).toBe('complete')
+    expect(context.phase).toBe('complete')
   })
 
   it('deep merges nested objects with set()', () => {
@@ -217,14 +219,12 @@ describe('createRequestLogger', () => {
     const logger = createRequestLogger({})
 
     logger.info('First entry')
-    logger.info('Second entry', { requestLogs: 'should be ignored' } as any)
-    logger.warn('Third entry', { requestLogs: [{ fake: true }] } as any)
+    logger.info('Second entry', { requestLogs: 'should be ignored' } as FieldContext)
+    logger.warn('Third entry', { requestLogs: [{ fake: true }] } as FieldContext)
 
     const context = logger.getContext()
-    expect(context.requestLogs).toHaveLength(3)
-    expect(context.requestLogs[0].message).toBe('First entry')
-    expect(context.requestLogs[1].message).toBe('Second entry')
-    expect(context.requestLogs[2].message).toBe('Third entry')
+    const logs = defined(context.requestLogs, 'requestLogs') as Array<{ message: string }>
+    expect(logs.map(entry => entry.message)).toEqual(['First entry', 'Second entry', 'Third entry'])
   })
 
   it('captures custom error properties (statusCode, data, cause)', () => {

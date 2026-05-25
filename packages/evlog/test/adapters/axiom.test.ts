@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { sendBatchToAxiom, sendToAxiom } from '../../src/adapters/axiom'
+import { sendBatchToAxiom, sendToAxiom, createAxiomDrain } from '../../src/adapters/axiom'
 
 describe('axiom adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -29,7 +29,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -42,7 +42,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         baseUrl: 'https://custom.axiom.co',
       })
 
@@ -55,7 +55,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
       })
 
@@ -68,7 +68,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'http://localhost:3400/custom/ingest/',
       })
 
@@ -81,7 +81,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my dataset/test',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -93,7 +93,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my dataset/test',
-        token: 'test-token',
+        apiKey: 'test-token',
         edgeUrl: 'https://eu-central-1.aws.edge.axiom.co',
       })
 
@@ -106,7 +106,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'my-secret-token',
+        apiKey: 'my-secret-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -120,7 +120,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         orgId: 'my-org-123',
       })
 
@@ -135,7 +135,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -148,7 +148,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -162,7 +162,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -179,7 +179,7 @@ describe('axiom adapter', () => {
 
       await expect(sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })).rejects.toThrow('Axiom API error: 400 Bad Request')
     })
   })
@@ -194,7 +194,7 @@ describe('axiom adapter', () => {
 
       await sendBatchToAxiom(events, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -207,7 +207,7 @@ describe('axiom adapter', () => {
     it('sends empty array when no events', async () => {
       await sendBatchToAxiom([], {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -225,7 +225,7 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
@@ -237,11 +237,53 @@ describe('axiom adapter', () => {
 
       await sendToAxiom(event, {
         dataset: 'my-dataset',
-        token: 'test-token',
+        apiKey: 'test-token',
         timeout: 10000,
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
+    })
+  })
+
+  describe('createAxiomDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    afterEach(() => {
+      delete process.env.NUXT_AXIOM_API_KEY
+      delete process.env.AXIOM_API_KEY
+      delete process.env.NUXT_AXIOM_DATASET
+      delete process.env.AXIOM_DATASET
+      delete process.env.NUXT_AXIOM_TOKEN
+      delete process.env.AXIOM_TOKEN
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createAxiomDrain({ apiKey: 'test-key', dataset: 'logs' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when credentials are missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createAxiomDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/axiom] Missing dataset or apiKey'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('accepts legacy token alias', async () => {
+      const drain = createAxiomDrain({ token: 'legacy-key', dataset: 'logs' })
+      await drain(createDrainContext())
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(options.headers).toEqual(expect.objectContaining({
+        Authorization: 'Bearer legacy-key',
+      }))
     })
   })
 })

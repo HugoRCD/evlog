@@ -32,7 +32,7 @@ export { createError, createEvlogError } from '../error'
  *   },
  *   drain: pipeline(createAxiomDrain({
  *     dataset: 'logs',
- *     token: process.env.AXIOM_TOKEN!,
+ *     apiKey: process.env.AXIOM_API_KEY!,
  *   })),
  *   enrich: (ctx) => {
  *     ctx.event.deploymentId = process.env.VERCEL_DEPLOYMENT_ID

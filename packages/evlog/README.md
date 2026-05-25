@@ -853,7 +853,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_AXIOM_TOKEN=xaat-your-token
+NUXT_AXIOM_API_KEY=xaat-your-token
 NUXT_AXIOM_DATASET=your-dataset
 ```
 
@@ -948,8 +948,68 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_BETTER_STACK_SOURCE_TOKEN=your-source-token
+NUXT_BETTER_STACK_API_KEY=your-source-token
 ```
+
+### HyperDX
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createHyperDXDrain } from 'evlog/hyperdx'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createHyperDXDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_HYPERDX_API_KEY=your-api-key
+# Optional — defaults to https://in-otel.hyperdx.io
+NUXT_HYPERDX_ENDPOINT=https://in-otel.hyperdx.io
+```
+
+### File System
+
+Write wide events to local NDJSON files (`.evlog/logs/` by default):
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createFsDrain } from 'evlog/fs'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createFsDrain())
+})
+```
+
+Set environment variables:
+
+```bash
+NUXT_EVLOG_FS_DIR=.evlog/logs
+```
+
+### Memory
+
+In-memory ring buffer — works in any runtime, including Cloudflare Workers:
+
+```typescript
+// server/plugins/evlog-drain.ts
+import { createMemoryDrain } from 'evlog/memory'
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createMemoryDrain())
+})
+```
+
+Optional environment variables:
+
+```bash
+NUXT_EVLOG_MEMORY_STORE=default
+NUXT_EVLOG_MEMORY_MAX_EVENTS=1000
+```
+
+Pair with `readMemoryLogs()` for dev-only agent access over HTTP. See the [Memory adapter docs](https://www.evlog.dev/integrate/adapters/self-hosted/memory).
 
 ### Multiple Destinations
 

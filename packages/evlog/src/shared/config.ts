@@ -7,7 +7,7 @@ export function getRuntimeConfig(): Promise<Record<string, any> | undefined> {
 
 /**
  * Description of a single adapter config field. `env` is the ordered list of
- * environment variables to fall back to, e.g. `['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN']`.
+ * environment variables to fall back to, e.g. `['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY']`.
  */
 export interface ConfigField<T> {
   key: keyof T & string

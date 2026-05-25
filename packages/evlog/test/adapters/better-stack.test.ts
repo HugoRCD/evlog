@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { sendBatchToBetterStack, sendToBetterStack, toBetterStackEvent } from '../../src/adapters/better-stack'
+import { sendBatchToBetterStack, sendToBetterStack, toBetterStackEvent, createBetterStackDrain } from '../../src/adapters/better-stack'
 
 describe('better-stack adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
@@ -50,7 +50,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -62,7 +62,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         endpoint: 'https://custom.betterstack.com',
       })
 
@@ -74,7 +74,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         endpoint: 'https://custom.betterstack.com/',
       })
 
@@ -86,7 +86,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'my-secret-token',
+        apiKey: 'my-secret-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -99,7 +99,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -112,7 +112,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent({ action: 'test-action', userId: '123' })
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -137,7 +137,7 @@ describe('better-stack adapter', () => {
       const event = createTestEvent()
 
       await expect(sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })).rejects.toThrow('Better Stack API error: 400 Bad Request')
     })
   })
@@ -151,7 +151,7 @@ describe('better-stack adapter', () => {
       ]
 
       await sendBatchToBetterStack(events, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
@@ -164,7 +164,7 @@ describe('better-stack adapter', () => {
 
     it('sends empty array when no events', async () => {
       await sendBatchToBetterStack([], {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
@@ -179,7 +179,7 @@ describe('better-stack adapter', () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
@@ -190,11 +190,51 @@ describe('better-stack adapter', () => {
       const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
 
       await sendToBetterStack(event, {
-        sourceToken: 'test-token',
+        apiKey: 'test-token',
         timeout: 10000,
       })
 
       expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
+    })
+  })
+
+  describe('createBetterStackDrain', () => {
+    const createDrainContext = (overrides?: Partial<WideEvent>) => ({
+      event: createTestEvent(overrides),
+      request: { method: 'GET', path: '/', requestId: 'r1' },
+      headers: {},
+    })
+
+    afterEach(() => {
+      delete process.env.NUXT_BETTER_STACK_API_KEY
+      delete process.env.BETTER_STACK_API_KEY
+      delete process.env.NUXT_BETTER_STACK_SOURCE_TOKEN
+      delete process.env.BETTER_STACK_SOURCE_TOKEN
+    })
+
+    it('returns a callable drain that posts events', async () => {
+      const drain = createBetterStackDrain({ apiKey: 'test-key' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('logs error and skips fetch when apiKey is missing', async () => {
+      const consoleSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = createBetterStackDrain()
+      await drain(createDrainContext())
+      expect(consoleSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/better-stack] Missing apiKey'),
+      )
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('accepts legacy sourceToken alias', async () => {
+      const drain = createBetterStackDrain({ sourceToken: 'legacy-key' })
+      await drain(createDrainContext())
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      expect(options.headers).toEqual(expect.objectContaining({
+        Authorization: 'Bearer legacy-key',
+      }))
     })
   })
 })

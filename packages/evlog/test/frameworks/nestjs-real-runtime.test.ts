@@ -11,6 +11,7 @@ import {
   findEventViaDrain,
   waitForDrainCalls,
 } from '../helpers/framework'
+import { defined } from '../helpers/defined'
 
 /**
  * Stress test: boot a real NestJS app with NestFactory's Express adapter,
@@ -96,9 +97,11 @@ describe('evlog/nestjs (real NestJS runtime)', () => {
     expect(res.status).toBe(200)
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/me')
-    expect(event).toBeDefined()
-    expect((event!.user as { id: string }).id).toBe('u-1')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/me'),
+      'wide event for /api/me',
+    )
+    expect((event.user as { id: string }).id).toBe('u-1')
   })
 
   it('drains the wide event with status 500 when a controller throws', async () => {
@@ -126,8 +129,10 @@ describe('evlog/nestjs (real NestJS runtime)', () => {
       .set('x-request-id', 'real-nest-req')
     await waitForDrainCalls(drain)
 
-    const event = findEventViaDrain(drain, e => e.path === '/api/users')
-    expect(event).toBeDefined()
-    expect(event!.requestId).toBe('real-nest-req')
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/users'),
+      'wide event for /api/users',
+    )
+    expect(event.requestId).toBe('real-nest-req')
   })
 })

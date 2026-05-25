@@ -13,7 +13,18 @@ export default defineNuxtConfig({
     'nuxt-studio',
     '@vercel/analytics',
     '@vercel/speed-insights',
+    '@databuddy/nuxt',
   ],
+
+  databuddy: {
+    clientId: '389b5a41-31cb-4ea4-a5e8-8ec3ac4ffccc',
+    trackWebVitals: true,
+    trackErrors: true,
+    trackHashChanges: true,
+    trackOutgoingLinks: true,
+    trackInteractions: true,
+    trackAttributes: true,
+  },
 
   colorMode: {
     preference: 'dark',

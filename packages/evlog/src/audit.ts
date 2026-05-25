@@ -32,11 +32,19 @@ export interface AuditInput {
  * Used by `idempotencyKey` and `hash-chain` so the same logical event always
  * produces the same digest, regardless of how object keys were added.
  */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  if (Object.prototype.toString.call(value) !== '[object Object]') return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || value.constructor === Object
+}
+
 function stableStringify(value: unknown): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
   if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  const keys = Object.keys(value as Record<string, unknown>).sort()
-  return `{${keys.map(k => `${JSON.stringify(k)}:${stableStringify((value as Record<string, unknown>)[k])}`).join(',')}}`
+  if (!isPlainObject(value)) return JSON.stringify(value)
+  const keys = Object.keys(value).sort()
+  return `{${keys.map(k => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`
 }
 
 /**
@@ -134,7 +142,7 @@ function decorateAudit(audit: AuditFields, timestamp: string): AuditFields {
  */
 export function withAuditMethods<T extends object = Record<string, unknown>>(logger: RequestLogger<T>): AuditableLogger<T> {
   const target = logger as AuditableLogger<T>
-  if (target.audit) return target
+  if ((target as { audit?: AuditMethod<T> }).audit) return target
 
   const audit = function audit(input: AuditInput): void {
     const fields = buildAuditFields(input)
@@ -424,11 +432,11 @@ export function defineAuditAction<TTargetType extends string | undefined = undef
   const targetType = options?.target
   return (input) => {
     const merged: AuditInput = {
-      ...input,
+      ...(input as AuditInput),
       action,
     }
     if (targetType && input.target && !input.target.type) {
-      merged.target = { ...input.target, type: targetType }
+      merged.target = { ...input.target, type: targetType } as AuditTarget
     }
     return merged
   }
@@ -511,7 +519,7 @@ function matchesAudit(event: AuditFields, matcher: AuditMatcher): boolean {
   if (matcher.outcome !== undefined && event.outcome !== matcher.outcome) return false
   if (matcher.actor) {
     for (const [k, v] of Object.entries(matcher.actor)) {
-      if ((event.actor as Record<string, unknown>)[k] !== v) return false
+      if ((event.actor as unknown as Record<string, unknown>)[k] !== v) return false
     }
   }
   if (matcher.target) {

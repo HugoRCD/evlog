@@ -53,6 +53,7 @@ const noopResult: MiddlewareLoggerResult = {
     error() {},
     info() {},
     warn() {},
+    setLevel() {},
     emit() {
       return null 
     },

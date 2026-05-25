@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import type { EnrichContext, WideEvent } from '../../src/types'
 import type { GeoInfo, UserAgentInfo } from '../../src/enrichers'
-import { createGeoEnricher, createRequestSizeEnricher, createTraceContextEnricher, createUserAgentEnricher } from '../../src/enrichers'
+import { createGeoEnricher, createRequestSizeEnricher, createTraceContextEnricher, createUserAgentEnricher, createDefaultEnrichers } from '../../src/enrichers'
 
 function createContext(headers: Record<string, string>, responseHeaders?: Record<string, string>): EnrichContext {
   const event: WideEvent = {
@@ -424,5 +424,25 @@ describe('enrichers - empty/missing headers (T8)', () => {
       requestBytes: 512,
       responseBytes: undefined,
     })
+  })
+})
+
+describe('createDefaultEnrichers', () => {
+  it('composes user agent, geo, request size, and trace context enrichers', async () => {
+    const enrich = createDefaultEnrichers()
+    const ctx = createContext({
+      'user-agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 13_4) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Safari/605.1.15',
+      'content-length': '512',
+      traceparent: '00-0af7651916cd43dd8448eb211c80319c-b7ad6b7169203331-01',
+      'x-vercel-ip-country': 'US',
+      'x-vercel-ip-city': 'San Francisco',
+    }, { 'content-length': '1024' })
+
+    await enrich(ctx)
+
+    expect(ctx.event.userAgent).toBeDefined()
+    expect(ctx.event.geo).toBeDefined()
+    expect(ctx.event.requestSize).toBeDefined()
+    expect(ctx.event.traceContext).toBeDefined()
   })
 })

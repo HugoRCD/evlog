@@ -27,11 +27,10 @@ export default defineEventHandler(async (event) => {
   try {
     const pages = await queryCollection(event, 'docs').all()
 
-    for (const page of pages as unknown as Array<Record<string, unknown> & { path?: string }>) {
-      const meta = page as Record<string, unknown>
+    for (const page of pages) {
       let pagePath = page.path || '/'
 
-      if (meta.sitemap === false) continue
+      if (page.sitemap === false) continue
       if (pagePath.endsWith('.navigation') || pagePath.includes('/.navigation')) continue
 
       if (pagePath === '/landing') pagePath = '/'
@@ -41,8 +40,8 @@ export default defineEventHandler(async (event) => {
 
       const urlEntry: SitemapUrl = { loc: pagePath }
 
-      if (meta.modifiedAt && typeof meta.modifiedAt === 'string') {
-        const [datePart] = meta.modifiedAt.split('T')
+      if (page.modifiedAt && typeof page.modifiedAt === 'string') {
+        const [datePart] = page.modifiedAt.split('T')
         urlEntry.lastmod = datePart
       }
 
