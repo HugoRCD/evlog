@@ -1,5 +1,12 @@
 # evlog-community-enricher-skeleton
 
+## 4.0.1
+
+### Patch Changes
+
+- Updated dependencies [[`cfc9322`](https://github.com/HugoRCD/evlog/commit/cfc932289aa5192706c70bb728afebad560a17e5)]:
+  - evlog@2.18.1
+
 ## 4.0.0
 
 ### Patch Changes
