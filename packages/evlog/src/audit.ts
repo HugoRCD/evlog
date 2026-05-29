@@ -1,4 +1,4 @@
-import type { AuditActor, AuditFields, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
+import type { AuditActor, AuditActionDefinition, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
 import { getHeader as getSharedHeader } from './shared/headers'
 
@@ -206,9 +206,7 @@ export interface AuditMethod<T extends object = Record<string, unknown>> {
 export function audit(input: AuditInput): WideEvent | null {
   const fields = buildAuditFields(input)
   const logger = createLogger({ audit: fields })
-  const wide = logger.emit({ _forceKeep: true } as FieldContext<Record<string, unknown>> & { _forceKeep?: boolean })
-  _testCollector?.(fields, wide)
-  return wide
+  return logger.emit({ _forceKeep: true } as FieldContext<Record<string, unknown>> & { _forceKeep?: boolean })
 }
 
 /**
@@ -388,12 +386,7 @@ export function auditDiff(
   return result
 }
 
-/** Single JSON Patch operation produced by {@link auditDiff}. */
-export interface AuditPatchOp {
-  op: 'add' | 'remove' | 'replace'
-  path: string
-  value?: unknown
-}
+export type { AuditPatchOp } from './types'
 
 /** Options for {@link auditDiff}. */
 export interface AuditDiffOptions {
@@ -407,16 +400,25 @@ export interface AuditDiffOptions {
   includeAfter?: boolean
 }
 
+/** Options for {@link defineAuditAction}. Same shape as {@link AuditCatalogEntry}. */
+export type DefineAuditActionOptions = AuditActionDefinition
+
 /**
- * Define a typed audit action with an optional fixed target type.
+ * Define a typed audit action with optional fixed target type and catalog metadata.
  *
  * Returns a curried helper that fills in the action name (and target shape
  * if provided) so call sites stay terse and the action set is discoverable
- * in one place.
+ * in one place. Metadata (`description`, `severity`, `requiresChanges`, …)
+ * is exposed on the factory for introspection, docs, and review tooling.
  *
  * @example
  * ```ts
- * const refund = defineAuditAction('invoice.refund', { target: 'invoice' })
+ * const refund = defineAuditAction('invoice.refund', {
+ *   target: 'invoice',
+ *   severity: 'high',
+ *   requiresChanges: true,
+ *   redactPaths: ['cardNumber'],
+ * })
  *
  * log.audit(refund({
  *   actor: { type: 'user', id: user.id },
@@ -425,12 +427,12 @@ export interface AuditDiffOptions {
  * }))
  * ```
  */
-export function defineAuditAction<TTargetType extends string | undefined = undefined>(
-  action: string,
-  options?: { target?: TTargetType },
-): DefinedAuditAction<TTargetType> {
+export function defineAuditAction<
+  const TAction extends string,
+  const TOptions extends DefineAuditActionOptions = DefineAuditActionOptions,
+>(action: TAction, options?: TOptions): DefinedAuditAction<TAction, TOptions> {
   const targetType = options?.target
-  return (input) => {
+  const factory = ((input) => {
     const merged: AuditInput = {
       ...(input as AuditInput),
       action,
@@ -439,32 +441,55 @@ export function defineAuditAction<TTargetType extends string | undefined = undef
       merged.target = { ...input.target, type: targetType } as AuditTarget
     }
     return merged
-  }
+  }) as DefinedAuditAction<TAction, TOptions>
+
+  Object.defineProperties(factory, {
+    action: { value: action, enumerable: true },
+    target: { value: options?.target, enumerable: true },
+    description: { value: options?.description, enumerable: true },
+    severity: { value: options?.severity, enumerable: true },
+    requiresChanges: { value: options?.requiresChanges, enumerable: true },
+    requiresReason: { value: options?.requiresReason, enumerable: true },
+    redactPaths: { value: options?.redactPaths, enumerable: true },
+  })
+
+  return factory
 }
 
 /**
  * Return type of {@link defineAuditAction}. Accepts a partial input (no
  * `action`, target type pre-filled when provided).
  */
-export type DefinedAuditAction<TTargetType extends string | undefined> = (
-  input: TTargetType extends string
-    ? Omit<AuditInput, 'action' | 'target'> & { target?: Omit<AuditTarget, 'type'> & { type?: TTargetType } }
-    : Omit<AuditInput, 'action'>,
-) => AuditInput
+export type DefinedAuditAction<
+  TAction extends string = string,
+  TOptions extends DefineAuditActionOptions = DefineAuditActionOptions,
+> =
+  & ((
+    input: TOptions['target'] extends string
+      ? Omit<AuditInput, 'action' | 'target'> & { target?: Omit<AuditTarget, 'type'> & { type?: TOptions['target'] } }
+      : Omit<AuditInput, 'action'>,
+  ) => AuditInput)
+  & {
+    readonly action: TAction
+    readonly target: TOptions['target']
+    readonly description: TOptions['description']
+    readonly severity: TOptions['severity']
+    readonly requiresChanges: TOptions['requiresChanges']
+    readonly requiresReason: TOptions['requiresReason']
+    readonly redactPaths: TOptions['redactPaths']
+  }
 
 /**
  * Test helper that captures every audit event emitted while it is active.
  *
- * Returns `{ events, restore, expect }`:
+ * Returns `{ events, restore, toIncludeAuditOf, assertAudit }`:
  * - `events` — live array of captured `AuditFields`, populated as audits fire.
  * - `restore()` — uninstall the collector. Call from `afterEach()`.
- * - `expect.toIncludeAuditOf(matcher)` — assertion helper used inside `expect`
- *   blocks, returns `true` if at least one captured event matches.
+ * - `toIncludeAuditOf(matcher)` — returns `true` if at least one captured event matches.
+ * - `assertAudit(matcher)` — returns the matched event or throws with a readable summary.
  *
- * Only captures audits going through `log.audit()` and the standalone
- * `audit()` function. Events emitted via raw `log.set({ audit })` skip the
- * collector by design — wrap them with `log.audit()` to make them visible to
- * tests.
+ * Captures audits on emit from `log.audit()`, standalone `audit()`, and
+ * `log.set({ audit })` — including auto-filled `idempotencyKey`.
  *
  * @example
  * ```ts
@@ -490,6 +515,16 @@ export function mockAudit(): MockAudit {
     toIncludeAuditOf(matcher) {
       return events.some(event => matchesAudit(event, matcher))
     },
+    assertAudit(matcher) {
+      const match = events.find(event => matchesAudit(event, matcher))
+      if (!match) {
+        const summary = events.map(e => ({ action: e.action, outcome: e.outcome }))
+        throw new Error(
+          `No audit event matched ${JSON.stringify(matcher)}. Captured ${events.length} event(s): ${JSON.stringify(summary)}`,
+        )
+      }
+      return match
+    },
   }
 }
 
@@ -498,6 +533,8 @@ export interface MockAudit {
   events: AuditFields[]
   restore: () => void
   toIncludeAuditOf: (matcher: AuditMatcher) => boolean
+  /** Throws when no captured event matches; returns the matched event otherwise. */
+  assertAudit: (matcher: AuditMatcher) => AuditFields
 }
 
 /** Partial structural matcher for {@link MockAudit.toIncludeAuditOf}. */
@@ -555,6 +592,7 @@ export function finalizeAudit(event: WideEvent): void {
   if (!a) return
   const decorated = decorateAudit(a, String(event.timestamp))
   event.audit = decorated
+  _testCollector?.(decorated, event)
 }
 
 /** Shape of the optional better-auth bridge for the audit enricher. */

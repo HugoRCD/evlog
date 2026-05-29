@@ -15,6 +15,7 @@ export {
 } from './audit'
 export type {
   AuditDiffOptions,
+  DefineAuditActionOptions,
   AuditEnricherOptions,
   AuditInput,
   AuditMatcher,
@@ -69,9 +70,12 @@ export type { EvlogConfig } from './shared/define'
 
 export type {
   AuditAction,
+  AuditActionDefinition,
   AuditActor,
+  AuditChanges,
   AuditFields,
   AuditLoggerMethod,
+  AuditSeverity,
   AuditTarget,
   BaseWideEvent,
   DeepPartial,

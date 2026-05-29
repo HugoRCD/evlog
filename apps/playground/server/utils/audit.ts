@@ -8,14 +8,20 @@ import { defineAuditCatalog } from 'evlog'
  * and the `target.type` is auto-injected when set on the catalog entry.
  */
 export const billingAudit = defineAuditCatalog('billing', {
-  INVOICE_REFUND: { target: 'invoice' },
-  INVOICE_CREATE: { target: 'invoice' },
-  INVOICE_VOID: { target: 'invoice' },
-  SUBSCRIPTION_CANCEL: { target: 'subscription' },
+  INVOICE_REFUND: {
+    target: 'invoice',
+    severity: 'high',
+    requiresChanges: true,
+    description: 'Refund an invoice to the customer',
+    redactPaths: ['cardNumber', 'cvv'],
+  },
+  INVOICE_CREATE: { target: 'invoice', severity: 'medium' },
+  INVOICE_VOID: { target: 'invoice', severity: 'high', requiresReason: true },
+  SUBSCRIPTION_CANCEL: { target: 'subscription', severity: 'high' },
   /**
    * No `target` set → call sites can pass any target shape (or none).
    */
-  PASSWORD_CHANGE: {},
+  PASSWORD_CHANGE: { severity: 'high', requiresChanges: true, redactPaths: ['password'] },
 })
 
 /**

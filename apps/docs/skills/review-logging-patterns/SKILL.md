@@ -27,6 +27,22 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
 | Drain pipeline          | [references/drain-pipeline.md](references/drain-pipeline.md)       |
+| Audit logs              | [build-audit-logs](../build-audit-logs/SKILL.md) skill + [docs](https://www.evlog.dev/use-cases/audit/overview) |
+
+## Audit logs
+
+For security-sensitive actions (auth, billing, admin, data export), use evlog's audit layer — a typed `audit` field on wide events, not a parallel logger. See the **`build-audit-logs`** skill for end-to-end setup (`log.audit`, `withAudit`, denials, `auditEnricher`, `auditOnly`, `signed`, `mockAudit`).
+
+```typescript
+log.audit({
+  action: 'invoice.refund',
+  actor: { type: 'user', id: user.id },
+  target: { type: 'invoice', id: invoice.id },
+  outcome: 'success',
+})
+```
+
+Docs: https://www.evlog.dev/use-cases/audit/overview
 
 ## Installation
 

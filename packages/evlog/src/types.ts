@@ -415,6 +415,28 @@ export interface LoggerConfig {
  * `tools`, `reason`, and `promptId` are filled when `type === 'agent'` and
  * mirror the AI SDK fields already used by `evlog/ai`.
  */
+/** Relative importance of an audit action for alerting and review prioritisation. */
+export type AuditSeverity = 'low' | 'medium' | 'high' | 'critical'
+
+/**
+ * Static metadata for a single audit action — used by {@link defineAuditAction}
+ * and each entry of {@link defineAuditCatalog}.
+ */
+export interface AuditActionDefinition {
+  /** Default `target.type` for every audit emitted from this action. */
+  target?: string
+  /** Human-readable description for docs, SIEM rules, and review tooling. */
+  description?: string
+  /** Relative importance for alerting and review prioritisation. */
+  severity?: AuditSeverity
+  /** When true, callers should supply `changes` (e.g. via {@link auditDiff}). */
+  requiresChanges?: boolean
+  /** When true, callers should supply `reason` (especially for denials). */
+  requiresReason?: boolean
+  /** Default redact paths merged with {@link auditDiff} for this action. */
+  redactPaths?: readonly string[]
+}
+
 export interface AuditActor {
   type: 'user' | 'system' | 'api' | 'agent'
   id: string
@@ -459,6 +481,20 @@ export interface AuditTarget {
  * - `context` — request/runtime context auto-populated by {@link auditEnricher}
  *   (`requestId`, `traceId`, `ip`, `userAgent`, `tenantId`).
  */
+/** Single JSON Patch operation for audit change tracking (RFC 6902 subset). */
+export interface AuditPatchOp {
+  op: 'add' | 'remove' | 'replace'
+  path: string
+  value?: unknown
+}
+
+/** Before/after snapshots and optional patch produced by {@link auditDiff}. */
+export interface AuditChanges {
+  before?: unknown
+  after?: unknown
+  patch?: AuditPatchOp[]
+}
+
 export interface AuditFields {
   /** Action name. Convention: `'<resource>.<verb>'`, e.g. `'invoice.refund'`. */
   action: string
@@ -467,8 +503,8 @@ export interface AuditFields {
   outcome: 'success' | 'failure' | 'denied'
   /** Human-readable explanation, especially required for `outcome: 'denied'`. */
   reason?: string
-  /** Before/after snapshots for mutating actions. */
-  changes?: { before?: unknown, after?: unknown }
+  /** Before/after snapshots and optional patch from {@link auditDiff}. */
+  changes?: AuditChanges
   /** ID of the action that caused this one. */
   causationId?: string
   /** ID shared by every action in the same logical operation. */

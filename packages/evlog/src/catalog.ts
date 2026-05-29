@@ -1,5 +1,4 @@
-import type { AuditInput } from './audit'
-import type { AuditTarget } from './types'
+import type { AuditActionDefinition, AuditTarget } from './types'
 import { defineAuditAction } from './audit'
 import { EvlogError } from './error'
 
@@ -256,10 +255,7 @@ export function defineErrorCatalog<
 }
 
 /** Static metadata for a single entry in an audit catalog. */
-export interface AuditCatalogEntry {
-  /** Default `target.type` for every audit emitted from this action. */
-  target?: string
-}
+export type AuditCatalogEntry = AuditActionDefinition
 
 /** Map of audit catalog entries keyed by their (UPPER_SNAKE) name. */
 export interface AuditCatalogMap {
@@ -276,6 +272,11 @@ export type DefinedCatalogAudit<TAction extends string, TEntry extends AuditCata
   & {
     readonly action: TAction
     readonly target: TEntry['target']
+    readonly description: TEntry['description']
+    readonly severity: TEntry['severity']
+    readonly requiresChanges: TEntry['requiresChanges']
+    readonly requiresReason: TEntry['requiresReason']
+    readonly redactPaths: TEntry['redactPaths']
   }
 
 /**
@@ -302,7 +303,12 @@ export type AuditCatalog<TPrefix extends string, TMap extends AuditCatalogMap> =
  * import { defineAuditCatalog } from 'evlog'
  *
  * export const billingAudit = defineAuditCatalog('billing', {
- *   INVOICE_REFUND: { target: 'invoice' },
+ *   INVOICE_REFUND: {
+ *     target: 'invoice',
+ *     severity: 'high',
+ *     requiresChanges: true,
+ *     description: 'Refund an invoice to the customer',
+ *   },
  *   INVOICE_CREATE: { target: 'invoice' },
  * })
  *
@@ -328,12 +334,7 @@ export function defineAuditCatalog<
   for (const key of Object.keys(map)) {
     const action = `${prefix}.${key}`
     const entry = map[key]
-    const fn = defineAuditAction(action, entry.target ? { target: entry.target } : undefined) as ((input: unknown) => AuditInput) & { action: string, target?: string }
-    Object.defineProperties(fn, {
-      action: { value: action, enumerable: true },
-      target: { value: entry.target, enumerable: true },
-    })
-    out[key] = fn
+    out[key] = defineAuditAction(action, entry)
     actions.push(action)
   }
 

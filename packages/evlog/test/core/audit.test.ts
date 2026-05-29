@@ -228,10 +228,25 @@ describe('defineAuditAction()', () => {
     expect(built.action).toBe('invoice.refund')
     expect(built.target).toEqual({ type: 'invoice', id: 'inv_1' })
   })
+
+  it('exposes catalog metadata on the factory', () => {
+    const refund = defineAuditAction('invoice.refund', {
+      target: 'invoice',
+      severity: 'high',
+      requiresChanges: true,
+      description: 'Refund an invoice',
+      redactPaths: ['cardNumber'],
+    })
+    expect(refund.action).toBe('invoice.refund')
+    expect(refund.severity).toBe('high')
+    expect(refund.requiresChanges).toBe(true)
+    expect(refund.description).toBe('Refund an invoice')
+    expect(refund.redactPaths).toEqual(['cardNumber'])
+  })
 })
 
 describe('mockAudit()', () => {
-  it('captures audit events from log.audit() and audit()', () => {
+  it('captures audit events from standalone audit()', () => {
     const captured = mockAudit()
     audit({ action: 'a', actor: { type: 'system', id: 's' } })
     expect(captured.events).toHaveLength(1)
@@ -240,10 +255,51 @@ describe('mockAudit()', () => {
     captured.restore()
   })
 
+  it('captures audit events from log.audit() on emit', () => {
+    const captured = mockAudit()
+    const log = createRequestLogger()
+    log.audit({
+      action: 'invoice.refund',
+      actor: { type: 'user', id: 'u1' },
+      target: { type: 'invoice', id: 'inv_1' },
+      outcome: 'success',
+    })
+    log.emit()
+    expect(captured.events).toHaveLength(1)
+    const recorded = defined(captured.events[0], 'audit event')
+    expect(recorded.action).toBe('invoice.refund')
+    expect(recorded.idempotencyKey).toBeDefined()
+    captured.restore()
+  })
+
+  it('captures log.audit.deny() with outcome denied', () => {
+    const captured = mockAudit()
+    const log = createRequestLogger()
+    log.audit.deny('Insufficient permissions', {
+      action: 'invoice.refund',
+      actor: { type: 'user', id: 'u1' },
+      target: { type: 'invoice', id: 'inv_1' },
+    })
+    log.emit()
+    const recorded = defined(captured.events[0], 'audit event')
+    expect(recorded.outcome).toBe('denied')
+    expect(recorded.reason).toBe('Insufficient permissions')
+    captured.restore()
+  })
+
   it('matcher supports regex actions', () => {
     const captured = mockAudit()
     audit({ action: 'invoice.refund', actor: { type: 'system', id: 's' } })
     expect(captured.toIncludeAuditOf({ action: /^invoice\./ })).toBe(true)
+    captured.restore()
+  })
+
+  it('assertAudit returns the matched event or throws', () => {
+    const captured = mockAudit()
+    audit({ action: 'invoice.refund', actor: { type: 'user', id: 'u1' }, outcome: 'success' })
+    const match = captured.assertAudit({ action: 'invoice.refund', outcome: 'success' })
+    expect(match.action).toBe('invoice.refund')
+    expect(() => captured.assertAudit({ action: 'missing' })).toThrow(/No audit event matched/)
     captured.restore()
   })
 })

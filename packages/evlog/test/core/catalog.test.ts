@@ -192,7 +192,13 @@ describe('defineErrorCatalog', () => {
 
 describe('defineAuditCatalog', () => {
   const billingAudit = defineAuditCatalog('billing', {
-    INVOICE_REFUND: { target: 'invoice' },
+    INVOICE_REFUND: {
+      target: 'invoice',
+      severity: 'high',
+      requiresChanges: true,
+      description: 'Refund an invoice to the customer',
+      redactPaths: ['cardNumber'],
+    },
     INVOICE_CREATE: { target: 'invoice' },
     SUBSCRIPTION_CANCEL: { target: 'subscription' },
     PASSWORD_CHANGE: {},
@@ -212,6 +218,10 @@ describe('defineAuditCatalog', () => {
   it('exposes static action and target on the factory itself', () => {
     expect(billingAudit.INVOICE_REFUND.action).toBe('billing.INVOICE_REFUND')
     expect(billingAudit.INVOICE_REFUND.target).toBe('invoice')
+    expect(billingAudit.INVOICE_REFUND.severity).toBe('high')
+    expect(billingAudit.INVOICE_REFUND.requiresChanges).toBe(true)
+    expect(billingAudit.INVOICE_REFUND.description).toBe('Refund an invoice to the customer')
+    expect(billingAudit.INVOICE_REFUND.redactPaths).toEqual(['cardNumber'])
     expect(billingAudit.PASSWORD_CHANGE.action).toBe('billing.PASSWORD_CHANGE')
     expect(billingAudit.PASSWORD_CHANGE.target).toBeUndefined()
   })

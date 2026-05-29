@@ -23,7 +23,7 @@ When you already know the system is wired and just need to remember the API:
 | Auto-record success / failure / denied for a function | `withAudit({ action, target }, fn)` |
 | Recording a state change | add `changes: auditDiff(before, after)` |
 | Centralised typed action vocabulary | `defineAuditAction('invoice.refund', { target: 'invoice' })` |
-| Asserting audits in tests | `mockAudit()` |
+| Asserting audits in tests | `mockAudit()` — `assertAudit()` or `toIncludeAuditOf()` |
 
 `AuditFields` schema (always provide `action`, `actor`, `outcome`; `target` strongly recommended; the rest is filled in for you):
 
@@ -34,7 +34,7 @@ interface AuditFields {
   outcome: 'success' | 'failure' | 'denied'
   target?: { type: string, id: string, [k: string]: unknown }
   reason?: string
-  changes?: { before?: unknown, after?: unknown } | AuditPatchOp[]
+  changes?: { before?: unknown, after?: unknown, patch?: AuditPatchOp[] }
   causationId?: string
   correlationId?: string
   version?: number                                // defaults to AUDIT_SCHEMA_VERSION
@@ -444,6 +444,6 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 ## Reference
 
 - Per-framework wiring (Hono, Express, Next.js, standalone): [`references/framework-wiring.md`](references/framework-wiring.md)
-- Docs page: [`apps/docs/content/2.logging/7.audit.md`](../../../apps/docs/content/2.logging/7.audit.md)
+- Docs: [Audit logs overview](https://www.evlog.dev/use-cases/audit/overview) — source at [`apps/docs/content/4.use-cases/4.audit/`](../../../apps/docs/content/4.use-cases/4.audit/)
 - Source: [`packages/evlog/src/audit.ts`](../../../packages/evlog/src/audit.ts)
-- Tests: [`packages/evlog/test/audit.test.ts`](../../../packages/evlog/test/audit.test.ts)
+- Tests: [`packages/evlog/test/core/audit.test.ts`](../../../packages/evlog/test/core/audit.test.ts)
