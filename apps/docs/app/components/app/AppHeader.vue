@@ -45,7 +45,7 @@ const headerUi = computed(() => isHome.value
         <AssistantChat />
       </template>
 
-      <UContentSearchButton />
+      <UContentSearchButton aria-label="Search documentation" />
 
       <template v-if="links?.length">
         <UButton

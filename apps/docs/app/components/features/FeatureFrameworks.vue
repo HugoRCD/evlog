@@ -6,12 +6,6 @@ const props = defineProps<{
   linkLabel?: string
 }>()
 
-const prefersReducedMotion = ref(false)
-
-onMounted(() => {
-  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-})
-
 // eslint-disable-next-line @typescript-eslint/naming-convention
 const NuxtLink = resolveComponent('NuxtLink')
 const activeTab = ref(0)
@@ -42,7 +36,7 @@ const frameworkRows = [
 <template>
   <section class="py-24 md:py-32">
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.5 }"
       :in-view-options="{ once: true }"
@@ -63,7 +57,7 @@ const frameworkRows = [
         <p v-if="$slots.description" class="mt-4 text-sm text-muted max-w-md mx-auto">
           <slot name="description" mdc-unwrap="p" />
         </p>
-        <NuxtLink v-if="props.link" :to="props.link" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-dimmed hover:text-primary transition-colors">
+        <NuxtLink v-if="props.link" :to="props.link" class="mt-4 inline-flex items-center gap-1.5 font-mono text-xs text-muted hover:text-primary transition-colors">
           {{ props.linkLabel || 'Learn more' }}
           <UIcon name="i-lucide-arrow-right" class="size-3" />
         </NuxtLink>
@@ -71,7 +65,7 @@ const frameworkRows = [
     </Motion>
 
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.4, delay: 0.1 }"
       :in-view-options="{ once: true }"
@@ -100,7 +94,7 @@ const frameworkRows = [
           />
           <span
             class="font-mono text-xs whitespace-nowrap transition-colors duration-300"
-            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-highlighted' : 'text-dimmed group-hover:text-highlighted'"
+            :class="fw.tab !== undefined && activeTab === fw.tab ? 'text-highlighted' : 'text-muted group-hover:text-highlighted'"
           >
             {{ fw.name }}
           </span>
@@ -109,52 +103,52 @@ const frameworkRows = [
     </Motion>
 
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.5, delay: 0.2 }"
       :in-view-options="{ once: true }"
       class="mx-auto max-w-3xl"
     >
-      <div v-show="activeTab === 0" class="landing-code">
+      <div v-if="activeTab === 0" class="landing-code">
         <slot name="nuxt" />
       </div>
-      <div v-show="activeTab === 1" class="landing-code">
+      <div v-if="activeTab === 1" class="landing-code">
         <slot name="nextjs" />
       </div>
-      <div v-show="activeTab === 2" class="landing-code">
+      <div v-if="activeTab === 2" class="landing-code">
         <slot name="sveltekit" />
       </div>
-      <div v-show="activeTab === 3" class="landing-code">
+      <div v-if="activeTab === 3" class="landing-code">
         <slot name="nitro" />
       </div>
-      <div v-show="activeTab === 4" class="landing-code">
+      <div v-if="activeTab === 4" class="landing-code">
         <slot name="tanstack-start" />
       </div>
-      <div v-show="activeTab === 5" class="landing-code">
+      <div v-if="activeTab === 5" class="landing-code">
         <slot name="react-router" />
       </div>
-      <div v-show="activeTab === 6" class="landing-code">
+      <div v-if="activeTab === 6" class="landing-code">
         <slot name="nestjs" />
       </div>
-      <div v-show="activeTab === 7" class="landing-code">
+      <div v-if="activeTab === 7" class="landing-code">
         <slot name="express" />
       </div>
-      <div v-show="activeTab === 8" class="landing-code">
+      <div v-if="activeTab === 8" class="landing-code">
         <slot name="hono" />
       </div>
-      <div v-show="activeTab === 9" class="landing-code">
+      <div v-if="activeTab === 9" class="landing-code">
         <slot name="fastify" />
       </div>
-      <div v-show="activeTab === 10" class="landing-code">
+      <div v-if="activeTab === 10" class="landing-code">
         <slot name="elysia" />
       </div>
-      <div v-show="activeTab === 11" class="landing-code">
+      <div v-if="activeTab === 11" class="landing-code">
         <slot name="cloudflare" />
       </div>
-      <div v-show="activeTab === 12" class="landing-code">
+      <div v-if="activeTab === 12" class="landing-code">
         <slot name="bun" />
       </div>
-      <div v-show="activeTab === 13" class="landing-code">
+      <div v-if="activeTab === 13" class="landing-code">
         <slot name="orpc" />
       </div>
     </Motion>

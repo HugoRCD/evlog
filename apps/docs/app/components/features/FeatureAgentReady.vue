@@ -86,7 +86,7 @@ function startAnimation() {
 <template>
   <section class="py-24 md:py-32">
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.5 }"
       :in-view-options="{ once: true }"
@@ -127,7 +127,7 @@ function startAnimation() {
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <!-- Left: Structured error output -->
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.1 }"
         :in-view-options="{ once: true }"
@@ -192,7 +192,7 @@ function startAnimation() {
 
       <!-- Right: AI Agent Analysis -->
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.2 }"
         :in-view-options="{ once: true }"

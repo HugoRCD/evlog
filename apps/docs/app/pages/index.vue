@@ -6,10 +6,24 @@ definePageMeta({
 
 useHead({
   titleTemplate: '',
+  link: [
+    { rel: 'canonical', href: 'https://www.evlog.dev/' },
+    {
+      rel: 'preload',
+      href: '/fonts/GeistPixel-Line.woff2',
+      as: 'font',
+      type: 'font/woff2',
+      crossorigin: '',
+    },
+  ],
 })
 
 const { data: page } = await useAsyncData('evlog-docs-home', () => {
   return queryCollection('docs').path('/landing').first()
+}, {
+  getCachedData(key, nuxtApp) {
+    return nuxtApp.payload.data[key] ?? nuxtApp.static.data[key]
+  },
 })
 
 useSeoMeta({
@@ -22,13 +36,14 @@ useSeoMeta({
   ogImage: '/og.png',
   ogImageWidth: 1200,
   ogImageHeight: 630,
+  ogUrl: 'https://www.evlog.dev/',
   twitterSite: '@hugorcd',
   twitterCreator: '@hugorcd',
 })
 </script>
 
 <template>
-  <div>
-    <ContentRenderer v-if="page" :value="page" />
-  </div>
+  <main v-if="page">
+    <ContentRenderer :value="page" />
+  </main>
 </template>

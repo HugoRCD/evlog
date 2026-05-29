@@ -54,7 +54,7 @@ function setOutput(type: 'success' | 'error') {
 <template>
   <section class="pt-16 md:pt-20 pb-24 md:pb-32">
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.5 }"
       :in-view-options="{ once: true }"
@@ -95,7 +95,7 @@ function setOutput(type: 'success' | 'error') {
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <!-- Left: Combined handler code -->
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.1 }"
         :in-view-options="{ once: true }"
@@ -133,7 +133,7 @@ function setOutput(type: 'success' | 'error') {
 
       <!-- Right: Output with 200/402 toggle -->
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.2 }"
         :in-view-options="{ once: true }"

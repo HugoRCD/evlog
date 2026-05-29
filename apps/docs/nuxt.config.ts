@@ -4,6 +4,7 @@ export default defineNuxtConfig({
   extends: ['docus'],
 
   routeRules: {
+    '/': { prerender: true },
     ...redirects,
   },
 
@@ -36,8 +37,8 @@ export default defineNuxtConfig({
       { name: 'Geist Mono', weights: [400, 500, 600, 700], global: true },
       {
         name: 'Geist Pixel Line',
-        src: '/fonts/GeistPixel-Line.ttf',
-        weights: [400, 500, 600],
+        src: '/fonts/GeistPixel-Line.woff2',
+        weights: [400],
         global: true,
       },
     ],

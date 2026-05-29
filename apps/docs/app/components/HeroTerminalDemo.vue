@@ -3,11 +3,13 @@ const phase = ref<'chaos' | 'resolving' | 'resolved'>('chaos')
 const chaosLogs = ref<{ id: number, ts: string, level: string, msg: string, line: number }[]>([])
 const visibleFields = ref(0)
 const ctaVisible = ref(false)
+const rootRef = ref<HTMLElement>()
 
 let logId = 0
 let lineNum = 1
 let chaosInterval: ReturnType<typeof setInterval> | null = null
 let fieldInterval: ReturnType<typeof setInterval> | null = null
+let viewportObserver: IntersectionObserver | undefined
 
 const logTemplates = [
   { msg: 'GET /api/users/me 200 (8ms)', level: 'info' },
@@ -110,9 +112,28 @@ function reset() {
   startChaos()
 }
 
-onMounted(startChaos)
+onMounted(() => {
+  const root = rootRef.value
+  if (!root) return
+
+  viewportObserver = new IntersectionObserver(
+    ([entry]) => {
+      if (!entry?.isIntersecting) return
+      viewportObserver?.disconnect()
+      const start = () => startChaos()
+      if ('requestIdleCallback' in window) {
+        requestIdleCallback(start, { timeout: 1500 })
+      } else {
+        setTimeout(start, 0)
+      }
+    },
+    { rootMargin: '120px 0px', threshold: 0 },
+  )
+  viewportObserver.observe(root)
+})
 
 onUnmounted(() => {
+  viewportObserver?.disconnect()
   if (chaosInterval) clearInterval(chaosInterval)
   if (fieldInterval) clearInterval(fieldInterval)
 })
@@ -126,7 +147,7 @@ const levelColors: Record<string, string> = {
 </script>
 
 <template>
-  <div class="w-full max-w-7xl mx-auto px-4">
+  <div ref="rootRef" class="w-full max-w-7xl mx-auto px-4">
     <!-- Sources + Terminal grid -->
     <div class="grid grid-cols-1 lg:grid-cols-[160px_1fr_160px] gap-0 items-center">
       <!-- Left sources with connector lines -->
@@ -136,7 +157,7 @@ const levelColors: Record<string, string> = {
             <UIcon :name="src.icon" class="size-3.5 shrink-0 text-dimmed" />
             <div class="flex flex-col">
               <span class="font-medium text-[11px] text-highlighted">{{ src.label }}</span>
-              <span class="text-[9px] text-dimmed">{{ src.sublabel }}</span>
+              <span class="text-[9px] text-muted">{{ src.sublabel }}</span>
             </div>
           </div>
           <div class="w-5 h-px bg-muted relative overflow-hidden">
@@ -168,7 +189,7 @@ const levelColors: Record<string, string> = {
                   'bg-accented': phase === 'chaos',
                 }"
               />
-              <span class="font-mono text-[9px] text-dimmed uppercase tracking-wider hidden sm:inline">
+              <span class="font-mono text-[9px] text-muted uppercase tracking-wider hidden sm:inline">
                 {{ phase === 'resolved' ? 'structured' : phase === 'resolving' ? 'processing' : 'live' }}
               </span>
             </div>
@@ -297,7 +318,9 @@ const levelColors: Record<string, string> = {
                     Fix provided
                   </span>
                   <button
-                    class="ml-auto text-dimmed hover:text-muted transition-colors flex items-center gap-1"
+                    type="button"
+                    class="ml-auto text-muted hover:text-highlighted transition-colors flex items-center gap-1"
+                    aria-label="Replay terminal demo"
                     @click="reset"
                   >
                     <UIcon name="i-lucide-rotate-ccw" class="size-2.5" />
@@ -320,7 +343,7 @@ const levelColors: Record<string, string> = {
             <UIcon :name="src.icon" class="size-3.5 shrink-0 text-dimmed" />
             <div class="flex flex-col">
               <span class="font-medium text-[11px] text-highlighted">{{ src.label }}</span>
-              <span class="text-[9px] text-dimmed">{{ src.sublabel }}</span>
+              <span class="text-[9px] text-muted">{{ src.sublabel }}</span>
             </div>
           </div>
         </div>
@@ -339,7 +362,7 @@ const levelColors: Record<string, string> = {
           class="px-3 py-1.5 border font-mono text-[10px] transition-all duration-500"
           :class="phase === 'resolved'
             ? 'bg-emerald-500/5 border-emerald-500/20 text-emerald-400/90'
-            : 'bg-default border-muted text-dimmed'"
+            : 'bg-default border-muted text-muted'"
         >
           <span :class="phase === 'resolved' ? 'text-emerald-500' : 'text-red-400/60'" class="mr-1.5">{{ phase === 'resolved' ? '✓' : '?' }}</span>
           {{ phase === 'resolved' ? q.answer : q.text }}

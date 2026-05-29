@@ -6,10 +6,9 @@ const justUseEvlogUrl = computed(() =>
   typeof pub.justUseEvlogUrl === 'string' ? pub.justUseEvlogUrl.trim() : '',
 )
 
-const prefersReducedMotion = ref(false)
-
 const shipByTime = ref('')
-const showColon = ref(true)
+
+let clockInterval: ReturnType<typeof setInterval> | undefined
 
 function updateShipByTime() {
   const now = new Date()
@@ -20,12 +19,12 @@ function updateShipByTime() {
 }
 
 onMounted(() => {
-  prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
   updateShipByTime()
-  setInterval(updateShipByTime, 1_000)
-  setInterval(() => {
-    showColon.value = !showColon.value
-  }, 1_000)
+  clockInterval = setInterval(updateShipByTime, 1_000)
+})
+
+onBeforeUnmount(() => {
+  if (clockInterval) clearInterval(clockInterval)
 })
 </script>
 
@@ -43,7 +42,7 @@ onMounted(() => {
 
     <div class="relative z-10 pt-24 md:pt-32 text-center max-w-2xl mx-auto px-6">
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5 }"
         :in-view-options="{ once: true }"
@@ -106,9 +105,9 @@ onMounted(() => {
 
     <div class="relative z-10 mt-auto pt-32 md:pt-44 pb-4">
       <div class="max-w-4xl mx-auto px-6 flex items-center justify-between">
-        <div class="text-xs font-mono italic tracking-tight text-dimmed">
+        <div class="text-xs font-mono italic tracking-tight text-muted">
           &copy; {{ new Date().getFullYear() }} - Made by
-          <a href="https://hrcd.fr/" target="_blank" rel="noopener noreferrer" class="hover:underline text-dimmed">HugoRCD</a>
+          <a href="https://hrcd.fr/" target="_blank" rel="noopener noreferrer" class="hover:underline text-muted">HugoRCD</a>
         </div>
         <div class="flex items-center gap-3">
           <a href="https://x.com/hugorcd" target="_blank" rel="noopener noreferrer" aria-label="X" class="text-muted hover:text-dimmed transition-colors">
@@ -132,5 +131,11 @@ onMounted(() => {
   0%, 45% { opacity: 1; }
   50%, 95% { opacity: 0; }
   100% { opacity: 1; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cta-dot {
+    animation: none;
+  }
 }
 </style>

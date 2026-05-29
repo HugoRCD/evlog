@@ -81,7 +81,7 @@ function setView(view: 'without' | 'with') {
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <div class="flex flex-col gap-6">
         <Motion
-          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+          :initial="false"
           :while-in-view="{ opacity: 1, y: 0 }"
           :transition="{ duration: 0.5 }"
           :in-view-options="{ once: true }"
@@ -119,7 +119,7 @@ function setView(view: 'without' | 'with') {
         </Motion>
 
         <Motion
-          :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+          :initial="false"
           :while-in-view="{ opacity: 1, y: 0 }"
           :transition="{ duration: 0.5, delay: 0.15 }"
           :in-view-options="{ once: true }"
@@ -145,7 +145,7 @@ function setView(view: 'without' | 'with') {
       </div>
 
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.1 }"
         :in-view-options="{ once: true }"

@@ -90,7 +90,7 @@ onBeforeUnmount(() => {
 <template>
   <section class="py-24 md:py-32">
     <Motion
-      :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+      :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
       :transition="{ duration: 0.5 }"
       :in-view-options="{ once: true }"
@@ -130,7 +130,7 @@ onBeforeUnmount(() => {
 
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.1 }"
         :in-view-options="{ once: true }"
@@ -147,10 +147,13 @@ onBeforeUnmount(() => {
               <button
                 v-for="(label, idx) in benchLabels"
                 :key="label"
+                type="button"
                 class="font-mono text-[10px] px-2 py-0.5 border transition-all duration-300 outline-none cursor-pointer"
                 :class="activeBench === idx
-                  ? 'border-primary/30 bg-primary/10 text-primary'
-                  : 'border-transparent text-dimmed hover:text-muted'"
+                  ? 'border-primary/30 bg-primary/10 text-blue-400'
+                  : 'border-transparent text-muted hover:text-highlighted'"
+                :aria-label="`${label} benchmark`"
+                :aria-pressed="activeBench === idx"
                 @click="activeBench = idx"
               >
                 {{ label }}
@@ -245,7 +248,7 @@ onBeforeUnmount(() => {
       </Motion>
 
       <Motion
-        :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 20 }"
+        :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
         :transition="{ duration: 0.5, delay: 0.2 }"
         :in-view-options="{ once: true }"
@@ -343,7 +346,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="text-right">
-                <p class="font-mono text-xl font-medium text-primary tabular-nums">
+                <p class="font-mono text-xl font-medium text-blue-400 tabular-nums">
                   ~3µs
                 </p>
                 <p class="font-mono text-[10px] text-dimmed">

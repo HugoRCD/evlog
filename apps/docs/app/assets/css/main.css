@@ -10,12 +10,13 @@
   --font-sans: "Geist", sans-serif;
   --font-mono: "Geist Mono", monospace;
   --font-pixel: "Geist Pixel Line", monospace;
-  --font-pixel-square: "Geist Pixel Square", monospace;
+  --font-pixel-square: "Geist Pixel Line", monospace;
 }
 
 :root {
   --ui-radius: 0;
   --ui-bg: var(--color-zinc-950);
+  --ui-text-dimmed: var(--color-zinc-400);
 }
 
 @layer base {
@@ -29,7 +30,7 @@
 }
 
 .section-label {
-  @apply font-pixel text-[10px] uppercase tracking-widest text-dimmed mb-4 flex items-center;
+  @apply font-pixel text-[10px] uppercase tracking-widest text-muted mb-4 flex items-center;
 }
 
 .section-label::before {
