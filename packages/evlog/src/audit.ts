@@ -519,8 +519,9 @@ export function mockAudit(): MockAudit {
       const match = events.find(event => matchesAudit(event, matcher))
       if (!match) {
         const summary = events.map(e => ({ action: e.action, outcome: e.outcome }))
+        const matcherStr = JSON.stringify(matcher, (_k, v) => (v instanceof RegExp ? v.toString() : v))
         throw new Error(
-          `No audit event matched ${JSON.stringify(matcher)}. Captured ${events.length} event(s): ${JSON.stringify(summary)}`,
+          `No audit event matched ${matcherStr}. Captured ${events.length} event(s): ${JSON.stringify(summary)}`,
         )
       }
       return match
