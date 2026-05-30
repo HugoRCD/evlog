@@ -105,12 +105,16 @@ export function evlog(options: EvlogElysiaOptions = {}) {
   const requestState = new WeakMap<Request, RequestState>()
 
   return new Elysia({ name: 'evlog' })
-    .derive({ as: 'global' }, ({ request, path, headers }) => {
-      const ctx: ElysiaContext = { request, path, headers: headers as Record<string, string> }
+    .onRequest(({ request }) => {
+      const url = new URL(request.url)
+      const headers = (request.headers).toJSON?.() ?? Object.fromEntries(request.headers.entries())
+      const ctx: ElysiaContext = { request, path: url.pathname, headers }
       const { logger, finish, skipped } = integration.start(ctx, options)
       storage.enterWith(logger)
       requestState.set(request, { finish, skipped, logger })
-      return { log: logger }
+    })
+    .derive({ as: 'global' }, ({ request }) => {
+      return { log: requestState.get(request)?.logger as RequestLogger }
     })
     .onAfterResponse({ as: 'global' }, async ({ request, set }) => {
       const state = requestState.get(request)
