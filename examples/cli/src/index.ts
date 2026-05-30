@@ -6,9 +6,10 @@ import { main } from './commands'
 
 runMain(main, setup)
   .then(() => setup.flush())
-  .catch((error: unknown) => {
+  .catch(async (error: unknown) => {
     if (process.env.DEBUG) {
       console.error(parseCliError(error))
     }
+    await setup.flush().catch(() => {})
     exitWithError(error)
   })

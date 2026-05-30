@@ -165,6 +165,7 @@ bun src/index.ts doctor --json   # your JSON on stdout; drain unchanged
 + export const setup = setupEvlog({ service: 'my-cli', version: '1.0.0', drain: createCliDrain() })
 
   // src/index.ts
++ import { exitWithError } from '@evlog/cli'
 + import { runMain } from '@evlog/cli/citty'
 + import { setup } from './evlog'
 - runMain(main)

@@ -172,6 +172,7 @@ describe('@evlog/cli', () => {
       await setup.invoke(
         {
           command: 'login',
+          argv: ['login', '--token=shlv_secret'],
           flags: { token: 'shlv_secret_token_abc' },
         },
         () => {},
@@ -181,6 +182,29 @@ describe('@evlog/cli', () => {
       const event = findEventViaDrain(drain, e => e.path === '/login')
       const cli = (event as Record<string, unknown>).cli as Record<string, unknown>
       expect(cli.flags).toEqual({ token: '[REDACTED]' })
+      expect(cli.argv).toBeUndefined()
+    })
+  })
+
+  describe('env precedence', () => {
+    it('prefers top-level service and version over config.env', async () => {
+      const drain = createDrainSpy()
+      const setup = setupEvlog({
+        service: 'top-level-service',
+        version: '9.9.9',
+        env: { service: 'env-service', version: '1.0.0' },
+        drain,
+        flushOnExit: false,
+        redact: false,
+        silent: true,
+      })
+
+      await setup.invoke({ command: 'status' }, () => {})
+      await waitForDrainCalls(drain, 1)
+
+      const event = findEventViaDrain(drain, e => e.path === '/status')
+      expect(event?.service).toBe('top-level-service')
+      expect((event as Record<string, unknown>).cli).toMatchObject({ version: '9.9.9' })
     })
   })
 

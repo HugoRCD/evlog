@@ -34,6 +34,13 @@
   },
   "main": "./dist/index.mjs",
   "types": "./dist/index.d.mts",
+  "typesVersions": {
+    "*": {
+      ".": ["./dist/index.d.mts"],
+      "citty": ["./dist/citty.d.mts"],
+      "http": ["./dist/http.d.mts"]
+    }
+  },
   "files": [
     "dist",
     "README.md"

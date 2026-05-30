@@ -2,6 +2,8 @@
 "@evlog/cli": minor
 ---
 
+# Add `@evlog/cli`
+
 Add `@evlog/cli` — CLI observability for evlog.
 
 - `setupEvlog()` + `invoke()` + `createCommandLogger()` + `useLogger()`

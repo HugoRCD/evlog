@@ -24,7 +24,10 @@ export const sync = defineCommand({
   },
   async run({ args }) {
     const log = useLogger()
-    const count = Number(args.records) || 5
+    const count = Number(args.records)
+    if (!Number.isInteger(count) || count < 0) {
+      throw new TypeError('records must be a non-negative integer')
+    }
     const hooks = createOutboundHooks(log)
     const source = 'https://api.example.com'
 

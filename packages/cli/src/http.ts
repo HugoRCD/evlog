@@ -17,11 +17,17 @@ export interface OutboundHooks {
 }
 
 function resolveUrl(request: Request | string | URL, baseURL?: string): string {
-  if (typeof request === 'string') {
-    return baseURL ? new URL(request, baseURL).href : request
+  try {
+    if (typeof request === 'string') {
+      return baseURL ? new URL(request, baseURL).href : request
+    }
+    if (request instanceof URL) return request.href
+    return request.url
+  } catch {
+    if (typeof request === 'string') return request
+    if (request instanceof URL) return request.href
+    return request.url
   }
-  if (request instanceof URL) return request.href
-  return request.url
 }
 
 /**

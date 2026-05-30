@@ -27,4 +27,20 @@ describe('@evlog/cli/http', () => {
       },
     })
   })
+
+  it('does not throw when URL resolution fails', () => {
+    const log = createRequestLogger({ method: 'CLI', path: '/sync' })
+    const hooks = createOutboundHooks(log)
+
+    expect(() => hooks.onRequest?.({
+      request: 'not a valid url',
+      options: { method: 'GET', baseURL: ':::invalid:::' },
+    })).not.toThrow()
+
+    const ctx = log.getContext() as Record<string, unknown>
+    expect((ctx.http as Record<string, unknown>).outbound).toMatchObject({
+      method: 'GET',
+      url: 'not a valid url',
+    })
+  })
 })

@@ -1,4 +1,4 @@
-import type { RequestLogger } from 'evlog'
+import type { FieldContext, RequestLogger } from 'evlog'
 
 /** Fields merged into the wide event under `cli.*`. */
 export interface CliContextFields {
@@ -10,12 +10,14 @@ export interface CliContextFields {
 
 /**
  * Build CLI context fields for a command invocation.
+ *
+ * Raw `argv` is intentionally omitted — secrets in `--token=…` or positional args
+ * would bypass flag-level redaction. Use structured `flags` instead.
  */
-export function buildCliContext(options: CliContextFields): Record<string, unknown> {
+export function buildCliContext(options: CliContextFields): FieldContext {
   return {
     cli: {
       command: options.command,
-      argv: options.argv,
       flags: options.flags,
       version: options.version,
       tty: {
@@ -32,5 +34,5 @@ export function buildCliContext(options: CliContextFields): Record<string, unkno
 
 /** Attach CLI context to a request logger before the handler runs. */
 export function applyCliContext(logger: RequestLogger, options: CliContextFields): void {
-  logger.set(buildCliContext(options) as never)
+  logger.set(buildCliContext(options))
 }

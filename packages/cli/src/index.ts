@@ -41,10 +41,10 @@ function bootstrapLogger(config: EvlogSetupConfig, argv: string[]): void {
     ...toLoggerConfig({ ...config, redact }),
     ...logToConsoleFlags(logToConsole),
     env: {
+      ...config.env,
       service: config.service ?? config.env?.service ?? 'cli',
       environment: config.environment ?? config.env?.environment,
       version: config.version ?? config.env?.version,
-      ...config.env,
     },
     _suppressDrainWarning: !logToConsole,
   })
