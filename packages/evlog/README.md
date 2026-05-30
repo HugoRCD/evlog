@@ -1391,6 +1391,7 @@ try {
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
+| **CLI** | `setupEvlog({ drain })` with `import { setupEvlog, useLogger } from '@evlog/cli'` ([example](./examples/cli)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |

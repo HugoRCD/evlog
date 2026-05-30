@@ -108,5 +108,11 @@ jobs:
         run: pnpm run dev:prepare
       - name: Build package
         run: pnpm run build:package
+      - name: Verify publish tarballs
+        run: |
+          for dir in packages/evlog packages/nuxthub packages/cli; do
+            echo "==> $dir"
+            (cd "$dir" && npm publish --dry-run --access public)
+          done
       - name: Publish
-        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub'
+        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/cli'

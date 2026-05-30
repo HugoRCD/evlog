@@ -33,6 +33,8 @@ packages/evlog/            Main package
   src/enrichers/           Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
   src/runtime/             Runtime code (client/, server/, utils/)
   test/                    Tests
+packages/cli/              @evlog/cli — CLI observability (setupEvlog, citty, http)
+examples/cli/              Demo citty + Clack CLI
 .agents/skills/            Internal skills for creating adapters, enrichers, and framework integrations
 ```
 

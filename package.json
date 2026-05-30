@@ -33,6 +33,7 @@
     "example:browser": "dotenv -- turbo run dev --filter=evlog-browser-example",
     "example:bun-script": "dotenv -- turbo run dev --filter=evlog-bun-script-example",
     "example:tanstack-start": "dotenv -- turbo run dev --filter=evlog-tanstack-start-example",
+    "example:cli": "pnpm --filter @evlog/cli run build && pnpm --filter evlog-cli-example start",
     "example:vite": "dotenv -- turbo run dev --filter=evlog-vite-example",
     "build": "turbo run build",
     "build:package": "turbo run build --filter='./packages/*'",

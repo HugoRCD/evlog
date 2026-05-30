@@ -1,0 +1,7 @@
+{
+  "extends": "../../packages/evlog/tsconfig.json",
+  "compilerOptions": {
+    "noEmit": true
+  },
+  "include": ["src/**/*"]
+}

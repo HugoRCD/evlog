@@ -28,6 +28,7 @@ scope.
 - bench (benchmarks)
 - better-auth (Better Auth integration)
 - better-stack (Better Stack drain adapter)
+- cli (@evlog/cli — citty observability)
 - core (logger, pipeline, error, redact, catalog internals)
 - datadog (Datadog drain adapter)
 - deps (the dependencies)
