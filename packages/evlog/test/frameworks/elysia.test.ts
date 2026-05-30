@@ -133,6 +133,22 @@ describe('evlog/elysia', () => {
     })
   })
 
+  it('captures 404s for unmatched routes', async () => {
+    const { drain } = createPipelineSpies()
+    const app = new Elysia()
+      .use(evlog({ drain }))
+      .get('/api/exists', () => ({ ok: true }))
+
+    await request(app, '/api/does-not-exist')
+    await waitForDrainCalls(drain)
+
+    assertHttpEventEmitted(drain, {
+      path: '/api/does-not-exist',
+      status: 404,
+      level: 'error',
+    })
+  })
+
   it('skips routes not matching include patterns', async () => {
     const { drain } = createPipelineSpies()
 
