@@ -1,5 +1,6 @@
 import { ToolLoopAgent, createAgentUIStreamResponse, stepCountIs } from 'ai'
-import { createAILogger, createEvlogIntegration } from 'evlog/ai'
+import { createEvlogIntegration } from 'evlog/ai'
+import { createNitroAIStreamLogger } from 'evlog/ai/nitro'
 import { queryEvents } from '../tools/query-events'
 
 const systemPrompt = `You are a helpful assistant that analyzes application logs stored in a SQLite database.
@@ -58,20 +59,19 @@ Use json_extract() for querying JSON columns. Examples:
 - Only use SELECT queries — never modify data.`
 
 export default defineEventHandler(async (event) => {
-  const logger = useLogger(event)
   const { messages } = await readBody(event)
-
-  logger.set({ action: 'chat', messagesCount: messages.length })
-
-  const ai = createAILogger(logger, {
-    toolInputs: true,
-    cost: {
-      'gemini-3-flash': { input: 0.1, output: 0.4 },
+  const { ai, log, wrapResponse } = createNitroAIStreamLogger(event, {
+    fields: { action: 'chat', messagesCount: messages.length },
+    ai: {
+      toolInputs: true,
+      cost: {
+        'gemini-3-flash': { input: 0.1, output: 0.4 },
+      },
     },
   })
 
   ai.onUpdate((metadata) => {
-    logger.set({
+    log.set({
       aiLive: {
         step: metadata.calls,
         totalTokens: metadata.totalTokens,
@@ -92,7 +92,7 @@ export default defineEventHandler(async (event) => {
         integrations: [createEvlogIntegration(ai)],
       },
     })
-    return createAgentUIStreamResponse({
+    return wrapResponse(createAgentUIStreamResponse({
       agent,
       uiMessages: messages,
       messageMetadata: ({ part }) => {
@@ -107,12 +107,12 @@ export default defineEventHandler(async (event) => {
         }
       },
       onFinish: () => {
-        logger.set({
+        log.set({
           aiFinalMetadata: ai.getMetadata(),
           aiFinalCost: ai.getEstimatedCost(),
         })
       },
-    })
+    }))
   } catch (error) {
     throw createError({
       statusCode: 500,

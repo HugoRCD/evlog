@@ -797,22 +797,30 @@ See [the Audit Logs guide](https://evlog.dev/use-cases/audit/overview) for compl
 Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Requires `ai >= 6.0.0`.
 
 ```typescript
-import { streamText } from 'ai'
-import { createAILogger } from 'evlog/ai'
+import { consumeStream, streamText } from 'ai'
+import { createEvlogIntegration } from 'evlog/ai'
+import { createNitroAIStreamLogger } from 'evlog/ai/nitro'
 
 export default defineEventHandler(async (event) => {
-  const log = useLogger(event)
-  const ai = createAILogger(log)
+  const { ai, wrapResponse } = createNitroAIStreamLogger(event)
 
   const result = streamText({
     model: ai.wrap('anthropic/claude-sonnet-4.6'),  // string or model object
     messages,
+    experimental_telemetry: {
+      isEnabled: true,
+      integrations: [createEvlogIntegration(ai)],
+    },
     onFinish: ({ text }) => saveConversation(text),  // no conflict
   })
 
-  return result.toTextStreamResponse()
+  return wrapResponse(result.toUIMessageStreamResponse({
+    consumeSseStream: consumeStream,
+  }))
 })
 ```
+
+For Nuxt/Nitro streaming responses, `createNitroAIStreamLogger(event)` emits a correlated child event with `operation: 'ai-stream'` and `_parentRequestId`. For awaited calls such as `generateText`, bind `createAILogger` to the request logger directly.
 
 The middleware captures: `inputTokens`, `outputTokens`, `cacheReadTokens`, `reasoningTokens`, `model`, `provider`, `finishReason`, `toolCalls`, `steps`, `msToFirstChunk`, `msToFinish`, `tokensPerSecond`.
 
@@ -1255,7 +1263,7 @@ The framework emits **one wide event per HTTP request** when the response finish
 | Express, Fastify, NestJS, SvelteKit, React Router, Elysia | Yes |
 | Next.js `withEvlog` | Yes |
 | Hono (`c.get('log')` only) | Not yet |
-| Nitro / Nuxt `useLogger(event)` | Not yet — use post-emit warnings; see [Wide events](https://evlog.dev/learn/wide-events) |
+| Nitro / Nuxt `useLogger(event)` | Not yet — use `createNitroAIStreamLogger()` for AI streams |
 
 ```typescript
 import { evlog, useLogger } from 'evlog/express'
