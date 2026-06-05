@@ -159,7 +159,14 @@ function createObservedBody(
   body: ReadableStream<Uint8Array>,
   onDone: () => Promise<void>,
   onError: (error: unknown) => Promise<void>,
-): ReadableStream<Uint8Array> {
+): ReadableStream<Uint8Array> | null {
+  if (body.locked) {
+    void onError(new TypeError('stream is already locked')).catch((err: unknown) => {
+      console.error('[evlog] stream error handling failed:', err)
+    })
+    return null
+  }
+
   const reader = body.getReader()
 
   return new ReadableStream<Uint8Array>({
@@ -288,6 +295,7 @@ export function createNitroAIStreamLogger<T extends object = Record<string, unkn
         return emit(fields, meta).then(() => undefined)
       },
     )
+    if (!body) return response
 
     return new Response(body, {
       status: response.status,

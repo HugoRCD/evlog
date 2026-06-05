@@ -89,6 +89,7 @@ function createStream(chunks: string[]): ReadableStream<Uint8Array> {
 function collectNitroEvents() {
   const order: string[] = []
   const drained: WideEvent[] = []
+  const drainContexts: DrainContext[] = []
 
   nitroRuntime.app.hooks.callHook.mockImplementation((name: string, ctx: EnrichContext | DrainContext) => {
     order.push(name)
@@ -97,11 +98,16 @@ function collectNitroEvents() {
     }
     if (name === 'evlog:drain') {
       drained.push(structuredClone(ctx.event))
+      drainContexts.push({
+        event: structuredClone(ctx.event),
+        request: ctx.request,
+        headers: ctx.headers,
+      })
     }
     return Promise.resolve()
   })
 
-  return { drained, order }
+  return { drained, drainContexts, order }
 }
 
 describe('createNitroAIStreamLogger', () => {
@@ -127,7 +133,7 @@ describe('createNitroAIStreamLogger', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const { promises, waitUntil } = createWaitUntil()
     const { event, parent } = createEvent(waitUntil)
-    const { drained, order } = collectNitroEvents()
+    const { drained, drainContexts, order } = collectNitroEvents()
     const source = createDeferredStream()
     const stream = createNitroAIStreamLogger(event, {
       fields: { chatId: 'chat_1', userId: 'user_1' },
@@ -157,6 +163,9 @@ describe('createNitroAIStreamLogger', () => {
     expect(waitUntil).toHaveBeenCalledTimes(1)
     expect(order).toEqual(['evlog:enrich', 'evlog:drain'])
     expect(drained).toHaveLength(1)
+    expect(defined(drainContexts[0], 'drain context').headers).toEqual({
+      'user-agent': 'vitest',
+    })
 
     const child = defined(drained[0], 'child event')
     expect(child.operation).toBe('ai-stream')
@@ -220,5 +229,57 @@ describe('createNitroAIStreamLogger', () => {
     expect(child.error).toMatchObject({ message: 'stream exploded' })
     const drainCalls = nitroRuntime.app.hooks.callHook.mock.calls.filter(([name]) => name === 'evlog:drain')
     expect(drainCalls).toHaveLength(1)
+  })
+
+  it('records an error and returns the original response when the body is already locked', async () => {
+    const { promises, waitUntil } = createWaitUntil()
+    const { event } = createEvent(waitUntil)
+    const { drained } = collectNitroEvents()
+    const original = new Response(createStream(['locked']), { status: 200 })
+    const body = defined(original.body, 'response body')
+    const reader = body.getReader()
+    const stream = createNitroAIStreamLogger(event)
+
+    try {
+      const response = stream.wrapResponse(original)
+
+      expect(response).toBe(original)
+      await vi.waitFor(() => {
+        expect(promises).toHaveLength(1)
+      })
+      await Promise.all(promises)
+
+      expect(drained).toHaveLength(1)
+      expect(defined(drained[0], 'child event').error).toMatchObject({
+        message: 'stream is already locked',
+      })
+    } finally {
+      reader.releaseLock()
+    }
+  })
+
+  it('handles locked body error handler rejections', async () => {
+    const waitUntilError = new Error('waitUntil failed')
+    const waitUntil = vi.fn((_promise: Promise<unknown>) => {
+      throw waitUntilError
+    })
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const { event } = createEvent(waitUntil)
+    collectNitroEvents()
+    const original = new Response(createStream(['locked']), { status: 200 })
+    const body = defined(original.body, 'response body')
+    const reader = body.getReader()
+    const stream = createNitroAIStreamLogger(event)
+
+    try {
+      const response = stream.wrapResponse(original)
+
+      expect(response).toBe(original)
+      await vi.waitFor(() => {
+        expect(errorSpy).toHaveBeenCalledWith('[evlog] stream error handling failed:', waitUntilError)
+      })
+    } finally {
+      reader.releaseLock()
+    }
   })
 })
