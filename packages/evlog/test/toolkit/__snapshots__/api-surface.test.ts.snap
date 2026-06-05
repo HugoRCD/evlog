@@ -44,6 +44,9 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "createAIMiddleware",
     "createEvlogIntegration",
   ],
+  "./ai/nitro": [
+    "createNitroAIStreamLogger",
+  ],
   "./axiom": [
     "createAxiomDrain",
     "sendBatchToAxiom",

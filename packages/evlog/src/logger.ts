@@ -18,7 +18,7 @@ function isoNow(): string {
 
 /** Shown after post-emit warnings so users can fix fire-and-forget / ALS continuations. */
 const POST_EMIT_FORK_HINT =
-  'For intentional background work tied to this request, use log.fork(\'label\', fn) when your integration supports it (see https://evlog.dev).'
+  'For intentional background work tied to this request, use log.fork(\'label\', fn) when your integration supports it. For Nuxt/Nitro AI streams, use createNitroAIStreamLogger() from evlog/ai/nitro (see https://evlog.dev).'
 
 function warnPostEmit(method: string, detail: string): void {
   console.warn(

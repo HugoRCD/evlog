@@ -54,6 +54,7 @@ export default defineConfig({
     'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
     'ai/index': 'src/ai/index.ts',
+    'ai/nitro': 'src/ai/nitro.ts',
     'better-auth/index': 'src/better-auth/index.ts',
   },
   format: 'esm',

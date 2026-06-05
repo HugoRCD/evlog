@@ -211,6 +211,11 @@
       "import": "./dist/ai/index.mjs",
       "default": "./dist/ai/index.mjs"
     },
+    "./ai/nitro": {
+      "types": "./dist/ai/nitro.d.mts",
+      "import": "./dist/ai/nitro.mjs",
+      "default": "./dist/ai/nitro.mjs"
+    },
     "./better-auth": {
       "types": "./dist/better-auth/index.d.mts",
       "import": "./dist/better-auth/index.mjs",
@@ -325,6 +330,9 @@
       ],
       "ai": [
         "./dist/ai/index.d.mts"
+      ],
+      "ai/nitro": [
+        "./dist/ai/nitro.d.mts"
       ],
       "better-auth": [
         "./dist/better-auth/index.d.mts"
