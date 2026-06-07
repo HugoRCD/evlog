@@ -1,7 +1,7 @@
 import type { AuditableLogger, AuditInput, AuditMethod } from './audit'
 import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
 import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
-import { redactEvent, resolveRedactConfig } from './redact'
+import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact'
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
@@ -230,7 +230,8 @@ function emitWideEvent(
   finalizeAudit(formatted)
 
   if (globalRedact) {
-    redactEvent(formatted, globalRedact)
+    formatted = redactEvent(formatted, globalRedact) as WideEvent
+    markGloballyRedacted(formatted)
   }
 
   if (!globalSilent) {

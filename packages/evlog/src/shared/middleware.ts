@@ -1,6 +1,6 @@
 import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
 import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, shouldKeep } from '../logger'
-import { redactEvent, resolveRedactConfig } from '../redact'
+import { isGloballyRedacted, redactEvent, resolveRedactConfig } from '../redact'
 import { extractErrorStatus } from './errors'
 import type { EvlogPlugin, PluginRunner } from './plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './plugin'
@@ -92,6 +92,16 @@ export function resolveMiddlewarePluginRunner(options: { plugins?: EvlogPlugin[]
   return runner
 }
 
+/** Copy redacted fields onto the emitted event without replacing its identity. */
+function assignRedactedEvent(target: WideEvent, redacted: Partial<WideEvent>): void {
+  for (const key of Object.keys(target) as Array<keyof WideEvent>) {
+    if (!(key in redacted)) {
+      delete target[key]
+    }
+  }
+  Object.assign(target, redacted)
+}
+
 /**
  * Apply redact, enrich, and drain to an emitted wide event — the same
  * pipeline used by {@link createMiddlewareLogger}'s `finish`.
@@ -106,8 +116,8 @@ export async function runEnrichAndDrain(
 ): Promise<void> {
   const runner = plugins ?? resolveMiddlewarePluginRunner(options)
   const resolvedRedact = resolveRedactConfig(options.redact)
-  if (resolvedRedact) {
-    redactEvent(emittedEvent, resolvedRedact)
+  if (resolvedRedact && !isGloballyRedacted(emittedEvent)) {
+    assignRedactedEvent(emittedEvent, redactEvent(emittedEvent, resolvedRedact) as Partial<WideEvent>)
   }
 
   if (options.enrich || runner.hasEnrich) {

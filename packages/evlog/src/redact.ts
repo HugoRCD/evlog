@@ -115,33 +115,67 @@ function cloneRegex(re: RegExp): RegExp {
   return new RegExp(re.source, re.flags)
 }
 
+/** @internal Set on wide events after initLogger redaction so middleware skips a second pass. */
+export const globallyRedacted = Symbol.for('evlog.globallyRedacted')
+
+/** @internal Mark a wide event as already redacted by {@link initLogger}. */
+export function markGloballyRedacted(event: Record<string, unknown>): void {
+  Object.defineProperty(event, globallyRedacted, { value: true, enumerable: false, configurable: true })
+}
+
+/** @internal Whether global redaction already ran on this wide event. */
+export function isGloballyRedacted(event: Record<string, unknown>): boolean {
+  return Reflect.has(event, globallyRedacted)
+}
+
 /**
- * Redact sensitive data from a wide event in-place.
+ * Clone before redaction. Wide events are JSON-shaped; fall back when
+ * `structuredClone` rejects non-cloneable values (functions, symbols, etc.).
+ */
+function cloneForRedaction(event: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return structuredClone(event)
+  } catch {
+    try {
+      return JSON.parse(JSON.stringify(event)) as Record<string, unknown>
+    } catch {
+      console.warn('[cloneForRedaction] Shallow clone used — nested objects may be mutated by redactPath, redactPatterns, and applyMaskersToTree')
+      return { ...event }
+    }
+  }
+}
+
+/**
+ * Redact sensitive data from a wide event without mutating the input.
  *
- * Three strategies applied in order:
+ * Returns a deep clone with redaction applied. Three strategies run in order:
  * 1. **Path-based**: dot-notation paths — the leaf value is replaced with `replacement`.
  * 2. **Masker-based**: built-in patterns with smart partial masking (e.g. `****1111`).
  * 3. **Pattern-based**: custom RegExp patterns replaced with `replacement`.
  *
- * @param event - The wide event object (mutated in-place).
+ * @param event - The wide event object (not mutated).
  * @param config - Redaction configuration.
+ * @returns A redacted deep clone of `event`.
  */
-export function redactEvent(event: Record<string, unknown>, config: RedactConfig): void {
+export function redactEvent(event: Record<string, unknown>, config: RedactConfig): Record<string, unknown> {
+  const clone = cloneForRedaction(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
 
   if (config.paths?.length) {
     for (const path of config.paths) {
-      redactPath(event, path.split('.'), replacement)
+      redactPath(clone, path.split('.'), replacement)
     }
   }
 
   if (config._maskers?.length) {
-    applyMaskersToTree(event, config._maskers)
+    applyMaskersToTree(clone, config._maskers)
   }
 
   if (config.patterns?.length) {
-    redactPatterns(event, config.patterns, replacement)
+    redactPatterns(clone, config.patterns, replacement)
   }
+
+  return clone
 }
 
 function redactPath(obj: Record<string, unknown>, segments: string[], replacement: string): void {

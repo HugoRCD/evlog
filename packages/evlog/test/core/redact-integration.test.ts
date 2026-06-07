@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { redactEvent, resolveRedactConfig } from '../../src/redact'
-import { createLogger, initLogger } from '../../src/logger'
+import { createLogger, initLogger, log } from '../../src/logger'
 import { createPipelineSpies, waitForDrainCalls } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
 
@@ -150,6 +150,37 @@ describe('initLogger + redact integration', () => {
     expect(event.contact).not.toContain('alice@example.com')
     expect(event.card).toBe('4111-1111-1111-1111')
   })
+
+  it('does not mutate source arrays or objects passed to log.info', () => {
+    initLogger({ pretty: false, redact: true })
+
+    const array = ['1.2.3.4']
+    const object = { redactedValue: '1.2.3.4' }
+    const str = '1.2.3.4'
+
+    log.info({ array })
+    expect(array).toEqual(['1.2.3.4'])
+
+    log.info({ object })
+    expect(object).toEqual({ redactedValue: '1.2.3.4' })
+
+    log.info({ str })
+    expect(str).toBe('1.2.3.4')
+  })
+
+  it('does not mutate nested context when createLogger emits', () => {
+    initLogger({ pretty: false, redact: true })
+
+    const nested = { ip: '192.168.1.100' }
+    const array = ['10.0.0.1']
+    const logger = createLogger({ nested, array })
+    const event = defined(logger.emit(), 'emitted event')
+
+    expect(nested.ip).toBe('192.168.1.100')
+    expect(array).toEqual(['10.0.0.1'])
+    expect((event.nested as Record<string, unknown>).ip).toBe('***.***.***.100')
+    expect(event.array).toEqual(['***.***.***.1'])
+  })
 })
 
 describe('default redaction behavior', () => {
@@ -206,13 +237,13 @@ describe('default redaction behavior', () => {
 
 describe('built-in smart masking', () => {
   it('masks credit card numbers keeping last 4 digits', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       a: '4111111111111111',
       b: '4111-1111-1111-1111',
       c: '4111 1111 1111 1111',
       safe: 'no card here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['creditCard'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['creditCard'] }), 'redact config'))
     expect(event.a).toBe('****1111')
     expect(event.b).toBe('****1111')
     expect(event.c).toBe('****1111')
@@ -220,25 +251,25 @@ describe('built-in smart masking', () => {
   })
 
   it('masks email addresses keeping first char and TLD', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       a: 'alice@example.com',
       b: 'Contact bob.smith+tag@company.co.uk',
       safe: 'no email here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config'))
     expect(event.a).toBe('a***@***.com')
     expect(event.b).toBe('Contact b***@***.uk')
     expect(event.safe).toBe('no email here')
   })
 
   it('masks IPv4 addresses keeping last octet', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       a: '192.168.1.1',
       b: 'Client 10.0.0.5 connected',
       localhost: '127.0.0.1',
       zero: '0.0.0.0',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['ipv4'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['ipv4'] }), 'redact config'))
     expect(event.a).toBe('***.***.***.1')
     expect(event.b).toBe('Client ***.***.***.5 connected')
     expect(event.localhost).toBe('127.0.0.1')
@@ -246,7 +277,7 @@ describe('built-in smart masking', () => {
   })
 
   it('masks international phone numbers keeping last 2 digits', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       us: '+1 (555) 123-4567',
       fr: '+33 6 12 34 56 78',
       uk: '+44 7911 123456',
@@ -254,7 +285,7 @@ describe('built-in smart masking', () => {
       parens: '(555) 123-4567',
       safe: 'no phone here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
     expect(event.us).toContain('****')
     expect(event.us).not.toContain('555')
     expect(event.fr).not.toContain('12 34')
@@ -264,7 +295,7 @@ describe('built-in smart masking', () => {
   })
 
   it('does not mask digit-rich identifiers (UUIDs, hex hashes, ids)', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       uuid: '12345642-f647-42bb-9fda-742d2b4f41fa',
       requestId: '00000000-1111-2222-3333-444444444444',
       idempotencyKey: '961da3f34097bb096902b5457ae02687',
@@ -272,7 +303,7 @@ describe('built-in smart masking', () => {
       bareDigits: '0612345678',
       localPhone: '06 12 34 56 78',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['phone'] }), 'redact config'))
     expect(event.uuid).toBe('12345642-f647-42bb-9fda-742d2b4f41fa')
     expect(event.requestId).toBe('00000000-1111-2222-3333-444444444444')
     expect(event.idempotencyKey).toBe('961da3f34097bb096902b5457ae02687')
@@ -287,11 +318,11 @@ describe('built-in smart masking', () => {
     // no semantic value.
     const tokenTail = 'X'.repeat(86)
     const token = ['eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9', 'eyJzdWIiOiIxMjM0NTY3ODkwIn0', tokenTail].join('.')
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       auth: `Token: ${token}`,
       safe: 'no jwt here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['jwt'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['jwt'] }), 'redact config'))
     expect(event.auth).toContain('eyJ***')
     expect(event.auth).not.toContain(tokenTail)
     expect(event.safe).toBe('no jwt here')
@@ -300,23 +331,23 @@ describe('built-in smart masking', () => {
   it('masks Bearer tokens keeping prefix', () => {
     // Stripe-shaped key built from fragments to avoid secret-scanner alarms.
     const fakeStripeKey = ['sk', 'live', 'abc123def456ghi789'].join('_')
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       header: `Bearer ${fakeStripeKey}`,
       safe: 'no bearer here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['bearer'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['bearer'] }), 'redact config'))
     expect(event.header).toContain('Bearer')
     expect(event.header).not.toContain(fakeStripeKey)
     expect(event.safe).toBe('no bearer here')
   })
 
   it('masks IBAN numbers keeping country code and last 3 digits', () => {
-    const event: Record<string, unknown> = {
+    let event: Record<string, unknown> = {
       fr: 'FR76 3000 6000 0112 3456 7890 189',
       de: 'DE89 3704 0044 0532 0130 00',
       safe: 'no iban here',
     }
-    redactEvent(event, defined(resolveRedactConfig({ builtins: ['iban'] }), 'redact config'))
+    event = redactEvent(event, defined(resolveRedactConfig({ builtins: ['iban'] }), 'redact config'))
     expect(event.fr).toContain('FR76')
     expect(event.fr).not.toContain('3000')
     expect(event.de).toContain('DE89')
