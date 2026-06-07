@@ -116,32 +116,36 @@ function cloneRegex(re: RegExp): RegExp {
 }
 
 /**
- * Redact sensitive data from a wide event in-place.
+ * Redact sensitive data from a wide event without mutating the input.
  *
- * Three strategies applied in order:
+ * Returns a deep clone with redaction applied. Three strategies run in order:
  * 1. **Path-based**: dot-notation paths — the leaf value is replaced with `replacement`.
  * 2. **Masker-based**: built-in patterns with smart partial masking (e.g. `****1111`).
  * 3. **Pattern-based**: custom RegExp patterns replaced with `replacement`.
  *
- * @param event - The wide event object (mutated in-place).
+ * @param event - The wide event object (not mutated).
  * @param config - Redaction configuration.
+ * @returns A redacted deep clone of `event`.
  */
-export function redactEvent(event: Record<string, unknown>, config: RedactConfig): void {
+export function redactEvent(event: Record<string, unknown>, config: RedactConfig): Record<string, unknown> {
+  const clone = structuredClone(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
 
   if (config.paths?.length) {
     for (const path of config.paths) {
-      redactPath(event, path.split('.'), replacement)
+      redactPath(clone, path.split('.'), replacement)
     }
   }
 
   if (config._maskers?.length) {
-    applyMaskersToTree(event, config._maskers)
+    applyMaskersToTree(clone, config._maskers)
   }
 
   if (config.patterns?.length) {
-    redactPatterns(event, config.patterns, replacement)
+    redactPatterns(clone, config.patterns, replacement)
   }
+
+  return clone
 }
 
 function redactPath(obj: Record<string, unknown>, segments: string[], replacement: string): void {

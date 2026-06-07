@@ -48,6 +48,9 @@ apps/chat/.data
 
 # Local-only working notes (intentions, follow-ups, brain dumps)
 .notes/
+
+# Local bug repro scripts (not versioned)
+examples/repro/
 packages/evlog/test/nitro-v3/fixture/.wrangler
 apps/nuxthub-playground/.data
 .next/

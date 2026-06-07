@@ -230,7 +230,7 @@ function emitWideEvent(
   finalizeAudit(formatted)
 
   if (globalRedact) {
-    redactEvent(formatted, globalRedact)
+    formatted = redactEvent(formatted, globalRedact) as WideEvent
   }
 
   if (!globalSilent) {
