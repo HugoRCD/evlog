@@ -139,6 +139,7 @@ function cloneForRedaction(event: Record<string, unknown>): Record<string, unkno
     try {
       return JSON.parse(JSON.stringify(event)) as Record<string, unknown>
     } catch {
+      console.warn('[cloneForRedaction] Shallow clone used — nested objects may be mutated by redactPath, redactPatterns, and applyMaskersToTree')
       return { ...event }
     }
   }
