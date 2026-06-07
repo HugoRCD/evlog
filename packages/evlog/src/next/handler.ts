@@ -230,12 +230,13 @@ export function createWithEvlog(options: NextEvlogOptions) {
         const requestInfo = { method, path, requestId }
 
         if (result instanceof Response && shouldDeferEmitForResponse(result)) {
-          logger.set({ status: result.status })
           const wrapped = bindStreamingResponseLifecycle(result, async (meta) => {
             if (meta.error) {
               logger.error(meta.error)
             }
-            await emitRequestEvent(logger, requestInfo, headers, meta.status ?? result.status)
+            const finalStatus = meta.status ?? result.status
+            logger.set({ status: finalStatus })
+            await emitRequestEvent(logger, requestInfo, headers, finalStatus)
           })
           return wrapped as Awaited<TReturn>
         }

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { getHeaders } from 'h3'
 import type { DrainContext, RouteConfig, ServerEvent, WideEvent } from '../../src/types'
 import { defined } from '../helpers/defined'
+import { createDeferredStream } from '../helpers/stream'
 import { filterSafeHeaders } from '../../src/utils'
 import { getServiceForPath, shouldLog } from '../../src/shared/routes'
 import { createRequestLogger, initLogger } from '../../src/logger'
@@ -976,25 +977,6 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
 })
 
 describe('nitro plugin - streaming emit defer (#321)', () => {
-  const encoder = new TextEncoder()
-
-  function createDeferredStream() {
-    let close: (() => void) | undefined
-    const stream = new ReadableStream<Uint8Array>({
-      start(controller) {
-        controller.enqueue(encoder.encode('hello'))
-        close = () => {
-          controller.enqueue(encoder.encode(' world'))
-          controller.close()
-        }
-      },
-    })
-    return {
-      stream,
-      close: () => defined(close, 'close stream')(),
-    }
-  }
-
   beforeEach(() => {
     initLogger({ env: { service: 'test-app' }, pretty: false, silent: true, _suppressDrainWarning: true })
   })

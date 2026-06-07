@@ -1,5 +1,11 @@
+/**
+ * Metadata passed to streaming response completion callbacks.
+ * Reports the HTTP status and any error that occurred while reading the body.
+ */
 export interface StreamCompleteMeta {
+  /** Final HTTP status code for the response. */
   status: number
+  /** Present when the stream body failed before or during completion. */
   error?: Error
 }
 

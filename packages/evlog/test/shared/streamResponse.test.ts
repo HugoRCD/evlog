@@ -1,25 +1,9 @@
 import { describe, expect, it, vi } from 'vitest'
 import { bindStreamingResponseLifecycle, isStreamingResponse, shouldDeferEmitForResponse } from '../../src/shared/streamResponse'
 import { defined } from '../helpers/defined'
+import { createDeferredStream } from '../helpers/stream'
 
 const encoder = new TextEncoder()
-
-function createDeferredStream() {
-  let close: (() => void) | undefined
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode('hello'))
-      close = () => {
-        controller.enqueue(encoder.encode(' world'))
-        controller.close()
-      }
-    },
-  })
-  return {
-    stream,
-    close: () => defined(close, 'close stream')(),
-  }
-}
 
 function createImmediateStream(chunks: string[]) {
   return new ReadableStream<Uint8Array>({

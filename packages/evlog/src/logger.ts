@@ -890,7 +890,8 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       emitted = true
       pendingWideEvent = wide
       if (wide) {
-        pendingDrainState.set(wide, { drainStarted: false })
+        // Only enable the AI merge window when middleware defers drain until finish.
+        pendingDrainState.set(wide, { drainStarted: !deferDrain })
       }
       return wide
     },

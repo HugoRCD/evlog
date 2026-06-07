@@ -3,25 +3,7 @@ import { createWithEvlog } from '../../src/next/handler'
 import { evlogStorage } from '../../src/next/storage'
 import { initLogger } from '../../src/logger'
 import { defined } from '../helpers/defined'
-
-const encoder = new TextEncoder()
-
-function createDeferredStream() {
-  let close: (() => void) | undefined
-  const stream = new ReadableStream<Uint8Array>({
-    start(controller) {
-      controller.enqueue(encoder.encode('hello'))
-      close = () => {
-        controller.enqueue(encoder.encode(' world'))
-        controller.close()
-      }
-    },
-  })
-  return {
-    stream,
-    close: () => defined(close, 'close stream')(),
-  }
-}
+import { createDeferredStream } from '../helpers/stream'
 
 // Mock next/server to prevent import errors
 vi.mock('next/server', () => ({

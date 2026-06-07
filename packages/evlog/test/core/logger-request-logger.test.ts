@@ -518,13 +518,26 @@ describe('createRequestLogger', () => {
 
   it('merges ai fields onto the emitted wide event before drain starts', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const logger = createRequestLogger({ method: 'POST', path: '/api/chat', requestId: 'r1' })
+    const logger = createRequestLogger(
+      { method: 'POST', path: '/api/chat', requestId: 'r1' },
+      { _deferDrain: true },
+    )
     const emitted = logger.emit({ status: 200 })
     logger.set({ ai: { calls: 1, totalTokens: 42 } })
     expect(warnSpy).not.toHaveBeenCalled()
     expect(emitted?.ai).toEqual({ calls: 1, totalTokens: 42 })
     logger.set({ action: 'chat' })
     expect(warnSpy).toHaveBeenCalled()
+    warnSpy.mockRestore()
+  })
+
+  it('does not merge ai fields after immediate drain when deferDrain is false', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const logger = createRequestLogger({ method: 'POST', path: '/api/chat', requestId: 'r1' })
+    logger.emit({ status: 200 })
+    logger.set({ ai: { calls: 1, totalTokens: 42 } })
+    expect(warnSpy).toHaveBeenCalled()
+    expect(String(warnSpy.mock.calls[0]?.[0])).toContain('Keys dropped: ai')
     warnSpy.mockRestore()
   })
 
