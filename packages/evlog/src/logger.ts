@@ -41,6 +41,25 @@ function mergeInto(target: Record<string, unknown>, source: Record<string, unkno
   }
 }
 
+const pendingDrainState = new WeakMap<WideEvent, { drainStarted: boolean }>()
+
+function isAiOnlyFieldUpdate(data: Record<string, unknown>): boolean {
+  const keys = Object.keys(data)
+  return keys.length === 1 && keys[0] === 'ai'
+}
+
+/**
+ * Mark a wide event as past the post-emit AI merge window so late `log.set({ ai })`
+ * calls warn again. Called by framework enrich/drain pipelines before drain runs.
+ *
+ * @internal Used by middleware and framework integrations.
+ */
+export function markWideEventDrainStarted(event: WideEvent | null): void {
+  if (!event) return
+  const state = pendingDrainState.get(event)
+  if (state) state.drainStarted = true
+}
+
 /**
  * @internal Wide-event field merge — exported for test mocks that mirror emit accumulation.
  */
@@ -704,6 +723,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
   let hasWarn = false
   let manualLevel: LogLevel | undefined
   let emitted = false
+  let pendingWideEvent: WideEvent | null = null
 
   function addLog(level: 'info' | 'warn', message: string): void {
     if (!Array.isArray(context.requestLogs)) {
@@ -738,7 +758,18 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
     audit: auditMethod,
     set(data: FieldContext<T>): void {
       if (emitted) {
-        const keys = Object.keys(data as Record<string, unknown>)
+        const record = data as Record<string, unknown>
+        const pendingState = pendingWideEvent ? pendingDrainState.get(pendingWideEvent) : undefined
+        if (
+          pendingWideEvent
+          && pendingState
+          && !pendingState.drainStarted
+          && isAiOnlyFieldUpdate(record)
+        ) {
+          mergeInto(pendingWideEvent as Record<string, unknown>, record)
+          return
+        }
+        const keys = Object.keys(record)
         warnPostEmit('log.set()', `Keys dropped: ${keys.length ? keys.join(', ') : '(empty)'}.`)
         return
       }
@@ -843,6 +874,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
 
       if (!forceKeep && !shouldSample(level)) {
         emitted = true
+        pendingWideEvent = null
         return null
       }
 
@@ -856,6 +888,10 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
 
       const wide = emitWideEvent(level, context, { deferDrain, ownsEvent: true, waitUntil })
       emitted = true
+      pendingWideEvent = wide
+      if (wide) {
+        pendingDrainState.set(wide, { drainStarted: false })
+      }
       return wide
     },
 

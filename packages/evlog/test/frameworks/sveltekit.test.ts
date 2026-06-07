@@ -589,4 +589,45 @@ describe('evlog/sveltekit', () => {
       expect(result.why).toBe('Card declined')
     })
   })
+
+  it('defers emit for streaming responses until the body completes (#321)', async () => {
+    const { drain } = createPipelineSpies()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const handle = evlog({ drain })
+    const event = createMockEvent('POST', '/api/chat')
+
+    let closeStream!: () => void
+    const encoder = new TextEncoder()
+    const resolve = vi.fn(() => {
+      const log = useLogger()
+      let close: (() => void) | undefined
+      const stream = new ReadableStream<Uint8Array>({
+        start(controller) {
+          controller.enqueue(encoder.encode('hello'))
+          close = () => {
+            controller.enqueue(encoder.encode(' world'))
+            controller.close()
+          }
+        },
+      })
+      closeStream = defined(close, 'close stream')
+      queueMicrotask(() => {
+        log.set({ ai: { calls: 1, totalTokens: 42 } })
+      })
+      return new Response(stream, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    })
+
+    const response = await handle({ event, resolve })
+    expect(drain).not.toHaveBeenCalled()
+
+    closeStream()
+    await expect(response.text()).resolves.toBe('hello world')
+    await waitForDrainCalls(drain)
+
+    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
+    expect(findEventViaDrain(drain, e => e.path === '/api/chat')?.ai).toEqual({ calls: 1, totalTokens: 42 })
+  })
 })

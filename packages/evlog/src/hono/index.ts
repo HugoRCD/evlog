@@ -2,6 +2,7 @@ import type { Context, MiddlewareHandler } from 'hono'
 import type { RequestLogger } from '../types'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
+import { shouldDeferEmitForResponse } from '../shared/streamResponse'
 
 export type EvlogHonoOptions = BaseEvlogOptions
 
@@ -54,13 +55,20 @@ const integration = defineFrameworkIntegration<Context>({
  */
 export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
   return async (c, next) => {
-    const { skipped, finish } = integration.start(c, options)
+    const { skipped, finish, finishResponse } = integration.start(c, options)
     if (skipped) {
       await next()
       return
     }
     try {
       await next()
+      if (shouldDeferEmitForResponse(c.res)) {
+        const response = new Response(c.res.body, {
+          status: c.res.status,
+          headers: c.res.headers,
+        })
+        return finishResponse(response, { status: response.status })
+      }
       await finish({ status: c.res.status })
     } catch (error) {
       await finish({ error: error as Error })

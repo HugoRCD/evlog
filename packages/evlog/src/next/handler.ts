@@ -1,8 +1,9 @@
 import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, getGlobalDrain, initLogger, isEnabled, isLoggerLocked } from '../logger'
+import { createRequestLogger, getGlobalDrain, initLogger, isEnabled, isLoggerLocked, markWideEventDrainStarted } from '../logger'
 import { attachForkToLogger } from '../shared/fork'
 import type { MiddlewareLoggerOptions } from '../shared/middleware'
 import { shouldLog, getServiceForPath } from '../shared/routes'
+import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
 import { filterSafeHeaders } from '../utils'
 import { EvlogError } from '../error'
 import type { NextEvlogOptions } from './types'
@@ -83,6 +84,8 @@ async function callEnrichAndDrain(
       }
     }
 
+    markWideEventDrainStarted(emittedEvent)
+
     if (drain) {
       const drainCtx: DrainContext = {
         event: emittedEvent,
@@ -110,6 +113,33 @@ async function callEnrichAndDrain(
 
   // Fallback: fire-and-forget (enrich still awaited for correctness)
   run().catch(() => {})
+}
+
+async function emitRequestEvent(
+  logger: ReturnType<typeof createRequestLogger>,
+  requestInfo: { method: string, path: string, requestId: string },
+  headers: Record<string, string>,
+  status: number,
+): Promise<void> {
+  let forceKeep = false
+  if (state.options.keep) {
+    try {
+      const tailCtx: TailSamplingContext = {
+        status,
+        path: requestInfo.path,
+        method: requestInfo.method,
+        context: logger.getContext(),
+        shouldKeep: false,
+      }
+      await state.options.keep(tailCtx)
+      forceKeep = tailCtx.shouldKeep ?? false
+    } catch (err) {
+      console.error('[evlog] keep callback failed:', err)
+    }
+  }
+
+  const emittedEvent = logger.emit({ _forceKeep: forceKeep })
+  await callEnrichAndDrain(emittedEvent, requestInfo, headers, status)
 }
 
 /**
@@ -197,6 +227,18 @@ export function createWithEvlog(options: NextEvlogOptions) {
 
       try {
         const result = await evlogStorage.run(logger, () => handler(...args))
+        const requestInfo = { method, path, requestId }
+
+        if (result instanceof Response && shouldDeferEmitForResponse(result)) {
+          logger.set({ status: result.status })
+          const wrapped = bindStreamingResponseLifecycle(result, async (meta) => {
+            if (meta.error) {
+              logger.error(meta.error)
+            }
+            await emitRequestEvent(logger, requestInfo, headers, meta.status ?? result.status)
+          })
+          return wrapped as Awaited<TReturn>
+        }
 
         // Extract response status
         let { status } = { status: 200 }
@@ -205,26 +247,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
         }
         logger.set({ status })
 
-        // Build tail sampling context and call keep callback
-        let forceKeep = false
-        if (state.options.keep) {
-          try {
-            const tailCtx: TailSamplingContext = {
-              status,
-              path,
-              method,
-              context: logger.getContext(),
-              shouldKeep: false,
-            }
-            await state.options.keep(tailCtx)
-            forceKeep = tailCtx.shouldKeep ?? false
-          } catch (err) {
-            console.error('[evlog] keep callback failed:', err)
-          }
-        }
-
-        const emittedEvent = logger.emit({ _forceKeep: forceKeep })
-        await callEnrichAndDrain(emittedEvent, { method, path, requestId }, headers, status)
+        await emitRequestEvent(logger, requestInfo, headers, status)
 
         return result as Awaited<TReturn>
       } catch (error) {
@@ -235,26 +258,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
           ?? 500
         logger.set({ status: errorStatus })
 
-        // Build tail sampling context and call keep callback
-        let forceKeep = false
-        if (state.options.keep) {
-          try {
-            const tailCtx: TailSamplingContext = {
-              status: errorStatus,
-              path,
-              method,
-              context: logger.getContext(),
-              shouldKeep: false,
-            }
-            await state.options.keep(tailCtx)
-            forceKeep = tailCtx.shouldKeep ?? false
-          } catch (err) {
-            console.error('[evlog] keep callback failed:', err)
-          }
-        }
-
-        const emittedEvent = logger.emit({ _forceKeep: forceKeep })
-        await callEnrichAndDrain(emittedEvent, { method, path, requestId }, headers, errorStatus)
+        await emitRequestEvent(logger, { method, path, requestId }, headers, errorStatus)
 
         // Return structured JSON response for EvlogErrors (like H3 does for Nuxt)
         if (isRequest && error instanceof EvlogError) {

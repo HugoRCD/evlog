@@ -2,6 +2,26 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWithEvlog } from '../../src/next/handler'
 import { evlogStorage } from '../../src/next/storage'
 import { initLogger } from '../../src/logger'
+import { defined } from '../helpers/defined'
+
+const encoder = new TextEncoder()
+
+function createDeferredStream() {
+  let close: (() => void) | undefined
+  const stream = new ReadableStream<Uint8Array>({
+    start(controller) {
+      controller.enqueue(encoder.encode('hello'))
+      close = () => {
+        controller.enqueue(encoder.encode(' world'))
+        controller.close()
+      }
+    },
+  })
+  return {
+    stream,
+    close: () => defined(close, 'close stream')(),
+  }
+}
 
 // Mock next/server to prevent import errors
 vi.mock('next/server', () => ({
@@ -365,5 +385,37 @@ describe('withEvlog', () => {
     expect(drainCtx.headers.cookie).toBeUndefined()
     expect(drainCtx.headers['x-custom']).toBe('safe-value')
     expect(drainCtx.headers['content-type']).toBe('application/json')
+  })
+
+  it('defers emit for streaming responses until the body completes (#321)', async () => {
+    const drainMock = vi.fn()
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    let closeStream!: () => void
+    const handler = withEvlog((_request: Request) => {
+      const log = defined(evlogStorage.getStore(), 'request logger')
+      const { stream, close } = createDeferredStream()
+      closeStream = close
+      queueMicrotask(() => {
+        log.set({ ai: { calls: 1, totalTokens: 42 } })
+      })
+      return new Response(stream, {
+        status: 200,
+        headers: { 'content-type': 'text/event-stream' },
+      })
+    })
+
+    const response = await handler(new Request('http://localhost/api/chat', { method: 'POST' }))
+    expect(drainMock).not.toHaveBeenCalled()
+
+    closeStream()
+    await expect(response.text()).resolves.toBe('hello world')
+    await vi.waitFor(() => {
+      expect(drainMock).toHaveBeenCalledTimes(1)
+    })
+
+    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
+    expect(drainMock.mock.calls[0]?.[0]?.event?.ai).toEqual({ calls: 1, totalTokens: 42 })
   })
 })

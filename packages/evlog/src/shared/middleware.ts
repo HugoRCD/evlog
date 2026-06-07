@@ -1,10 +1,11 @@
 import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, shouldKeep } from '../logger'
+import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, markWideEventDrainStarted, shouldKeep } from '../logger'
 import { isGloballyRedacted, redactEvent, resolveRedactConfig } from '../redact'
 import { extractErrorStatus } from './errors'
 import type { EvlogPlugin, PluginRunner } from './plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './plugin'
 import { shouldLog, getServiceForPath } from './routes'
+import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from './streamResponse'
 
 /**
  * Base options shared by every framework integration. Re-exported via
@@ -44,6 +45,11 @@ export interface MiddlewareLoggerOptions extends BaseEvlogOptions {
 export interface MiddlewareLoggerResult {
   logger: RequestLogger
   finish: (opts?: { status?: number; error?: Error }) => Promise<WideEvent | null>
+  /**
+   * Finish request logging, deferring emit until a streaming response body completes.
+   * Returns the original response or a wrapped copy when the body is a stream.
+   */
+  finishResponse: (response: Response, opts?: { status?: number }) => Promise<Response>
   skipped: boolean
 }
 
@@ -62,6 +68,7 @@ const noopResult: MiddlewareLoggerResult = {
     },
   },
   finish: () => Promise.resolve(null),
+  finishResponse: (response) => Promise.resolve(response),
   skipped: true,
 }
 
@@ -139,6 +146,8 @@ export async function runEnrichAndDrain(
     }
   }
 
+  markWideEventDrainStarted(emittedEvent)
+
   const drain = options.drain ?? getGlobalDrain()
   const hasUserDrain = !!drain
   const hasPluginDrain = runner.hasDrain
@@ -213,29 +222,51 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     })
   }
 
-  const finish = async (opts?: { status?: number; error?: Error }): Promise<WideEvent | null> => {
+  const finish = (opts?: { status?: number; error?: Error }): Promise<WideEvent | null> => {
+    return performFinish(logger, opts)
+  }
+
+  const finishResponse = async (response: Response, opts?: { status?: number }): Promise<Response> => {
+    const status = opts?.status ?? response.status
+    if (!shouldDeferEmitForResponse(response)) {
+      await performFinish(logger, { status })
+      return response
+    }
+
+    return bindStreamingResponseLifecycle(response, async (meta) => {
+      await performFinish(logger, {
+        status: meta.status ?? status,
+        error: meta.error,
+      })
+    })
+  }
+
+  async function performFinish(
+    requestLogger: RequestLogger,
+    opts?: { status?: number; error?: Error },
+  ): Promise<WideEvent | null> {
     const { status, error } = opts ?? {}
 
     if (error) {
-      logger.error(error)
+      requestLogger.error(error)
       const errorStatus = extractErrorStatus(error)
-      logger.set({ status: errorStatus })
+      requestLogger.set({ status: errorStatus })
     } else if (status !== undefined) {
-      logger.set({ status })
+      requestLogger.set({ status })
     }
 
     const durationMs = Date.now() - startTime
 
     const resolvedStatus = error
       ? extractErrorStatus(error)
-      : status ?? (logger.getContext().status as number | undefined)
+      : status ?? (requestLogger.getContext().status as number | undefined)
 
     const tailCtx: TailSamplingContext = {
       status: resolvedStatus,
       duration: durationMs,
       path,
       method,
-      context: logger.getContext(),
+      context: requestLogger.getContext(),
       shouldKeep: false,
     }
 
@@ -247,7 +278,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     }
 
     const forceKeep = tailCtx.shouldKeep || shouldKeep(tailCtx)
-    const emittedEvent = logger.emit({ _forceKeep: forceKeep })
+    const emittedEvent = requestLogger.emit({ _forceKeep: forceKeep })
 
     if (
       emittedEvent
@@ -258,7 +289,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
 
     if (pluginRunner.hasRequestLifecycle) {
       pluginRunner.runOnRequestFinish({
-        logger,
+        logger: requestLogger,
         request: requestInfo,
         headers: options.headers,
         event: emittedEvent,
@@ -271,5 +302,5 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
     return emittedEvent
   }
 
-  return { logger, finish, skipped: false }
+  return { logger, finish, finishResponse, skipped: false }
 }

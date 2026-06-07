@@ -974,3 +974,69 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
     expect(apiEvent.context._evlogShouldEmit).toBe(true)
   })
 })
+
+describe('nitro plugin - streaming emit defer (#321)', () => {
+  const encoder = new TextEncoder()
+
+  function createDeferredStream() {
+    let close: (() => void) | undefined
+    const stream = new ReadableStream<Uint8Array>({
+      start(controller) {
+        controller.enqueue(encoder.encode('hello'))
+        close = () => {
+          controller.enqueue(encoder.encode(' world'))
+          controller.close()
+        }
+      },
+    })
+    return {
+      stream,
+      close: () => defined(close, 'close stream')(),
+    }
+  }
+
+  beforeEach(() => {
+    initLogger({ env: { service: 'test-app' }, pretty: false, silent: true, _suppressDrainWarning: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('defers afterResponse emit until a streaming body completes', async () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const event: ServerEvent = { method: 'POST', path: '/api/chat', context: {} }
+    event.context._evlogShouldEmit = true
+    event.context._evlogStartTime = Date.now()
+    event.context.log = createRequestLogger(
+      { method: 'POST', path: '/api/chat', requestId: 'req-1' },
+      { _deferDrain: true },
+    )
+
+    const { stream, close } = createDeferredStream()
+    event.response = new Response(stream, {
+      status: 200,
+      headers: { 'content-type': 'text/event-stream' },
+    })
+
+    queueMicrotask(() => {
+      defined(event.context.log, 'request logger').set({ ai: { calls: 1, totalTokens: 42 } })
+    })
+
+    const { bindStreamingResponseLifecycle } = await import('../../src/shared/streamResponse')
+    let emitCount = 0
+    event.response = bindStreamingResponseLifecycle(event.response, () => {
+      emitCount++
+      defined(event.context.log, 'request logger').emit({ status: 200 })
+    })
+
+    expect(emitCount).toBe(0)
+    close()
+    await expect(event.response.text()).resolves.toBe('hello world')
+    await vi.waitFor(() => {
+      expect(emitCount).toBe(1)
+    })
+    expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
+    expect(defined(event.context.log, 'request logger').getContext().ai).toEqual({ calls: 1, totalTokens: 42 })
+  })
+})

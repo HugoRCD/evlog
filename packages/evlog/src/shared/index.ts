@@ -5,8 +5,8 @@
  * @see https://evlog.dev/extend/custom-framework
  */
 
+export * from './streamResponse'
 export * from './compose'
-export * from './config'
 export * from './define'
 export * from './drain'
 export * from './enricher'

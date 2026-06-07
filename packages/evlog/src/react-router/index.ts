@@ -55,7 +55,7 @@ export function evlog(options: EvlogReactRouterOptions = {}) {
       headers: extractSafeHeaders(request.headers),
       ...options,
     }
-    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
+    const { logger, finish, finishResponse, skipped } = createMiddlewareLogger(middlewareOpts)
 
     if (skipped) {
       return next()
@@ -66,8 +66,7 @@ export function evlog(options: EvlogReactRouterOptions = {}) {
 
     try {
       const response = await storage.run(logger, () => next())
-      await finish({ status: response.status })
-      return response
+      return finishResponse(response, { status: response.status })
     } catch (error) {
       await finish({ error: error as Error })
       throw error
