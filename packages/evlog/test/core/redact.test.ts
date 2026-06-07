@@ -196,6 +196,17 @@ describe('redactEvent - edge cases', () => {
     expect(redacted.items).toEqual(['***.***.***.2'])
   })
 
+  it('redacts events that contain non-cloneable values', () => {
+    const source: Record<string, unknown> = {
+      email: 'alice@example.com',
+      handler: () => {},
+    }
+    const redacted = redactEvent(source, { patterns: [/[\w.+-]+@[\w-]+\.[\w.]+/g] })
+    expect(typeof source.handler).toBe('function')
+    expect(redacted.email).toBe('[REDACTED]')
+    expect(redacted).not.toHaveProperty('handler')
+  })
+
   it('handles empty config gracefully', () => {
     let event: Record<string, unknown> = { user: { email: 'alice@example.com' } }
     event = redactEvent(event, {})

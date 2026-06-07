@@ -1,7 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { initLogger } from '../../src/logger'
+import { globallyRedacted } from '../../src/redact'
 import { createMiddlewareLogger } from '../../src/shared/middleware'
 import { defined } from '../helpers/defined'
+import { createPipelineSpies, waitForDrainCalls } from '../helpers/framework'
 
 describe('createMiddlewareLogger', () => {
   beforeEach(() => {
@@ -428,6 +430,32 @@ describe('createMiddlewareLogger', () => {
       expect(drain).toHaveBeenCalledOnce()
       expect(event).not.toBeNull()
       expect(drain.mock.calls[0][0].event.region).toBe('eu')
+    })
+  })
+
+  describe('redact', () => {
+    it('skips middleware redaction when initLogger already redacted the event', async () => {
+      const { drain } = createPipelineSpies()
+      initLogger({
+        env: { service: 'test-app' },
+        pretty: false,
+        silent: true,
+        redact: { builtins: ['email'] },
+        drain,
+      })
+
+      const { logger, finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/users',
+        redact: { builtins: ['email'] },
+      })
+      logger.set({ contact: 'alice@example.com' })
+      const event = defined(await finish({ status: 200 }), 'emitted event')
+
+      expect(event.contact).toBe('a***@***.com')
+      expect(Reflect.has(event, globallyRedacted)).toBe(true)
+      await waitForDrainCalls(drain)
+      expect(drain.mock.calls[0]![0].event.contact).toBe('a***@***.com')
     })
   })
 })

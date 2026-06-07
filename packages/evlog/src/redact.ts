@@ -115,6 +115,35 @@ function cloneRegex(re: RegExp): RegExp {
   return new RegExp(re.source, re.flags)
 }
 
+/** @internal Set on wide events after initLogger redaction so middleware skips a second pass. */
+export const globallyRedacted = Symbol.for('evlog.globallyRedacted')
+
+/** @internal Mark a wide event as already redacted by {@link initLogger}. */
+export function markGloballyRedacted(event: Record<string, unknown>): void {
+  Object.defineProperty(event, globallyRedacted, { value: true, enumerable: false, configurable: true })
+}
+
+/** @internal Whether global redaction already ran on this wide event. */
+export function isGloballyRedacted(event: Record<string, unknown>): boolean {
+  return Reflect.has(event, globallyRedacted)
+}
+
+/**
+ * Clone before redaction. Wide events are JSON-shaped; fall back when
+ * `structuredClone` rejects non-cloneable values (functions, symbols, etc.).
+ */
+function cloneForRedaction(event: Record<string, unknown>): Record<string, unknown> {
+  try {
+    return structuredClone(event)
+  } catch {
+    try {
+      return JSON.parse(JSON.stringify(event)) as Record<string, unknown>
+    } catch {
+      return { ...event }
+    }
+  }
+}
+
 /**
  * Redact sensitive data from a wide event without mutating the input.
  *
@@ -128,7 +157,7 @@ function cloneRegex(re: RegExp): RegExp {
  * @returns A redacted deep clone of `event`.
  */
 export function redactEvent(event: Record<string, unknown>, config: RedactConfig): Record<string, unknown> {
-  const clone = structuredClone(event)
+  const clone = cloneForRedaction(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
 
   if (config.paths?.length) {
