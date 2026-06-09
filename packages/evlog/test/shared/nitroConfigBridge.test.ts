@@ -104,6 +104,17 @@ describe('nitroConfigBridge — active runtime', () => {
     expect(importSpy).not.toHaveBeenCalled()
   })
 
+  it('preserves silent from inlined __EVLOG_CONFIG__', async () => {
+    globalThis.__EVLOG_CONFIG__ = { silent: true, pretty: false }
+    const { bridge, importSpy } = await loadBridgeWithMocks()
+    bridge.setActiveNitroRuntime('v2')
+
+    const config = await bridge.resolveEvlogConfigForNitroPlugin()
+
+    expect(config?.silent).toBe(true)
+    expect(importSpy).not.toHaveBeenCalled()
+  })
+
   it('prefers __EVLOG_CONFIG__ over process.env.__EVLOG_CONFIG', async () => {
     globalThis.__EVLOG_CONFIG__ = { env: { service: 'svc-inline' } }
     process.env.__EVLOG_CONFIG = JSON.stringify({ env: { service: 'svc-env' } })
