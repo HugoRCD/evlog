@@ -361,7 +361,10 @@ export default defineNuxtModule<ModuleOptions>({
 
       const evlogForNitro = nuxt.options.runtimeConfig.evlog ?? options
       if (evlogForNitro !== undefined && typeof evlogForNitro === 'object') {
-        process.env.__EVLOG_CONFIG = JSON.stringify(evlogForNitro)
+        const serialized = JSON.stringify(evlogForNitro)
+        nitroConfig.replace = nitroConfig.replace || {}
+        nitroConfig.replace.__EVLOG_CONFIG__ = serialized
+        process.env.__EVLOG_CONFIG = serialized
       }
     })
     nuxt.options.runtimeConfig.public.evlog = {
