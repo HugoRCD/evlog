@@ -22,6 +22,28 @@ export interface NitroModuleOptions {
   pretty?: boolean
 
   /**
+   * Dev-only code snippets around the primary stack frame in pretty error output.
+   * @default true in development
+   */
+  prettyErrorFrames?: boolean
+
+  /**
+   * Max stack frames shown after the code snippet in pretty error output.
+   * @default 3
+   */
+  prettyErrorStackDepth?: number
+  /** Compact terminal error layout. @default true in dev */
+  prettyErrorCompact?: boolean
+
+  /**
+   * Development error console handler.
+   * - `'evlog'` — suppress Nitro's dev overlay; rely on evlog wide events (default when pretty in dev)
+   * - `'nitro'` — keep Nitro's native dev error output
+   * @default 'evlog' when pretty in development, otherwise 'nitro'
+   */
+  devErrorHandler?: 'evlog' | 'nitro'
+
+  /**
    * Suppress built-in console output.
    * When true, events are still built, sampled, and passed to drains,
    * but nothing is written to console. Use when drains own the output
@@ -80,6 +102,11 @@ export interface NitroPluginEvlogConfig {
   enabled?: boolean
   env?: Record<string, unknown>
   pretty?: boolean
+  prettyErrorFrames?: boolean
+  prettyErrorStackDepth?: number
+  /** Compact terminal error layout. @default true in dev */
+  prettyErrorCompact?: boolean
+  devErrorHandler?: 'evlog' | 'nitro'
   silent?: boolean
   include?: string[]
   exclude?: string[]
@@ -103,6 +130,97 @@ export function resolveEvlogError(error: Error): Error | null {
 }
 
 export { extractErrorStatus } from './shared/errors'
+
+/**
+ * Mark an h3 event handled synchronously.
+ * Nitro chains a built-in dev handler after custom handlers; `send()` defers
+ * `res.end`, so without this the Youch overlay still runs.
+ * @internal
+ */
+export function markH3ErrorHandled(event: { _handled?: boolean }): void {
+  event._handled = true
+}
+
+/**
+ * Whether to register evlog's silent dev error handler instead of Nitro's overlay.
+ * @internal
+ */
+export function shouldUseEvlogDevErrorHandler(config: Pick<NitroModuleOptions, 'pretty' | 'devErrorHandler'>): boolean {
+  if (config.devErrorHandler === 'nitro') return false
+  if (config.devErrorHandler === 'evlog') return true
+  const pretty = config.pretty ?? process.env.NODE_ENV !== 'production'
+  return pretty && process.env.NODE_ENV !== 'production'
+}
+
+/**
+ * Prepend evlog's Nitro error handler so it runs before framework handlers (e.g. Nuxt).
+ * @internal
+ */
+export function prependNitroErrorHandler(
+  errorHandler: string | string[] | undefined,
+  handlerPath: string,
+): string | string[] {
+  if (!errorHandler) return handlerPath
+  if (Array.isArray(errorHandler)) {
+    return errorHandler.includes(handlerPath) ? errorHandler : [handlerPath, ...errorHandler]
+  }
+  if (errorHandler === handlerPath) return handlerPath
+  return [handlerPath, errorHandler]
+}
+
+/**
+ * Whether the Nitro dev Youch overlay should be suppressed for this process.
+ * @internal
+ */
+export function shouldSuppressNitroDevOverlay(): boolean {
+  try {
+    const raw = process.env.__EVLOG_CONFIG
+    if (raw) {
+      return shouldUseEvlogDevErrorHandler(JSON.parse(raw) as NitroModuleOptions)
+    }
+  } catch {
+    // ignore malformed config
+  }
+  return shouldUseEvlogDevErrorHandler({})
+}
+
+/**
+ * Clear Nitro/h3 unhandled flags so the dev Youch logger skips this error.
+ * @internal
+ */
+export function suppressNitroDevOverlay(error: Error): void {
+  const err = error as Error & { unhandled?: boolean; fatal?: boolean }
+  err.unhandled = false
+  err.fatal = false
+}
+
+/**
+ * Build Nitro-compatible JSON for non-EvlogError throws.
+ * Sanitizes 5xx messages in production.
+ */
+export function buildPlainNitroErrorBody(
+  error: Error,
+  url: string,
+  isDev = process.env.NODE_ENV === 'development',
+): Record<string, unknown> {
+  const status = extractErrorStatus(error)
+  const rawMessage = ((error as { statusText?: string }).statusText
+    ?? (error as { statusMessage?: string }).statusMessage
+    ?? error.message) || 'Internal Server Error'
+  const message = isDev
+    ? rawMessage
+    : (status >= 500 ? 'Internal Server Error' : rawMessage)
+
+  return {
+    url,
+    status,
+    statusCode: status,
+    statusText: message,
+    statusMessage: message,
+    message,
+    error: true,
+  }
+}
 
 /**
  * Build a standard evlog error JSON response body.

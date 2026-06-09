@@ -23,6 +23,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     },
     emittedEvent: WideEvent | null,
     event: ServerEvent,
+    options?: { deferDrain?: boolean },
   ): Promise<void> {
     if (!emittedEvent) return
 
@@ -39,13 +40,20 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       console.error('[evlog] enrich failed:', err)
     }
 
-    nitroApp.hooks.callHook('evlog:drain', {
+    const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
       event: emittedEvent,
       request: hookContext.request,
       headers: hookContext.headers,
     }).catch((err) => {
       console.error('[evlog] drain failed:', err)
     })
+
+    if (options?.deferDrain) {
+      void drainPromise
+      return
+    }
+
+    await drainPromise
   }
 
   it('calls enrich then drain in sequence', async () => {
@@ -242,5 +250,80 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
 
     expect(enrichHeaders).toEqual(mockHeaders)
     expect(drainHeaders).toEqual(mockHeaders)
+  })
+
+  it('deferDrain does not register drain on event.waitUntil', async () => {
+    const mockWaitUntil = vi.fn()
+    let resolveDrain!: () => void
+    const slowDrain = new Promise<void>((resolve) => {
+      resolveDrain = resolve
+    })
+
+    vi.mocked(getHeaders).mockReturnValue({})
+
+    const mockHooks = {
+      callHook: vi.fn().mockImplementation((hookName: string) => {
+        if (hookName === 'evlog:drain') return slowDrain
+        return Promise.resolve()
+      }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/fail',
+      context: {
+        requestId: 'req-wu',
+        waitUntil: mockWaitUntil,
+      },
+    }
+
+    const emittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      service: 'test',
+      environment: 'test',
+    }
+
+    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent, { deferDrain: true })
+
+    expect(mockWaitUntil).not.toHaveBeenCalled()
+    resolveDrain()
+    await slowDrain
+  })
+
+  it('deferDrain returns before a slow drain hook completes', async () => {
+    let resolveDrain!: () => void
+    const slowDrain = new Promise<void>((resolve) => {
+      resolveDrain = resolve
+    })
+
+    vi.mocked(getHeaders).mockReturnValue({})
+
+    const mockHooks = {
+      callHook: vi.fn().mockImplementation((hookName: string) => {
+        if (hookName === 'evlog:drain') return slowDrain
+        return Promise.resolve()
+      }),
+    }
+
+    const mockEvent: ServerEvent = {
+      method: 'GET',
+      path: '/api/fail',
+      context: { requestId: 'req-slow' },
+    }
+
+    const emittedEvent: WideEvent = {
+      timestamp: new Date().toISOString(),
+      level: 'error',
+      service: 'test',
+      environment: 'test',
+    }
+
+    const started = Date.now()
+    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent, { deferDrain: true })
+    expect(Date.now() - started).toBeLessThan(100)
+
+    resolveDrain()
+    await slowDrain
   })
 })

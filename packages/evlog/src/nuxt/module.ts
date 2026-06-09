@@ -10,6 +10,7 @@ import {
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import { prependNitroErrorHandler } from '../nitro'
 import { createStripPlugin } from '../vite/strip'
 import { createSourceLocationPlugin } from '../vite/source-location'
 import { name, version } from '../../package.json'
@@ -75,6 +76,28 @@ export interface ModuleOptions {
    * @default true in development, false in production
    */
   pretty?: boolean
+
+  /**
+   * Dev-only code snippets around the primary stack frame in pretty error output.
+   * @default true in development
+   */
+  prettyErrorFrames?: boolean
+
+  /**
+   * Max stack frames shown after the code snippet in pretty error output.
+   * @default 3
+   */
+  prettyErrorStackDepth?: number
+  /** Tighter dev error layout (shorter snippet, no stack tail). @default true in dev */
+  prettyErrorCompact?: boolean
+
+  /**
+   * Development error console handler.
+   * - `'evlog'` — suppress Nitro's dev overlay; rely on evlog wide events
+   * - `'nitro'` — keep Nitro's native dev error output
+   * @default 'evlog' when pretty in development
+   */
+  devErrorHandler?: 'evlog' | 'nitro'
 
   /**
    * Suppress built-in console output.
@@ -357,7 +380,8 @@ export default defineNuxtModule<ModuleOptions>({
     // often cannot resolve useRuntimeConfig().evlog via dynamic import reliably).
     // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
     nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
-      nitroConfig.errorHandler = nitroConfig.errorHandler || resolver.resolve('../nitro/errorHandler')
+      const evlogHandler = resolver.resolve('../nitro/errorHandler')
+      nitroConfig.errorHandler = prependNitroErrorHandler(nitroConfig.errorHandler, evlogHandler)
 
       const evlogForNitro = nuxt.options.runtimeConfig.evlog ?? options
       if (evlogForNitro !== undefined && typeof evlogForNitro === 'object') {

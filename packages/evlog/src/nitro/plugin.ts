@@ -6,6 +6,9 @@ import type { NitroApp } from 'nitropack/types'
 import { defineNitroPlugin } from 'nitropack/runtime/internal/plugin'
 import { getHeaders } from 'h3'
 import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } from '../logger'
+import { registerPrettyErrorSnippetReader } from '../shared/pretty-error'
+import { readCodeSnippetFromDisk } from '../shared/pretty-error-snippet.node'
+import { enrichErrorStackForDev } from '../shared/enrich-error-stack.node'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shared/nitroConfigBridge'
@@ -74,6 +77,7 @@ async function callEnrichAndDrain(
   nitroApp: NitroApp,
   emittedEvent: WideEvent | null,
   event: ServerEvent,
+  options?: { deferDrain?: boolean },
 ): Promise<void> {
   if (!emittedEvent) return
 
@@ -105,16 +109,23 @@ async function callEnrichAndDrain(
   }
   const drainPromise = Promise.all(drainTasks)
 
-  // Use waitUntil if available (Cloudflare Workers, Vercel Edge, etc.)
-  // This keeps the runtime alive for background work without blocking the response
+  // deferDrain: fire-and-forget — never event.waitUntil() here. On Nitro 2.13+
+  // (h3 2 / srvx), event.waitUntil queues work that must finish before the HTTP
+  // response is sent, so a slow evlog:drain hook (Axiom, etc.) would hang 4xx/5xx
+  // responses even though emit() already logged to the terminal.
+  if (options?.deferDrain) {
+    void drainPromise.catch((err) => {
+      console.error('[evlog] background drain failed:', err)
+    })
+    return
+  }
+
+  // afterResponse path — response is already sent; waitUntil extends serverless
+  // runtimes, await is the Node fallback so drains are not lost.
   const waitUntilCtx = event.context.cloudflare?.context ?? event.context
   if (typeof waitUntilCtx?.waitUntil === 'function') {
     waitUntilCtx.waitUntil(drainPromise)
   } else {
-    // Fallback: await drain to prevent lost logs in serverless environments
-    // (e.g. Vercel Fluid Compute). On the normal path this runs from
-    // afterResponse (response already sent); on the error path it may run
-    // before the error response is finalized.
     await drainPromise
   }
 }
@@ -125,10 +136,15 @@ export default defineNitroPlugin(async (nitroApp) => {
 
   const redact = normalizeRedactConfig(evlogConfig?.redact as boolean | Record<string, unknown> | undefined)
 
+  registerPrettyErrorSnippetReader(readCodeSnippetFromDisk)
+
   initLogger({
     enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
+    prettyErrorFrames: evlogConfig?.prettyErrorFrames,
+    prettyErrorStackDepth: evlogConfig?.prettyErrorStackDepth,
+    prettyErrorCompact: evlogConfig?.prettyErrorCompact,
     silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
     minLevel: evlogConfig?.minLevel,
@@ -209,7 +225,12 @@ export default defineNitroPlugin(async (nitroApp) => {
 
     const requestLog = e.context.log as RequestLogger | undefined
     if (requestLog) {
-      requestLog.error(error as Error)
+      // Block afterResponse/response hooks from emitting while we enrich the stack.
+      e.context._evlogEmitted = true
+
+      const err = error as Error
+      await enrichErrorStackForDev(err, { pretty: evlogConfig?.pretty })
+      requestLog.error(err)
 
       const errorStatus = extractErrorStatus(error)
       requestLog.set({ status: errorStatus })
@@ -232,10 +253,10 @@ export default defineNitroPlugin(async (nitroApp) => {
       const runner = getGlobalPluginRunner()
       if (runner.hasKeep) await runner.runKeep(tailCtx)
 
-      e.context._evlogEmitted = true
-
       const emittedEvent = requestLog.emit({ _forceKeep: tailCtx.shouldKeep })
-      await callEnrichAndDrain(nitroApp, emittedEvent, e)
+      void callEnrichAndDrain(nitroApp, emittedEvent, e, { deferDrain: true }).catch((err) => {
+        console.error('[evlog] background enrich/drain failed:', err)
+      })
     }
   })
 

@@ -1,11 +1,12 @@
 <script setup lang="ts">
+import { parseError } from 'evlog'
 import type { TestConfig } from '~/config/tests.config'
 
 const props = defineProps<TestConfig>()
 
 const toast = useToast()
 
-const { execute, isLoading, result, error, status } = useTestRunner(props.id, {
+const { execute, result, error, status, reset } = useTestRunner(props.id, {
   endpoint: props.endpoint,
   method: props.method,
   onSuccess: (response) => {
@@ -17,14 +18,33 @@ const { execute, isLoading, result, error, status } = useTestRunner(props.id, {
     }
   },
   onError: (err) => {
-    if (props.toastOnError) {
+    if (props.parseErrorToast) {
+      const parsed = parseError(err)
+      toast.add({
+        title: parsed.message,
+        description: parsed.why,
+        color: 'error',
+        actions: parsed.link
+          ? [{ label: 'Learn more', onClick: () => window.open(parsed.link, '_blank') }]
+          : undefined,
+      })
+      if (parsed.fix) {
+        console.info(`💡 Fix: ${parsed.fix}`)
+      }
+    } else if (props.toastOnError) {
       toast.add({
         ...props.toastOnError,
         color: 'error',
       })
     }
+
+    if (props.expectError) {
+      reset()
+    }
   },
 })
+
+const running = ref(false)
 
 const accentColor = computed(() => {
   const map: Record<string, string> = {
@@ -38,6 +58,9 @@ const accentColor = computed(() => {
 })
 
 async function handleClick() {
+  if (running.value) return
+
+  running.value = true
   try {
     if (props.onClick) {
       await execute(props.onClick)
@@ -45,7 +68,9 @@ async function handleClick() {
       await execute()
     }
   } catch {
-    // Error already handled
+    // Error already handled via onError / onClick
+  } finally {
+    running.value = false
   }
 }
 </script>
@@ -60,7 +85,7 @@ async function handleClick() {
       @click="handleClick"
     >
       <UIcon
-        v-if="isLoading"
+        v-if="running"
         name="i-lucide-loader-circle"
         class="size-3.5 animate-spin text-primary absolute top-4 right-4"
       />

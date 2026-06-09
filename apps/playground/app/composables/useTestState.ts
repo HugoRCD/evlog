@@ -7,6 +7,18 @@ interface TestState {
 
 const state = ref<Record<string, TestState>>({})
 
+function patchTest(id: string, patch: Partial<TestState>): void {
+  state.value = {
+    ...state.value,
+    [id]: {
+      ...state.value[id],
+      status: state.value[id]?.status ?? 'idle',
+      ...patch,
+      timestamp: Date.now(),
+    },
+  }
+}
+
 export function useTestState() {
   return {
     getStatus: (id: string) => state.value[id]?.status ?? 'idle',
@@ -16,39 +28,26 @@ export function useTestState() {
     getError: (id: string) => state.value[id]?.error,
 
     setStatus: (id: string, status: TestState['status']) => {
-      if (!state.value[id]) {
-        state.value[id] = { status, timestamp: Date.now() }
-      } else {
-        state.value[id].status = status
-        state.value[id].timestamp = Date.now()
-      }
+      patchTest(id, { status })
     },
 
     setResult: (id: string, result: any) => {
-      if (!state.value[id]) {
-        state.value[id] = { status: 'success', result, timestamp: Date.now() }
-      } else {
-        state.value[id].result = result
-      }
+      patchTest(id, { result, status: state.value[id]?.status ?? 'success' })
     },
 
     setError: (id: string, error: any) => {
-      if (!state.value[id]) {
-        state.value[id] = { status: 'error', error, timestamp: Date.now() }
-      } else {
-        state.value[id].error = error
-      }
+      patchTest(id, { error, status: 'error' })
     },
 
     clearResults: (id: string) => {
-      if (state.value[id]) {
-        state.value[id].result = undefined
-        state.value[id].error = undefined
-      }
+      if (!state.value[id]) return
+      patchTest(id, { result: undefined, error: undefined })
     },
 
     clearTest: (id: string) => {
-      delete state.value[id]
+      const next = { ...state.value }
+      delete next[id]
+      state.value = next
     },
 
     resetAll: () => {

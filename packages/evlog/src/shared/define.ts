@@ -16,6 +16,11 @@ export interface EvlogConfig extends BaseEvlogOptions {
   enabled?: boolean
   /** Auto-detected from `NODE_ENV` when omitted. */
   pretty?: boolean
+  /** Dev-only code snippets in pretty error output. @default true in dev */
+  prettyErrorFrames?: boolean
+  /** Max stack frames after the snippet. @default 3 */
+  prettyErrorStackDepth?: number
+  prettyErrorCompact?: boolean
   sampling?: SamplingConfig
   /** Suppress built-in console output (useful when drains own the channel). */
   silent?: boolean
@@ -66,6 +71,9 @@ export function toLoggerConfig(config: EvlogConfig): LoggerConfig {
   if (env) out.env = env
   if (config.enabled !== undefined) out.enabled = config.enabled
   if (config.pretty !== undefined) out.pretty = config.pretty
+  if (config.prettyErrorFrames !== undefined) out.prettyErrorFrames = config.prettyErrorFrames
+  if (config.prettyErrorStackDepth !== undefined) out.prettyErrorStackDepth = config.prettyErrorStackDepth
+  if (config.prettyErrorCompact !== undefined) out.prettyErrorCompact = config.prettyErrorCompact
   if (config.sampling !== undefined) out.sampling = config.sampling
   if (config.minLevel !== undefined) out.minLevel = config.minLevel
   if (config.stringify !== undefined) out.stringify = config.stringify

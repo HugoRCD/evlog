@@ -3,6 +3,9 @@ import type { CaptureError } from 'nitro/types'
 import type { HTTPEvent } from 'nitro/h3'
 import { parseURL } from 'ufo'
 import { createRequestLogger, getGlobalPluginRunner, initLogger, isEnabled } from '../logger'
+import { registerPrettyErrorSnippetReader } from '../shared/pretty-error'
+import { readCodeSnippetFromDisk } from '../shared/pretty-error-snippet.node'
+import { enrichErrorStackForDev } from '../shared/enrich-error-stack.node'
 import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shared/nitroConfigBridge'
@@ -71,6 +74,7 @@ async function callDrainHook(
   emittedEvent: WideEvent | null,
   event: HTTPEvent,
   hookContext: Omit<EnrichContext, 'event'>,
+  options?: { deferDrain?: boolean },
 ): Promise<void> {
   if (!emittedEvent) return
 
@@ -102,15 +106,17 @@ async function callDrainHook(
   if (drainTasks.length === 0) return
   const drainPromise = Promise.all(drainTasks)
 
-  // Use waitUntil if available (srvx native — Cloudflare Workers, Vercel Edge, etc.)
-  // This keeps the runtime alive for background work without blocking the response
+  // deferDrain: never waitUntil — see nitro/plugin.ts callEnrichAndDrain.
+  if (options?.deferDrain) {
+    void drainPromise.catch((err) => {
+      console.error('[evlog] background drain failed:', err)
+    })
+    return
+  }
+
   if (typeof event.req.waitUntil === 'function') {
     event.req.waitUntil(drainPromise)
   } else {
-    // Fallback: await drain to prevent lost logs in serverless environments
-    // (e.g. Vercel Fluid Compute). On the normal path this runs from the
-    // response hook (response already sent); on the error path it may run
-    // before the error response is finalized.
     await drainPromise
   }
 }
@@ -120,6 +126,7 @@ async function callEnrichAndDrain(
   emittedEvent: WideEvent | null,
   event: HTTPEvent,
   res?: Response,
+  options?: { deferDrain?: boolean },
 ): Promise<void> {
   if (!emittedEvent) return
 
@@ -137,7 +144,7 @@ async function callEnrichAndDrain(
     await runner.runEnrich(enrichCtx)
   }
 
-  await callDrainHook(hooks, emittedEvent, event, hookContext)
+  await callDrainHook(hooks, emittedEvent, event, hookContext, options)
 }
 
 /**
@@ -155,10 +162,15 @@ export default definePlugin(async (nitroApp) => {
 
   const redact = normalizeRedactConfig(evlogConfig?.redact as boolean | Record<string, unknown> | undefined)
 
+  registerPrettyErrorSnippetReader(readCodeSnippetFromDisk)
+
   initLogger({
     enabled: evlogConfig?.enabled,
     env: evlogConfig?.env,
     pretty: evlogConfig?.pretty,
+    prettyErrorFrames: evlogConfig?.prettyErrorFrames,
+    prettyErrorStackDepth: evlogConfig?.prettyErrorStackDepth,
+    prettyErrorCompact: evlogConfig?.prettyErrorCompact,
     silent: evlogConfig?.silent,
     sampling: evlogConfig?.sampling,
     minLevel: evlogConfig?.minLevel,
@@ -263,11 +275,15 @@ export default definePlugin(async (nitroApp) => {
     const log = ctx.log as RequestLogger | undefined
     if (!log) return
 
+    // Block response hook from emitting while we enrich the stack.
+    ctx._evlogEmitted = true
+
     // Check if error.cause is an EvlogError (thrown errors get wrapped in HTTPError by nitro)
     const actualError = (error.cause as Error)?.name === 'EvlogError' 
       ? error.cause as Error 
       : error as Error
 
+    await enrichErrorStackForDev(actualError, { pretty: evlogConfig?.pretty })
     log.error(actualError)
 
     const errorStatus = extractErrorStatus(actualError)
@@ -290,9 +306,9 @@ export default definePlugin(async (nitroApp) => {
     const runner = getGlobalPluginRunner()
     if (runner.hasKeep) await runner.runKeep(tailCtx)
 
-    ctx._evlogEmitted = true
-
     const emittedEvent = log.emit({ _forceKeep: tailCtx.shouldKeep })
-    await callEnrichAndDrain(hooks, emittedEvent, e)
+    void callEnrichAndDrain(hooks, emittedEvent, e, undefined, { deferDrain: true }).catch((err) => {
+      console.error('[evlog] background enrich/drain failed:', err)
+    })
   })
 })

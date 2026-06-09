@@ -21,20 +21,45 @@ vi.mock('nitropack/runtime', () => ({
 import { createError } from '../../src/error'
 import errorHandler from '../../src/nitro/errorHandler'
 
-const mockEvent = { node: { req: {}, res: {} } } as H3Event
+const mockEvent = { node: { req: {}, res: {} }, _handled: false } as H3Event & { _handled: boolean }
+
+const defaultHandlerMock = vi.fn().mockResolvedValue(undefined)
 
 function invokeErrorHandler(error: Error) {
-  errorHandler(error, mockEvent, { defaultHandler: vi.fn() })
+  return errorHandler(error, mockEvent, { defaultHandler: defaultHandlerMock })
 }
 
 describe('errorHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('NODE_ENV', 'development')
+    vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true }))
+    mockEvent._handled = false
+  })
+
+  it('marks the h3 event handled so Nitro dev handler does not run', async () => {
+    await invokeErrorHandler(new Error('boom'))
+    expect(mockEvent._handled).toBe(true)
+  })
+
+  it('clears unhandled flag in dev pretty mode', async () => {
+    vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true }))
+    const error = Object.assign(new Error('boom'), { unhandled: true, fatal: true })
+    await invokeErrorHandler(error)
+    expect(error.unhandled).toBe(false)
+    expect(error.fatal).toBe(false)
+  })
+
+  it('calls defaultHandler when devErrorHandler is nitro', async () => {
+    vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true, devErrorHandler: 'nitro' }))
+    const defaultHandler = vi.fn().mockResolvedValue(undefined)
+    const error = new Error('boom')
+    await errorHandler(error, mockEvent, { defaultHandler })
+    expect(defaultHandler).toHaveBeenCalledWith(error, mockEvent, { silent: false })
   })
 
   describe('EvlogError handling', () => {
-    it('serializes EvlogError with all data fields', () => {
+    it('serializes EvlogError with all data fields', async () => {
       const evlogError = Object.assign(new Error('Payment failed'), {
         name: 'EvlogError',
         status: 402,
@@ -48,7 +73,7 @@ describe('errorHandler', () => {
         },
       })
 
-      invokeErrorHandler(evlogError)
+      await invokeErrorHandler(evlogError)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 402)
       expect(mockSetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'application/json')
@@ -65,7 +90,7 @@ describe('errorHandler', () => {
       })
     })
 
-    it('derives HTTP status from evlogError when in error.cause', () => {
+    it('derives HTTP status from evlogError when in error.cause', async () => {
       const evlogError = Object.assign(new Error('Not found'), {
         name: 'EvlogError',
         status: 404,
@@ -77,7 +102,7 @@ describe('errorHandler', () => {
 
       const wrapperError = Object.assign(new Error('Wrapper error'), { cause: evlogError })
 
-      invokeErrorHandler(wrapperError)
+      await invokeErrorHandler(wrapperError)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 404)
 
@@ -86,15 +111,15 @@ describe('errorHandler', () => {
       expect(sentBody.data).toEqual({ why: 'Resource does not exist' })
     })
 
-    it('defaults to 500 when no status on evlogError', () => {
+    it('defaults to 500 when no status on evlogError', async () => {
       const evlogError = Object.assign(new Error('Unknown error'), { name: 'EvlogError' })
 
-      invokeErrorHandler(evlogError)
+      await invokeErrorHandler(evlogError)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
 
-    it('does not expose internal context on EvlogError responses', () => {
+    it('does not expose internal context on EvlogError responses', async () => {
       const err = createError({
         message: 'Not allowed',
         status: 403,
@@ -102,7 +127,7 @@ describe('errorHandler', () => {
         internal: { userId: 'u-internal', rawPolicy: 'deny:admin' },
       })
 
-      invokeErrorHandler(err)
+      await invokeErrorHandler(err)
 
       const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.internal).toBeUndefined()
@@ -117,12 +142,12 @@ describe('errorHandler', () => {
   })
 
   describe('non-EvlogError handling', () => {
-    it('uses Nitro-compatible format for standard errors', () => {
+    it('uses Nitro-compatible format for standard errors', async () => {
       const error = Object.assign(new Error('Something went wrong'), {
         statusCode: 400,
       })
 
-      invokeErrorHandler(error)
+      await invokeErrorHandler(error)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 400)
 
@@ -135,46 +160,46 @@ describe('errorHandler', () => {
       expect(sentBody.data).toBeUndefined()
     })
 
-    it('defaults to 500 for errors without status', () => {
+    it('defaults to 500 for errors without status', async () => {
       const error = new Error('Generic error')
 
-      invokeErrorHandler(error)
+      await invokeErrorHandler(error)
 
       expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
     })
 
-    it('uses "Internal Server Error" when no message', () => {
+    it('uses "Internal Server Error" when no message', async () => {
       const error = new Error('')
 
-      invokeErrorHandler(error)
+      await invokeErrorHandler(error)
 
       const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
     })
 
-    it('sanitizes 5xx error messages in production', () => {
+    it('sanitizes 5xx error messages in production', async () => {
       vi.stubEnv('NODE_ENV', 'production')
 
       const error = Object.assign(new Error('Database connection failed: password invalid'), {
         statusCode: 500,
       })
 
-      invokeErrorHandler(error)
+      await invokeErrorHandler(error)
 
       const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
     })
 
-    it('preserves 4xx error messages in production', () => {
+    it('preserves 4xx error messages in production', async () => {
       vi.stubEnv('NODE_ENV', 'production')
 
       const error = Object.assign(new Error('Invalid email format'), {
         statusCode: 400,
       })
 
-      invokeErrorHandler(error)
+      await invokeErrorHandler(error)
 
       const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
       expect(sentBody.message).toBe('Invalid email format')

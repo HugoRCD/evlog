@@ -291,6 +291,18 @@ export interface LoggerConfig {
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
+  /**
+   * Dev-only code snippets around the primary stack frame in pretty error output.
+   * @default true in development
+   */
+  prettyErrorFrames?: boolean
+  /**
+   * Max stack frames shown after the code snippet in pretty error output.
+   * @default 3
+   */
+  prettyErrorStackDepth?: number
+  /** Tighter dev error layout (shorter snippet, no stack tail). @default true in dev */
+  prettyErrorCompact?: boolean
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
   /**
