@@ -1,5 +1,45 @@
 # evlog
 
+## 2.19.0
+
+### Minor Changes
+
+- [#356](https://github.com/HugoRCD/evlog/pull/356) [`bb3ec19`](https://github.com/HugoRCD/evlog/commit/bb3ec1932402861fd12bb47633c191cf3c993941) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add optional catalog metadata on `defineAuditCatalog` and `defineAuditAction` entries: `description`, `severity`, `requiresChanges`, `requiresReason`, and `redactPaths`. Metadata is exposed on each factory for introspection, docs, and review tooling.
+
+- [#370](https://github.com/HugoRCD/evlog/pull/370) [`6dc352d`](https://github.com/HugoRCD/evlog/commit/6dc352ddba142ae68735ca932119566ac6074730) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Improve dev terminal error output and introduce a clearer `dev` config API.
+
+  **Presets:** `dev: 'evlog' | 'nitro' | 'both'` — controls Nitro's Youch overlay (`frameworkOverlay`) and how much stack detail evlog prints in the wide event (`prettyError.detail`). Default in pretty dev is `'evlog'` (no Nitro overlay, full evlog error block). `'nitro'` keeps Nitro's stack and prints only message + Why/Fix/link in the wide event. `'both'` shows both full outputs.
+
+  **Explicit object:** `dev: { frameworkOverlay, prettyError: { snippet, stackDepth, compact, detail: 'full' | 'guidance' } }`.
+
+  Other improvements: tighter error blocks by default (`prettyError.compact`), tree spacers, hanging-indent Why/Fix wrapping, `stdout` for error wide events in dev, source-mapped file:line via Nitro `loadStackTrace`, Nitro error hook enrich+drain no longer blocks HTTP responses.
+
+- [#371](https://github.com/HugoRCD/evlog/pull/371) [`0625240`](https://github.com/HugoRCD/evlog/commit/0625240cecf483107550000dfc38ba48359b32bd) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add glob path redaction to `RedactConfig.paths`. Single-segment patterns like `password` are shorthand for `**.password` (any nesting depth). Key-name globs (`*_token`) and path globs (`user.*`) are supported. `auditRedactPreset` simplified to path globs.
+
+  ```ts
+  initLogger({
+    redact: {
+      paths: ["password", "*_token", "headers.x-forwarded-for"],
+    },
+  });
+  ```
+
+- [#367](https://github.com/HugoRCD/evlog/pull/367) [`23d616f`](https://github.com/HugoRCD/evlog/commit/23d616ffecd9c2105051297d3ece44dd5542879d) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Defer wide-event emit for streaming HTTP responses (SSE, AI SDK UI streams, chunked bodies) until the response body finishes, so `createAILogger()` metadata is included on the same request event instead of triggering post-emit warnings.
+
+  Applies to Next.js `withEvlog`, SvelteKit, Hono, React Router, oRPC, and Nitro/Nuxt integrations. Also merges late `ai` fields onto an emitted event before enrich/drain when metadata arrives in a narrow race window.
+
+  Fixes [#321](https://github.com/HugoRCD/evlog/issues/321)
+
+### Patch Changes
+
+- [#356](https://github.com/HugoRCD/evlog/pull/356) [`bb3ec19`](https://github.com/HugoRCD/evlog/commit/bb3ec1932402861fd12bb47633c191cf3c993941) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix `mockAudit()` to capture in-request `log.audit()` events on emit (with finalized `idempotencyKey`). Add `assertAudit()` matcher on the mock result. Type `AuditFields.changes.patch` via new `AuditChanges` export.
+
+- [#369](https://github.com/HugoRCD/evlog/pull/369) [`0c6cb24`](https://github.com/HugoRCD/evlog/commit/0c6cb247cb608083f3fca72ed1d69dc55e34962f) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix Nuxt `silent` option not suppressing built-in console output in production builds on evlog 2.11+. The Nuxt module now bakes evlog options into `nitro.options.replace.__EVLOG_CONFIG__` (matching standalone Nitro modules), so the Nitro plugin receives `silent: true` and no longer emits an unenriched log line before your `evlog:drain` hook runs.
+
+- [#359](https://github.com/HugoRCD/evlog/pull/359) [`1b17ff1`](https://github.com/HugoRCD/evlog/commit/1b17ff1d51ebe92c75026d269d31c9b6da25857c) Thanks [@abhishekg999](https://github.com/abhishekg999)! - Fix `evlog/elysia` to capture unmatched routes so Elysia 404 responses emit HTTP events with the correct path and error level.
+
+- [#365](https://github.com/HugoRCD/evlog/pull/365) [`e2806b8`](https://github.com/HugoRCD/evlog/commit/e2806b8e47e78b4c147ec4fc3b1daef47749dac7) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix redaction mutating source objects and arrays passed by reference. Wide events are now deep-cloned before redaction, so `log.info({ user })` and `createLogger().emit()` only scrub the emitted copy sent to console and drains.
+
 ## 2.18.1
 
 ### Patch Changes
