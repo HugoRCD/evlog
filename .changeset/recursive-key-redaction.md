@@ -2,13 +2,12 @@
 "evlog": minor
 ---
 
-Add recursive key-based redaction to `RedactConfig`. Use `keys` to redact object property names at any nesting depth (e.g. `password` covers `user.password` and `data.a.b.password`), and `keyPatterns` for regex on key names. `auditRedactPreset` now uses `keys` instead of explicit dot-notation paths.
+Add glob path redaction to `RedactConfig.paths`. Single-segment patterns like `password` are shorthand for `**.password` (any nesting depth). Key-name globs (`*_token`) and path globs (`user.*`) are supported. `auditRedactPreset` simplified to path globs.
 
 ```ts
 initLogger({
   redact: {
-    keys: ['password', 'apiKey', 'authorization'],
-    keyPatterns: [/.*_token$/i],
+    paths: ['password', '*_token', 'headers.x-forwarded-for'],
   },
 })
 ```

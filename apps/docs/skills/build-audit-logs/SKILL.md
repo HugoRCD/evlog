@@ -282,14 +282,14 @@ function authorize(actor, action, resource) {
 
 ### Step 5 — Redact
 
-Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It redacts `authorization`, `cookie`, `set-cookie`, and common credential key names (`password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn`) at any nesting depth — including inside `audit.changes.before` / `audit.changes.after`:
+Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It redacts HTTP auth headers and common credential field names (`password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn`, plus `cookie` / `set-cookie`) at any nesting depth — including inside `audit.changes.before` / `audit.changes.after`:
 
 ```ts
 import { initLogger, auditRedactPreset } from 'evlog'
 
 initLogger({
   redact: {
-    keys: [...(auditRedactPreset.keys ?? [])],
+    paths: [...(auditRedactPreset.paths ?? [])],
   },
 })
 ```

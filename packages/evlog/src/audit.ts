@@ -1,6 +1,6 @@
 import type { AuditActor, AuditActionDefinition, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
-import { buildKeyMatcher, redactValueByKeys } from './redact'
+import { compileRedactPathMatchers, redactValueByPaths } from './redact'
 import { getHeader as getSharedHeader } from './shared/headers'
 
 /**
@@ -304,8 +304,8 @@ export interface WithAuditContext {
  * `changes` field. Output is a JSON Patch-style array (RFC 6902 subset:
  * `add`, `remove`, `replace`) — small enough to ship over the wire.
  *
- * Object keys whose name matches one of the `redactPaths` (dot-notation, e.g.
- * `'user.password'`, `'card.cvv'`) are replaced with `'[REDACTED]'` so PII
+ * Fields matching `redactPaths` glob patterns (e.g. `'password'`, `'**.password'`,
+ * `'*_token'`, `'user.email'`) are replaced with `'[REDACTED]'` so PII
  * never leaks through the diff.
  *
  * @example
@@ -324,7 +324,12 @@ export function auditDiff(
   options: AuditDiffOptions = {},
 ): { before?: unknown, after?: unknown, patch: AuditPatchOp[] } {
   const replacement = options.replacement ?? '[REDACTED]'
-  const keyMatcher = buildKeyMatcher(options.redactPaths) ?? (() => false)
+  const pathMatchers = compileRedactPathMatchers(options.redactPaths) ?? {
+    exactPaths: new Set<string>(),
+    pathGlobs: [],
+    keyGlobs: [],
+    caseInsensitiveLeaves: new Set<string>(),
+  }
   const patch: AuditPatchOp[] = []
 
   function diff(a: unknown, b: unknown, path: string): void {
@@ -355,7 +360,7 @@ export function auditDiff(
   }
 
   function redactValue(value: unknown, path: string): unknown {
-    return redactValueByKeys(value, keyMatcher, replacement, path)
+    return redactValueByPaths(value, pathMatchers, replacement, path)
   }
 
   diff(before, after, '')
@@ -369,7 +374,7 @@ export type { AuditPatchOp } from './types'
 
 /** Options for {@link auditDiff}. */
 export interface AuditDiffOptions {
-  /** Object keys (dot-notation) whose values should be replaced with `[REDACTED]`. */
+  /** Path globs (same syntax as `RedactConfig.paths`) whose values are replaced with `[REDACTED]`. */
   redactPaths?: string[]
   /** Custom replacement string. @default '[REDACTED]' */
   replacement?: string
@@ -846,7 +851,7 @@ function stripIntegrity(event: WideEvent): WideEvent {
  * Strict redact preset for audit events.
  *
  * Combine with the user's existing redact configuration via spread:
- * `initLogger({ redact: { keys: [...auditRedactPreset.keys!, ...mine] } })`.
+ * `initLogger({ redact: { paths: [...auditRedactPreset.paths!, ...mine] } })`.
  *
  * Hardens PII handling:
  * - Drops `Authorization` and `Cookie` headers anywhere they appear.
@@ -859,7 +864,7 @@ function stripIntegrity(event: WideEvent): WideEvent {
  * enough signal to be useful.
  */
 export const auditRedactPreset: RedactConfig = {
-  keys: [
+  paths: [
     'password',
     'passwordHash',
     'token',

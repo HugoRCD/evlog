@@ -69,26 +69,24 @@ describe('redactEvent - path-based', () => {
     expect(user.settings).toBe('[REDACTED]')
   })
 
-  it('does not redact nested password with top-level path only', () => {
-    const source: Record<string, unknown> = {
-      password: 'top',
-      user: { password: 'nested' },
-    }
-    const event = redactEvent(source, { paths: ['password'] })
-    expect(event.password).toBe('[REDACTED]')
-    expect((event.user as Record<string, unknown>).password).toBe('nested')
-    expect(source.user).toEqual({ password: 'nested' })
+  it('does not redact nested email when exact path is user.email only', () => {
+    const event = redactEvent(
+      { user: { email: 'a@b.com' }, other: { email: 'c@d.com' } },
+      { paths: ['user.email'] },
+    )
+    expect((event.user as Record<string, unknown>).email).toBe('[REDACTED]')
+    expect((event.other as Record<string, unknown>).email).toBe('c@d.com')
   })
 })
 
-describe('redactEvent - key-based', () => {
-  it('redacts a key at any nesting depth', () => {
+describe('redactEvent - path globs', () => {
+  it('redacts password at any nesting depth via shorthand', () => {
     const source: Record<string, unknown> = {
       password: 'top',
       user: { name: 'Alice', password: 'secret' },
       data: { a: { b: { password: 'deep' } } },
     }
-    const event = redactEvent(source, { keys: ['password'] })
+    const event = redactEvent(source, { paths: ['password'] })
     expect(event.password).toBe('[REDACTED]')
     expect((event.user as Record<string, unknown>).password).toBe('[REDACTED]')
     expect((event.user as Record<string, unknown>).name).toBe('Alice')
@@ -97,22 +95,32 @@ describe('redactEvent - key-based', () => {
     expect(source.user).toEqual({ name: 'Alice', password: 'secret' })
   })
 
+  it('treats password and **.password as equivalent', () => {
+    const data = {
+      user: { password: 'secret' },
+      password: 'top',
+    }
+    const shorthand = redactEvent(data, { paths: ['password'] })
+    const explicit = redactEvent(data, { paths: ['**.password'] })
+    expect(shorthand).toEqual(explicit)
+  })
+
   it('replaces the entire matched value without recursing into children', () => {
     const event = redactEvent(
       { password: { nested: 'still-here' } },
-      { keys: ['password'] },
+      { paths: ['password'] },
     )
     expect(event.password).toBe('[REDACTED]')
   })
 
-  it('redacts multiple key names', () => {
+  it('redacts multiple shorthand segments', () => {
     const event = redactEvent(
       {
         password: 'p',
         token: 't',
         user: { apiKey: 'k', name: 'Alice' },
       },
-      { keys: ['password', 'token', 'apiKey'] },
+      { paths: ['password', 'token', 'apiKey'] },
     )
     expect(event.password).toBe('[REDACTED]')
     expect(event.token).toBe('[REDACTED]')
@@ -120,29 +128,43 @@ describe('redactEvent - key-based', () => {
     expect((event.user as Record<string, unknown>).name).toBe('Alice')
   })
 
-  it('matches key names with keyPatterns', () => {
+  it('matches key-name globs without dots', () => {
     const event = redactEvent(
       {
         access_token: 'a',
         refresh_token: 'r',
+        nested: { access_token: 'n' },
         username: 'alice',
       },
-      { keyPatterns: [/.*_token$/] },
+      { paths: ['*_token'] },
     )
     expect(event.access_token).toBe('[REDACTED]')
     expect(event.refresh_token).toBe('[REDACTED]')
+    expect((event.nested as Record<string, unknown>).access_token).toBe('[REDACTED]')
     expect(event.username).toBe('alice')
   })
 
-  it('combines keys and exact paths', () => {
+  it('matches path globs under a prefix', () => {
+    const event = redactEvent(
+      {
+        user: { email: 'a@b.com', password: 'secret' },
+        admin: { email: 'c@d.com' },
+      },
+      { paths: ['user.*'] },
+    )
+    expect((event.user as Record<string, unknown>).email).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect((event.admin as Record<string, unknown>).email).toBe('c@d.com')
+  })
+
+  it('combines globs and exact paths', () => {
     const event = redactEvent(
       {
         password: 'everywhere',
         headers: { 'x-forwarded-for': '1.2.3.4', authorization: 'Bearer x' },
       },
       {
-        keys: ['password', 'authorization'],
-        paths: ['headers.x-forwarded-for'],
+        paths: ['password', 'authorization', 'headers.x-forwarded-for'],
       },
     )
     expect(event.password).toBe('[REDACTED]')
@@ -153,9 +175,38 @@ describe('redactEvent - key-based', () => {
   it('uses custom replacement string', () => {
     const event = redactEvent(
       { user: { password: 'secret' } },
-      { keys: ['password'], replacement: '***' },
+      { paths: ['password'], replacement: '***' },
     )
     expect((event.user as Record<string, unknown>).password).toBe('***')
+  })
+
+  it('redacts header keys case-insensitively', () => {
+    const event = redactEvent(
+      {
+        headers: { Authorization: 'Bearer x', Cookie: 'sid=1' },
+      },
+      { paths: ['authorization', 'cookie'] },
+    )
+    const headers = event.headers as Record<string, unknown>
+    expect(headers.Authorization).toBe('[REDACTED]')
+    expect(headers.Cookie).toBe('[REDACTED]')
+  })
+
+  it('redacts audit.changes nested passwords via segment shorthand', () => {
+    const event = redactEvent(
+      {
+        audit: {
+          changes: {
+            before: { password: 'old' },
+            after: { password: 'new' },
+          },
+        },
+      },
+      { paths: ['password'] },
+    )
+    const changes = (event.audit as Record<string, unknown>).changes as Record<string, unknown>
+    expect((changes.before as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect((changes.after as Record<string, unknown>).password).toBe('[REDACTED]')
   })
 })
 
@@ -396,17 +447,6 @@ describe('normalizeRedactConfig', () => {
     expect(config?.replacement).toBe('***')
   })
 
-  it('preserves keys and deserializes keyPatterns', () => {
-    const config = defined(normalizeRedactConfig({
-      keys: ['password', 'token'],
-      keyPatterns: ['.*_secret$'],
-      builtins: false,
-    }), 'redact config')
-    expect(config.keys).toEqual(['password', 'token'])
-    expect(config.keyPatterns).toHaveLength(1)
-    expect(defined(config.keyPatterns?.[0], 'keyPatterns[0]').source).toBe('.*_secret$')
-  })
-
   it('converts string patterns to RegExp separately from built-in maskers', () => {
     const config = defined(normalizeRedactConfig({
       patterns: ['\\b\\d{4}\\b'],
@@ -433,7 +473,9 @@ describe('normalizeRedactConfig', () => {
       builtins: false,
       patterns: [re],
     }), 'redact config')
-    expect(defined(config.patterns?.[0], 'patterns[0]')).toBe(re)
+    const pattern = defined(config.patterns?.[0], 'patterns[0]')
+    expect(pattern.source).toBe(re.source)
+    expect(pattern.flags).toBe(re.flags)
   })
 
   it('filters out invalid pattern entries', () => {
@@ -442,6 +484,17 @@ describe('normalizeRedactConfig', () => {
       patterns: ['valid', 42, null, undefined],
     })
     expect(config?.patterns).toHaveLength(1)
+  })
+
+  it('ignores invalid regex sources without throwing', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const config = normalizeRedactConfig({
+      builtins: false,
+      patterns: ['valid', '(unclosed', { source: '[', flags: 'g' }],
+    })
+    expect(config?.patterns).toHaveLength(1)
+    expect(warn).toHaveBeenCalled()
+    warn.mockRestore()
   })
 
   it('handles builtins field from deserialized JSON', () => {
