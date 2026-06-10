@@ -1,5 +1,6 @@
 import type { AuditActor, AuditActionDefinition, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
+import { buildKeyMatcher, redactValueByKeys } from './redact'
 import { getHeader as getSharedHeader } from './shared/headers'
 
 /**
@@ -323,17 +324,8 @@ export function auditDiff(
   options: AuditDiffOptions = {},
 ): { before?: unknown, after?: unknown, patch: AuditPatchOp[] } {
   const replacement = options.replacement ?? '[REDACTED]'
-  const redactSet = new Set((options.redactPaths ?? []).map(p => p))
+  const keyMatcher = buildKeyMatcher(options.redactPaths) ?? (() => false)
   const patch: AuditPatchOp[] = []
-
-  function isRedacted(path: string): boolean {
-    if (redactSet.size === 0) return false
-    if (redactSet.has(path)) return true
-    for (const p of redactSet) {
-      if (path.endsWith(`.${p}`)) return true
-    }
-    return false
-  }
 
   function diff(a: unknown, b: unknown, path: string): void {
     if (a === b) return
@@ -363,20 +355,7 @@ export function auditDiff(
   }
 
   function redactValue(value: unknown, path: string): unknown {
-    if (value === null || typeof value !== 'object') {
-      const segs = path.split('/').filter(Boolean)
-      const last = segs[segs.length - 1]
-      if (last && isRedacted(last)) return replacement
-      return value
-    }
-    if (Array.isArray(value)) {
-      return value.map((v, i) => redactValue(v, `${path}/${i}`))
-    }
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = isRedacted(k) ? replacement : redactValue(v, `${path}/${k}`)
-    }
-    return out
+    return redactValueByKeys(value, keyMatcher, replacement, path)
   }
 
   diff(before, after, '')
@@ -867,7 +846,7 @@ function stripIntegrity(event: WideEvent): WideEvent {
  * Strict redact preset for audit events.
  *
  * Combine with the user's existing redact configuration via spread:
- * `initLogger({ redact: { paths: [...auditRedactPreset.paths!, ...mine] } })`.
+ * `initLogger({ redact: { keys: [...auditRedactPreset.keys!, ...mine] } })`.
  *
  * Hardens PII handling:
  * - Drops `Authorization` and `Cookie` headers anywhere they appear.
@@ -880,31 +859,19 @@ function stripIntegrity(event: WideEvent): WideEvent {
  * enough signal to be useful.
  */
 export const auditRedactPreset: RedactConfig = {
-  paths: [
-    'audit.changes.before.password',
-    'audit.changes.before.passwordHash',
-    'audit.changes.before.token',
-    'audit.changes.before.apiKey',
-    'audit.changes.before.secret',
-    'audit.changes.before.accessToken',
-    'audit.changes.before.refreshToken',
-    'audit.changes.before.cardNumber',
-    'audit.changes.before.cvv',
-    'audit.changes.before.ssn',
-    'audit.changes.after.password',
-    'audit.changes.after.passwordHash',
-    'audit.changes.after.token',
-    'audit.changes.after.apiKey',
-    'audit.changes.after.secret',
-    'audit.changes.after.accessToken',
-    'audit.changes.after.refreshToken',
-    'audit.changes.after.cardNumber',
-    'audit.changes.after.cvv',
-    'audit.changes.after.ssn',
-    'headers.authorization',
-    'headers.cookie',
-    'headers.set-cookie',
-    'audit.context.headers.authorization',
-    'audit.context.headers.cookie',
+  keys: [
+    'password',
+    'passwordHash',
+    'token',
+    'apiKey',
+    'secret',
+    'accessToken',
+    'refreshToken',
+    'cardNumber',
+    'cvv',
+    'ssn',
+    'authorization',
+    'cookie',
+    'set-cookie',
   ],
 }

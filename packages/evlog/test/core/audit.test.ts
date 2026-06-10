@@ -16,7 +16,7 @@ import {
 } from '../../src/audit'
 import type { AuditFields, DrainContext, EnrichContext, WideEvent } from '../../src/types'
 import { createLogger, createRequestLogger, initLogger } from '../../src/logger'
-import { resolveRedactConfig } from '../../src/redact'
+import { redactEvent, resolveRedactConfig } from '../../src/redact'
 import { defined } from '../helpers/defined'
 
 function createDrainCtx(event: Partial<WideEvent> = {}): DrainContext {
@@ -508,15 +508,36 @@ describe('end-to-end: audit + auditOnly + global drain', () => {
 })
 
 describe('auditRedactPreset', () => {
-  it('drops authorization headers', () => {
+  it('redacts authorization and cookie key names at any depth', () => {
     const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
-    expect(config.paths).toContain('headers.authorization')
+    expect(config.keys).toContain('authorization')
+    expect(config.keys).toContain('cookie')
+    expect(config.keys).toContain('set-cookie')
   })
 
-  it('drops password fields under audit.changes', () => {
+  it('redacts credential key names at any depth', () => {
     const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
-    expect(config.paths).toContain('audit.changes.before.password')
-    expect(config.paths).toContain('audit.changes.after.password')
+    expect(config.keys).toContain('password')
+    expect(config.keys).toContain('token')
+    expect(config.keys).toContain('apiKey')
+  })
+
+  it('redacts nested audit.changes password fields via keys', () => {
+    const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
+    const event = redactEvent(
+      {
+        audit: {
+          changes: {
+            before: { password: 'old' },
+            after: { password: 'new' },
+          },
+        },
+      },
+      config,
+    )
+    const changes = (event.audit as Record<string, unknown>).changes as Record<string, unknown>
+    expect((changes.before as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect((changes.after as Record<string, unknown>).password).toBe('[REDACTED]')
   })
 })
 

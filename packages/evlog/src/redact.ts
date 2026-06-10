@@ -4,6 +4,87 @@ const DEFAULT_REPLACEMENT = '[REDACTED]'
 
 export type Masker = [RegExp, (match: string) => string]
 
+/** Predicate that returns whether an object key name should be fully redacted. */
+export type KeyMatcher = (key: string) => boolean
+
+/**
+ * Build a matcher from exact key names and regex patterns on key names.
+ * Returns `undefined` when both inputs are empty.
+ */
+export function buildKeyMatcher(keys?: string[], keyPatterns?: RegExp[]): KeyMatcher | undefined {
+  const keySet = new Set(keys ?? [])
+  const patterns = (keyPatterns ?? []).map(cloneRegex)
+  if (keySet.size === 0 && patterns.length === 0) return undefined
+
+  return (key: string) => {
+    if (keySet.has(key)) return true
+    for (const pattern of patterns) {
+      pattern.lastIndex = 0
+      if (pattern.test(key)) return true
+    }
+    return false
+  }
+}
+
+/**
+ * Redact values whose key names match `matcher`, recursively at any depth.
+ * Mutates `obj` in place (intended for use on a clone).
+ */
+export function redactKeysInTree(obj: unknown, matcher: KeyMatcher, replacement: string): void {
+  if (obj === null || obj === undefined) return
+
+  if (Array.isArray(obj)) {
+    for (const item of obj) {
+      redactKeysInTree(item, matcher, replacement)
+    }
+    return
+  }
+
+  if (typeof obj === 'object') {
+    const record = obj as Record<string, unknown>
+    for (const key in record) {
+      if (matcher(key)) {
+        record[key] = replacement
+      } else {
+        redactKeysInTree(record[key], matcher, replacement)
+      }
+    }
+  }
+}
+
+/**
+ * Return a copy of `value` with key-name matches replaced by `replacement`.
+ * Used by audit diffs; does not mutate the input.
+ *
+ * When `value` is a scalar and `path` is provided, the last JSON Pointer
+ * segment is checked against `matcher` (for patch leaf values).
+ */
+export function redactValueByKeys(
+  value: unknown,
+  matcher: KeyMatcher,
+  replacement: string,
+  path?: string,
+): unknown {
+  if (value === null || typeof value !== 'object') {
+    if (path) {
+      const last = path.split('/').filter(Boolean).at(-1)
+      if (last && matcher(last)) return replacement
+    }
+    return value
+  }
+
+  if (Array.isArray(value)) {
+    return value.map((v, i) => redactValueByKeys(v, matcher, replacement, path ? `${path}/${i}` : undefined))
+  }
+
+  const out: Record<string, unknown> = {}
+  for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
+    const childPath = path ? `${path}/${k}` : k
+    out[k] = matcher(k) ? replacement : redactValueByKeys(v, matcher, replacement, childPath)
+  }
+  return out
+}
+
 /**
  * Built-in PII detection patterns with smart masking.
  * Each builtin preserves just enough signal for debugging while scrubbing PII.
@@ -148,10 +229,11 @@ function cloneForRedaction(event: Record<string, unknown>): Record<string, unkno
 /**
  * Redact sensitive data from a wide event without mutating the input.
  *
- * Returns a deep clone with redaction applied. Three strategies run in order:
- * 1. **Path-based**: dot-notation paths — the leaf value is replaced with `replacement`.
- * 2. **Masker-based**: built-in patterns with smart partial masking (e.g. `****1111`).
- * 3. **Pattern-based**: custom RegExp patterns replaced with `replacement`.
+ * Returns a deep clone with redaction applied. Four strategies run in order:
+ * 1. **Key-based**: object key names (and `keyPatterns`) at any nesting depth — full value replacement.
+ * 2. **Path-based**: exact dot-notation paths — the leaf value is replaced with `replacement`.
+ * 3. **Masker-based**: built-in patterns with smart partial masking (e.g. `****1111`).
+ * 4. **Pattern-based**: custom RegExp patterns on string values replaced with `replacement`.
  *
  * @param event - The wide event object (not mutated).
  * @param config - Redaction configuration.
@@ -160,6 +242,11 @@ function cloneForRedaction(event: Record<string, unknown>): Record<string, unkno
 export function redactEvent(event: Record<string, unknown>, config: RedactConfig): Record<string, unknown> {
   const clone = cloneForRedaction(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
+
+  const keyMatcher = buildKeyMatcher(config.keys, config.keyPatterns)
+  if (keyMatcher) {
+    redactKeysInTree(clone, keyMatcher, replacement)
+  }
 
   if (config.paths?.length) {
     for (const path of config.paths) {
@@ -280,6 +367,10 @@ export function normalizeRedactConfig(raw: boolean | Record<string, unknown> | u
     config.paths = raw.paths as string[]
   }
 
+  if (Array.isArray(raw.keys)) {
+    config.keys = raw.keys as string[]
+  }
+
   if (typeof raw.replacement === 'string') {
     config.replacement = raw.replacement
   }
@@ -291,16 +382,24 @@ export function normalizeRedactConfig(raw: boolean | Record<string, unknown> | u
   }
 
   if (Array.isArray(raw.patterns)) {
-    config.patterns = (raw.patterns as unknown[]).map((p) => {
-      if (p instanceof RegExp) return p
-      if (typeof p === 'string') return new RegExp(p, 'g')
-      if (typeof p === 'object' && p !== null) {
-        const obj = p as Record<string, string>
-        return new RegExp(obj.source, obj.flags ?? 'g')
-      }
-      return null
-    }).filter((p): p is RegExp => p !== null)
+    config.patterns = deserializeRegexList(raw.patterns)
+  }
+
+  if (Array.isArray(raw.keyPatterns)) {
+    config.keyPatterns = deserializeRegexList(raw.keyPatterns)
   }
 
   return resolveRedactConfig(config)
+}
+
+function deserializeRegexList(raw: unknown[]): RegExp[] {
+  return raw.map((p) => {
+    if (p instanceof RegExp) return p
+    if (typeof p === 'string') return new RegExp(p, 'g')
+    if (typeof p === 'object' && p !== null) {
+      const obj = p as Record<string, string>
+      return new RegExp(obj.source, obj.flags ?? 'g')
+    }
+    return null
+  }).filter((p): p is RegExp => p !== null)
 }

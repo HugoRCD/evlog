@@ -68,6 +68,95 @@ describe('redactEvent - path-based', () => {
     expect(user.age).toBe('[REDACTED]')
     expect(user.settings).toBe('[REDACTED]')
   })
+
+  it('does not redact nested password with top-level path only', () => {
+    const source: Record<string, unknown> = {
+      password: 'top',
+      user: { password: 'nested' },
+    }
+    const event = redactEvent(source, { paths: ['password'] })
+    expect(event.password).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).password).toBe('nested')
+    expect(source.user).toEqual({ password: 'nested' })
+  })
+})
+
+describe('redactEvent - key-based', () => {
+  it('redacts a key at any nesting depth', () => {
+    const source: Record<string, unknown> = {
+      password: 'top',
+      user: { name: 'Alice', password: 'secret' },
+      data: { a: { b: { password: 'deep' } } },
+    }
+    const event = redactEvent(source, { keys: ['password'] })
+    expect(event.password).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).name).toBe('Alice')
+    const deep = (event.data as Record<string, unknown>).a as Record<string, unknown>
+    expect((deep.b as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect(source.user).toEqual({ name: 'Alice', password: 'secret' })
+  })
+
+  it('replaces the entire matched value without recursing into children', () => {
+    const event = redactEvent(
+      { password: { nested: 'still-here' } },
+      { keys: ['password'] },
+    )
+    expect(event.password).toBe('[REDACTED]')
+  })
+
+  it('redacts multiple key names', () => {
+    const event = redactEvent(
+      {
+        password: 'p',
+        token: 't',
+        user: { apiKey: 'k', name: 'Alice' },
+      },
+      { keys: ['password', 'token', 'apiKey'] },
+    )
+    expect(event.password).toBe('[REDACTED]')
+    expect(event.token).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).apiKey).toBe('[REDACTED]')
+    expect((event.user as Record<string, unknown>).name).toBe('Alice')
+  })
+
+  it('matches key names with keyPatterns', () => {
+    const event = redactEvent(
+      {
+        access_token: 'a',
+        refresh_token: 'r',
+        username: 'alice',
+      },
+      { keyPatterns: [/.*_token$/] },
+    )
+    expect(event.access_token).toBe('[REDACTED]')
+    expect(event.refresh_token).toBe('[REDACTED]')
+    expect(event.username).toBe('alice')
+  })
+
+  it('combines keys and exact paths', () => {
+    const event = redactEvent(
+      {
+        password: 'everywhere',
+        headers: { 'x-forwarded-for': '1.2.3.4', authorization: 'Bearer x' },
+      },
+      {
+        keys: ['password', 'authorization'],
+        paths: ['headers.x-forwarded-for'],
+      },
+    )
+    expect(event.password).toBe('[REDACTED]')
+    expect((event.headers as Record<string, unknown>).authorization).toBe('[REDACTED]')
+    expect((event.headers as Record<string, unknown>)['x-forwarded-for']).toBe('[REDACTED]')
+  })
+
+  it('uses custom replacement string', () => {
+    const event = redactEvent(
+      { user: { password: 'secret' } },
+      { keys: ['password'], replacement: '***' },
+    )
+    expect((event.user as Record<string, unknown>).password).toBe('***')
+  })
 })
 
 describe('redactEvent - pattern-based', () => {
@@ -305,6 +394,17 @@ describe('normalizeRedactConfig', () => {
     })
     expect(config?.paths).toEqual(['user.email'])
     expect(config?.replacement).toBe('***')
+  })
+
+  it('preserves keys and deserializes keyPatterns', () => {
+    const config = defined(normalizeRedactConfig({
+      keys: ['password', 'token'],
+      keyPatterns: ['.*_secret$'],
+      builtins: false,
+    }), 'redact config')
+    expect(config.keys).toEqual(['password', 'token'])
+    expect(config.keyPatterns).toHaveLength(1)
+    expect(defined(config.keyPatterns?.[0], 'keyPatterns[0]').source).toBe('.*_secret$')
   })
 
   it('converts string patterns to RegExp separately from built-in maskers', () => {

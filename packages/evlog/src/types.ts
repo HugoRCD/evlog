@@ -98,8 +98,21 @@ export interface IngestPayload {
  * or select specific ones with `builtins: ['email', 'creditCard']`.
  */
 export interface RedactConfig {
-  /** Dot-notation paths to redact (e.g., 'user.email', 'headers.x-forwarded-for') */
+  /**
+   * Exact dot-notation paths to redact (e.g. `'user.email'`, `'headers.x-forwarded-for'`).
+   * Only the leaf at that path is replaced — does not match the same key name elsewhere.
+   */
   paths?: string[]
+  /**
+   * Object key names to redact at any nesting depth (e.g. `'password'` redacts
+   * `user.password`, `data.a.b.password`, etc.). Replaces the entire value.
+   */
+  keys?: string[]
+  /**
+   * RegExp patterns matched against object key names at any nesting depth.
+   * Replaces the entire value (e.g. `/.*_token$/` matches `access_token`, `refresh_token`).
+   */
+  keyPatterns?: RegExp[]
   /** Additional regex patterns to match and replace string values anywhere in the event */
   patterns?: RegExp[]
   /**
@@ -112,7 +125,7 @@ export interface RedactConfig {
    */
   builtins?: false | Array<'creditCard' | 'email' | 'ipv4' | 'phone' | 'jwt' | 'bearer' | 'iban'>
   /**
-   * Replacement string used for path-based and custom pattern redaction.
+   * Replacement string used for path-, key-, and custom pattern redaction.
    * Built-in patterns use smart partial masking instead (e.g. `****1111` for credit cards).
    * @default '[REDACTED]'
    */
