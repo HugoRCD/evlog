@@ -1,0 +1,91 @@
+{
+  "name": "@evlog/cli",
+  "version": "0.0.0",
+  "description": "CLI observability primitive for evlog — wide events, drain, catalogs, and audit for command-line tools",
+  "author": "HugoRCD <contact@hrcd.fr>",
+  "homepage": "https://evlog.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HugoRCD/evlog.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/HugoRCD/evlog/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    },
+    "./citty": {
+      "types": "./dist/citty.d.mts",
+      "import": "./dist/citty.mjs",
+      "default": "./dist/citty.mjs"
+    },
+    "./http": {
+      "types": "./dist/http.d.mts",
+      "import": "./dist/http.mjs",
+      "default": "./dist/http.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "typesVersions": {
+    "*": {
+      ".": ["./dist/index.d.mts"],
+      "citty": ["./dist/citty.d.mts"],
+      "http": ["./dist/http.d.mts"]
+    }
+  },
+  "files": [
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "cli",
+    "evlog",
+    "logging",
+    "wide-events",
+    "structured-logging",
+    "audit"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev:prepare": "tsdown",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "citty": "^0.2.2",
+    "evlog": "workspace:*",
+    "ofetch": "^1.4.1",
+    "tsdown": "^0.15.11",
+    "typescript": "^6.0.3"
+  },
+  "peerDependencies": {
+    "evlog": "^2.14.0",
+    "citty": "^0.1.6 || ^0.2.0",
+    "ofetch": "^1.4.0"
+  },
+  "peerDependenciesMeta": {
+    "evlog": {
+      "optional": false
+    },
+    "citty": {
+      "optional": true
+    },
+    "ofetch": {
+      "optional": true
+    }
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
