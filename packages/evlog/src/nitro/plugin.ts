@@ -21,27 +21,6 @@ function getSafeHeaders(event: ServerEvent): Record<string, string> {
   return filterSafeHeaders(allHeaders)
 }
 
-function getSafeResponseHeaders(event: ServerEvent): Record<string, string> | undefined {
-  const headers: Record<string, string> = {}
-  const nodeRes = event.node?.res as { getHeaders?: () => Record<string, unknown> } | undefined
-
-  if (nodeRes?.getHeaders) {
-    for (const [key, value] of Object.entries(nodeRes.getHeaders())) {
-      if (value === undefined) continue
-      headers[key] = Array.isArray(value) ? value.join(', ') : String(value)
-    }
-  }
-
-  if (event.response?.headers) {
-    event.response.headers.forEach((value, key) => {
-      headers[key] = value
-    })
-  }
-
-  if (Object.keys(headers).length === 0) return undefined
-  return filterSafeHeaders(headers)
-}
-
 function getResponseStatus(event: ServerEvent): number {
   // Node.js style
   if (event.node?.res?.statusCode) {

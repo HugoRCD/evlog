@@ -14,7 +14,7 @@ import {
 } from '../../src/shared/pretty-error'
 import { readCodeSnippetFromDisk } from '../../src/shared/pretty-error-snippet.node'
 import { enrichErrorStackForDev } from '../../src/shared/enrich-error-stack.node'
-import { shouldShowFrameworkOverlay, prependNitroErrorHandler } from '../../src/nitro'
+import { prependNitroErrorHandler } from '../../src/nitro'
 
 const SAMPLE_STACK = `Error: Payment processing failed
     at Object.handler (file:///Users/dev/project/server/api/test.get.ts:100:0)
@@ -200,20 +200,6 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
     const fixIndex = children.findIndex(line => line.includes('Fix:'))
     expect(fixIndex).toBeGreaterThanOrEqual(0)
     expect(children[fixIndex + 1]).toMatch(/^\s{5}\S/)
-  })
-})
-
-describe('framework overlay routing', () => {
-  const originalEnv = process.env.NODE_ENV
-
-  afterEach(() => {
-    process.env.NODE_ENV = originalEnv
-  })
-
-  it('defaults to no Nitro overlay in pretty dev and allows opt-in', () => {
-    process.env.NODE_ENV = 'development'
-    expect(shouldShowFrameworkOverlay({ pretty: true })).toBe(false)
-    expect(shouldShowFrameworkOverlay({ pretty: true, dev: 'nitro' })).toBe(true)
   })
 })
 

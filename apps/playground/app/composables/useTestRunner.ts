@@ -3,11 +3,7 @@ interface UseTestRunnerOptions {
   onError?: (error: any) => void
   endpoint?: string
   method?: 'GET' | 'POST'
-  /** Abort $fetch after this many ms (playground cards). */
-  timeoutMs?: number
 }
-
-const DEFAULT_FETCH_TIMEOUT_MS = 15_000
 
 export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
   const state = useTestState()
@@ -25,18 +21,9 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
       let response
 
       if (options?.endpoint) {
-        const timeoutMs = options.timeoutMs ?? DEFAULT_FETCH_TIMEOUT_MS
-        const controller = new AbortController()
-        const timeoutId = setTimeout(() => controller.abort(), timeoutMs)
-
-        try {
-          response = await $fetch(options.endpoint, {
-            method: options.method || 'GET',
-            signal: controller.signal,
-          })
-        } finally {
-          clearTimeout(timeoutId)
-        }
+        response = await $fetch(options.endpoint, {
+          method: options.method || 'GET',
+        })
       } else if (fn) {
         response = await fn()
       }
@@ -46,15 +33,12 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
       options?.onSuccess?.(response)
 
       return response
-    } catch (err: unknown) {
+    } catch (err: any) {
       state.setStatus(testId, 'error')
-      state.setError(testId, summarizeError(err))
+      state.setError(testId, err)
       options?.onError?.(err)
+
       throw err
-    } finally {
-      if (state.getStatus(testId) === 'loading') {
-        state.setStatus(testId, 'idle')
-      }
     }
   }
 
@@ -70,11 +54,4 @@ export function useTestRunner(testId: string, options?: UseTestRunnerOptions) {
     status,
     reset,
   }
-}
-
-function summarizeError(err: unknown): { message: string } {
-  if (err && typeof err === 'object' && 'message' in err) {
-    return { message: String((err as { message: unknown }).message) }
-  }
-  return { message: String(err) }
 }

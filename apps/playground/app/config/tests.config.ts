@@ -16,10 +16,6 @@ export interface TestConfig {
     color: string
   }
   showResult?: boolean
-  /** $fetch is expected to fail — reset card to idle after handling. */
-  expectError?: boolean
-  /** Show a parseError() toast on fetch failure (use with endpoint + expectError). */
-  parseErrorToast?: boolean
   toastOnSuccess?: {
     title: string
     description: string
@@ -487,9 +483,32 @@ export const testConfig = {
           label: 'Trigger API Error',
           description: 'Server-side structured error displayed as a rich toast with context, suggested fix, and helpful links',
           color: 'error',
-          endpoint: '/api/test/structured-error',
-          expectError: true,
-          parseErrorToast: true,
+          onClick: async () => {
+            try {
+              await $fetch('/api/test/structured-error')
+            } catch (err) {
+              const error = parseError(err)
+              const toast = useToast()
+              toast.add({
+                title: error.message,
+                description: error.why,
+                color: 'error',
+                actions: error.link
+                  ? [
+                    {
+                      label: 'Learn more',
+                      onClick: () => {
+                        window.open(error.link, '_blank')
+                      },
+                    }
+                  ]
+                  : undefined,
+              })
+              if (error.fix) {
+                console.info(`💡 Fix: ${error.fix}`)
+              }
+            }
+          },
           badge: {
             label: 'parseError()',
             color: 'red',
