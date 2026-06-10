@@ -10,6 +10,8 @@ import {
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import type { DevTerminalInput } from '../shared/dev-terminal'
+import { prependNitroErrorHandler } from '../nitro'
 import { createStripPlugin } from '../vite/strip'
 import { createSourceLocationPlugin } from '../vite/source-location'
 import { name, version } from '../../package.json'
@@ -75,6 +77,12 @@ export interface ModuleOptions {
    * @default true in development, false in production
    */
   pretty?: boolean
+
+  /**
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
+   */
+  dev?: DevTerminalInput
 
   /**
    * Suppress built-in console output.
@@ -357,7 +365,8 @@ export default defineNuxtModule<ModuleOptions>({
     // often cannot resolve useRuntimeConfig().evlog via dynamic import reliably).
     // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
     nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
-      nitroConfig.errorHandler = nitroConfig.errorHandler || resolver.resolve('../nitro/errorHandler')
+      const evlogHandler = resolver.resolve('../nitro/errorHandler').replace(/\\/g, '/')
+      nitroConfig.errorHandler = prependNitroErrorHandler(nitroConfig.errorHandler, evlogHandler)
 
       const evlogForNitro = nuxt.options.runtimeConfig.evlog ?? options
       if (evlogForNitro !== undefined && typeof evlogForNitro === 'object') {

@@ -127,6 +127,12 @@ describe('nitroConfigBridge — active runtime', () => {
     expect(importSpy).not.toHaveBeenCalled()
   })
 
+  it('reads inlined config via readEvlogConfigSync', async () => {
+    globalThis.__EVLOG_CONFIG__ = { env: { service: 'svc-inline' } }
+    const { readEvlogConfigSync } = await import('../../src/shared/nitroConfigBridge')
+    expect(readEvlogConfigSync()).toEqual({ env: { service: 'svc-inline' } })
+  })
+
   it('ignores __EVLOG_CONFIG__ when it is not an object literal', async () => {
     globalThis.__EVLOG_CONFIG__ = 'not-an-object'
     const { bridge, importSpy } = await loadBridgeWithMocks()

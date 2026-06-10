@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Nitro } from 'nitro/types'
 import type { NitroModuleOptions } from '../nitro'
+import { prependNitroErrorHandler } from '../nitro'
 
 export type { NitroModuleOptions }
 
@@ -31,14 +32,11 @@ export default function evlog(options?: NitroModuleOptions) {
       }
 
 
-      // Set error handler only if not already configured by user
-      if (!nitro.options.errorHandler) {
-        nitro.options.errorHandler = [resolveModulePath('errorHandler')]
-      } else if (Array.isArray(nitro.options.errorHandler)) {
-        nitro.options.errorHandler.unshift(resolveModulePath('errorHandler'))
-      } else if (typeof nitro.options.errorHandler === 'string') {
-        nitro.options.errorHandler = [resolveModulePath('errorHandler'), nitro.options.errorHandler]
-      }
+      const handlers = prependNitroErrorHandler(
+        nitro.options.errorHandler,
+        resolveModulePath('errorHandler'),
+      )
+      nitro.options.errorHandler = Array.isArray(handlers) ? handlers : [handlers]
 
       // Inject config into runtimeConfig — works in production where the
       // plugin is bundled through Nitro's builder and the virtual

@@ -4,6 +4,10 @@ import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact'
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
+import { buildErrorEntries, PRETTY_ERROR_TREE_SPACER, registerPrettyErrorSnippetReader } from './shared/pretty-error'
+import type { ResolvedPrettyError } from './shared/dev-terminal'
+import { resolveDevTerminal } from './shared/dev-terminal'
+import { EvlogError } from './error'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
@@ -52,6 +56,12 @@ let globalEnv: EnvironmentContext = {
 }
 
 let globalPretty = isDev()
+let globalPrettyError: ResolvedPrettyError = {
+  snippet: isDev(),
+  stackDepth: 2,
+  compact: isDev(),
+  detail: 'full',
+}
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
@@ -80,6 +90,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   }
 
   globalPretty = config.pretty ?? isDev()
+  globalPrettyError = resolveDevTerminal(config).prettyError
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
@@ -92,6 +103,14 @@ export function initLogger(config: LoggerConfig = {}): void {
 
   if (globalPluginRunner.plugins.length > 0) {
     void globalPluginRunner.runSetup({ env: { ...globalEnv } })
+  }
+
+  if (!isBrowser() && typeof process !== 'undefined' && process.versions?.node) {
+    void import('./shared/pretty-error-snippet.node.js').then((mod) => {
+      registerPrettyErrorSnippetReader(mod.readCodeSnippetFromDisk)
+    }).catch(() => {
+      registerPrettyErrorSnippetReader(null)
+    })
   }
 
   const hasAnyDrain = !!globalDrain || globalPluginRunner.hasDrain
@@ -521,11 +540,35 @@ function buildAIEntries(ai: Record<string, unknown>): TreeEntry[] {
   return entries
 }
 
+function flushPrettyLines(lines: string[]): void {
+  if (lines.length === 0) return
+  const text = `${lines.join('\n')}\n`
+  if (
+    typeof process !== 'undefined'
+    && typeof process.stdout?.write === 'function'
+    && !isBrowser()
+    && process.env.VITEST !== 'true'
+  ) {
+    process.stdout.write(text)
+    return
+  }
+  console.log(lines.join('\n'))
+}
+
 function prettyPrintWideEvent(event: Record<string, unknown>): void {
   const { timestamp, level, service, environment, version, ...rest } = event
   const ts = typeof timestamp === 'string' ? timestamp.slice(11, 23) : ''
   const levelLabel = typeof level === 'string' ? level : 'info'
   const browser = isBrowser()
+  const lines: string[] = []
+  const writeLine = (...args: unknown[]) => {
+    if (browser) {
+      console.log(...args)
+      return
+    }
+    const [line] = args
+    if (typeof line === 'string') lines.push(line)
+  }
 
   const parts: string[] = []
   const styles: string[] = []
@@ -536,7 +579,11 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     styles.push(cssColors.dim, cssColors.reset, lc, cssColors.reset, cssColors.cyan, cssColors.reset)
   } else {
     const lc = getLevelColor(levelLabel)
-    parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
+    if (isDev()) {
+      parts.push(`${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
+    } else {
+      parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
+    }
   }
 
   if (rest.method && rest.path) {
@@ -569,23 +616,35 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     delete rest.duration
   }
 
-  console.log(parts.join(''), ...styles)
+  writeLine(parts.join(''), ...styles)
 
   const aiData = isPlainObject(rest.ai) ? rest.ai : undefined
   if (aiData) {
     delete rest.ai
   }
 
+  const errorData = rest.error
+  if (errorData !== undefined) {
+    delete rest.error
+  }
+
   const restEntries = Object.entries(rest).filter(([_, v]) => v !== undefined)
   const aiEntries = aiData ? buildAIEntries(aiData) : []
-  const allEntries: TreeEntry[] = [
+  const errorEntries = errorData !== undefined
+    ? buildErrorEntries(errorData, globalPrettyError)
+    : []
+  const contextEntries: TreeEntry[] = [
     ...restEntries.map(([key, value]) => ({ key, value: formatValue(value) })),
     ...aiEntries,
   ]
+  const allEntries: TreeEntry[] = errorEntries.length > 0
+    ? [...errorEntries, ...contextEntries]
+    : contextEntries
 
   for (let i = 0; i < allEntries.length; i++) {
     const entry = allEntries[i]
     if (!entry) continue
+
     const { children } = entry
     const hasChildren = children !== undefined && children.length > 0
     const isLast = i === allEntries.length - 1 && !hasChildren
@@ -593,10 +652,10 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
 
     if (browser) {
       const val = entry.value ? ` ${escapeFormatString(entry.value)}` : ''
-      console.log(`  %c${prefix}%c %c${escapeFormatString(entry.key)}:%c${val}`, cssColors.dim, cssColors.reset, cssColors.cyan, cssColors.reset)
+      writeLine(`  %c${prefix}%c %c${escapeFormatString(entry.key)}:%c${val}`, cssColors.dim, cssColors.reset, cssColors.cyan, cssColors.reset)
     } else {
       const val = entry.value ? ` ${entry.value}` : ''
-      console.log(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${entry.key}:${colors.reset}${val}`)
+      writeLine(`  ${colors.dim}${prefix}${colors.reset} ${colors.cyan}${entry.key}:${colors.reset}${val}`)
     }
 
     if (hasChildren && children) {
@@ -605,15 +664,29 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
       for (let j = 0; j < children.length; j++) {
         const child = children[j]
         if (child === undefined) continue
+        if (child === PRETTY_ERROR_TREE_SPACER) {
+          writeLine(`  ${colors.dim}${connector}${colors.reset}`)
+          continue
+        }
         const isLastChild = j === children.length - 1
         const childPrefix = isLastChild ? '└─' : '├─'
+        if (child === '') {
+          writeLine('')
+          continue
+        }
         if (browser) {
-          console.log(`  %c${connector}  ${childPrefix}%c ${escapeFormatString(child)}`, cssColors.dim, cssColors.reset)
+          writeLine(`  %c${connector}  ${childPrefix}%c ${escapeFormatString(child)}`, cssColors.dim, cssColors.reset)
+        } else if (child.startsWith(' ') || child.startsWith('\x1B')) {
+          writeLine(`  ${colors.dim}${connector}${colors.reset}${child}`)
         } else {
-          console.log(`  ${colors.dim}${connector}  ${childPrefix}${colors.reset} ${child}`)
+          writeLine(`  ${colors.dim}${connector}  ${childPrefix}${colors.reset} ${child}`)
         }
       }
     }
+  }
+
+  if (!browser && lines.length > 0) {
+    flushPrettyLines(lines)
   }
 }
 
@@ -776,6 +849,14 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       const errRecord = err as unknown as Record<string, unknown>
       for (const k of ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'cause', 'internal'] as const) {
         if (k in err) errorObj[k] = errRecord[k]
+      }
+
+      if (err instanceof EvlogError) {
+        if (err.code) errorObj.code = err.code
+        if (err.why) errorObj.why = err.why
+        if (err.fix) errorObj.fix = err.fix
+        if (err.link) errorObj.link = err.link
+        if (err.status) errorObj.status = err.status
       }
 
       if (isPlainObject(context.error)) {

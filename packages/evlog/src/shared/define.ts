@@ -1,4 +1,5 @@
 import type { EnvironmentContext, LoggerConfig, SamplingConfig } from '../types'
+import type { DevTerminalInput } from './dev-terminal'
 import type { BaseEvlogOptions } from './middleware'
 
 /**
@@ -16,6 +17,11 @@ export interface EvlogConfig extends BaseEvlogOptions {
   enabled?: boolean
   /** Auto-detected from `NODE_ENV` when omitted. */
   pretty?: boolean
+  /**
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
+   */
+  dev?: DevTerminalInput
   sampling?: SamplingConfig
   /** Suppress built-in console output (useful when drains own the channel). */
   silent?: boolean
@@ -66,6 +72,7 @@ export function toLoggerConfig(config: EvlogConfig): LoggerConfig {
   if (env) out.env = env
   if (config.enabled !== undefined) out.enabled = config.enabled
   if (config.pretty !== undefined) out.pretty = config.pretty
+  if (config.dev !== undefined) out.dev = config.dev
   if (config.sampling !== undefined) out.sampling = config.sampling
   if (config.minLevel !== undefined) out.minLevel = config.minLevel
   if (config.stringify !== undefined) out.stringify = config.stringify

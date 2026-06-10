@@ -1,41 +1,34 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
-import type { H3Event } from 'h3'
-import { defined } from '../helpers/defined'
 
 declare global {
   // eslint-disable-next-line @typescript-eslint/naming-convention
   var __EVLOG_CONFIG__: unknown
 }
 
-const mockSetResponseStatus = vi.fn()
-const mockSetResponseHeader = vi.fn()
-const mockSend = vi.fn()
-const mockGetRequestURL = vi.fn(() => ({ pathname: '/api/test' }))
-
-vi.mock('h3', () => ({
-  setResponseStatus: (event: H3Event, status: number) => mockSetResponseStatus(event, status),
-  setResponseHeader: (event: H3Event, name: string, value: string) => mockSetResponseHeader(event, name, value),
-  send: (event: H3Event, body: string) => mockSend(event, body),
-  getRequestURL: (event: H3Event, options?: { xForwardedHost?: boolean }) => mockGetRequestURL(event, options),
-}))
-
-vi.mock('nitropack/runtime', () => ({
-  defineNitroErrorHandler: <T>(handler: T) => handler,
+vi.mock('nitro', () => ({
+  defineErrorHandler: <T>(handler: T) => handler,
 }))
 
 import { createError } from '../../src/error'
-import errorHandler from '../../src/nitro/errorHandler'
+import errorHandler from '../../src/nitro-v3/errorHandler'
 import { resetNitroDevOverlayCache, shouldSuppressNitroDevOverlay } from '../../src/nitro'
-
-const mockEvent = { node: { req: {}, res: {} }, _handled: false } as H3Event & { _handled: boolean }
 
 const defaultHandlerMock = vi.fn().mockResolvedValue(undefined)
 
-function invokeErrorHandler(error: Error) {
-  return errorHandler(error, mockEvent, { defaultHandler: defaultHandlerMock })
+const mockEvent = {
+  req: { url: 'http://localhost/api/test' },
+  _handled: false,
+} as { req: { url: string }; _handled: boolean }
+
+function invokeErrorHandler(error: Error, event = mockEvent) {
+  return errorHandler(error, event, { defaultHandler: defaultHandlerMock })
 }
 
-describe('errorHandler', () => {
+async function readJson(response: Response) {
+  return JSON.parse(await response.text())
+}
+
+describe('nitro-v3 errorHandler', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     vi.stubEnv('NODE_ENV', 'development')
@@ -63,7 +56,9 @@ describe('errorHandler', () => {
     resetNitroDevOverlayCache()
     const defaultHandler = vi.fn().mockResolvedValue(undefined)
     const error = new Error('boom')
+
     await errorHandler(error, mockEvent, { defaultHandler })
+
     expect(defaultHandler).toHaveBeenCalledWith(error, mockEvent, { silent: false })
   })
 
@@ -89,17 +84,17 @@ describe('errorHandler', () => {
         },
       })
 
-      await invokeErrorHandler(evlogError)
+      const response = await invokeErrorHandler(evlogError)
 
-      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 402)
-      expect(mockSetResponseHeader).toHaveBeenCalledWith(mockEvent, 'Content-Type', 'application/json')
+      expect(response.status).toBe(402)
+      expect(response.headers.get('Content-Type')).toBe('application/json')
 
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.statusCode).toBe(402)
-      expect(sentBody.message).toBe('Payment failed')
-      expect(sentBody.url).toBe('/api/test')
-      expect(sentBody.error).toBe(true)
-      expect(sentBody.data).toEqual({
+      const body = await readJson(response)
+      expect(body.statusCode).toBe(402)
+      expect(body.message).toBe('Payment failed')
+      expect(body.url).toBe('/api/test')
+      expect(body.error).toBe(true)
+      expect(body.data).toEqual({
         why: 'Card declined',
         fix: 'Try another card',
         link: 'https://docs.example.com',
@@ -118,21 +113,21 @@ describe('errorHandler', () => {
 
       const wrapperError = Object.assign(new Error('Wrapper error'), { cause: evlogError })
 
-      await invokeErrorHandler(wrapperError)
+      const response = await invokeErrorHandler(wrapperError)
 
-      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 404)
+      expect(response.status).toBe(404)
 
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.statusCode).toBe(404)
-      expect(sentBody.data).toEqual({ why: 'Resource does not exist' })
+      const body = await readJson(response)
+      expect(body.statusCode).toBe(404)
+      expect(body.data).toEqual({ why: 'Resource does not exist' })
     })
 
     it('defaults to 500 when no status on evlogError', async () => {
       const evlogError = Object.assign(new Error('Unknown error'), { name: 'EvlogError' })
 
-      await invokeErrorHandler(evlogError)
+      const response = await invokeErrorHandler(evlogError)
 
-      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
+      expect(response.status).toBe(500)
     })
 
     it('does not expose internal context on EvlogError responses', async () => {
@@ -143,13 +138,13 @@ describe('errorHandler', () => {
         internal: { userId: 'u-internal', rawPolicy: 'deny:admin' },
       })
 
-      await invokeErrorHandler(err)
+      const response = await invokeErrorHandler(err)
 
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.internal).toBeUndefined()
-      expect(JSON.stringify(sentBody)).not.toContain('u-internal')
-      expect(JSON.stringify(sentBody)).not.toContain('rawPolicy')
-      expect(sentBody.data).toEqual({
+      const body = await readJson(response)
+      expect(body.internal).toBeUndefined()
+      expect(JSON.stringify(body)).not.toContain('u-internal')
+      expect(JSON.stringify(body)).not.toContain('rawPolicy')
+      expect(body.data).toEqual({
         why: 'Insufficient role',
         fix: undefined,
         link: undefined,
@@ -163,35 +158,30 @@ describe('errorHandler', () => {
         statusCode: 400,
       })
 
-      await invokeErrorHandler(error)
+      const response = await invokeErrorHandler(error)
 
-      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 400)
+      expect(response.status).toBe(400)
 
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.statusCode).toBe(400)
-      expect(sentBody.statusMessage).toBe('Something went wrong')
-      expect(sentBody.message).toBe('Something went wrong')
-      expect(sentBody.url).toBe('/api/test')
-      expect(sentBody.error).toBe(true)
-      expect(sentBody.data).toBeUndefined()
+      const body = await readJson(response)
+      expect(body.statusCode).toBe(400)
+      expect(body.statusMessage).toBe('Something went wrong')
+      expect(body.message).toBe('Something went wrong')
+      expect(body.url).toBe('/api/test')
+      expect(body.error).toBe(true)
+      expect(body.data).toBeUndefined()
     })
 
     it('defaults to 500 for errors without status', async () => {
-      const error = new Error('Generic error')
-
-      await invokeErrorHandler(error)
-
-      expect(mockSetResponseStatus).toHaveBeenCalledWith(mockEvent, 500)
+      const response = await invokeErrorHandler(new Error('Generic error'))
+      expect(response.status).toBe(500)
     })
 
     it('uses "Internal Server Error" when no message', async () => {
-      const error = new Error('')
+      const response = await invokeErrorHandler(new Error(''))
 
-      await invokeErrorHandler(error)
-
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.message).toBe('Internal Server Error')
-      expect(sentBody.statusMessage).toBe('Internal Server Error')
+      const body = await readJson(response)
+      expect(body.message).toBe('Internal Server Error')
+      expect(body.statusMessage).toBe('Internal Server Error')
     })
 
     it('sanitizes 5xx error messages in production', async () => {
@@ -201,11 +191,9 @@ describe('errorHandler', () => {
         statusCode: 500,
       })
 
-      await invokeErrorHandler(error)
-
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.message).toBe('Internal Server Error')
-      expect(sentBody.statusMessage).toBe('Internal Server Error')
+      const body = await readJson(await invokeErrorHandler(error))
+      expect(body.message).toBe('Internal Server Error')
+      expect(body.statusMessage).toBe('Internal Server Error')
     })
 
     it('preserves 4xx error messages in production', async () => {
@@ -215,11 +203,9 @@ describe('errorHandler', () => {
         statusCode: 400,
       })
 
-      await invokeErrorHandler(error)
-
-      const sentBody = JSON.parse(defined(mockSend.mock.calls[0]?.[1], 'response body'))
-      expect(sentBody.message).toBe('Invalid email format')
-      expect(sentBody.statusMessage).toBe('Invalid email format')
+      const body = await readJson(await invokeErrorHandler(error))
+      expect(body.message).toBe('Invalid email format')
+      expect(body.statusMessage).toBe('Invalid email format')
     })
   })
 })

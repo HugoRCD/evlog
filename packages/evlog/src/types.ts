@@ -1,4 +1,5 @@
 import type { NitroRuntimeHooks } from 'nitropack/types'
+import type { DevTerminalInput } from './shared/dev-terminal'
 
 declare module 'nitropack/types' {
   interface NitroRuntimeHooks {
@@ -297,6 +298,11 @@ export interface LoggerConfig {
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
+  /**
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
+   */
+  dev?: DevTerminalInput
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
   /**
@@ -915,6 +921,8 @@ export interface H3EventContext {
   _evlogStartTime?: number
   /** Internal: flag to prevent double emission on errors */
   _evlogEmitted?: boolean
+  /** Internal: error hook is mid-emit; blocks concurrent afterResponse/response emission */
+  _evlogEmitting?: boolean
   /** Internal: whether the route matched shouldLog filtering (emit-time guard) */
   _evlogShouldEmit?: boolean
   [key: string]: unknown

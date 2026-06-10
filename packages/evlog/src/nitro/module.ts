@@ -2,6 +2,7 @@ import { dirname, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import type { Nitro } from 'nitropack'
 import type { NitroModuleOptions } from '../nitro'
+import { prependNitroErrorHandler } from '../nitro'
 
 export type { NitroModuleOptions }
 
@@ -23,10 +24,11 @@ export default function evlog(options?: NitroModuleOptions) {
       nitro.options.plugins = nitro.options.plugins || []
       nitro.options.plugins.push(resolveModulePath('plugin'))
 
-      // Set error handler only if not already configured by user
-      if (!nitro.options.errorHandler) {
-        nitro.options.errorHandler = resolveModulePath('errorHandler')
-      }
+      // Prepend so evlog runs before any framework handler (Nuxt registers its own).
+      nitro.options.errorHandler = prependNitroErrorHandler(
+        nitro.options.errorHandler,
+        resolveModulePath('errorHandler'),
+      )
 
       // explicitly tell nitro to bundle evlog's files to correctly resolve nitro dependencies
       // in nitro v2 we can only disable externals globally
