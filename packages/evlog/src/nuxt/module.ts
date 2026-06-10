@@ -365,7 +365,7 @@ export default defineNuxtModule<ModuleOptions>({
     // often cannot resolve useRuntimeConfig().evlog via dynamic import reliably).
     // @ts-expect-error nitro:config hook exists but is not in NuxtHooks type
     nuxt.hook('nitro:config', (nitroConfig: NitroConfig) => {
-      const evlogHandler = resolver.resolve('../nitro/errorHandler')
+      const evlogHandler = resolver.resolve('../nitro/errorHandler').replace(/\\/g, '/')
       nitroConfig.errorHandler = prependNitroErrorHandler(nitroConfig.errorHandler, evlogHandler)
 
       const evlogForNitro = nuxt.options.runtimeConfig.evlog ?? options

@@ -71,11 +71,11 @@ export function resolveDevTerminal(input: DevTerminalResolveInput = {}): Resolve
   let frameworkOverlay: boolean | undefined
   let prettyError: DevPrettyErrorConfig = {}
 
-  if (typeof input.dev === 'string') {
+  if (typeof input.dev === 'string' && input.dev in DEV_PRESETS) {
     const { frameworkOverlay: presetOverlay, detail } = DEV_PRESETS[input.dev]
     frameworkOverlay = presetOverlay
     prettyError = { detail }
-  } else if (input.dev) {
+  } else if (input.dev && typeof input.dev === 'object') {
     const { frameworkOverlay: devOverlay, prettyError: devPrettyError } = input.dev
     frameworkOverlay = devOverlay
     if (devPrettyError) {

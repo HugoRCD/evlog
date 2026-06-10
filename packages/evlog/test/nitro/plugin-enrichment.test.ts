@@ -1,60 +1,27 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { NitroApp } from 'nitropack/types'
 import { getHeaders } from 'h3'
 import type { DrainContext, EnrichContext, ServerEvent, WideEvent } from '../../src/types'
 import { defined } from '../helpers/defined'
-import { filterSafeHeaders } from '../../src/utils'
-import { createRequestLogger, initLogger } from '../../src/logger'
+import { callEnrichAndDrain } from '../../src/nitro/enrich-drain'
+import { initLogger } from '../../src/logger'
 
 vi.mock('h3', () => ({
   getHeaders: vi.fn(),
 }))
 
-function getSafeHeaders(allHeaders: Partial<Record<string, string | undefined>>): Record<string, string> {
-  return filterSafeHeaders(allHeaders)
+function asNitroApp(hooks: { callHook: NitroApp['hooks']['callHook'] }): NitroApp {
+  return { hooks } as NitroApp
 }
 
-
 describe('nitro plugin - enrichment pipeline (T7)', () => {
-  async function callEnrichAndDrain(
-    nitroApp: {
-      hooks: {
-        callHook: (name: string, ctx: EnrichContext | DrainContext) => Promise<void>
-      }
-    },
-    emittedEvent: WideEvent | null,
-    event: ServerEvent,
-    options?: { deferDrain?: boolean },
-  ): Promise<void> {
-    if (!emittedEvent) return
+  beforeEach(() => {
+    initLogger({ pretty: false })
+  })
 
-    const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
-    const hookContext = {
-      request: { method: event.method, path: event.path, requestId: event.context.requestId as string | undefined },
-      headers: getSafeHeaders(allHeaders),
-      response: { status: 200 },
-    }
-
-    try {
-      await nitroApp.hooks.callHook('evlog:enrich', { event: emittedEvent, ...hookContext })
-    } catch (err) {
-      console.error('[evlog] enrich failed:', err)
-    }
-
-    const drainPromise = nitroApp.hooks.callHook('evlog:drain', {
-      event: emittedEvent,
-      request: hookContext.request,
-      headers: hookContext.headers,
-    }).catch((err) => {
-      console.error('[evlog] drain failed:', err)
-    })
-
-    if (options?.deferDrain) {
-      void drainPromise
-      return
-    }
-
-    await drainPromise
-  }
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
 
   it('calls enrich then drain in sequence', async () => {
     const callOrder: string[] = []
@@ -81,7 +48,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       environment: 'test',
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent)
 
     expect(callOrder).toEqual(['evlog:enrich', 'evlog:drain'])
   })
@@ -97,7 +64,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       context: {},
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, null, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), null, mockEvent)
 
     expect(mockHooks.callHook).not.toHaveBeenCalled()
   })
@@ -133,7 +100,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       environment: 'test',
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent)
 
     expect(drainCalled).toBe(true)
     expect(consoleSpy).toHaveBeenCalledWith('[evlog] enrich failed:', expect.any(Error))
@@ -168,7 +135,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     }
 
     // Should not throw
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent)
 
     await vi.waitFor(() => expect(consoleSpy).toHaveBeenCalledWith('[evlog] drain failed:', expect.any(Error)))
     consoleSpy.mockRestore()
@@ -205,7 +172,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       environment: 'test',
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent)
 
     const drained = defined(drainEvent, 'drainEvent')
     expect(drained.enriched).toBe(true)
@@ -246,7 +213,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       environment: 'test',
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent)
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent)
 
     expect(enrichHeaders).toEqual(mockHeaders)
     expect(drainHeaders).toEqual(mockHeaders)
@@ -284,7 +251,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
       environment: 'test',
     }
 
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent, { deferDrain: true })
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent, { deferDrain: true })
 
     expect(mockWaitUntil).not.toHaveBeenCalled()
     resolveDrain()
@@ -320,7 +287,7 @@ describe('nitro plugin - enrichment pipeline (T7)', () => {
     }
 
     const started = Date.now()
-    await callEnrichAndDrain({ hooks: mockHooks }, emittedEvent, mockEvent, { deferDrain: true })
+    await callEnrichAndDrain(asNitroApp(mockHooks), emittedEvent, mockEvent, { deferDrain: true })
     expect(Date.now() - started).toBeLessThan(100)
 
     resolveDrain()

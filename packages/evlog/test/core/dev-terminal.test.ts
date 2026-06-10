@@ -54,6 +54,14 @@ describe('resolveDevTerminal', () => {
       },
     })
   })
+
+  it('ignores unknown preset strings and falls back to defaults', () => {
+    process.env.NODE_ENV = 'development'
+    expect(() => resolveDevTerminal({ pretty: true, dev: 'unknown' as 'evlog' })).not.toThrow()
+    expect(resolveDevTerminal({ pretty: true, dev: 'unknown' as 'evlog' })).toEqual(
+      resolveDevTerminal({ pretty: true }),
+    )
+  })
 })
 
 describe('shouldShowFrameworkOverlay', () => {

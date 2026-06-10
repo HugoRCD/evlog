@@ -67,7 +67,7 @@ export interface CodeSnippetLine {
 }
 
 const SKIP_PATH_RE = /(?:^|[/\\])(?:node_modules|\.nuxt|\.output)(?:[/\\]|$)/
-const SKIP_FRAME_PATH_RE = /(?:^|[/\\])(?:packages[/\\]evlog|evlog[/\\]dist|evlog[/\\]src)(?:[/\\]|$)|[/\\]error\.(?:ts|mjs)(?:$|:)/
+const SKIP_FRAME_PATH_RE = /(?:^|[/\\])(?:packages[/\\]evlog|evlog[/\\](?:dist|src))(?:[/\\]|$)/
 const SKIP_FRAME_FN_RE = /^(?:createError|EvlogError|new EvlogError)$/
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {

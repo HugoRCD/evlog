@@ -2,6 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { H3Event } from 'h3'
 import { defined } from '../helpers/defined'
 
+declare global {
+  // eslint-disable-next-line @typescript-eslint/naming-convention
+  var __EVLOG_CONFIG__: unknown
+}
+
 const mockSetResponseStatus = vi.fn()
 const mockSetResponseHeader = vi.fn()
 const mockSend = vi.fn()
@@ -20,6 +25,7 @@ vi.mock('nitropack/runtime', () => ({
 
 import { createError } from '../../src/error'
 import errorHandler from '../../src/nitro/errorHandler'
+import { resetNitroDevOverlayCache, shouldSuppressNitroDevOverlay } from '../../src/nitro'
 
 const mockEvent = { node: { req: {}, res: {} }, _handled: false } as H3Event & { _handled: boolean }
 
@@ -34,6 +40,8 @@ describe('errorHandler', () => {
     vi.clearAllMocks()
     vi.stubEnv('NODE_ENV', 'development')
     vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true }))
+    delete globalThis.__EVLOG_CONFIG__
+    resetNitroDevOverlayCache()
     mockEvent._handled = false
   })
 
@@ -52,10 +60,18 @@ describe('errorHandler', () => {
 
   it('calls defaultHandler when dev preset is nitro', async () => {
     vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true, dev: 'nitro' }))
+    resetNitroDevOverlayCache()
     const defaultHandler = vi.fn().mockResolvedValue(undefined)
     const error = new Error('boom')
     await errorHandler(error, mockEvent, { defaultHandler })
     expect(defaultHandler).toHaveBeenCalledWith(error, mockEvent, { silent: false })
+  })
+
+  it('reads inlined __EVLOG_CONFIG__ for overlay suppression', () => {
+    vi.stubEnv('__EVLOG_CONFIG', undefined)
+    globalThis.__EVLOG_CONFIG__ = { pretty: true, dev: 'nitro' }
+    resetNitroDevOverlayCache()
+    expect(shouldSuppressNitroDevOverlay()).toBe(false)
   })
 
   describe('EvlogError handling', () => {

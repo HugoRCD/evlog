@@ -110,6 +110,14 @@ export function readEvlogConfigFromNitroEnv(): EvlogConfig | undefined {
   }
 }
 
+/**
+ * Synchronous evlog config for hot paths (error handler overlay, etc.).
+ * Matches {@link resolveEvlogConfigForNitroPlugin} steps 1–2 only.
+ */
+export function readEvlogConfigSync(): EvlogConfig | undefined {
+  return readEvlogConfigFromInline() ?? readEvlogConfigFromNitroEnv()
+}
+
 let cachedNitropackRuntime: NitroRuntimeConfigModule | null | undefined
 let cachedNitroV3Runtime: NitroRuntimeConfigModule | null | undefined
 let cachedNitropackInternalConfig: NitroRuntimeConfigModule | null | undefined

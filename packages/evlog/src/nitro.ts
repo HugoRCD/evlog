@@ -2,6 +2,7 @@ import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingC
 import type { DevTerminalInput, DevTerminalResolveInput } from './shared/dev-terminal'
 import { extractErrorStatus } from './shared/errors'
 import { resolveDevTerminal, shouldShowFrameworkOverlay } from './shared/dev-terminal'
+import { readEvlogConfigSync } from './shared/nitroConfigBridge'
 
 export type { DevTerminalInput, DevTerminalPreset, DevPrettyErrorConfig, DevTerminalConfigObject, ResolvedPrettyError } from './shared/dev-terminal'
 export { resolveDevTerminal, shouldShowFrameworkOverlay } from './shared/dev-terminal'
@@ -134,7 +135,8 @@ export function prependNitroErrorHandler(
 ): string | string[] {
   if (!errorHandler) return handlerPath
   if (Array.isArray(errorHandler)) {
-    return errorHandler.includes(handlerPath) ? errorHandler : [handlerPath, ...errorHandler]
+    const rest = errorHandler.filter(h => h !== handlerPath)
+    return [handlerPath, ...rest]
   }
   if (errorHandler === handlerPath) return handlerPath
   return [handlerPath, errorHandler]
@@ -144,28 +146,25 @@ export function prependNitroErrorHandler(
  * Whether the Nitro dev Youch overlay should be suppressed for this process.
  * @internal
  */
-let cachedConfigRaw: string | undefined
+let cachedConfigKey: string | undefined
 let cachedSuppressOverlay: boolean | undefined
 
 export function shouldSuppressNitroDevOverlay(): boolean {
-  const raw = process.env.__EVLOG_CONFIG
-  if (cachedSuppressOverlay !== undefined && cachedConfigRaw === raw) {
+  const config = readEvlogConfigSync()
+  const key = config ? JSON.stringify(config) : ''
+  if (cachedSuppressOverlay !== undefined && cachedConfigKey === key) {
     return cachedSuppressOverlay
   }
 
-  cachedConfigRaw = raw
-
-  try {
-    if (raw) {
-      cachedSuppressOverlay = !resolveDevTerminal(JSON.parse(raw) as DevTerminalResolveInput).frameworkOverlay
-      return cachedSuppressOverlay
-    }
-  } catch {
-    // ignore malformed config
-  }
-
-  cachedSuppressOverlay = !resolveDevTerminal({}).frameworkOverlay
+  cachedConfigKey = key
+  cachedSuppressOverlay = !resolveDevTerminal(config ?? {}).frameworkOverlay
   return cachedSuppressOverlay
+}
+
+/** @internal Reset overlay decision cache — tests only. */
+export function resetNitroDevOverlayCache(): void {
+  cachedConfigKey = undefined
+  cachedSuppressOverlay = undefined
 }
 
 /**

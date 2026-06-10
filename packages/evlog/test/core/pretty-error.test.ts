@@ -92,6 +92,15 @@ describe('parseStackFrames', () => {
     expect(primary?.line).toBe(100)
   })
 
+  it('does not skip user handler files named error.ts', () => {
+    const stack = `Error: boom
+    at Object.handler (file:///Users/dev/project/server/api/error.ts:42:5)
+    at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
+    const primary = pickPrimaryFrame(parseStackFrames(stack))
+    expect(primary?.file).toContain('server/api/error.ts')
+    expect(primary?.line).toBe(42)
+  })
+
   it('skips bundled .nuxt/dev frames', () => {
     const stack = `Payment processing failed
 at createError (.nuxt/dev/index.mjs:3007:10)
@@ -218,6 +227,7 @@ describe('prependNitroErrorHandler', () => {
     const existing = ['/nuxt/error', '/nitro/dev']
     expect(prependNitroErrorHandler(existing, handler)).toEqual([handler, ...existing])
     expect(prependNitroErrorHandler([handler, ...existing], handler)).toEqual([handler, ...existing])
+    expect(prependNitroErrorHandler(['framework', handler], handler)).toEqual([handler, 'framework'])
   })
 })
 
