@@ -99,7 +99,11 @@ export async function callEnrichAndDrain(
     console.error('[evlog] enrich failed:', err)
   }
   if (runner.hasEnrich) {
-    await runner.runEnrich(enrichCtx)
+    try {
+      await runner.runEnrich(enrichCtx)
+    } catch (err) {
+      console.error('[evlog] enrich failed:', err)
+    }
   }
 
   const drainCtx = {
@@ -113,7 +117,11 @@ export async function callEnrichAndDrain(
     }),
   ]
   if (runner.hasDrain) {
-    drainTasks.push(runner.runDrain(drainCtx))
+    drainTasks.push(
+      runner.runDrain(drainCtx).catch((err) => {
+        console.error('[evlog] drain failed:', err)
+      }),
+    )
   }
   const drainPromise = Promise.all(drainTasks)
 

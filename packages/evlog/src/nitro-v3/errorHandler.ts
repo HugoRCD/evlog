@@ -7,11 +7,9 @@ import {
   serializeEvlogErrorResponse,
   shouldSuppressNitroDevOverlay,
   suppressNitroDevOverlay,
+  markH3ErrorHandled,
 } from '../nitro'
-
-type NitroErrorHandlerContext = {
-  defaultHandler?: (error: Error, event: unknown, opts?: { silent?: boolean; json?: boolean }) => Promise<unknown>
-}
+import type { NitroErrorHandlerContext } from '../shared/nitro-types'
 
 /**
  * Custom Nitro v3 error handler that properly serializes EvlogError.
@@ -23,12 +21,14 @@ type NitroErrorHandlerContext = {
  * export { default } from 'evlog/nitro/v3/errorHandler'
  * ```
  */
-export default defineErrorHandler(async (error, event, ctx?: NitroErrorHandlerContext) => {
+export default defineErrorHandler(async (error, event, ctx: NitroErrorHandlerContext) => {
   const suppressOverlay = shouldSuppressNitroDevOverlay()
 
-  if (!suppressOverlay && ctx?.defaultHandler) {
+  if (!suppressOverlay) {
     await ctx.defaultHandler(error, event, { silent: false })
   }
+
+  markH3ErrorHandled(event)
 
   if (suppressOverlay) {
     suppressNitroDevOverlay(error)

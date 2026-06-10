@@ -62,6 +62,30 @@ describe('resolveDevTerminal', () => {
       resolveDevTerminal({ pretty: true }),
     )
   })
+
+  it('accepts explicit dev object overrides', () => {
+    process.env.NODE_ENV = 'development'
+    expect(resolveDevTerminal({
+      pretty: true,
+      dev: {
+        frameworkOverlay: true,
+        prettyError: {
+          snippet: false,
+          stackDepth: 1,
+          compact: false,
+          detail: 'guidance',
+        },
+      },
+    })).toEqual({
+      frameworkOverlay: true,
+      prettyError: {
+        snippet: false,
+        stackDepth: 0,
+        compact: false,
+        detail: 'guidance',
+      },
+    })
+  })
 })
 
 describe('shouldShowFrameworkOverlay', () => {
