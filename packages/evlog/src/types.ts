@@ -1,4 +1,5 @@
 import type { NitroRuntimeHooks } from 'nitropack/types'
+import type { DevTerminalInput } from './shared/dev-terminal'
 
 declare module 'nitropack/types' {
   interface NitroRuntimeHooks {
@@ -98,21 +99,27 @@ export interface IngestPayload {
  * or select specific ones with `builtins: ['email', 'creditCard']`.
  */
 export interface RedactConfig {
-  /** Dot-notation paths to redact (e.g., 'user.email', 'headers.x-forwarded-for') */
+  /**
+   * Dot-notation paths to redact. Supports globs:
+   * - `'user.email'` — exact path only
+   * - `'password'` or `'**.password'` — key at any nesting depth
+   * - `'*_token'` — key-name glob at any depth
+   * - `'user.*'` — path glob under `user`
+   */
   paths?: string[]
   /** Additional regex patterns to match and replace string values anywhere in the event */
   patterns?: RegExp[]
   /**
    * Control built-in PII patterns.
    * - `undefined` / omitted → all built-ins enabled (default)
-   * - `false` → no built-ins, only custom `paths`/`patterns`
+   * - `false` → no built-ins, only custom `paths` and `patterns`
    * - `['email', 'creditCard', ...]` → only the listed built-ins
    *
    * Available: `'creditCard'`, `'email'`, `'ipv4'`, `'phone'`, `'jwt'`, `'bearer'`, `'iban'`
    */
   builtins?: false | Array<'creditCard' | 'email' | 'ipv4' | 'phone' | 'jwt' | 'bearer' | 'iban'>
   /**
-   * Replacement string used for path-based and custom pattern redaction.
+   * Replacement string used for path- and custom pattern redaction.
    * Built-in patterns use smart partial masking instead (e.g. `****1111` for credit cards).
    * @default '[REDACTED]'
    */
@@ -291,6 +298,11 @@ export interface LoggerConfig {
   env?: Partial<EnvironmentContext>
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
+  /**
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
+   */
+  dev?: DevTerminalInput
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
   /**
@@ -909,6 +921,8 @@ export interface H3EventContext {
   _evlogStartTime?: number
   /** Internal: flag to prevent double emission on errors */
   _evlogEmitted?: boolean
+  /** Internal: error hook is mid-emit; blocks concurrent afterResponse/response emission */
+  _evlogEmitting?: boolean
   /** Internal: whether the route matched shouldLog filtering (emit-time guard) */
   _evlogShouldEmit?: boolean
   [key: string]: unknown

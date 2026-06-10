@@ -3,7 +3,7 @@ defineProps<{
   name: string
   href: string
   icon: string
-  wordmarkClass?: string
+  wordmarkClass: string
 }>()
 </script>
 
@@ -12,12 +12,12 @@ defineProps<{
     :href
     target="_blank"
     rel="noopener noreferrer"
-    class="landing-logo-item shrink-0"
+    class="landing-logo-item flex w-full min-w-0 items-center justify-center"
     :aria-label="name"
   >
     <UIcon
       :name="icon"
-      :class="wordmarkClass ?? 'h-10 w-auto shrink-0'"
+      :class="wordmarkClass"
       aria-hidden="true"
     />
   </a>

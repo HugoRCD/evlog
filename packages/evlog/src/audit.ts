@@ -1,5 +1,6 @@
 import type { AuditActor, AuditActionDefinition, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
+import { compileRedactPathMatchers, redactValueByPaths } from './redact'
 import { getHeader as getSharedHeader } from './shared/headers'
 
 /**
@@ -303,8 +304,8 @@ export interface WithAuditContext {
  * `changes` field. Output is a JSON Patch-style array (RFC 6902 subset:
  * `add`, `remove`, `replace`) — small enough to ship over the wire.
  *
- * Object keys whose name matches one of the `redactPaths` (dot-notation, e.g.
- * `'user.password'`, `'card.cvv'`) are replaced with `'[REDACTED]'` so PII
+ * Fields matching `redactPaths` glob patterns (e.g. `'password'`, `'**.password'`,
+ * `'*_token'`, `'user.email'`) are replaced with `'[REDACTED]'` so PII
  * never leaks through the diff.
  *
  * @example
@@ -323,17 +324,13 @@ export function auditDiff(
   options: AuditDiffOptions = {},
 ): { before?: unknown, after?: unknown, patch: AuditPatchOp[] } {
   const replacement = options.replacement ?? '[REDACTED]'
-  const redactSet = new Set((options.redactPaths ?? []).map(p => p))
-  const patch: AuditPatchOp[] = []
-
-  function isRedacted(path: string): boolean {
-    if (redactSet.size === 0) return false
-    if (redactSet.has(path)) return true
-    for (const p of redactSet) {
-      if (path.endsWith(`.${p}`)) return true
-    }
-    return false
+  const pathMatchers = compileRedactPathMatchers(options.redactPaths) ?? {
+    exactPaths: new Set<string>(),
+    pathGlobs: [],
+    keyGlobs: [],
+    caseInsensitiveLeaves: new Set<string>(),
   }
+  const patch: AuditPatchOp[] = []
 
   function diff(a: unknown, b: unknown, path: string): void {
     if (a === b) return
@@ -363,20 +360,7 @@ export function auditDiff(
   }
 
   function redactValue(value: unknown, path: string): unknown {
-    if (value === null || typeof value !== 'object') {
-      const segs = path.split('/').filter(Boolean)
-      const last = segs[segs.length - 1]
-      if (last && isRedacted(last)) return replacement
-      return value
-    }
-    if (Array.isArray(value)) {
-      return value.map((v, i) => redactValue(v, `${path}/${i}`))
-    }
-    const out: Record<string, unknown> = {}
-    for (const [k, v] of Object.entries(value as Record<string, unknown>)) {
-      out[k] = isRedacted(k) ? replacement : redactValue(v, `${path}/${k}`)
-    }
-    return out
+    return redactValueByPaths(value, pathMatchers, replacement, path)
   }
 
   diff(before, after, '')
@@ -390,7 +374,7 @@ export type { AuditPatchOp } from './types'
 
 /** Options for {@link auditDiff}. */
 export interface AuditDiffOptions {
-  /** Object keys (dot-notation) whose values should be replaced with `[REDACTED]`. */
+  /** Path globs (same syntax as `RedactConfig.paths`) whose values are replaced with `[REDACTED]`. */
   redactPaths?: string[]
   /** Custom replacement string. @default '[REDACTED]' */
   replacement?: string
@@ -881,30 +865,18 @@ function stripIntegrity(event: WideEvent): WideEvent {
  */
 export const auditRedactPreset: RedactConfig = {
   paths: [
-    'audit.changes.before.password',
-    'audit.changes.before.passwordHash',
-    'audit.changes.before.token',
-    'audit.changes.before.apiKey',
-    'audit.changes.before.secret',
-    'audit.changes.before.accessToken',
-    'audit.changes.before.refreshToken',
-    'audit.changes.before.cardNumber',
-    'audit.changes.before.cvv',
-    'audit.changes.before.ssn',
-    'audit.changes.after.password',
-    'audit.changes.after.passwordHash',
-    'audit.changes.after.token',
-    'audit.changes.after.apiKey',
-    'audit.changes.after.secret',
-    'audit.changes.after.accessToken',
-    'audit.changes.after.refreshToken',
-    'audit.changes.after.cardNumber',
-    'audit.changes.after.cvv',
-    'audit.changes.after.ssn',
-    'headers.authorization',
-    'headers.cookie',
-    'headers.set-cookie',
-    'audit.context.headers.authorization',
-    'audit.context.headers.cookie',
+    'password',
+    'passwordHash',
+    'token',
+    'apiKey',
+    'secret',
+    'accessToken',
+    'refreshToken',
+    'cardNumber',
+    'cvv',
+    'ssn',
+    'authorization',
+    'cookie',
+    'set-cookie',
   ],
 }

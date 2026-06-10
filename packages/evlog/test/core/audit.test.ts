@@ -16,7 +16,7 @@ import {
 } from '../../src/audit'
 import type { AuditFields, DrainContext, EnrichContext, WideEvent } from '../../src/types'
 import { createLogger, createRequestLogger, initLogger } from '../../src/logger'
-import { resolveRedactConfig } from '../../src/redact'
+import { redactEvent, resolveRedactConfig } from '../../src/redact'
 import { defined } from '../helpers/defined'
 
 function createDrainCtx(event: Partial<WideEvent> = {}): DrainContext {
@@ -207,6 +207,24 @@ describe('auditDiff()', () => {
     )
     expect(diff.patch).toContainEqual({ op: 'replace', path: '/user/name', value: 'B' })
     expect(diff.patch).toContainEqual({ op: 'replace', path: '/user/password', value: '[REDACTED]' })
+  })
+
+  it('redacts exact dotted paths without matching other branches', () => {
+    const diff = auditDiff(
+      { user: { password: 'old' }, admin: { password: 'secret' } },
+      { user: { password: 'new' }, admin: { password: 'secret' } },
+      { redactPaths: ['user.password'] },
+    )
+    expect(diff.patch).toContainEqual({ op: 'replace', path: '/user/password', value: '[REDACTED]' })
+    expect(diff.patch).not.toContainEqual({ op: 'replace', path: '/admin/password', value: '[REDACTED]' })
+  })
+
+  it('preserves non-plain objects in snapshots', () => {
+    const before = { at: new Date('2026-01-01T00:00:00.000Z') }
+    const after = { at: new Date('2026-06-01T00:00:00.000Z') }
+    const diff = auditDiff(before, after, { includeBefore: true, includeAfter: true })
+    expect((diff.before as { at: Date }).at).toBeInstanceOf(Date)
+    expect((diff.after as { at: Date }).at).toBeInstanceOf(Date)
   })
 
   it('emits add and remove operations', () => {
@@ -508,15 +526,36 @@ describe('end-to-end: audit + auditOnly + global drain', () => {
 })
 
 describe('auditRedactPreset', () => {
-  it('drops authorization headers', () => {
+  it('redacts authorization and cookie path globs at any depth', () => {
     const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
-    expect(config.paths).toContain('headers.authorization')
+    expect(config.paths).toContain('authorization')
+    expect(config.paths).toContain('cookie')
+    expect(config.paths).toContain('set-cookie')
   })
 
-  it('drops password fields under audit.changes', () => {
+  it('redacts credential path globs at any depth', () => {
     const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
-    expect(config.paths).toContain('audit.changes.before.password')
-    expect(config.paths).toContain('audit.changes.after.password')
+    expect(config.paths).toContain('password')
+    expect(config.paths).toContain('token')
+    expect(config.paths).toContain('apiKey')
+  })
+
+  it('redacts nested audit.changes password fields via path globs', () => {
+    const config = defined(resolveRedactConfig(auditRedactPreset), 'audit redact preset')
+    const event = redactEvent(
+      {
+        audit: {
+          changes: {
+            before: { password: 'old' },
+            after: { password: 'new' },
+          },
+        },
+      },
+      config,
+    )
+    const changes = (event.audit as Record<string, unknown>).changes as Record<string, unknown>
+    expect((changes.before as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect((changes.after as Record<string, unknown>).password).toBe('[REDACTED]')
   })
 })
 

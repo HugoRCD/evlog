@@ -2,7 +2,16 @@
 // internal/app.mjs which imports virtual modules that crash outside rollup builds.
 import { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils'
 import { getRequestURL, setResponseHeader, setResponseStatus, send } from 'h3'
-import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } from '../nitro'
+import {
+  resolveEvlogError,
+  extractErrorStatus,
+  buildPlainNitroErrorBody,
+  serializeEvlogErrorResponse,
+  markH3ErrorHandled,
+  shouldSuppressNitroDevOverlay,
+  suppressNitroDevOverlay,
+} from '../nitro'
+import type { NitroErrorHandlerContext } from '../shared/nitro-types'
 
 /**
  * Custom Nitro error handler that properly serializes EvlogError.
@@ -12,38 +21,28 @@ import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } fr
  * For non-EvlogError, it preserves Nitro's default response shape while
  * sanitizing internal error details in production for 5xx errors.
  */
-export default defineNitroErrorHandler((error, event) => {
+export default defineNitroErrorHandler(async (error, event, ctx: NitroErrorHandlerContext) => {
+  const suppressOverlay = shouldSuppressNitroDevOverlay()
+
+  if (!suppressOverlay) {
+    await ctx.defaultHandler(error, event, { silent: false })
+  }
+
+  markH3ErrorHandled(event)
+  if (suppressOverlay) {
+    suppressNitroDevOverlay(error)
+  }
+
   const evlogError = resolveEvlogError(error)
 
   const isDev = process.env.NODE_ENV === 'development'
   const url = getRequestURL(event, { xForwardedHost: true }).pathname
 
-  // For non-EvlogError, preserve Nitro's default response shape
   if (!evlogError) {
-    const status = extractErrorStatus(error)
-
-    // Derive message from statusText/statusMessage/message for cross-version compatibility
-    const rawMessage = ((error as { statusText?: string }).statusText
-      ?? (error as { statusMessage?: string }).statusMessage
-      ?? error.message) || 'Internal Server Error'
-
-    // Sanitize internal error details in production for 5xx errors
-    const message = isDev
-      ? rawMessage
-      : (status >= 500 ? 'Internal Server Error' : rawMessage)
-
-    setResponseStatus(event, status)
+    const body = buildPlainNitroErrorBody(error, url, isDev)
+    setResponseStatus(event, body.status as number)
     setResponseHeader(event, 'Content-Type', 'application/json')
-
-    return send(event, JSON.stringify({
-      url,
-      status,
-      statusCode: status,
-      statusText: message,
-      statusMessage: message,
-      message,
-      error: true,
-    }))
+    return send(event, JSON.stringify(body))
   }
 
   const status = extractErrorStatus(evlogError)

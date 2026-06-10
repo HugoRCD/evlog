@@ -148,20 +148,34 @@ export function filterSafeHeaders(headers: Partial<Record<string, string | undef
 const patternCache = new Map<string, RegExp>()
 
 /**
+ * Compile a glob pattern to a anchored RegExp.
+ *
+ * - `*` matches any characters except the separator
+ * - `**` matches any characters including the separator
+ * - `?` matches one character except the separator
+ */
+export function globToRegExp(pattern: string, separator: '/' | '.' = '/'): RegExp {
+  const cacheKey = `${separator}:${pattern}`
+  let regex = patternCache.get(cacheKey)
+  if (!regex) {
+    const segment = separator === '/' ? '[^/]*' : '[^.]*'
+    const char = separator === '/' ? '[^/]' : '[^.]'
+    const regexPattern = pattern
+      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
+      .replace(/\*\*/g, '{{GLOBSTAR}}')
+      .replace(/\*/g, segment)
+      .replace(/{{GLOBSTAR}}/g, '.*')
+      .replace(/\?/g, char)
+    regex = new RegExp(`^${regexPattern}$`)
+    patternCache.set(cacheKey, regex)
+  }
+  return regex
+}
+
+/**
  * Match a path against a glob pattern.
  * Supports * (any chars except /) and ** (any chars including /).
  */
 export function matchesPattern(path: string, pattern: string): boolean {
-  let regex = patternCache.get(pattern)
-  if (!regex) {
-    const regexPattern = pattern
-      .replace(/[.+^${}()|[\]\\]/g, '\\$&')
-      .replace(/\*\*/g, '{{GLOBSTAR}}')
-      .replace(/\*/g, '[^/]*')
-      .replace(/{{GLOBSTAR}}/g, '.*')
-      .replace(/\?/g, '[^/]')
-    regex = new RegExp(`^${regexPattern}$`)
-    patternCache.set(pattern, regex)
-  }
-  return regex.test(path)
+  return globToRegExp(pattern, '/').test(path)
 }

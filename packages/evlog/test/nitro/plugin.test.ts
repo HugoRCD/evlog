@@ -847,7 +847,7 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
    * Replicates the plugin's `afterResponse` hook logic.
    */
   function simulateAfterResponseHook(event: ServerEvent): { emitted: boolean } {
-    if (event.context._evlogEmitted || !event.context._evlogShouldEmit) {
+    if (event.context._evlogEmitted || event.context._evlogEmitting || !event.context._evlogShouldEmit) {
       return { emitted: false }
     }
     const { log } = event.context
@@ -864,11 +864,16 @@ describe('nitro plugin - middleware compatibility (#210)', () => {
     if (!event.context._evlogShouldEmit) return { emitted: false }
     const { log } = event.context
     if (!log) return { emitted: false }
-    log.error(error)
-    log.set({ status: 500 })
-    event.context._evlogEmitted = true
-    const result = log.emit()
-    return { emitted: result !== null }
+    event.context._evlogEmitting = true
+    try {
+      log.error(error)
+      log.set({ status: 500 })
+      const result = log.emit()
+      if (result) event.context._evlogEmitted = true
+      return { emitted: result !== null }
+    } finally {
+      delete event.context._evlogEmitting
+    }
   }
 
   beforeEach(() => {

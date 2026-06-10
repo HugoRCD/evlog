@@ -23,7 +23,7 @@ describe('nitro modules avoid backslash paths', () => {
 
   it('nitro v2 module pushes POSIX-style plugin and errorHandler paths', () => {
     const nitro = makeNitroStub()
-    nitroV2Module({ env: { service: 'test' } }).setup(nitro as never)
+    nitroV2Module({ env: { service: 'test' }, silent: true }).setup(nitro as never)
 
     expect(nitro.options.plugins).toHaveLength(1)
     expect(nitro.options.plugins[0]).not.toMatch(/\\/)
@@ -32,6 +32,9 @@ describe('nitro modules avoid backslash paths', () => {
     expect(nitro.options.errorHandler).toBeTypeOf('string')
     expect(nitro.options.errorHandler).not.toMatch(/\\/)
     expect(nitro.options.errorHandler).toMatch(/\/nitro\/errorHandler$/)
+
+    const { replace } = nitro.options as { replace?: Record<string, string> }
+    expect(JSON.parse(replace!.__EVLOG_CONFIG__)).toEqual({ env: { service: 'test' }, silent: true })
   })
 
   it('nitro v3 module pushes POSIX-style plugin and errorHandler paths', () => {
