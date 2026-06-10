@@ -1,4 +1,5 @@
 import type { NitroRuntimeHooks } from 'nitropack/types'
+import type { DevTerminalInput } from './shared/dev-terminal'
 
 declare module 'nitropack/types' {
   interface NitroRuntimeHooks {
@@ -292,17 +293,10 @@ export interface LoggerConfig {
   /** Enable pretty printing (auto-detected: true in dev, false in prod) */
   pretty?: boolean
   /**
-   * Dev-only code snippets around the primary stack frame in pretty error output.
-   * @default true in development
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
    */
-  prettyErrorFrames?: boolean
-  /**
-   * Max stack frames shown after the code snippet in pretty error output.
-   * @default 3
-   */
-  prettyErrorStackDepth?: number
-  /** Tighter dev error layout (shorter snippet, no stack tail). @default true in dev */
-  prettyErrorCompact?: boolean
+  dev?: DevTerminalInput
   /** Sampling configuration for filtering logs */
   sampling?: SamplingConfig
   /**

@@ -2,4 +2,10 @@
 'evlog': minor
 ---
 
-Improve dev terminal error output in pretty mode: tighter error blocks by default (`prettyErrorCompact` — shorter snippet; dim gray stack tail; context tree unchanged). Tree spacers between error message, source, guidance, and stack for easier scanning. Long Why/Fix lines wrap with hanging indent. Writes via `stdout` in dev to avoid duplicate Consola/Nuxt timestamps. Verbose layout with `prettyErrorCompact: false`. Structured `error` blocks shown first with source-mapped file:line via Nitro's `loadStackTrace` in dev (skipped when `pretty: false` or in production). `devErrorHandler: 'evlog'` (default) suppresses Nitro's Youch overlay; `'nitro'` keeps it. On the Nitro error hook, enrich+drain runs in the background (`void`, never `event.waitUntil`) so HTTP error responses are not blocked by slow drains — Nitro 2.13+ queues `waitUntil` work before sending the response, which previously hung 4xx/5xx when Axiom/stream drains were enabled. Options: `prettyErrorFrames`, `prettyErrorStackDepth`, `prettyErrorCompact`.
+Improve dev terminal error output and introduce a clearer `dev` config API.
+
+**Presets:** `dev: 'evlog' | 'nitro' | 'both'` — controls Nitro's Youch overlay (`frameworkOverlay`) and how much stack detail evlog prints in the wide event (`prettyError.detail`). Default in pretty dev is `'evlog'` (no Nitro overlay, full evlog error block). `'nitro'` keeps Nitro's stack and prints only message + Why/Fix/link in the wide event. `'both'` shows both full outputs.
+
+**Explicit object:** `dev: { frameworkOverlay, prettyError: { snippet, stackDepth, compact, detail: 'full' | 'guidance' } }`.
+
+Other improvements: tighter error blocks by default (`prettyError.compact`), tree spacers, hanging-indent Why/Fix wrapping, `stdout` for error wide events in dev, source-mapped file:line via Nitro `loadStackTrace`, Nitro error hook enrich+drain no longer blocks HTTP responses.

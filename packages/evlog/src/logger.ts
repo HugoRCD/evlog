@@ -5,6 +5,8 @@ import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
 import { buildErrorEntries, PRETTY_ERROR_TREE_SPACER, registerPrettyErrorSnippetReader } from './shared/pretty-error'
+import type { ResolvedPrettyError } from './shared/dev-terminal'
+import { resolveDevTerminal } from './shared/dev-terminal'
 import { EvlogError } from './error'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
 
@@ -54,9 +56,12 @@ let globalEnv: EnvironmentContext = {
 }
 
 let globalPretty = isDev()
-let globalPrettyErrorFrames = isDev()
-let globalPrettyErrorStackDepth: number | undefined
-let globalPrettyErrorCompact = isDev()
+let globalPrettyError: ResolvedPrettyError = {
+  snippet: isDev(),
+  stackDepth: 2,
+  compact: isDev(),
+  detail: 'full',
+}
 let globalSampling: SamplingConfig = {}
 let globalStringify = true
 let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
@@ -85,9 +90,7 @@ export function initLogger(config: LoggerConfig = {}): void {
   }
 
   globalPretty = config.pretty ?? isDev()
-  globalPrettyErrorFrames = config.prettyErrorFrames ?? isDev()
-  globalPrettyErrorStackDepth = config.prettyErrorStackDepth
-  globalPrettyErrorCompact = config.prettyErrorCompact ?? isDev()
+  globalPrettyError = resolveDevTerminal(config).prettyError
   globalSampling = config.sampling ?? {}
   globalStringify = config.stringify ?? true
   globalDrain = config.drain
@@ -628,11 +631,7 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
   const restEntries = Object.entries(rest).filter(([_, v]) => v !== undefined)
   const aiEntries = aiData ? buildAIEntries(aiData) : []
   const errorEntries = errorData !== undefined
-    ? buildErrorEntries(errorData, {
-      prettyErrorFrames: globalPrettyErrorFrames,
-      prettyErrorStackDepth: globalPrettyErrorStackDepth,
-      compact: globalPrettyErrorCompact,
-    })
+    ? buildErrorEntries(errorData, globalPrettyError)
     : []
   const contextEntries: TreeEntry[] = [
     ...restEntries.map(([key, value]) => ({ key, value: formatValue(value) })),

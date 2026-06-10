@@ -1,4 +1,5 @@
 import { colors, isBrowser, isDev } from '../utils'
+import type { ResolvedPrettyError } from './dev-terminal'
 
 /** @internal Server-only snippet reader registered by Nitro plugin or initLogger. */
 type SnippetReader = (file: string, line: number, contextLines?: number) => CodeSnippetLine[] | null
@@ -54,13 +55,7 @@ export interface StackFrame {
 }
 
 /** Options for {@link buildErrorEntries}. */
-export interface PrettyErrorOptions {
-  /** Dev-only code snippets around the primary stack frame. @default true in dev */
-  prettyErrorFrames?: boolean
-  /** Max stack frames shown after the snippet. @default 2 when compact, else 3 */
-  prettyErrorStackDepth?: number
-  /** Tighter dev error layout: shorter snippet, no blank lines within the block. @default true in dev */
-  compact?: boolean
+export type PrettyErrorOptions = Partial<ResolvedPrettyError> & {
   /** Project root for relative paths in snippets. @default process.cwd() */
   cwd?: string
 }
@@ -352,15 +347,19 @@ export function buildErrorEntries(
 
   const cwd = options.cwd ?? (typeof process !== 'undefined' && typeof process.cwd === 'function' ? process.cwd() : '.')
   const compact = options.compact ?? isDev()
-  const showFrames = !isBrowser() && (options.prettyErrorFrames ?? isDev())
-  const stackDepth = options.prettyErrorStackDepth ?? (compact ? 2 : 3)
+  const detail = options.detail ?? 'full'
+  const guidanceOnly = detail === 'guidance'
+  const showFrames = !guidanceOnly && !isBrowser() && (options.snippet ?? isDev())
+  const stackDepth = guidanceOnly
+    ? 0
+    : (options.stackDepth ?? (compact ? 2 : 3))
   const snippetContextLines = compact ? 1 : 2
 
   const children: string[] = []
-  const frames = parseStackFrames(normalized.stack)
-  const primary = pickPrimaryFrame(frames)
+  const frames = guidanceOnly ? [] : parseStackFrames(normalized.stack)
+  const primary = guidanceOnly ? undefined : pickPrimaryFrame(frames)
 
-  if (primary?.file && primary.line) {
+  if (!guidanceOnly && primary?.file && primary.line) {
     pushTreeSpacer(children)
     if (showFrames) {
       const snippet = readCodeSnippet(primary.file, primary.line, snippetContextLines)
@@ -396,12 +395,12 @@ export function buildErrorEntries(
     children.push(`${colors.dim}Caused by:${colors.reset} ${normalized.cause}`)
   }
 
-  const hiddenCount = frames.filter(f => !f.isApp || isInternalErrorFrame(f)).length
+  const hiddenCount = guidanceOnly ? 0 : frames.filter(f => !f.isApp || isInternalErrorFrame(f)).length
   const tailFrames = stackDepth > 0
     ? frames.filter(f => f !== primary && !isInternalErrorFrame(f)).slice(0, stackDepth)
     : []
 
-  if (hiddenCount > 0 || tailFrames.length > 0) {
+  if (!guidanceOnly && (hiddenCount > 0 || tailFrames.length > 0)) {
     pushTreeSpacer(children)
     if (hiddenCount > 0) {
       children.push(`${colors.gray}stack (${hiddenCount} frame${hiddenCount === 1 ? '' : 's'} hidden in node_modules)${colors.reset}`)

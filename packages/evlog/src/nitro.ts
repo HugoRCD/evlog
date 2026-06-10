@@ -1,5 +1,10 @@
 import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig } from './types'
+import type { DevTerminalInput, DevTerminalResolveInput } from './shared/dev-terminal'
 import { extractErrorStatus } from './shared/errors'
+import { resolveDevTerminal, shouldShowFrameworkOverlay } from './shared/dev-terminal'
+
+export type { DevTerminalInput, DevTerminalPreset, DevPrettyErrorConfig, DevTerminalConfigObject, ResolvedPrettyError } from './shared/dev-terminal'
+export { resolveDevTerminal, shouldShowFrameworkOverlay } from './shared/dev-terminal'
 
 export { shouldLog, getServiceForPath } from './shared/routes'
 
@@ -22,26 +27,10 @@ export interface NitroModuleOptions {
   pretty?: boolean
 
   /**
-   * Dev-only code snippets around the primary stack frame in pretty error output.
-   * @default true in development
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
+   * @default 'evlog' when pretty in development
    */
-  prettyErrorFrames?: boolean
-
-  /**
-   * Max stack frames shown after the code snippet in pretty error output.
-   * @default 3
-   */
-  prettyErrorStackDepth?: number
-  /** Compact terminal error layout. @default true in dev */
-  prettyErrorCompact?: boolean
-
-  /**
-   * Development error console handler.
-   * - `'evlog'` — suppress Nitro's dev overlay; rely on evlog wide events (default when pretty in dev)
-   * - `'nitro'` — keep Nitro's native dev error output
-   * @default 'evlog' when pretty in development, otherwise 'nitro'
-   */
-  devErrorHandler?: 'evlog' | 'nitro'
+  dev?: DevTerminalInput
 
   /**
    * Suppress built-in console output.
@@ -98,15 +87,9 @@ export interface NitroModuleOptions {
  * {@link import('./shared/define').EvlogConfig} for the canonical user-facing
  * config shape.
  */
-export interface NitroPluginEvlogConfig {
+export interface NitroPluginEvlogConfig extends DevTerminalResolveInput {
   enabled?: boolean
   env?: Record<string, unknown>
-  pretty?: boolean
-  prettyErrorFrames?: boolean
-  prettyErrorStackDepth?: number
-  /** Compact terminal error layout. @default true in dev */
-  prettyErrorCompact?: boolean
-  devErrorHandler?: 'evlog' | 'nitro'
   silent?: boolean
   include?: string[]
   exclude?: string[]
@@ -142,17 +125,6 @@ export function markH3ErrorHandled(event: { _handled?: boolean }): void {
 }
 
 /**
- * Whether to register evlog's silent dev error handler instead of Nitro's overlay.
- * @internal
- */
-export function shouldUseEvlogDevErrorHandler(config: Pick<NitroModuleOptions, 'pretty' | 'devErrorHandler'>): boolean {
-  if (config.devErrorHandler === 'nitro') return false
-  if (config.devErrorHandler === 'evlog') return true
-  const pretty = config.pretty ?? process.env.NODE_ENV !== 'production'
-  return pretty && process.env.NODE_ENV !== 'production'
-}
-
-/**
  * Prepend evlog's Nitro error handler so it runs before framework handlers (e.g. Nuxt).
  * @internal
  */
@@ -172,16 +144,28 @@ export function prependNitroErrorHandler(
  * Whether the Nitro dev Youch overlay should be suppressed for this process.
  * @internal
  */
+let cachedConfigRaw: string | undefined
+let cachedSuppressOverlay: boolean | undefined
+
 export function shouldSuppressNitroDevOverlay(): boolean {
+  const raw = process.env.__EVLOG_CONFIG
+  if (cachedSuppressOverlay !== undefined && cachedConfigRaw === raw) {
+    return cachedSuppressOverlay
+  }
+
+  cachedConfigRaw = raw
+
   try {
-    const raw = process.env.__EVLOG_CONFIG
     if (raw) {
-      return shouldUseEvlogDevErrorHandler(JSON.parse(raw) as NitroModuleOptions)
+      cachedSuppressOverlay = !resolveDevTerminal(JSON.parse(raw) as DevTerminalResolveInput).frameworkOverlay
+      return cachedSuppressOverlay
     }
   } catch {
     // ignore malformed config
   }
-  return shouldUseEvlogDevErrorHandler({})
+
+  cachedSuppressOverlay = !resolveDevTerminal({}).frameworkOverlay
+  return cachedSuppressOverlay
 }
 
 /**

@@ -10,6 +10,7 @@ import {
 } from '@nuxt/kit'
 import type { NitroConfig } from 'nitropack'
 import type { EnvironmentContext, LogLevel, RedactConfig, RouteConfig, SamplingConfig, TransportConfig } from '../types'
+import type { DevTerminalInput } from '../shared/dev-terminal'
 import { prependNitroErrorHandler } from '../nitro'
 import { createStripPlugin } from '../vite/strip'
 import { createSourceLocationPlugin } from '../vite/source-location'
@@ -78,26 +79,10 @@ export interface ModuleOptions {
   pretty?: boolean
 
   /**
-   * Dev-only code snippets around the primary stack frame in pretty error output.
-   * @default true in development
-   */
-  prettyErrorFrames?: boolean
-
-  /**
-   * Max stack frames shown after the code snippet in pretty error output.
-   * @default 3
-   */
-  prettyErrorStackDepth?: number
-  /** Tighter dev error layout (shorter snippet, no stack tail). @default true in dev */
-  prettyErrorCompact?: boolean
-
-  /**
-   * Development error console handler.
-   * - `'evlog'` — suppress Nitro's dev overlay; rely on evlog wide events
-   * - `'nitro'` — keep Nitro's native dev error output
+   * Dev terminal output: preset or explicit overlay + pretty-error settings.
    * @default 'evlog' when pretty in development
    */
-  devErrorHandler?: 'evlog' | 'nitro'
+  dev?: DevTerminalInput
 
   /**
    * Suppress built-in console output.

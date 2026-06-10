@@ -25,12 +25,14 @@ type NitroErrorHandlerContext = {
 }
 
 export default defineNitroErrorHandler(async (error, event, ctx?: NitroErrorHandlerContext) => {
-  if (!shouldSuppressNitroDevOverlay() && ctx?.defaultHandler) {
+  const suppressOverlay = shouldSuppressNitroDevOverlay()
+
+  if (!suppressOverlay && ctx?.defaultHandler) {
     await ctx.defaultHandler(error, event, { silent: false })
   }
 
   markH3ErrorHandled(event)
-  if (shouldSuppressNitroDevOverlay()) {
+  if (suppressOverlay) {
     suppressNitroDevOverlay(error)
   }
 

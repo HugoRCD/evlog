@@ -50,8 +50,8 @@ describe('errorHandler', () => {
     expect(error.fatal).toBe(false)
   })
 
-  it('calls defaultHandler when devErrorHandler is nitro', async () => {
-    vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true, devErrorHandler: 'nitro' }))
+  it('calls defaultHandler when dev preset is nitro', async () => {
+    vi.stubEnv('__EVLOG_CONFIG', JSON.stringify({ pretty: true, dev: 'nitro' }))
     const defaultHandler = vi.fn().mockResolvedValue(undefined)
     const error = new Error('boom')
     await errorHandler(error, mockEvent, { defaultHandler })

@@ -14,7 +14,7 @@ import {
 } from '../../src/shared/pretty-error'
 import { readCodeSnippetFromDisk } from '../../src/shared/pretty-error-snippet.node'
 import { enrichErrorStackForDev } from '../../src/shared/enrich-error-stack.node'
-import { shouldUseEvlogDevErrorHandler, prependNitroErrorHandler } from '../../src/nitro'
+import { shouldShowFrameworkOverlay, prependNitroErrorHandler } from '../../src/nitro'
 
 const SAMPLE_STACK = `Error: Payment processing failed
     at Object.handler (file:///Users/dev/project/server/api/test.get.ts:100:0)
@@ -138,7 +138,7 @@ describe('buildErrorEntries', () => {
       why: 'Card declined',
       fix: 'Try another card',
       link: 'https://docs.example.com/payments',
-    }, { prettyErrorFrames: false, prettyErrorStackDepth: 2, compact: false })
+    }, { snippet: false, stackDepth: 2, compact: false })
 
     expect(entries).toHaveLength(1)
     const entry = entries[0]!
@@ -157,7 +157,7 @@ describe('buildErrorEntries', () => {
       message: 'Payment failed',
       stack: SAMPLE_STACK,
       cause: 'Payment failed',
-    }, { prettyErrorFrames: false })
+    }, { snippet: false })
 
     const children = entries[0]?.children ?? []
     expect(children.some(line => line.includes('Caused by:'))).toBe(false)
@@ -172,7 +172,7 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
       message: 'Payment failed',
       stack,
       why: 'Card declined',
-    }, { prettyErrorFrames: false, prettyErrorStackDepth: 5, compact: false })
+    }, { snippet: false, stackDepth: 5, compact: false })
 
     const children = entries[0]?.children ?? []
     expect(children.some(line => line.includes('createError'))).toBe(false)
@@ -185,7 +185,7 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
       message: 'Payment failed',
       stack: SAMPLE_STACK,
       fix: longFix,
-    }, { prettyErrorFrames: false, prettyErrorStackDepth: 0, compact: false })
+    }, { snippet: false, stackDepth: 0, compact: false })
 
     const children = entries[0]?.children ?? []
     const fixIndex = children.findIndex(line => line.includes('Fix:'))
@@ -194,17 +194,17 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
   })
 })
 
-describe('dev error handler routing', () => {
+describe('framework overlay routing', () => {
   const originalEnv = process.env.NODE_ENV
 
   afterEach(() => {
     process.env.NODE_ENV = originalEnv
   })
 
-  it('defaults to evlog in pretty dev and allows Nitro overlay opt-in', () => {
+  it('defaults to no Nitro overlay in pretty dev and allows opt-in', () => {
     process.env.NODE_ENV = 'development'
-    expect(shouldUseEvlogDevErrorHandler({ pretty: true })).toBe(true)
-    expect(shouldUseEvlogDevErrorHandler({ pretty: true, devErrorHandler: 'nitro' })).toBe(false)
+    expect(shouldShowFrameworkOverlay({ pretty: true })).toBe(false)
+    expect(shouldShowFrameworkOverlay({ pretty: true, dev: 'nitro' })).toBe(true)
   })
 })
 
@@ -245,7 +245,7 @@ describe('pretty error logger integration', () => {
   beforeEach(() => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
-    initLogger({ pretty: true, prettyErrorFrames: false })
+    initLogger({ pretty: true, dev: { prettyError: { snippet: false } } })
   })
 
   afterEach(() => {
