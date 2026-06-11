@@ -1,5 +1,5 @@
 ---
-"evlog": path
+"evlog": patch
 "@evlog/nuxthub": patch
 ---
 
