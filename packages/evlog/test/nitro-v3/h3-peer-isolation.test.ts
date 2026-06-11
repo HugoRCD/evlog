@@ -22,8 +22,7 @@ function collectV3Chunks(entry: string): string[] {
     let source: string
     try {
       source = readFileSync(file, 'utf8')
-    }
-    catch {
+    } catch {
       return
     }
     let match: RegExpExecArray | null
