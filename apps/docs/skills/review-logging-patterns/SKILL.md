@@ -819,7 +819,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | HyperDX | `evlog/hyperdx` | `HYPERDX_API_KEY` (optional `HYPERDX_OTLP_ENDPOINT`; defaults to `https://in-otel.hyperdx.io`) |
 | PostHog | `evlog/posthog` | `POSTHOG_API_KEY`, `POSTHOG_HOST` |
 | Sentry | `evlog/sentry` | `SENTRY_DSN` |
-| Better Stack | `evlog/better-stack` | `BETTER_STACK_SOURCE_TOKEN` |
+| Better Stack | `evlog/better-stack` | `BETTER_STACK_API_KEY` |
 | Datadog | `evlog/datadog` | `DD_API_KEY` or `DATADOG_API_KEY`, optional `DD_SITE` / `DATADOG_LOGS_URL` |
 | File System | `evlog/fs` | None (local file system) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
