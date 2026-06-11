@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { applyDeprecatedAlias, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 
@@ -29,17 +29,13 @@ const BETTER_STACK_FIELDS: ConfigField<BetterStackConfig>[] = [
   { key: 'retries' },
 ]
 
-let warnedAboutSourceToken = false
-
 function applyApiKeyAlias(config: BetterStackConfig): BetterStackConfig {
-  if (!config.apiKey && config.sourceToken) {
-    if (!warnedAboutSourceToken) {
-      warnedAboutSourceToken = true
-      console.warn('[evlog/better-stack] `sourceToken` is deprecated, use `apiKey` instead. (Env: NUXT_BETTER_STACK_SOURCE_TOKEN → NUXT_BETTER_STACK_API_KEY.)')
-    }
-    config.apiKey = config.sourceToken
-  }
-  return config
+  return applyDeprecatedAlias(config, {
+    adapter: 'better-stack',
+    from: 'sourceToken',
+    to: 'apiKey',
+    envHint: 'Env: NUXT_BETTER_STACK_SOURCE_TOKEN → NUXT_BETTER_STACK_API_KEY.',
+  })
 }
 
 /**

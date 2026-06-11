@@ -124,6 +124,8 @@ export const SENSITIVE_HEADERS = [
   'proxy-authorization',
 ]
 
+const SENSITIVE_HEADER_SET = new Set(SENSITIVE_HEADERS)
+
 /**
  * Filter out undefined values and sensitive headers from a raw header map.
  *
@@ -137,7 +139,7 @@ export function filterSafeHeaders(headers: Partial<Record<string, string | undef
   const safeHeaders: Record<string, string> = {}
 
   for (const [key, value] of Object.entries(headers)) {
-    if (value !== undefined && !SENSITIVE_HEADERS.includes(key.toLowerCase())) {
+    if (value !== undefined && !SENSITIVE_HEADER_SET.has(key.toLowerCase())) {
       safeHeaders[key] = value
     }
   }

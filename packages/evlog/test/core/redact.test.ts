@@ -422,6 +422,23 @@ describe('resolveRedactConfig', () => {
     expect(config._maskers).toHaveLength(1)
     expect(config.patterns).toHaveLength(1)
   })
+
+  it('precompiles path matchers', () => {
+    const config = defined(resolveRedactConfig({ paths: ['user.password', '*_token'] }), 'redact config')
+    expect(config._pathMatchers).toBeDefined()
+
+    const redacted = redactEvent({ user: { password: 'hunter2' }, api_token: 'abc' }, config)
+    expect((redacted.user as Record<string, unknown>).password).toBe('[REDACTED]')
+    expect(redacted.api_token).toBe('[REDACTED]')
+  })
+
+  it('redacts identically with and without precompiled matchers', () => {
+    const event = { user: { Password: 'hunter2', name: 'jo' }, nested: { secret_token: 'x' } }
+    const paths = ['password', '*_token']
+    const resolved = defined(resolveRedactConfig({ builtins: false, paths }), 'redact config')
+    const adHoc: RedactConfig = { builtins: false, paths }
+    expect(redactEvent(event, resolved)).toEqual(redactEvent(event, adHoc))
+  })
 })
 
 describe('normalizeRedactConfig', () => {

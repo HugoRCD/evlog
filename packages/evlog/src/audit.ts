@@ -40,12 +40,17 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || value.constructor === Object
 }
 
-function stableStringify(value: unknown): string {
+function stableStringify(value: unknown, ancestors = new WeakSet<object>()): string {
   if (value === null || typeof value !== 'object') return JSON.stringify(value)
-  if (Array.isArray(value)) return `[${value.map(stableStringify).join(',')}]`
-  if (!isPlainObject(value)) return JSON.stringify(value)
-  const keys = Object.keys(value).sort()
-  return `{${keys.map(k => `${JSON.stringify(k)}:${stableStringify(value[k])}`).join(',')}}`
+  // Track only the current recursion path: shared (diamond) references are fine, true cycles are not.
+  if (ancestors.has(value)) return '"[Circular]"'
+  if (!Array.isArray(value) && !isPlainObject(value)) return JSON.stringify(value)
+  ancestors.add(value)
+  const out = Array.isArray(value)
+    ? `[${value.map(v => stableStringify(v, ancestors)).join(',')}]`
+    : `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableStringify(value[k], ancestors)}`).join(',')}}`
+  ancestors.delete(value)
+  return out
 }
 
 /**

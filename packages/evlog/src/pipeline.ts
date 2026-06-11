@@ -47,6 +47,15 @@ export interface PipelineDrainFn<T> {
  * nitroApp.hooks.hook('close', () => drain.flush())
  * ```
  */
+/**
+ * Unref a timer on runtimes that support it (Node, Bun) so a pending flush or
+ * retry backoff never holds the process open. Buffered events are delivered on
+ * shutdown via the documented `flush()` contract, not by keeping timers alive.
+ */
+function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
+  (timer as { unref?: () => void }).unref?.()
+}
+
 export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<T>): (drain: (batch: T[]) => void | Promise<void>) => PipelineDrainFn<T> {
   const batchSize = options?.batch?.size ?? 50
   const intervalMs = options?.batch?.intervalMs ?? 5000
@@ -94,6 +103,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
         timer = null
         if (!activeFlush) startFlush()
       }, intervalMs)
+      unrefTimer(timer)
     }
 
     function getRetryDelay(attempt: number): number {
@@ -122,7 +132,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
           if (attempt < maxAttempts) {
-            await new Promise<void>(r => setTimeout(r, getRetryDelay(attempt)))
+            await new Promise<void>(r => unrefTimer(setTimeout(r, getRetryDelay(attempt))))
           }
         }
       }

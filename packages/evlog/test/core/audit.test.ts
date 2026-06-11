@@ -500,6 +500,29 @@ describe('stableStringify plain-object guard', () => {
     expect(sig1).toBeDefined()
     expect(sig1).toBe(sig2)
   })
+
+  it('does not hang on circular references in audit changes', async () => {
+    const calls: WideEvent[] = []
+    const drain = signed((ctx: DrainContext) => {
+      calls.push(ctx.event)
+    }, { strategy: 'hmac', secret: 'test-secret' })
+
+    const circular: Record<string, unknown> = { name: 'loop' }
+    circular.self = circular
+    const shared = { id: 'x' }
+
+    await drain(createDrainCtx({
+      audit: {
+        action: 'update',
+        actor: { type: 'user', id: 'u1' },
+        outcome: 'success',
+        changes: { circular, a: shared, b: shared },
+      },
+    }))
+
+    const audit = defined(defined(calls[0], 'event').audit as AuditFields)
+    expect(audit.signature).toBeDefined()
+  })
 })
 
 describe('end-to-end: audit + auditOnly + global drain', () => {

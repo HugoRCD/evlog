@@ -1,4 +1,4 @@
-import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost, readBody, setResponseStatus } from 'h3'
+import { createError, defineEventHandler, getHeader, getHeaders, getRequestHost, readRawBody, setResponseStatus } from 'h3'
 import { useNitroApp } from 'nitropack/runtime'
 import type { IngestPayload, WideEvent } from '../../../../types'
 import { getEnvironment, getGlobalPluginRunner } from '../../../../logger'
@@ -29,6 +29,34 @@ function validateOrigin(event: Parameters<typeof defineEventHandler>[0] extends 
 
   if (originHost !== host) {
     throw createError({ statusCode: 403, message: 'Invalid origin' })
+  }
+}
+
+/**
+ * Maximum accepted ingest body size in bytes. Client wide events are small;
+ * anything larger is rejected before it reaches the enrich/drain pipeline.
+ */
+const MAX_BODY_BYTES = 32 * 1024
+
+async function readJsonBody(event: Parameters<typeof defineEventHandler>[0] extends (e: infer E) => unknown ? E : never): Promise<unknown> {
+  const contentLength = Number(getHeader(event, 'content-length'))
+  if (Number.isFinite(contentLength) && contentLength > MAX_BODY_BYTES) {
+    throw createError({ statusCode: 413, message: 'Payload too large' })
+  }
+
+  const raw = await readRawBody(event, 'utf8')
+  if (!raw) {
+    throw createError({ statusCode: 400, message: 'Invalid request body' })
+  }
+  // String length undercounts multi-byte characters, but is a close enough proxy for a size cap.
+  if (raw.length > MAX_BODY_BYTES) {
+    throw createError({ statusCode: 413, message: 'Payload too large' })
+  }
+
+  try {
+    return JSON.parse(raw)
+  } catch {
+    throw createError({ statusCode: 400, message: 'Invalid request body' })
   }
 }
 
@@ -108,10 +136,17 @@ function resolveWaitUntilContext(event: unknown): WaitUntilHost | undefined {
   return context
 }
 
+/**
+ * Client log ingestion endpoint.
+ *
+ * The origin check is CSRF-level protection only: it blocks cross-site browser
+ * requests but is trivially satisfied by non-browser clients. Treat ingested
+ * events as untrusted input — this endpoint is intentionally unauthenticated.
+ */
 export default defineEventHandler(async (event) => {
   validateOrigin(event)
 
-  const body = await readBody(event)
+  const body = await readJsonBody(event)
   const payload = validatePayload(body)
   const nitroApp = useNitroApp()
   const env = getEnvironment()

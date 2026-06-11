@@ -13,6 +13,9 @@ export function createSourceLocationPlugin(enabled?: boolean): Plugin {
     configResolved({ command, root: configRoot }) {
       active = enabled ?? command === 'serve'
       root = configRoot
+      if (enabled === true && command === 'build') {
+        console.warn('[evlog] sourceLocation is enabled for a production build: source file paths will be embedded in the client bundle.')
+      }
     },
 
     transform: {

@@ -126,6 +126,13 @@ export interface RedactConfig {
   replacement?: string
   /** @internal Resolved masker functions from built-in patterns. Not user-facing. */
   _maskers?: Array<[RegExp, (match: string) => string]>
+  /** @internal Precompiled matchers for `paths`, built once by `resolveRedactConfig`. Not user-facing. */
+  _pathMatchers?: {
+    exactPaths: Set<string>
+    pathGlobs: RegExp[]
+    keyGlobs: RegExp[]
+    caseInsensitiveLeaves: Set<string>
+  }
 }
 
 /**

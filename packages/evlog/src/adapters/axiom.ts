@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { applyDeprecatedAlias, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 
@@ -63,17 +63,13 @@ const AXIOM_FIELDS: ConfigField<ResolvedAxiomConfig>[] = [
   { key: 'retries' },
 ]
 
-let warnedAboutToken = false
-
 function applyApiKeyAlias(config: Partial<ResolvedAxiomConfig>): Partial<ResolvedAxiomConfig> {
-  if (!config.apiKey && config.token) {
-    if (!warnedAboutToken) {
-      warnedAboutToken = true
-      console.warn('[evlog/axiom] `token` is deprecated, use `apiKey` instead. (Env: NUXT_AXIOM_TOKEN/AXIOM_TOKEN → NUXT_AXIOM_API_KEY/AXIOM_API_KEY.)')
-    }
-    config.apiKey = config.token
-  }
-  return config
+  return applyDeprecatedAlias(config, {
+    adapter: 'axiom',
+    from: 'token',
+    to: 'apiKey',
+    envHint: 'Env: NUXT_AXIOM_TOKEN/AXIOM_TOKEN → NUXT_AXIOM_API_KEY/AXIOM_API_KEY.',
+  })
 }
 
 /**

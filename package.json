@@ -59,7 +59,7 @@
     "@changesets/changelog-github": "^0.6.0",
     "@changesets/cli": "^2.31.0",
     "@hrcd/eslint-config": "^3.0.3",
-    "@types/node": "latest",
+    "@types/node": "^25.9.1",
     "ai": "^6.0.168",
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",

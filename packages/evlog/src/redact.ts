@@ -10,7 +10,7 @@ export interface RedactPathMatchers {
   exactPaths: Set<string>
   pathGlobs: RegExp[]
   keyGlobs: RegExp[]
-  /** Single-segment shorthands (`password` → `**.password`) matched case-insensitively on leaf keys. */
+  /** Single-segment shorthands (`password` → `**.password`), stored lowercased, matched case-insensitively on leaf keys. */
   caseInsensitiveLeaves: Set<string>
 }
 
@@ -72,7 +72,7 @@ function addPathGlobPattern(
   const leaf = pattern.match(/^\*\*\.([^.?*]+)$/)
   if (leaf) {
     exactPaths.add(leaf[1]!)
-    caseInsensitiveLeaves.add(leaf[1]!)
+    caseInsensitiveLeaves.add(leaf[1]!.toLowerCase())
   }
 }
 
@@ -83,10 +83,7 @@ function addPathGlobPattern(
 export function matchesRedactPath(fullPath: string, leafKey: string, matchers: RedactPathMatchers): boolean {
   if (matchers.exactPaths.has(fullPath)) return true
 
-  const leafLower = leafKey.toLowerCase()
-  for (const name of matchers.caseInsensitiveLeaves) {
-    if (leafLower === name.toLowerCase()) return true
-  }
+  if (matchers.caseInsensitiveLeaves.has(leafKey.toLowerCase())) return true
 
   for (const glob of matchers.pathGlobs) {
     glob.lastIndex = 0
@@ -259,7 +256,10 @@ export function resolveRedactConfig(input: boolean | RedactConfig | undefined): 
   }
 
   if (input.builtins === false) {
-    return input
+    return {
+      ...input,
+      _pathMatchers: compileRedactPathMatchers(input.paths),
+    }
   }
 
   const maskers = Array.isArray(input.builtins)
@@ -272,6 +272,7 @@ export function resolveRedactConfig(input: boolean | RedactConfig | undefined): 
   return {
     ...input,
     _maskers: maskers,
+    _pathMatchers: compileRedactPathMatchers(input.paths),
   }
 }
 
@@ -329,7 +330,8 @@ export function redactEvent(event: Record<string, unknown>, config: RedactConfig
   const clone = cloneForRedaction(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
 
-  const pathMatchers = compileRedactPathMatchers(config.paths)
+  // Configs resolved via resolveRedactConfig carry precompiled matchers; compile lazily for ad-hoc configs.
+  const pathMatchers = config._pathMatchers ?? compileRedactPathMatchers(config.paths)
   if (pathMatchers) {
     redactPathsInTree(clone, pathMatchers, replacement)
   }
@@ -375,7 +377,6 @@ function redactPatterns(obj: unknown, patterns: RegExp[], replacement: string): 
 function applyPatterns(value: string, patterns: RegExp[], replacement: string): string {
   let result = value
   for (const pattern of patterns) {
-    pattern.lastIndex = 0
     result = result.replace(pattern, replacement)
   }
   return result
@@ -411,7 +412,6 @@ function applyMaskersToTree(obj: unknown, maskers: Masker[]): void {
 function applyMaskers(value: string, maskers: Masker[]): string {
   let result = value
   for (const [pattern, mask] of maskers) {
-    pattern.lastIndex = 0
     result = result.replace(pattern, mask)
   }
   return result
