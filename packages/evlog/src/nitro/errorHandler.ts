@@ -1,8 +1,7 @@
 // Import from specific subpath — the barrel 'nitropack/runtime' re-exports from
 // internal/app.mjs which imports virtual modules that crash outside rollup builds.
-import type { ServerResponse } from 'node:http'
 import { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils'
-import { getRequestURL, setResponseHeader, setResponseStatus, send } from 'h3'
+import { getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
 import type { H3Event } from 'h3'
 import {
   resolveEvlogError,
@@ -14,20 +13,18 @@ import {
   suppressNitroDevOverlay,
 } from '../nitro'
 
-type WritableNodeResponse = Pick<ServerResponse, 'end' | 'writableEnded'> & { ended?: boolean }
-
-async function sendNitroV2Json(event: H3Event, body: string): Promise<void> {
-  const res = event.node?.res as WritableNodeResponse | undefined
-  if (res) {
-    if (res.writableEnded || res.ended) {
-      return
-    }
-
-    res.end(body)
-    return
+/**
+ * Flush the error response by ending the Node response directly.
+ *
+ * h3 v1's `send()` is a no-op once the event is marked handled, and the event
+ * must be marked handled *before* responding so Nitro's chained dev handler
+ * (Youch overlay) does not run after us. Ending the Node response directly
+ * resolves that tension: the flush is synchronous and unconditional (#374).
+ */
+function endNodeResponse(event: H3Event, body: string): void {
+  if (!event.node.res.writableEnded) {
+    event.node.res.end(body)
   }
-
-  await send(event, body)
 }
 
 /**
@@ -41,6 +38,8 @@ async function sendNitroV2Json(event: H3Event, body: string): Promise<void> {
 export default defineNitroErrorHandler(async (error, event, ctx) => {
   const suppressOverlay = shouldSuppressNitroDevOverlay()
 
+  // Nitro v2 always passes `ctx`, but a missing context (e.g. the handler
+  // invoked directly) must degrade to a flushed response, not a crash.
   if (!suppressOverlay && ctx?.defaultHandler) {
     await ctx.defaultHandler(error, event, { silent: false })
   }
@@ -59,7 +58,7 @@ export default defineNitroErrorHandler(async (error, event, ctx) => {
     const body = buildPlainNitroErrorBody(error, url, isDev)
     setResponseStatus(event, body.status as number)
     setResponseHeader(event, 'Content-Type', 'application/json')
-    return sendNitroV2Json(event, JSON.stringify(body))
+    return endNodeResponse(event, JSON.stringify(body))
   }
 
   const status = extractErrorStatus(evlogError)
@@ -67,5 +66,5 @@ export default defineNitroErrorHandler(async (error, event, ctx) => {
   setResponseStatus(event, status)
   setResponseHeader(event, 'Content-Type', 'application/json')
 
-  return sendNitroV2Json(event, JSON.stringify(serializeEvlogErrorResponse(evlogError, url)))
+  return endNodeResponse(event, JSON.stringify(serializeEvlogErrorResponse(evlogError, url)))
 })

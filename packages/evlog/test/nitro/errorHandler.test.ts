@@ -9,19 +9,13 @@ declare global {
 
 const mockSetResponseStatus = vi.fn<(event: H3Event, status: number) => void>()
 const mockSetResponseHeader = vi.fn<(event: H3Event, name: string, value: string) => void>()
-const mockSend = vi.fn<(event: H3Event, body: string) => void>()
 const mockGetRequestURL = vi.fn<(event: H3Event, options?: { xForwardedHost?: boolean }) => { pathname: string }>(() => ({ pathname: '/api/test' }))
 const mockResponseEnd = vi.fn<(body?: string) => void>()
 
 vi.mock('h3', () => ({
   setResponseStatus: (event: H3Event, status: number) => mockSetResponseStatus(event, status),
   setResponseHeader: (event: H3Event, name: string, value: string) => mockSetResponseHeader(event, name, value),
-  send: (event: H3Event, body: string) => mockSend(event, body),
   getRequestURL: (event: H3Event, options?: { xForwardedHost?: boolean }) => mockGetRequestURL(event, options),
-}))
-
-vi.mock('nitropack/runtime', () => ({
-  defineNitroErrorHandler: <T>(handler: T) => handler,
 }))
 
 import { createError } from '../../src/error'
@@ -35,6 +29,9 @@ const mockEvent = {
 
 const defaultHandlerMock = vi.fn().mockResolvedValue(undefined)
 
+// Relaxed signature: production code is typed against nitropack's
+// NitroErrorHandler (H3Error, full H3Event, required ctx); tests exercise the
+// runtime behavior with plain errors, a partial event and an optional ctx.
 type TestErrorHandler = (
   error: Error,
   event: typeof mockEvent,
@@ -48,8 +45,7 @@ function invokeErrorHandler(error: Error) {
 }
 
 function readResponseBody(): Record<string, unknown> {
-  const body = defined(mockResponseEnd.mock.calls[0]?.[0] ?? mockSend.mock.calls[0]?.[1], 'response body')
-  return JSON.parse(body)
+  return JSON.parse(defined(mockResponseEnd.mock.calls[0]?.[0], 'response body'))
 }
 
 describe('errorHandler', () => {
@@ -68,15 +64,20 @@ describe('errorHandler', () => {
     expect(mockEvent._handled).toBe(true)
   })
 
-  it('ends the Node response directly on Nitro v2', async () => {
+  it('ends the Node response directly so h3 v1 cannot skip the flush (#374)', async () => {
     await invokeErrorHandler(new Error('boom'))
     expect(mockResponseEnd).toHaveBeenCalledWith(expect.stringContaining('"statusCode":500'))
-    expect(mockSend).not.toHaveBeenCalled()
   })
 
-  it('does not require the Nitro v3 error handler context', async () => {
+  it('flushes the response even when invoked without a handler context', async () => {
     await testErrorHandler(new Error('boom'), mockEvent)
     expect(mockResponseEnd).toHaveBeenCalledWith(expect.stringContaining('"statusCode":500'))
+  })
+
+  it('does not end the response twice when already ended', async () => {
+    mockEvent.node.res.writableEnded = true
+    await invokeErrorHandler(new Error('boom'))
+    expect(mockResponseEnd).not.toHaveBeenCalled()
   })
 
   it('clears unhandled flag in dev pretty mode', async () => {

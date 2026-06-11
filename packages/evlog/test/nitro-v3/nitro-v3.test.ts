@@ -17,7 +17,6 @@ import { consola } from 'consola'
 import { parseError } from '../../src/runtime/utils/parseError'
 
 const rootDir = resolve(__dirname, './fixture')
-const serverURL = 'http://localhost'
 
 describe.sequential('Nitro v3 Server with evlog', () => {
   let nitro: Awaited<ReturnType<typeof createNitro>>
@@ -33,7 +32,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
       rootDir,
     })
     devServer = createDevServer(nitro)
-    server = await devServer.listen({})
+    server = devServer.listen({})
     await prepare(nitro)
     const ready = new Promise<void>((resolve) => {
       nitro.hooks.hook('dev:reload', () => resolve())
@@ -50,7 +49,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
   })
 
   it('should be able to get the correct result', async () => {
-    const res = await server.fetch(new Request(new URL('/works', serverURL)))
+    const res = await server.fetch(new Request(new URL('/works', server.url)))
     const json = await res.json()
 
     expect(json).toEqual({ success: true })
@@ -66,7 +65,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     consola.wrapAll()
 
     try {
-      await server.fetch(new Request(new URL('/works', serverURL)))
+      await server.fetch(new Request(new URL('/works', server.url)))
 
       // Wait for async logs to be written
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -101,7 +100,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     consola.wrapAll()
 
     try {
-      const res = await server.fetch(new Request(new URL('/throws', serverURL)))
+      const res = await server.fetch(new Request(new URL('/throws', server.url)))
       
       expect(res.status).toBe(402)
       
@@ -149,7 +148,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     consola.wrapAll()
 
     try {
-      await server.fetch(new Request(new URL('/works', serverURL), {
+      await server.fetch(new Request(new URL('/works', server.url), {
         headers: {
           'Authorization': 'Bearer secret-token',
           'Cookie': 'session=abc123',
@@ -202,7 +201,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     consola.wrapAll()
 
     try {
-      await server.fetch(new Request(new URL('/works', serverURL)))
+      await server.fetch(new Request(new URL('/works', server.url)))
 
       // Wait for async logs and hooks to be called
       await new Promise(resolve => setTimeout(resolve, 100))
@@ -249,7 +248,7 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     consola.wrapAll()
 
     try {
-      await server.fetch(new Request(new URL('/works', serverURL)))
+      await server.fetch(new Request(new URL('/works', server.url)))
 
       // Wait for async logs and hooks to be called
       await new Promise(resolve => setTimeout(resolve, 100))
