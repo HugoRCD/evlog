@@ -320,19 +320,21 @@ describe('fs adapter', () => {
       process.env.NEXT_RUNTIME = 'edge'
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
 
-      vi.resetModules()
-      const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')
-      const drain = createFsDrainFresh({ dir: '.evlog/logs' })
+      try {
+        vi.resetModules()
+        const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')
+        const drain = createFsDrainFresh({ dir: '.evlog/logs' })
 
-      await drain(createDrainContext({ action: 'edge_skip' }))
-      await drain(createDrainContext({ action: 'edge_skip_again' }))
+        await drain(createDrainContext({ action: 'edge_skip' }))
+        await drain(createDrainContext({ action: 'edge_skip_again' }))
 
-      expect(warnSpy).toHaveBeenCalledTimes(1)
-      expect(warnSpy.mock.calls[0]?.[0]).toContain('[evlog/fs]')
-      expect(mockedAppendFile).not.toHaveBeenCalled()
-
-      delete process.env.NEXT_RUNTIME
-      warnSpy.mockRestore()
+        expect(warnSpy).toHaveBeenCalledTimes(1)
+        expect(warnSpy.mock.calls[0]?.[0]).toContain('[evlog/fs]')
+        expect(mockedAppendFile).not.toHaveBeenCalled()
+      } finally {
+        delete process.env.NEXT_RUNTIME
+        warnSpy.mockRestore()
+      }
     })
   })
 })

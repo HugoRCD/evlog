@@ -80,7 +80,7 @@ export function defineStreamedInstrumentation(options: StreamedInstrumentationOp
 
     const composedDrain = composeDrains(userDrain, serverDrain)
     const inner = createInstrumentation({ ...rest, drain: composedDrain })
-    inner.register()
+    await inner.register()
   }
 
   // We intentionally instantiate a "zero-time" inner just for onRequestError —

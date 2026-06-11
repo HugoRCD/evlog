@@ -33,6 +33,10 @@ export const DEFAULT_CAPTURE_OUTPUT_IGNORE: Array<string | RegExp> = [
   'Import trace:',
 ]
 
+/**
+ * Configuration for {@link createInstrumentation} and {@link defineNodeInstrumentation}.
+ * Controls global logger options and optional stdout/stderr capture (Node.js only).
+ */
 export interface InstrumentationOptions {
   /** Enable or disable all logging globally. @default true */
   enabled?: boolean
@@ -67,6 +71,8 @@ interface InstrumentationResult {
 
 let patching = false
 let loggerPromise: Promise<LoggerModule> | undefined
+let stdoutPatched = false
+let stderrPatched = false
 
 function loadLogger(): Promise<LoggerModule> {
   loggerPromise ??= import('../logger')
@@ -102,13 +108,14 @@ function shouldIgnoreCapturedOutput(message: string, ignore: Array<string | RegE
  */
 export function createInstrumentation(options: InstrumentationOptions = {}): InstrumentationResult {
   let registered = false
+  let registerPromise: Promise<void> | undefined
   const captureOutputOptions = resolveCaptureOutputOptions(options.captureOutput)
 
   function register(): void | Promise<void> {
     if (registered) return
-    registered = true
+    if (registerPromise) return registerPromise
 
-    return loadLogger().then(({ initLogger, lockLogger, log }) => {
+    registerPromise = loadLogger().then(({ initLogger, lockLogger, log }) => {
       initLogger({
         enabled: options.enabled,
         env: {
@@ -127,16 +134,21 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       if (captureOutputOptions && process.env.NEXT_RUNTIME === 'nodejs') {
         patchOutput(captureOutputOptions, log)
       }
+      registered = true
+    }).catch((error) => {
+      registerPromise = undefined
+      throw error
     })
+    return registerPromise
   }
 
   function patchOutput(config: CaptureOutputOptions, logApi: Log): void {
     const proc = globalThis.process
-    const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
-    const originalStderrWrite = proc.stderr.write.bind(proc.stderr)
     const ignore = config.ignore ?? DEFAULT_CAPTURE_OUTPUT_IGNORE
 
-    if (config.stdout !== false) {
+    if (config.stdout !== false && !stdoutPatched) {
+      const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
+      stdoutPatched = true
       proc.stdout.write = function(chunk: unknown, ...args: unknown[]): boolean {
         const message = String(chunk).trimEnd()
         if (!patching && message.length > 0 && !shouldIgnoreCapturedOutput(message, ignore)) {
@@ -151,7 +163,9 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       } as typeof process.stdout.write
     }
 
-    if (config.stderr !== false) {
+    if (config.stderr !== false && !stderrPatched) {
+      const originalStderrWrite = proc.stderr.write.bind(proc.stderr)
+      stderrPatched = true
       proc.stderr.write = function(chunk: unknown, ...args: unknown[]): boolean {
         const message = String(chunk).trimEnd()
         if (!patching && message.length > 0 && !shouldIgnoreCapturedOutput(message, ignore)) {

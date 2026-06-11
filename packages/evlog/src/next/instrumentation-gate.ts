@@ -50,8 +50,17 @@ function createOptionsLoader(options: InstrumentationOptions): () => Promise<Nod
   }
 }
 
+/**
+ * Hooks returned by {@link defineNodeInstrumentation} for root `instrumentation.ts`.
+ *
+ * - `register` — async startup hook; initializes the global logger on Node.js only.
+ * - `onRequestError` — logs SSR/RSC errors outside `withEvlog` via {@link NextInstrumentationRequest}
+ *   and {@link NextInstrumentationErrorContext}.
+ */
 export type NodeInstrumentationHooks = {
+  /** Next.js instrumentation startup hook (Node.js runtime only). */
   register: () => Promise<void>
+  /** Next.js global request error handler (Node.js runtime only). */
   onRequestError: (
     error: { digest?: string } & Error,
     request: NextInstrumentationRequest,
