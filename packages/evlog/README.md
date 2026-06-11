@@ -873,7 +873,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
+OTLP_ENDPOINT=http://localhost:4318
 ```
 
 ### Datadog

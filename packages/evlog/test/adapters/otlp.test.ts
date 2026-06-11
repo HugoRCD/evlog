@@ -431,24 +431,36 @@ describe('otlp adapter', () => {
     })
 
     let origNuxtOtlpEndpoint: string | undefined
+    let origOtelOtlpEndpoint: string | undefined
     let origOtlpEndpoint: string | undefined
 
     beforeEach(() => {
       origNuxtOtlpEndpoint = process.env.NUXT_OTLP_ENDPOINT
-      origOtlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      origOtelOtlpEndpoint = process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      origOtlpEndpoint = process.env.OTLP_ENDPOINT
       delete process.env.NUXT_OTLP_ENDPOINT
       delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      delete process.env.OTLP_ENDPOINT
     })
 
     afterEach(() => {
       if (origNuxtOtlpEndpoint === undefined) delete process.env.NUXT_OTLP_ENDPOINT
       else process.env.NUXT_OTLP_ENDPOINT = origNuxtOtlpEndpoint
-      if (origOtlpEndpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
-      else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origOtlpEndpoint
+      if (origOtelOtlpEndpoint === undefined) delete process.env.OTEL_EXPORTER_OTLP_ENDPOINT
+      else process.env.OTEL_EXPORTER_OTLP_ENDPOINT = origOtelOtlpEndpoint
+      if (origOtlpEndpoint === undefined) delete process.env.OTLP_ENDPOINT
+      else process.env.OTLP_ENDPOINT = origOtlpEndpoint
     })
 
     it('returns a callable drain that posts events', async () => {
       const drain = createOTLPDrain({ endpoint: 'http://localhost:4318' })
+      await drain(createDrainContext())
+      expect(fetchSpy).toHaveBeenCalledOnce()
+    })
+
+    it('resolves the endpoint from the OTLP_ENDPOINT alias', async () => {
+      process.env.OTLP_ENDPOINT = 'http://localhost:4318'
+      const drain = createOTLPDrain()
       await drain(createDrainContext())
       expect(fetchSpy).toHaveBeenCalledOnce()
     })
