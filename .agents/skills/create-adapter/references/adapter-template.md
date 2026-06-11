@@ -7,7 +7,7 @@ Replace `{Name}`, `{name}`, and `{NAME}` with the actual service name.
 ```typescript
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 
 // --- 1. Config Interface -------------------------------------------------
@@ -99,13 +99,13 @@ export async function sendBatchTo{Name}(
  * 1. Overrides passed to create{Name}Drain()
  * 2. runtimeConfig.evlog.{name}
  * 3. runtimeConfig.{name}
- * 4. Environment variables: NUXT_{NAME}_*, {NAME}_*
+ * 4. Environment variables: {NAME}_*
  *
  * @example
  * ```ts
  * import { create{Name}Drain } from 'evlog/{name}'
  *
- * // Zero config — set NUXT_{NAME}_API_KEY env var
+ * // Zero config — set {NAME}_API_KEY env var
  * defineEvlog({ drain: create{Name}Drain() })
  *
  * // With overrides
@@ -119,7 +119,7 @@ export function create{Name}Drain(overrides?: Partial<{Name}Config>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<{Name}Config>('{name}', FIELDS, overrides)
       if (!config.apiKey) {
-        console.error('[evlog/{name}] Missing apiKey. Set NUXT_{NAME}_API_KEY env var or pass to create{Name}Drain()')
+        console.error(`[evlog/{name}] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'])} env var or pass to create{Name}Drain()`)
         return null
       }
       return config as {Name}Config

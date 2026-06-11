@@ -46,6 +46,22 @@ export async function resolveAdapterConfig<T>(
   return config as Partial<T>
 }
 
+/**
+ * Format environment variable names for user-facing messages.
+ * Drops internal `NUXT_*` aliases; joins alternatives with `, ` and fields with `/`.
+ */
+export function formatPublicEnvKeys(...envLists: (string[] | undefined)[]): string {
+  return envLists
+    .map((list) => {
+      const all = (list ?? []).filter((k): k is string => !!k)
+      const publicKeys = all.filter(k => !k.startsWith('NUXT_'))
+      const keys = [...new Set(publicKeys.length > 0 ? publicKeys : all)]
+      return keys.join(', ')
+    })
+    .filter(part => part.length > 0)
+    .join('/')
+}
+
 const warnedDeprecatedAliases = new Set<string>()
 
 /**
@@ -54,7 +70,15 @@ const warnedDeprecatedAliases = new Set<string>()
  */
 export function applyDeprecatedAlias<T extends object>(
   config: T,
-  opts: { adapter: string, from: keyof T & string, to: keyof T & string, envHint?: string },
+  opts: {
+    adapter: string
+    from: keyof T & string
+    to: keyof T & string
+    /** @deprecated Use `fromEnv` / `toEnv` instead. */
+    envHint?: string
+    fromEnv?: string[]
+    toEnv?: string[]
+  },
 ): T {
   const record = config as Record<string, unknown>
   if (record[opts.to] === undefined || record[opts.to] === null) {
@@ -63,7 +87,10 @@ export function applyDeprecatedAlias<T extends object>(
       const warnKey = `${opts.adapter}:${opts.from}`
       if (!warnedDeprecatedAliases.has(warnKey)) {
         warnedDeprecatedAliases.add(warnKey)
-        console.warn(`[evlog/${opts.adapter}] \`${opts.from}\` is deprecated, use \`${opts.to}\` instead.${opts.envHint ? ` (${opts.envHint})` : ''}`)
+        const envHint = opts.fromEnv && opts.toEnv
+          ? `Env: ${formatPublicEnvKeys(opts.fromEnv)} → ${formatPublicEnvKeys(opts.toEnv)}`
+          : opts.envHint
+        console.warn(`[evlog/${opts.adapter}] \`${opts.from}\` is deprecated, use \`${opts.to}\` instead.${envHint ? ` (${envHint})` : ''}`)
       }
       record[opts.to] = fromValue
     }

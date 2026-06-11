@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { applyDeprecatedAlias, resolveAdapterConfig } from '../shared/config'
+import { applyDeprecatedAlias, formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 
@@ -68,7 +68,8 @@ function applyApiKeyAlias(config: Partial<ResolvedAxiomConfig>): Partial<Resolve
     adapter: 'axiom',
     from: 'token',
     to: 'apiKey',
-    envHint: 'Env: NUXT_AXIOM_TOKEN/AXIOM_TOKEN → NUXT_AXIOM_API_KEY/AXIOM_API_KEY.',
+    fromEnv: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'],
+    toEnv: ['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY'],
   })
 }
 
@@ -79,11 +80,11 @@ function applyApiKeyAlias(config: Partial<ResolvedAxiomConfig>): Partial<Resolve
  * 1. Overrides passed to createAxiomDrain()
  * 2. runtimeConfig.evlog.axiom
  * 3. runtimeConfig.axiom
- * 4. Environment variables: NUXT_AXIOM_API_KEY, AXIOM_API_KEY (or legacy `*_TOKEN`)
+ * 4. Environment variables: AXIOM_API_KEY, AXIOM_DATASET (or legacy `AXIOM_TOKEN`)
  *
  * @example
  * ```ts
- * // Zero config — set NUXT_AXIOM_API_KEY and NUXT_AXIOM_DATASET
+ * // Zero config — set AXIOM_API_KEY and AXIOM_DATASET
  * initLogger({ drain: createAxiomDrain() })
  *
  * // With overrides
@@ -101,7 +102,7 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
       )
       const config = applyApiKeyAlias(resolved)
       if (!config.dataset || !config.apiKey) {
-        console.error('[evlog/axiom] Missing dataset or apiKey. Set NUXT_AXIOM_API_KEY/NUXT_AXIOM_DATASET env vars or pass to createAxiomDrain()')
+        console.error(`[evlog/axiom] Missing dataset or apiKey. Set ${formatPublicEnvKeys(['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY'], ['NUXT_AXIOM_DATASET', 'AXIOM_DATASET'])} env vars or pass to createAxiomDrain()`)
         return null
       }
       if (config.edgeUrl && config.baseUrl) {

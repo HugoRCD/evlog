@@ -72,8 +72,7 @@ export function writeToMemory(events: WideEvent[], config: MemoryConfig): void {
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to `createMemoryDrain()`
  * 2. `runtimeConfig.evlog.memory` / `runtimeConfig.memory` (Nitro)
- * 3. Environment variables: `NUXT_EVLOG_MEMORY_STORE`, `EVLOG_MEMORY_STORE`,
- *    `NUXT_EVLOG_MEMORY_MAX_EVENTS`, `EVLOG_MEMORY_MAX_EVENTS`
+ * 3. Environment variables: `EVLOG_MEMORY_STORE`, `EVLOG_MEMORY_MAX_EVENTS`
  *
  * @example
  * ```ts

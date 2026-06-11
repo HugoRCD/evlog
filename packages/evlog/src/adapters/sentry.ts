@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 import { OTEL_SEVERITY_NUMBER } from '../shared/severity'
@@ -208,11 +208,11 @@ function buildEnvelopeBody(logs: SentryLog[], dsn: string): string {
  * 1. Overrides passed to createSentryDrain()
  * 2. runtimeConfig.evlog.sentry
  * 3. runtimeConfig.sentry
- * 4. Environment variables: NUXT_SENTRY_*, SENTRY_*
+ * 4. Environment variables: SENTRY_*
  *
  * @example
  * ```ts
- * // Zero config - just set NUXT_SENTRY_DSN env var
+ * // Zero config - just set SENTRY_DSN env var
  * nitroApp.hooks.hook('evlog:drain', createSentryDrain())
  *
  * // With overrides
@@ -227,7 +227,7 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<SentryConfig>('sentry', SENTRY_FIELDS, overrides)
       if (!config.dsn) {
-        console.error('[evlog/sentry] Missing DSN. Set NUXT_SENTRY_DSN/SENTRY_DSN env var or pass to createSentryDrain()')
+        console.error(`[evlog/sentry] Missing DSN. Set ${formatPublicEnvKeys(['NUXT_SENTRY_DSN', 'SENTRY_DSN'])} env var or pass to createSentryDrain()`)
         return null
       }
       return config as SentryConfig

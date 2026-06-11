@@ -853,8 +853,8 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_AXIOM_API_KEY=xaat-your-token
-NUXT_AXIOM_DATASET=your-dataset
+AXIOM_API_KEY=xaat-your-token
+AXIOM_DATASET=your-dataset
 ```
 
 ### OTLP (OpenTelemetry)
@@ -873,7 +873,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_OTLP_ENDPOINT=http://localhost:4318
+OTEL_EXPORTER_OTLP_ENDPOINT=http://localhost:4318
 ```
 
 ### Datadog
@@ -890,12 +890,10 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_DATADOG_API_KEY=your-api-key
+DD_API_KEY=your-api-key
 # Optional — defaults to datadoghq.com
-NUXT_DATADOG_SITE=datadoghq.eu
+DD_SITE=datadoghq.eu
 ```
-
-You can also use standard Datadog names: `DD_API_KEY` and `DD_SITE`.
 
 Wide events are sent with a short **`message` line** (method, path, level) and full context under the **`evlog`** attribute (facets like `@evlog.path`). See the [Datadog adapter docs](https://www.evlog.dev/integrate/adapters/datadog).
 
@@ -913,8 +911,8 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_POSTHOG_API_KEY=phc_your-key
-NUXT_POSTHOG_HOST=https://us.i.posthog.com  # Optional: for EU or self-hosted
+POSTHOG_API_KEY=phc_your-key
+POSTHOG_HOST=https://us.i.posthog.com  # Optional: for EU or self-hosted
 ```
 
 ### Sentry
@@ -931,7 +929,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_SENTRY_DSN=https://public@o0.ingest.sentry.io/123
+SENTRY_DSN=https://public@o0.ingest.sentry.io/123
 ```
 
 ### Better Stack
@@ -948,7 +946,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_BETTER_STACK_API_KEY=your-source-token
+BETTER_STACK_API_KEY=your-source-token
 ```
 
 ### HyperDX
@@ -965,9 +963,9 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_HYPERDX_API_KEY=your-api-key
+HYPERDX_API_KEY=your-api-key
 # Optional — defaults to https://in-otel.hyperdx.io
-NUXT_HYPERDX_ENDPOINT=https://in-otel.hyperdx.io
+HYPERDX_OTLP_ENDPOINT=https://in-otel.hyperdx.io
 ```
 
 ### File System
@@ -986,7 +984,7 @@ export default defineNitroPlugin((nitroApp) => {
 Set environment variables:
 
 ```bash
-NUXT_EVLOG_FS_DIR=.evlog/logs
+EVLOG_FS_DIR=.evlog/logs
 ```
 
 ### Memory
@@ -1005,8 +1003,8 @@ export default defineNitroPlugin((nitroApp) => {
 Optional environment variables:
 
 ```bash
-NUXT_EVLOG_MEMORY_STORE=default
-NUXT_EVLOG_MEMORY_MAX_EVENTS=1000
+EVLOG_MEMORY_STORE=default
+EVLOG_MEMORY_MAX_EVENTS=1000
 ```
 
 Pair with `readMemoryLogs()` for dev-only agent access over HTTP. See the [Memory adapter docs](https://www.evlog.dev/integrate/adapters/self-hosted/memory).

@@ -824,7 +824,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | File System | `evlog/fs` | None (local file system) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
-In Nuxt/Nitro, use the `NUXT_` prefix (e.g., `NUXT_AXIOM_API_KEY`) so values are available via `useRuntimeConfig()`. All adapters also read unprefixed variables as fallback.
+Use canonical env var names (e.g. `AXIOM_API_KEY`, `BETTER_STACK_API_KEY`) — the same names work in every framework.
 
 Setup pattern per framework:
 

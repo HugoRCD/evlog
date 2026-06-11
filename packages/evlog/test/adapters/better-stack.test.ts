@@ -223,12 +223,22 @@ describe('better-stack adapter', () => {
       const drain = createBetterStackDrain()
       await drain(createDrainContext())
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[evlog/better-stack] Missing apiKey'),
+        expect.stringContaining('Set BETTER_STACK_API_KEY env var'),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
     })
 
+    it('warns with canonical env names when legacy sourceToken alias is used', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const drain = createBetterStackDrain({ sourceToken: 'legacy-key' })
+      await drain(createDrainContext())
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[evlog/better-stack] `sourceToken` is deprecated, use `apiKey` instead. (Env: BETTER_STACK_SOURCE_TOKEN → BETTER_STACK_API_KEY)',
+      )
+    })
+
     it('accepts legacy sourceToken alias', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
       const drain = createBetterStackDrain({ sourceToken: 'legacy-key' })
       await drain(createDrainContext())
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]

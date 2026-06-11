@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { toOtlpAttributeValue } from '../shared/event'
 import { httpPost } from '../shared/http'
@@ -215,8 +215,8 @@ function getHeadersFromEnv(): Record<string, string> | undefined {
  *
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to createOTLPDrain()
- * 2. runtimeConfig.evlog.otlp (NUXT_EVLOG_OTLP_*)
- * 3. runtimeConfig.otlp (NUXT_OTLP_*)
+ * 2. runtimeConfig.evlog.otlp
+ * 3. runtimeConfig.otlp
  * 4. Environment variables: OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
  *
  * @example
@@ -242,7 +242,7 @@ export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
       }
 
       if (!config.endpoint) {
-        console.error('[evlog/otlp] Missing endpoint. Set NUXT_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT env var, or pass to createOTLPDrain()')
+        console.error(`[evlog/otlp] Missing endpoint. Set ${formatPublicEnvKeys(['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT'])} env var, or pass to createOTLPDrain()`)
         return null
       }
       return config as OTLPConfig

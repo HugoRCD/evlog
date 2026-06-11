@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineDrain } from '../shared/drain'
 import type { OTLPConfig } from './otlp'
 import { sendBatchToOTLP } from './otlp'
@@ -70,7 +70,7 @@ export function toHyperDXOTLPConfig(config: HyperDXConfig): OTLPConfig {
  * 1. Overrides passed to `createHyperDXDrain()`
  * 2. `runtimeConfig.evlog.hyperdx`
  * 3. `runtimeConfig.hyperdx`
- * 4. Environment variables: `NUXT_HYPERDX_*`, `HYPERDX_*` (and `OTEL_SERVICE_NAME` for service name)
+ * 4. Environment variables: `HYPERDX_*` (and `OTEL_SERVICE_NAME` for service name)
  *
  * @example
  * ```ts
@@ -84,7 +84,7 @@ export function createHyperDXDrain(overrides?: Partial<HyperDXConfig>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<HyperDXConfig>('hyperdx', HYPERDX_FIELDS, overrides)
       if (!config.apiKey) {
-        console.error('[evlog/hyperdx] Missing apiKey. Set HYPERDX_API_KEY or NUXT_HYPERDX_API_KEY, or pass to createHyperDXDrain()')
+        console.error(`[evlog/hyperdx] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_HYPERDX_API_KEY', 'HYPERDX_API_KEY'])}, or pass to createHyperDXDrain()`)
         return null
       }
       return config as HyperDXConfig
