@@ -149,6 +149,11 @@
       "import": "./dist/next/instrumentation.mjs",
       "default": "./dist/next/instrumentation.mjs"
     },
+    "./next/instrumentation/create": {
+      "types": "./dist/next/instrumentation/create.d.mts",
+      "import": "./dist/next/instrumentation/create.mjs",
+      "default": "./dist/next/instrumentation/create.mjs"
+    },
     "./next/stream": {
       "types": "./dist/next/stream.d.mts",
       "import": "./dist/next/stream.mjs",
@@ -289,6 +294,9 @@
       ],
       "next/instrumentation": [
         "./dist/next/instrumentation.d.mts"
+      ],
+      "next/instrumentation/create": [
+        "./dist/next/instrumentation/create.d.mts"
       ],
       "next/stream": [
         "./dist/next/stream.d.mts"

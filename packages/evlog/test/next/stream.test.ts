@@ -13,7 +13,7 @@ const { startStreamServer, innerInit, innerOnRequestError, createInstrumentation
 })
 
 vi.mock('../../src/stream', () => ({ startStreamServer }))
-vi.mock('../../src/next/instrumentation', () => ({ createInstrumentation }))
+vi.mock('../../src/next/instrumentation-create', () => ({ createInstrumentation }))
 
 describe('defineStreamedInstrumentation', () => {
   beforeEach(() => {

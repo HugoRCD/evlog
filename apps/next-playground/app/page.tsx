@@ -330,12 +330,12 @@ const sections: TestSection[] = [
     id: 'drains',
     label: 'Drains',
     title: 'Drain Adapters',
-    description: 'Test the full drain pipeline end-to-end. Events flow through enrich → pipeline → drain. Check your terminal for [DRAIN] output.',
+    description: 'Test the full drain pipeline end-to-end. Events flow through enrich → pipeline → fs, Axiom, and Better Stack drains.',
     tests: [
       {
         id: 'drain-emit',
         label: 'Emit Drain Event',
-        description: 'Sets context, emits wide event through the full pipeline. Watch for [DRAIN] in terminal.',
+        description: 'Sets context, emits wide event through the full pipeline. Check .evlog/logs/ or your configured adapters.',
         endpoint: '/api/test/drain',
         method: 'GET',
         color: 'success',

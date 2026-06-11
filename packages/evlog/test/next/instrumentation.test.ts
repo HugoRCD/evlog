@@ -5,6 +5,8 @@ vi.mock('next/server', () => ({ after: undefined }))
 
 // Spy on initLogger to verify register() calls it correctly
 const initLoggerSpy = vi.fn()
+const logInfoSpy = vi.fn()
+const logErrorSpy = vi.fn()
 vi.mock('../../src/logger', async (importOriginal) => {
   const mod = await importOriginal<typeof import('../../src/logger')>()
   return {
@@ -12,6 +14,17 @@ vi.mock('../../src/logger', async (importOriginal) => {
     initLogger: (...args: unknown[]) => {
       initLoggerSpy(...args)
       return mod.initLogger(...(args as Parameters<typeof mod.initLogger>))
+    },
+    log: {
+      ...mod.log,
+      info: (...args: unknown[]) => {
+        logInfoSpy(...args)
+        return mod.log.info(...(args as Parameters<typeof mod.log.info>))
+      },
+      error: (...args: unknown[]) => {
+        logErrorSpy(...args)
+        return mod.log.error(...(args as Parameters<typeof mod.log.error>))
+      },
     },
   }
 })
@@ -32,6 +45,8 @@ describe('createInstrumentation', () => {
     originalStderrWrite = process.stderr.write
     originalNextRuntime = process.env.NEXT_RUNTIME
     initLoggerSpy.mockClear()
+    logInfoSpy.mockClear()
+    logErrorSpy.mockClear()
   })
 
   afterEach(() => {
@@ -48,8 +63,12 @@ describe('createInstrumentation', () => {
   })
 
   async function loadModule() {
-    const mod = await import('../../src/next/instrumentation')
+    const mod = await import('../../src/next/instrumentation-create')
     return mod.createInstrumentation
+  }
+
+  async function runRegister(register: () => void | Promise<void>) {
+    await register()
   }
 
   it('register() calls initLogger() with correct config', async () => {
@@ -64,7 +83,7 @@ describe('createInstrumentation', () => {
       stringify: false,
     })
 
-    register()
+    await runRegister(register)
 
     expect(initLoggerSpy).toHaveBeenCalledTimes(1)
     const [[config]] = initLoggerSpy.mock.calls
@@ -85,7 +104,7 @@ describe('createInstrumentation', () => {
       pretty: false,
     })
 
-    register()
+    await runRegister(register)
 
     expect(process.stdout.write).not.toBe(originalStdoutWrite)
     expect(process.stderr.write).not.toBe(originalStderrWrite)
@@ -97,7 +116,7 @@ describe('createInstrumentation', () => {
 
     const { register } = createInstrumentation({ pretty: false })
 
-    register()
+    await runRegister(register)
 
     expect(process.stdout.write).toBe(originalStdoutWrite)
     expect(process.stderr.write).toBe(originalStderrWrite)
@@ -112,7 +131,7 @@ describe('createInstrumentation', () => {
       pretty: false,
     })
 
-    register()
+    await runRegister(register)
 
     expect(process.stdout.write).toBe(originalStdoutWrite)
     expect(process.stderr.write).toBe(originalStderrWrite)
@@ -126,7 +145,7 @@ describe('createInstrumentation', () => {
       drain: drainMock,
     })
 
-    register()
+    await runRegister(register)
 
     const error = Object.assign(new Error('Something broke'), { digest: 'abc123' })
     const request = { path: '/api/checkout', method: 'POST', headers: {} }
@@ -137,7 +156,7 @@ describe('createInstrumentation', () => {
       renderSource: 'react-server-components',
     }
 
-    onRequestError(error, request, context)
+    await onRequestError(error, request, context)
 
     expect(consoleErrorSpy).toHaveBeenCalled()
     const [[output]] = consoleErrorSpy.mock.calls
@@ -163,10 +182,10 @@ describe('createInstrumentation', () => {
       drain: drainMock,
     })
 
-    register()
+    await runRegister(register)
 
     const error = Object.assign(new Error('fail'), { digest: 'x' })
-    onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
+    await onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
       routerKind: 'App Router',
       routePath: '/test',
       routeType: 'page',
@@ -191,7 +210,7 @@ describe('createInstrumentation', () => {
       pretty: true,
     })
 
-    register()
+    await runRegister(register)
 
     // This should NOT cause infinite recursion:
     // stdout.write -> log.info -> pretty print -> console.log -> stdout.write -> GUARD stops
@@ -203,8 +222,8 @@ describe('createInstrumentation', () => {
   it('register() is idempotent — second call is a no-op', async () => {
     const createInstrumentation = await loadModule()
     const { register } = createInstrumentation({ pretty: false })
-    register()
-    register()
+    await runRegister(register)
+    await runRegister(register)
     expect(initLoggerSpy).toHaveBeenCalledTimes(1)
   })
 
@@ -215,14 +234,14 @@ describe('createInstrumentation', () => {
       pretty: false,
     })
 
-    register()
+    await runRegister(register)
 
     expect(initLoggerSpy).toHaveBeenCalledTimes(1)
     const [[config]] = initLoggerSpy.mock.calls
     expect(config.enabled).toBe(false)
 
     const error = Object.assign(new Error('fail'), { digest: 'x' })
-    onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
+    await onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
       routerKind: 'App Router',
       routePath: '/test',
       routeType: 'route',
@@ -235,7 +254,7 @@ describe('createInstrumentation', () => {
   it('createInstrumentation() with default options', async () => {
     const createInstrumentation = await loadModule()
     const { register } = createInstrumentation()
-    expect(() => register()).not.toThrow()
+    await expect(runRegister(register)).resolves.toBeUndefined()
     expect(initLoggerSpy).toHaveBeenCalledTimes(1)
   })
 
@@ -243,10 +262,10 @@ describe('createInstrumentation', () => {
     const createInstrumentation = await loadModule()
     const { register, onRequestError } = createInstrumentation({ pretty: false })
 
-    register()
+    await runRegister(register)
 
     const error = new Error('fail') as { digest?: string } & Error
-    onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
+    await onRequestError(error, { path: '/test', method: 'GET', headers: {} }, {
       routerKind: 'App Router',
       routePath: '/test',
       routeType: 'route',
@@ -268,10 +287,87 @@ describe('createInstrumentation', () => {
       pretty: false,
     })
 
-    register()
+    await runRegister(register)
 
     expect(process.stdout.write).toBe(originalStdoutWrite)
     expect(process.stderr.write).toBe(originalStderrWrite)
+  })
+
+  it('captureOutput ignores default Next.js edge bundler warnings on stderr', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const { register } = createInstrumentation({
+      captureOutput: true,
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(register)
+
+    process.stderr.write('A Node.js module is loaded in the Edge Runtime: node-module-in-edge-runtime\n')
+    expect(logErrorSpy).not.toHaveBeenCalled()
+
+    process.stderr.write('real application stderr\n')
+    expect(logErrorSpy).toHaveBeenCalledTimes(1)
+    expect(logErrorSpy.mock.calls[0]?.[0]).toMatchObject({
+      source: 'stderr',
+      message: 'real application stderr',
+    })
+  })
+
+  it('captureOutput object can disable stdout while keeping stderr', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const { register } = createInstrumentation({
+      captureOutput: { stdout: false, stderr: true },
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(register)
+
+    expect(process.stdout.write).toBe(originalStdoutWrite)
+    expect(process.stderr.write).not.toBe(originalStderrWrite)
+
+    process.stderr.write('stderr only\n')
+    expect(logErrorSpy).toHaveBeenCalledTimes(1)
+    expect(logInfoSpy).not.toHaveBeenCalled()
+  })
+
+  it('captureOutput custom ignore replaces the default filter', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const { register } = createInstrumentation({
+      captureOutput: { ignore: ['benign warning'] },
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(register)
+
+    process.stderr.write('node-module-in-edge-runtime\n')
+    expect(logErrorSpy).toHaveBeenCalledTimes(1)
+
+    logErrorSpy.mockClear()
+    process.stderr.write('benign warning from dependency\n')
+    expect(logErrorSpy).not.toHaveBeenCalled()
+  })
+})
+
+describe('instrumentation entry split', () => {
+  it('gate entry exports defineNodeInstrumentation only (Edge-safe)', async () => {
+    const gate = await import('../../src/next/instrumentation')
+    expect(gate.defineNodeInstrumentation).toBeTypeOf('function')
+    expect('createInstrumentation' in gate).toBe(false)
+  })
+
+  it('create entry exports createInstrumentation and captureOutput types', async () => {
+    const create = await import('../../src/next/instrumentation-create')
+    expect(create.createInstrumentation).toBeTypeOf('function')
+    expect(create.DEFAULT_CAPTURE_OUTPUT_IGNORE.length).toBeGreaterThan(0)
   })
 })
 
@@ -289,6 +385,13 @@ describe('defineNodeInstrumentation', () => {
     } else {
       process.env.NEXT_RUNTIME = originalNextRuntime
     }
+  })
+
+  it('options overload returns register and onRequestError hooks', async () => {
+    const { defineNodeInstrumentation } = await import('../../src/next/instrumentation')
+    const hooks = defineNodeInstrumentation({ service: 'test-app' })
+    expect(hooks.register).toBeTypeOf('function')
+    expect(hooks.onRequestError).toBeTypeOf('function')
   })
 
   it('does not call loader when NEXT_RUNTIME is edge', async () => {

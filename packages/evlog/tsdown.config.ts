@@ -41,6 +41,7 @@ export default defineConfig({
     'next/index': 'src/next/index.ts',
     'next/client': 'src/next/client.ts',
     'next/instrumentation': 'src/next/instrumentation.ts',
+    'next/instrumentation/create': 'src/next/instrumentation-create.ts',
     'next/stream': 'src/next/stream.ts',
     'hono/index': 'src/hono/index.ts',
     'express/index': 'src/express/index.ts',

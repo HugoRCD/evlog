@@ -30,7 +30,7 @@
 
 import { startStreamServer, type StreamServerOptions } from '../stream'
 import type { DrainContext } from '../types'
-import { createInstrumentation, type InstrumentationOptions } from './instrumentation'
+import { createInstrumentation, type InstrumentationOptions } from './instrumentation-create'
 
 export interface StreamedInstrumentationOptions extends InstrumentationOptions {
   /**
