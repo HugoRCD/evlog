@@ -48,9 +48,12 @@ export interface PipelineDrainFn<T> {
  * ```
  */
 /**
- * Unref a timer on runtimes that support it (Node, Bun) so a pending flush or
- * retry backoff never holds the process open. Buffered events are delivered on
- * shutdown via the documented `flush()` contract, not by keeping timers alive.
+ * Unref a timer on runtimes that support it (Node, Bun) so an idle flush
+ * scheduling timer never holds the process open. Buffered events are delivered
+ * on shutdown via the documented `flush()` contract, not by keeping timers
+ * alive. Retry backoff timers are intentionally left ref'd: an in-flight batch
+ * is active work, and an unref'd timer awaited by `flush()` would let the
+ * process exit mid-retry.
  */
 function unrefTimer(timer: ReturnType<typeof setTimeout>): void {
   (timer as { unref?: () => void }).unref?.()
@@ -132,7 +135,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
           if (attempt < maxAttempts) {
-            await new Promise<void>(r => unrefTimer(setTimeout(r, getRetryDelay(attempt))))
+            await new Promise<void>(r => setTimeout(r, getRetryDelay(attempt)))
           }
         }
       }

@@ -57,13 +57,16 @@ export function applyDeprecatedAlias<T extends object>(
   opts: { adapter: string, from: keyof T & string, to: keyof T & string, envHint?: string },
 ): T {
   const record = config as Record<string, unknown>
-  if (!record[opts.to] && record[opts.from]) {
-    const warnKey = `${opts.adapter}:${opts.from}`
-    if (!warnedDeprecatedAliases.has(warnKey)) {
-      warnedDeprecatedAliases.add(warnKey)
-      console.warn(`[evlog/${opts.adapter}] \`${opts.from}\` is deprecated, use \`${opts.to}\` instead.${opts.envHint ? ` (${opts.envHint})` : ''}`)
+  if (record[opts.to] === undefined || record[opts.to] === null) {
+    const fromValue = record[opts.from]
+    if (fromValue !== undefined && fromValue !== null) {
+      const warnKey = `${opts.adapter}:${opts.from}`
+      if (!warnedDeprecatedAliases.has(warnKey)) {
+        warnedDeprecatedAliases.add(warnKey)
+        console.warn(`[evlog/${opts.adapter}] \`${opts.from}\` is deprecated, use \`${opts.to}\` instead.${opts.envHint ? ` (${opts.envHint})` : ''}`)
+      }
+      record[opts.to] = fromValue
     }
-    record[opts.to] = record[opts.from]
   }
   return config
 }

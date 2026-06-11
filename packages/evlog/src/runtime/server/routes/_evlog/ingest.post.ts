@@ -48,8 +48,8 @@ async function readJsonBody(event: Parameters<typeof defineEventHandler>[0] exte
   if (!raw) {
     throw createError({ statusCode: 400, message: 'Invalid request body' })
   }
-  // String length undercounts multi-byte characters, but is a close enough proxy for a size cap.
-  if (raw.length > MAX_BODY_BYTES) {
+  // Measure actual UTF-8 bytes so multi-byte payloads can't slip past the cap.
+  if (new TextEncoder().encode(raw).byteLength > MAX_BODY_BYTES) {
     throw createError({ statusCode: 413, message: 'Payload too large' })
   }
 
