@@ -272,12 +272,22 @@ describe('axiom adapter', () => {
       const drain = createAxiomDrain()
       await drain(createDrainContext())
       expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('[evlog/axiom] Missing dataset or apiKey'),
+        expect.stringContaining('Set AXIOM_API_KEY/AXIOM_DATASET env vars'),
       )
       expect(fetchSpy).not.toHaveBeenCalled()
     })
 
+    it('warns when legacy token alias is used', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const drain = createAxiomDrain({ token: 'legacy-key', dataset: 'logs' })
+      await drain(createDrainContext())
+      expect(warnSpy).toHaveBeenCalledWith(
+        '[evlog/axiom] `token` is deprecated, use `apiKey` instead.',
+      )
+    })
+
     it('accepts legacy token alias', async () => {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
       const drain = createAxiomDrain({ token: 'legacy-key', dataset: 'logs' })
       await drain(createDrainContext())
       const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]

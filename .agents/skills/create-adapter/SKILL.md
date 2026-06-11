@@ -59,7 +59,7 @@ Create `packages/evlog/src/adapters/{name}.ts`. Read [references/adapter-templat
 
 The contract is now `defineHttpDrain<TConfig>({ resolve, encode })`. You only ship two pieces of logic:
 
-1. **`resolve()`** — produce a fully-resolved config or `null` to skip. Use `resolveAdapterConfig` for the standard precedence (overrides → `runtimeConfig.evlog.{name}` → `runtimeConfig.{name}` → `NUXT_{NAME}_*` → `{NAME}_*`).
+1. **`resolve()`** — produce a fully-resolved config or `null` to skip. Use `resolveAdapterConfig` for the standard precedence (overrides → `runtimeConfig.evlog.{name}` → `runtimeConfig.{name}` → env vars). List `NUXT_{NAME}_*` before `{NAME}_*` in `ConfigField.env` for silent Nuxt compat; show only `{NAME}_*` in user-facing messages via `formatPublicEnvKeys`.
 2. **`encode(events, config)`** — produce `{ url, headers, body }` for a batch of events (or `null` to skip). HTTP transport, retries, timeout, and error logging are handled by `defineHttpDrain`.
 
 Key rules:

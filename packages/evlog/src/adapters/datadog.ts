@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 
@@ -143,11 +143,11 @@ export function resolveDatadogIntakeUrl(config: Pick<DatadogConfig, 'site' | 'in
  * 1. Overrides passed to `createDatadogDrain()`
  * 2. `runtimeConfig.evlog.datadog`
  * 3. `runtimeConfig.datadog`
- * 4. Environment variables: `NUXT_DATADOG_*`, `DATADOG_*`, and common `DD_*` aliases
+ * 4. Environment variables: `DATADOG_*` and common `DD_*` aliases
  *
  * @example
  * ```ts
- * // Zero config — set DD_API_KEY (or NUXT_DATADOG_API_KEY) and optionally DD_SITE
+ * // Zero config — set DD_API_KEY and optionally DD_SITE
  * nitroApp.hooks.hook('evlog:drain', createDatadogDrain())
  *
  * nitroApp.hooks.hook('evlog:drain', createDatadogDrain({
@@ -161,7 +161,7 @@ export function createDatadogDrain(overrides?: Partial<DatadogConfig>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<DatadogConfig>('datadog', DATADOG_FIELDS, overrides)
       if (!config.apiKey) {
-        console.error('[evlog/datadog] Missing API key. Set NUXT_DATADOG_API_KEY, DATADOG_API_KEY, or DD_API_KEY, or pass apiKey to createDatadogDrain()')
+        console.error(`[evlog/datadog] Missing API key. Set ${formatPublicEnvKeys(['NUXT_DATADOG_API_KEY', 'DATADOG_API_KEY', 'DD_API_KEY'])}, or pass apiKey to createDatadogDrain()`)
         return null
       }
       return config as DatadogConfig

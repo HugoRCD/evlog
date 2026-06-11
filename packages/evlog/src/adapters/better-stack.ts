@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { applyDeprecatedAlias, resolveAdapterConfig } from '../shared/config'
+import { applyDeprecatedAlias, formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 
@@ -34,7 +34,6 @@ function applyApiKeyAlias(config: BetterStackConfig): BetterStackConfig {
     adapter: 'better-stack',
     from: 'sourceToken',
     to: 'apiKey',
-    envHint: 'Env: NUXT_BETTER_STACK_SOURCE_TOKEN/BETTER_STACK_SOURCE_TOKEN → NUXT_BETTER_STACK_API_KEY/BETTER_STACK_API_KEY.',
   })
 }
 
@@ -54,7 +53,7 @@ export function toBetterStackEvent(event: WideEvent): Record<string, unknown> {
  * 1. Overrides passed to createBetterStackDrain()
  * 2. runtimeConfig.evlog.betterStack
  * 3. runtimeConfig.betterStack
- * 4. Environment variables: NUXT_BETTER_STACK_API_KEY, BETTER_STACK_API_KEY (or legacy `*_SOURCE_TOKEN`)
+ * 4. Environment variables: BETTER_STACK_API_KEY (or legacy `BETTER_STACK_SOURCE_TOKEN`)
  *
  * @example
  * ```ts
@@ -70,7 +69,7 @@ export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>) {
       const resolved = await resolveAdapterConfig<BetterStackConfig>('betterStack', BETTER_STACK_FIELDS, overrides)
       const config = applyApiKeyAlias(resolved as BetterStackConfig)
       if (!config.apiKey) {
-        console.error('[evlog/better-stack] Missing apiKey. Set NUXT_BETTER_STACK_API_KEY env var or pass to createBetterStackDrain()')
+        console.error(`[evlog/better-stack] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_BETTER_STACK_API_KEY', 'BETTER_STACK_API_KEY'])} env var or pass to createBetterStackDrain()`)
         return null
       }
       return config

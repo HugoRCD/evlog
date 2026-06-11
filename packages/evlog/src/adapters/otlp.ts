@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineHttpDrain } from '../shared/drain'
 import { toOtlpAttributeValue } from '../shared/event'
 import { httpPost } from '../shared/http'
@@ -61,7 +61,7 @@ interface ExportLogsServiceRequest {
 }
 
 const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
-  { key: 'endpoint', env: ['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT'] },
+  { key: 'endpoint', env: ['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT', 'OTLP_ENDPOINT'] },
   { key: 'serviceName', env: ['NUXT_OTLP_SERVICE_NAME', 'OTEL_SERVICE_NAME'] },
   { key: 'headers' },
   { key: 'resourceAttributes' },
@@ -182,10 +182,10 @@ function buildResourceAttributes(
 
 /**
  * Build headers from OTEL env vars.
- * Kept inline as OTLP-specific (parses OTEL_EXPORTER_OTLP_HEADERS=key=val,key=val).
+ * Kept inline as OTLP-specific (parses OTEL_EXPORTER_OTLP_HEADERS / OTLP_HEADERS as key=val,key=val).
  */
 function getHeadersFromEnv(): Record<string, string> | undefined {
-  const headersEnv = process.env.OTEL_EXPORTER_OTLP_HEADERS || process.env.NUXT_OTLP_HEADERS
+  const headersEnv = process.env.OTEL_EXPORTER_OTLP_HEADERS || process.env.OTLP_HEADERS || process.env.NUXT_OTLP_HEADERS
   if (headersEnv) {
     const headers: Record<string, string> = {}
     const decoded = decodeURIComponent(headersEnv)
@@ -215,9 +215,9 @@ function getHeadersFromEnv(): Record<string, string> | undefined {
  *
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to createOTLPDrain()
- * 2. runtimeConfig.evlog.otlp (NUXT_EVLOG_OTLP_*)
- * 3. runtimeConfig.otlp (NUXT_OTLP_*)
- * 4. Environment variables: OTEL_EXPORTER_OTLP_ENDPOINT, OTEL_SERVICE_NAME
+ * 2. runtimeConfig.evlog.otlp
+ * 3. runtimeConfig.otlp
+ * 4. Environment variables: OTEL_EXPORTER_OTLP_ENDPOINT (or OTLP_ENDPOINT), OTEL_SERVICE_NAME
  *
  * @example
  * ```ts
@@ -242,7 +242,7 @@ export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
       }
 
       if (!config.endpoint) {
-        console.error('[evlog/otlp] Missing endpoint. Set NUXT_OTLP_ENDPOINT or OTEL_EXPORTER_OTLP_ENDPOINT env var, or pass to createOTLPDrain()')
+        console.error(`[evlog/otlp] Missing endpoint. Set ${formatPublicEnvKeys(['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT', 'OTLP_ENDPOINT'])} env var, or pass to createOTLPDrain()`)
         return null
       }
       return config as OTLPConfig

@@ -1,6 +1,6 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
-import { resolveAdapterConfig } from '../shared/config'
+import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import { defineDrain, defineHttpDrain } from '../shared/drain'
 import { httpPost } from '../shared/http'
 import { sendBatchToOTLP } from './otlp'
@@ -109,7 +109,7 @@ export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHog
  * 1. Overrides passed to createPostHogDrain()
  * 2. runtimeConfig.evlog.posthog
  * 3. runtimeConfig.posthog
- * 4. Environment variables: NUXT_POSTHOG_*, POSTHOG_*
+ * 4. Environment variables: POSTHOG_*
  *
  * @example
  * ```ts
@@ -129,7 +129,7 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
       resolve: async () => {
         const config = await resolveAdapterConfig<PostHogConfig>('posthog', POSTHOG_FIELDS, overrides)
         if (!config.apiKey) {
-          console.error('[evlog/posthog-events] Missing apiKey. Set NUXT_POSTHOG_API_KEY env var or pass to createPostHogDrain({ mode: \'events\' })')
+          console.error(`[evlog/posthog-events] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_POSTHOG_API_KEY', 'POSTHOG_API_KEY'])} env var or pass to createPostHogDrain({ mode: 'events' })`)
           return null
         }
         return config as PostHogConfig
@@ -150,7 +150,7 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<PostHogConfig>('posthog', POSTHOG_FIELDS, overrides)
       if (!config.apiKey) {
-        console.error('[evlog/posthog] Missing apiKey. Set NUXT_POSTHOG_API_KEY env var or pass to createPostHogDrain()')
+        console.error(`[evlog/posthog] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_POSTHOG_API_KEY', 'POSTHOG_API_KEY'])} env var or pass to createPostHogDrain()`)
         return null
       }
       return config as PostHogConfig
