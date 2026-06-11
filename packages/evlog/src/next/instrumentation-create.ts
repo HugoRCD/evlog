@@ -31,7 +31,12 @@ export const DEFAULT_CAPTURE_OUTPUT_IGNORE: Array<string | RegExp> = [
   'not supported in the Edge Runtime',
   'not supported inthe Edge Runtime',
   'Import trace:',
+  /^(?:\u001b\[[0-9;]*m)?(?:ERROR|INFO|WARN|DEBUG) \[/,
 ]
+
+interface EvlogProcessOutputGlobal {
+  __evlogNativeStdoutWrite?: typeof process.stdout.write
+}
 
 /**
  * Configuration for {@link createInstrumentation} and {@link defineNodeInstrumentation}.
@@ -79,6 +84,7 @@ let activeCaptureOutput:
       ignore: Array<string | RegExp>
       stdout: boolean
       stderr: boolean
+      silent: boolean
     }
   | undefined
 
@@ -108,18 +114,20 @@ function shouldIgnoreCapturedOutput(message: string, ignore: Array<string | RegE
   })
 }
 
-function applyCaptureOutput(config: CaptureOutputOptions, logApi: Log): void {
+function applyCaptureOutput(config: CaptureOutputOptions, logApi: Log, silent: boolean): void {
   activeCaptureOutput = {
     log: logApi,
     ignore: config.ignore ?? DEFAULT_CAPTURE_OUTPUT_IGNORE,
     stdout: config.stdout !== false,
     stderr: config.stderr !== false,
+    silent,
   }
 
   const proc = globalThis.process
 
   if (activeCaptureOutput.stdout && !stdoutPatched) {
     const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
+    ;(globalThis as EvlogProcessOutputGlobal).__evlogNativeStdoutWrite = originalStdoutWrite
     stdoutPatched = true
     proc.stdout.write = function(chunk: unknown, ...args: unknown[]): boolean {
       const message = String(chunk).trimEnd()
@@ -135,6 +143,9 @@ function applyCaptureOutput(config: CaptureOutputOptions, logApi: Log): void {
           active.log.info({ source: 'stdout', message })
         } finally {
           patching = false
+        }
+        if (!active.silent) {
+          return true
         }
       }
       return originalStdoutWrite(chunk as string, ...args as [])
@@ -158,6 +169,9 @@ function applyCaptureOutput(config: CaptureOutputOptions, logApi: Log): void {
           active.log.error({ source: 'stderr', message })
         } finally {
           patching = false
+        }
+        if (!active.silent) {
+          return true
         }
       }
       return originalStderrWrite(chunk as string, ...args as [])
@@ -197,7 +211,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       lockLogger()
 
       if (captureOutputOptions && process.env.NEXT_RUNTIME === 'nodejs') {
-        applyCaptureOutput(captureOutputOptions, log)
+        applyCaptureOutput(captureOutputOptions, log, options.silent ?? false)
       }
       registered = true
     }).catch((error) => {

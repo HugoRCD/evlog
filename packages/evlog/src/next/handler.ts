@@ -6,6 +6,7 @@ import { shouldLog, getServiceForPath } from '../shared/routes'
 import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
 import { filterSafeHeaders } from '../utils'
 import { EvlogError } from '../error'
+import { enrichNextErrorStackForDev } from './enrich-error-stack'
 import type { NextEvlogOptions } from './types'
 import { evlogStorage } from './storage'
 
@@ -252,7 +253,9 @@ export function createWithEvlog(options: NextEvlogOptions) {
 
         return result as Awaited<TReturn>
       } catch (error) {
-        logger.error(error instanceof Error ? error : new Error(String(error)))
+        const err = error instanceof Error ? error : new Error(String(error))
+        await enrichNextErrorStackForDev(err, { pretty: state.options.pretty })
+        logger.error(err)
 
         const errorStatus = (error as { status?: number }).status
           ?? (error as { statusCode?: number }).statusCode

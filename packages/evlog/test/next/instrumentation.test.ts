@@ -336,6 +336,76 @@ describe('createInstrumentation', () => {
     expect(logInfoSpy).not.toHaveBeenCalled()
   })
 
+  it('captureOutput without silent suppresses passthrough to avoid terminal duplication', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const passthroughSpy = vi.fn()
+    process.stdout.write = function(chunk: unknown, ...args: unknown[]) {
+      passthroughSpy()
+      return originalStdoutWrite.call(process.stdout, chunk as string, ...args as [])
+    } as typeof process.stdout.write
+
+    const { register } = createInstrumentation({
+      captureOutput: true,
+      pretty: false,
+      silent: false,
+    })
+
+    await runRegister(register)
+
+    passthroughSpy.mockClear()
+    process.stdout.write('hello from next\n')
+
+    expect(logInfoSpy).toHaveBeenCalledTimes(1)
+    expect(logInfoSpy.mock.calls[0]?.[0]).toMatchObject({
+      source: 'stdout',
+      message: 'hello from next',
+    })
+    expect(passthroughSpy).not.toHaveBeenCalled()
+  })
+
+  it('captureOutput with silent passthroughs raw output for drain-only setups', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const passthroughSpy = vi.fn()
+    process.stdout.write = function(chunk: unknown, ...args: unknown[]) {
+      passthroughSpy()
+      return originalStdoutWrite.call(process.stdout, chunk as string, ...args as [])
+    } as typeof process.stdout.write
+
+    const { register } = createInstrumentation({
+      captureOutput: true,
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(register)
+
+    passthroughSpy.mockClear()
+    process.stdout.write('hello from next\n')
+
+    expect(logInfoSpy).toHaveBeenCalledTimes(1)
+    expect(passthroughSpy).toHaveBeenCalledTimes(1)
+  })
+
+  it('captureOutput ignores evlog-formatted terminal lines on stdout', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const { register } = createInstrumentation({
+      captureOutput: true,
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(register)
+
+    process.stdout.write('ERROR [next-playground] GET /api/test 402 in 1ms\n')
+    expect(logInfoSpy).not.toHaveBeenCalled()
+  })
+
   it('captureOutput custom ignore replaces the default filter', async () => {
     const createInstrumentation = await loadModule()
     process.env.NEXT_RUNTIME = 'nodejs'

@@ -66,7 +66,7 @@ export interface CodeSnippetLine {
   isErrorLine: boolean
 }
 
-const SKIP_PATH_RE = /(?:^|[/\\])(?:node_modules|\.nuxt|\.output)(?:[/\\]|$)/
+const SKIP_PATH_RE = /(?:^|[/\\])(?:node_modules|\.nuxt|\.next|\.output)(?:[/\\]|$)/
 const SKIP_FRAME_PATH_RE = /(?:^|[/\\])(?:packages[/\\]evlog|evlog[/\\](?:dist|src))(?:[/\\]|$)/
 const SKIP_FRAME_FN_RE = /^(?:createError|EvlogError|new EvlogError)$/
 
@@ -154,9 +154,11 @@ export function decodeFileUrl(file: string): string {
 }
 
 function isAppPath(file: string): boolean {
-  const normalized = file.replace(/\\/g, '/')
+  const normalized = decodeFileUrl(file).replace(/\\/g, '/')
+  if (normalized.startsWith('node:')) return false
   if (SKIP_PATH_RE.test(normalized)) return false
   if (normalized.includes('/node_modules/')) return false
+  if (isFrameworkRuntimePath(normalized)) return false
   return true
 }
 
@@ -172,6 +174,25 @@ function formatDisplayPath(file: string, cwd: string): string {
   const srcIdx = decoded.indexOf('/src/')
   if (srcIdx >= 0) return decoded.slice(srcIdx + 1)
   return decoded
+}
+
+/**
+ * Compact a stack trace for wide-event storage (drains, NDJSON).
+ * Drops node_modules, build output, and evlog internals; keeps up to five useful frames.
+ */
+export function compactStackForStorage(stack: string | undefined, maxFrames = 5): string | undefined {
+  if (!stack) return undefined
+
+  const lines = stack.split('\n')
+  const head = lines[0] ?? ''
+  const frames = parseStackFrames(stack)
+  const useful = frames.filter(f => f.file && f.line && f.isApp && !isInternalErrorFrame(f)).slice(0, maxFrames)
+
+  if (useful.length === 0) {
+    return head || undefined
+  }
+
+  return [head, ...useful.map(f => f.raw)].join('\n')
 }
 
 /**
@@ -231,7 +252,21 @@ export function parseStackFrames(stack: string | undefined): StackFrame[] {
   return frames
 }
 
+function isFrameworkRuntimePath(path: string): boolean {
+  const normalized = path.replace(/\\/g, '/')
+  return normalized.includes('route-modules/')
+    || normalized.includes('webpack://next/')
+    || normalized.includes('/next/dist/')
+    || normalized.includes('/compiled/next-server/')
+}
+
+function isFrameworkRuntimeFrame(frame: StackFrame): boolean {
+  if (!frame.file) return false
+  return isFrameworkRuntimePath(decodeFileUrl(frame.file))
+}
+
 function isInternalErrorFrame(frame: StackFrame): boolean {
+  if (isFrameworkRuntimeFrame(frame)) return true
   if (frame.fn) {
     const fn = frame.fn.replace(/^async /, '')
     if (SKIP_FRAME_FN_RE.test(fn)) return true
@@ -240,31 +275,20 @@ function isInternalErrorFrame(frame: StackFrame): boolean {
   const path = decodeFileUrl(frame.file).replace(/\\/g, '/')
   if (SKIP_FRAME_PATH_RE.test(path)) return true
   if (path.includes('.nuxt/')) return true
+  if (path.includes('.next/')) return true
   return false
 }
 
 /**
- * Pick the most useful frame for code snippets (prefer app source over bundles).
+ * Pick the most useful frame for code snippets (topmost app throw site).
  */
 export function pickPrimaryFrame(frames: StackFrame[]): StackFrame | undefined {
-  const appFrames = frames.filter(f => f.isApp && f.file && f.line && !isInternalErrorFrame(f))
-  if (appFrames.length === 0) return undefined
-
-  const scored = appFrames.map((frame) => {
-    const path = decodeFileUrl(frame.file!).replace(/\\/g, '/')
-    let score = 0
-    if (path.includes('/server/')) score += 8
-    if (/\.(?:ts|tsx|vue)$/.test(path)) score += 6
-    if (path.includes('/src/')) score += 3
-    if (path.startsWith('./')) score += 2
-    if (/\.(?:js|jsx|mjs)$/.test(path)) score += 1
-    if (path.includes('.nuxt/')) score -= 20
-    if (path.includes('/packages/evlog/')) score -= 20
-    return { frame, score }
-  })
-
-  scored.sort((a, b) => b.score - a.score)
-  return scored[0]?.frame ?? appFrames[0]
+  for (const frame of frames) {
+    if (frame.isApp && frame.file && frame.line && !isInternalErrorFrame(frame)) {
+      return frame
+    }
+  }
+  return undefined
 }
 
 /**
@@ -276,6 +300,8 @@ export function readCodeSnippet(
   contextLines = 2,
 ): CodeSnippetLine[] | null {
   if (!isDev() || isBrowser() || !snippetReader) return null
+  const path = decodeFileUrl(file).replace(/\\/g, '/')
+  if (path.includes('.next/') || path.includes('.nuxt/') || path.includes('.output/')) return null
   return snippetReader(file, line, contextLines)
 }
 
@@ -292,15 +318,16 @@ function formatSnippetLines(snippet: CodeSnippetLine[]): string[] {
 function formatFrameLocation(frame: StackFrame, cwd: string): string {
   const file = frame.file ? formatDisplayPath(frame.file, cwd) : 'unknown'
   const loc = frame.line ? `${file}:${frame.line}` : file
-  return frame.fn ? `at ${frame.fn} (${loc})` : `at ${loc}`
+  const fn = frame.fn && frame.fn !== '<unknown>' ? frame.fn : undefined
+  return fn ? `at ${fn} (${loc})` : `at ${loc}`
 }
 
 function formatCollapsedFrame(frame: StackFrame, cwd: string): string {
   const file = frame.file ? formatDisplayPath(frame.file, cwd) : 'unknown'
   const loc = frame.line ? `${file}:${frame.line}` : file
   const prefix = frame.fn?.startsWith('async') ? 'at async ' : 'at '
-  const fn = frame.fn?.replace(/^async /, '') ?? loc
-  if (frame.fn && frame.fn !== loc) {
+  const fn = frame.fn?.replace(/^async /, '')
+  if (fn && fn !== '<unknown>' && fn !== loc) {
     return `${prefix}${fn} (${loc})`
   }
   return `${prefix}${loc}`
