@@ -73,6 +73,14 @@ let patching = false
 let loggerPromise: Promise<LoggerModule> | undefined
 let stdoutPatched = false
 let stderrPatched = false
+let activeCaptureOutput:
+  | {
+      log: Log
+      ignore: Array<string | RegExp>
+      stdout: boolean
+      stderr: boolean
+    }
+  | undefined
 
 function loadLogger(): Promise<LoggerModule> {
   loggerPromise ??= import('../logger')
@@ -98,6 +106,63 @@ function shouldIgnoreCapturedOutput(message: string, ignore: Array<string | RegE
     if (typeof pattern === 'string') return message.includes(pattern)
     return pattern.test(message)
   })
+}
+
+function applyCaptureOutput(config: CaptureOutputOptions, logApi: Log): void {
+  activeCaptureOutput = {
+    log: logApi,
+    ignore: config.ignore ?? DEFAULT_CAPTURE_OUTPUT_IGNORE,
+    stdout: config.stdout !== false,
+    stderr: config.stderr !== false,
+  }
+
+  const proc = globalThis.process
+
+  if (activeCaptureOutput.stdout && !stdoutPatched) {
+    const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
+    stdoutPatched = true
+    proc.stdout.write = function(chunk: unknown, ...args: unknown[]): boolean {
+      const message = String(chunk).trimEnd()
+      const active = activeCaptureOutput
+      if (
+        !patching
+        && message.length > 0
+        && active?.stdout
+        && !shouldIgnoreCapturedOutput(message, active.ignore)
+      ) {
+        patching = true
+        try {
+          active.log.info({ source: 'stdout', message })
+        } finally {
+          patching = false
+        }
+      }
+      return originalStdoutWrite(chunk as string, ...args as [])
+    } as typeof process.stdout.write
+  }
+
+  if (activeCaptureOutput.stderr && !stderrPatched) {
+    const originalStderrWrite = proc.stderr.write.bind(proc.stderr)
+    stderrPatched = true
+    proc.stderr.write = function(chunk: unknown, ...args: unknown[]): boolean {
+      const message = String(chunk).trimEnd()
+      const active = activeCaptureOutput
+      if (
+        !patching
+        && message.length > 0
+        && active?.stderr
+        && !shouldIgnoreCapturedOutput(message, active.ignore)
+      ) {
+        patching = true
+        try {
+          active.log.error({ source: 'stderr', message })
+        } finally {
+          patching = false
+        }
+      }
+      return originalStderrWrite(chunk as string, ...args as [])
+    } as typeof process.stderr.write
+  }
 }
 
 /**
@@ -132,7 +197,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       lockLogger()
 
       if (captureOutputOptions && process.env.NEXT_RUNTIME === 'nodejs') {
-        patchOutput(captureOutputOptions, log)
+        applyCaptureOutput(captureOutputOptions, log)
       }
       registered = true
     }).catch((error) => {
@@ -140,45 +205,6 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
       throw error
     })
     return registerPromise
-  }
-
-  function patchOutput(config: CaptureOutputOptions, logApi: Log): void {
-    const proc = globalThis.process
-    const ignore = config.ignore ?? DEFAULT_CAPTURE_OUTPUT_IGNORE
-
-    if (config.stdout !== false && !stdoutPatched) {
-      const originalStdoutWrite = proc.stdout.write.bind(proc.stdout)
-      stdoutPatched = true
-      proc.stdout.write = function(chunk: unknown, ...args: unknown[]): boolean {
-        const message = String(chunk).trimEnd()
-        if (!patching && message.length > 0 && !shouldIgnoreCapturedOutput(message, ignore)) {
-          patching = true
-          try {
-            logApi.info({ source: 'stdout', message })
-          } finally {
-            patching = false
-          }
-        }
-        return originalStdoutWrite(chunk as string, ...args as [])
-      } as typeof process.stdout.write
-    }
-
-    if (config.stderr !== false && !stderrPatched) {
-      const originalStderrWrite = proc.stderr.write.bind(proc.stderr)
-      stderrPatched = true
-      proc.stderr.write = function(chunk: unknown, ...args: unknown[]): boolean {
-        const message = String(chunk).trimEnd()
-        if (!patching && message.length > 0 && !shouldIgnoreCapturedOutput(message, ignore)) {
-          patching = true
-          try {
-            logApi.error({ source: 'stderr', message })
-          } finally {
-            patching = false
-          }
-        }
-        return originalStderrWrite(chunk as string, ...args as [])
-      } as typeof process.stderr.write
-    }
   }
 
   function onRequestError(

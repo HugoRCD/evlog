@@ -355,6 +355,32 @@ describe('createInstrumentation', () => {
     process.stderr.write('benign warning from dependency\n')
     expect(logErrorSpy).not.toHaveBeenCalled()
   })
+
+  it('captureOutput uses the latest registration filters without re-wrapping', async () => {
+    const createInstrumentation = await loadModule()
+    process.env.NEXT_RUNTIME = 'nodejs'
+
+    const first = createInstrumentation({
+      captureOutput: { ignore: ['stale-filter'] },
+      pretty: false,
+      silent: true,
+    })
+    const second = createInstrumentation({
+      captureOutput: { ignore: ['active-filter'] },
+      pretty: false,
+      silent: true,
+    })
+
+    await runRegister(first.register)
+    await runRegister(second.register)
+
+    process.stderr.write('matched active-filter\n')
+    expect(logErrorSpy).not.toHaveBeenCalled()
+
+    process.stderr.write('unfiltered stderr\n')
+    expect(logErrorSpy).toHaveBeenCalledTimes(1)
+    expect(logErrorSpy).toHaveBeenCalledWith({ source: 'stderr', message: 'unfiltered stderr' })
+  })
 })
 
 describe('instrumentation entry split', () => {
