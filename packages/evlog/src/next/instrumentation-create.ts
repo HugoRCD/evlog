@@ -5,6 +5,7 @@ import type {
 } from './instrumentation-gate'
 
 type LoggerModule = typeof import('../logger')
+type EvlogProcessOutputGlobal = import('../logger').EvlogProcessOutputGlobal
 
 /** Options for capturing process stdout/stderr as structured log events. */
 export interface CaptureOutputOptions {
@@ -31,12 +32,7 @@ export const DEFAULT_CAPTURE_OUTPUT_IGNORE: Array<string | RegExp> = [
   'not supported in the Edge Runtime',
   'not supported inthe Edge Runtime',
   'Import trace:',
-  /^(?:\u001b\[[0-9;]*m)?(?:ERROR|INFO|WARN|DEBUG) \[/,
 ]
-
-interface EvlogProcessOutputGlobal {
-  __evlogNativeStdoutWrite?: typeof process.stdout.write
-}
 
 /**
  * Configuration for {@link createInstrumentation} and {@link defineNodeInstrumentation}.

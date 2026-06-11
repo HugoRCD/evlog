@@ -390,22 +390,6 @@ describe('createInstrumentation', () => {
     expect(passthroughSpy).toHaveBeenCalledTimes(1)
   })
 
-  it('captureOutput ignores evlog-formatted terminal lines on stdout', async () => {
-    const createInstrumentation = await loadModule()
-    process.env.NEXT_RUNTIME = 'nodejs'
-
-    const { register } = createInstrumentation({
-      captureOutput: true,
-      pretty: false,
-      silent: true,
-    })
-
-    await runRegister(register)
-
-    process.stdout.write('ERROR [next-playground] GET /api/test 402 in 1ms\n')
-    expect(logInfoSpy).not.toHaveBeenCalled()
-  })
-
   it('captureOutput custom ignore replaces the default filter', async () => {
     const createInstrumentation = await loadModule()
     process.env.NEXT_RUNTIME = 'nodejs'
