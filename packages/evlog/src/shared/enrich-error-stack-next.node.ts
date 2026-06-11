@@ -2,6 +2,7 @@ import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { isAbsolute, relative } from 'node:path'
 import { pathToFileURL, fileURLToPath } from 'node:url'
+import { isFrameworkRuntimePath } from './pretty-error'
 
 /** Parsed stack frame from Next.js `parseStack`. */
 interface NextParsedFrame {
@@ -22,10 +23,6 @@ type SourceMapConsumerInstance = {
 }
 
 const require = createRequire(import.meta.url)
-
-function computeErrorName(error: Error): string {
-  return error.name || 'Error'
-}
 
 function formatMappedFrame(
   methodName: string | null,
@@ -52,19 +49,10 @@ function formatMappedFrame(
     : `    at ${fileLocation}${sourceLocation}`
 }
 
-function isFrameworkRuntimePath(path: string): boolean {
-  const normalized = path.replace(/\\/g, '/')
-  return normalized.includes('route-modules/')
-    || normalized.includes('webpack://next/')
-    || normalized.includes('/next/dist/')
-    || normalized.includes('/compiled/next-server/')
-}
-
 function shouldSkipMappedSource(source: string): boolean {
   const normalized = source.replace(/\\/g, '/')
   return normalized.includes('node_modules')
     || normalized.includes('/packages/evlog/')
-    || normalized.includes('/node_modules/')
     || isFrameworkRuntimePath(normalized)
 }
 
@@ -182,7 +170,7 @@ export function enrichErrorStackFromNextDev(error: Error): void {
 
     if (mappedLines.length === 0) return
 
-    error.stack = `${computeErrorName(error)}: ${error.message}\n${mappedLines.join('\n')}`
+    error.stack = `${error.name || 'Error'}: ${error.message}\n${mappedLines.join('\n')}`
   } catch {
     // Next internals unavailable — keep the original stack
   }

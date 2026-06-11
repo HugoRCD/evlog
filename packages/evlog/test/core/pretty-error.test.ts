@@ -143,14 +143,14 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
 })
 
 describe('compactStackForStorage', () => {
-  it('drops build output and node_modules frames from stored stacks', () => {
+  it('returns the stack unchanged when only build output and node_modules frames remain', () => {
     const stack = `EvlogError: Payment method declined
     at createError (/Users/dev/project/packages/evlog/src/error.ts:699:12)
     at Object.handler (/Users/dev/project/apps/next-playground/.next/dev/server/chunks/route.js:5372:176)
     at async /Users/dev/project/node_modules/next/dist/server/base-server.js:934:17
     at async /Users/dev/project/node_modules/next/dist/server/lib/start-server.js:225:13`
 
-    expect(compactStackForStorage(stack)).toBe('EvlogError: Payment method declined')
+    expect(compactStackForStorage(stack)).toBe(stack)
   })
 
   it('keeps app source frames when present', () => {

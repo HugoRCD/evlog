@@ -179,18 +179,16 @@ function formatDisplayPath(file: string, cwd: string): string {
 /**
  * Compact a stack trace for wide-event storage (drains, NDJSON).
  * Drops node_modules, build output, and evlog internals; keeps up to five useful frames.
+ * Returns the stack unchanged when no app frame survives the filter.
  */
 export function compactStackForStorage(stack: string | undefined, maxFrames = 5): string | undefined {
   if (!stack) return undefined
 
-  const lines = stack.split('\n')
-  const head = lines[0] ?? ''
+  const head = stack.split('\n')[0] ?? ''
   const frames = parseStackFrames(stack)
   const useful = frames.filter(f => f.file && f.line && f.isApp && !isInternalErrorFrame(f)).slice(0, maxFrames)
 
-  if (useful.length === 0) {
-    return head || undefined
-  }
+  if (useful.length === 0) return stack
 
   return [head, ...useful.map(f => f.raw)].join('\n')
 }
@@ -252,7 +250,8 @@ export function parseStackFrames(stack: string | undefined): StackFrame[] {
   return frames
 }
 
-function isFrameworkRuntimePath(path: string): boolean {
+/** True for Next.js runtime internals (route-modules, next/dist, bundled next-server). */
+export function isFrameworkRuntimePath(path: string): boolean {
   const normalized = path.replace(/\\/g, '/')
   return normalized.includes('route-modules/')
     || normalized.includes('webpack://next/')
