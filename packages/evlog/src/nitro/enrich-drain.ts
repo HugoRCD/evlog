@@ -3,6 +3,7 @@ import { getHeaders } from 'h3'
 import { getGlobalPluginRunner } from '../logger'
 import type { EnrichContext, ServerEvent, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
+import { extendDeferredDrain } from './deferred-drain'
 
 function getSafeHeaders(event: ServerEvent): Record<string, string> {
   const allHeaders = getHeaders(event as Parameters<typeof getHeaders>[0])
@@ -52,19 +53,6 @@ function buildHookContext(event: ServerEvent): Omit<EnrichContext, 'event'> {
       status: getResponseStatus(event),
       headers: responseHeaders,
     },
-  }
-}
-
-/** @internal Extend drain lifetime on Cloudflare without blocking Nitro Node responses. */
-export function extendDeferredDrain(
-  drainPromise: Promise<unknown>,
-  waitUntil?: (promise: Promise<unknown>) => void,
-): void {
-  void drainPromise.catch((err) => {
-    console.error('[evlog] background drain failed:', err)
-  })
-  if (typeof waitUntil === 'function') {
-    waitUntil(drainPromise)
   }
 }
 
