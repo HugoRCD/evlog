@@ -34,8 +34,6 @@ function applyApiKeyAlias(config: BetterStackConfig): BetterStackConfig {
     adapter: 'better-stack',
     from: 'sourceToken',
     to: 'apiKey',
-    fromEnv: ['NUXT_BETTER_STACK_SOURCE_TOKEN', 'BETTER_STACK_SOURCE_TOKEN'],
-    toEnv: ['NUXT_BETTER_STACK_API_KEY', 'BETTER_STACK_API_KEY'],
   })
 }
 

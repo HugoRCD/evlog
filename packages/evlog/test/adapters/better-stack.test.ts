@@ -228,12 +228,12 @@ describe('better-stack adapter', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
     })
 
-    it('warns with canonical env names when legacy sourceToken alias is used', async () => {
+    it('warns when legacy sourceToken alias is used', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const drain = createBetterStackDrain({ sourceToken: 'legacy-key' })
       await drain(createDrainContext())
       expect(warnSpy).toHaveBeenCalledWith(
-        '[evlog/better-stack] `sourceToken` is deprecated, use `apiKey` instead. (Env: BETTER_STACK_SOURCE_TOKEN → BETTER_STACK_API_KEY)',
+        '[evlog/better-stack] `sourceToken` is deprecated, use `apiKey` instead.',
       )
     })
 

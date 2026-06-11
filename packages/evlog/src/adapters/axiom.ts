@@ -68,8 +68,6 @@ function applyApiKeyAlias(config: Partial<ResolvedAxiomConfig>): Partial<Resolve
     adapter: 'axiom',
     from: 'token',
     to: 'apiKey',
-    fromEnv: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'],
-    toEnv: ['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY'],
   })
 }
 

@@ -277,12 +277,12 @@ describe('axiom adapter', () => {
       expect(fetchSpy).not.toHaveBeenCalled()
     })
 
-    it('warns with canonical env names when legacy token alias is used', async () => {
+    it('warns when legacy token alias is used', async () => {
       const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
       const drain = createAxiomDrain({ token: 'legacy-key', dataset: 'logs' })
       await drain(createDrainContext())
       expect(warnSpy).toHaveBeenCalledWith(
-        '[evlog/axiom] `token` is deprecated, use `apiKey` instead. (Env: AXIOM_TOKEN → AXIOM_API_KEY)',
+        '[evlog/axiom] `token` is deprecated, use `apiKey` instead.',
       )
     })
 

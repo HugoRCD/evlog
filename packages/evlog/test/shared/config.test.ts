@@ -30,7 +30,7 @@ describe('applyDeprecatedAlias', () => {
     vi.restoreAllMocks()
   })
 
-  it('warns with canonical env var names only', () => {
+  it('warns about the deprecated config field only', () => {
     const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     applyDeprecatedAlias(
       { sourceToken: 'legacy' },
@@ -38,12 +38,10 @@ describe('applyDeprecatedAlias', () => {
         adapter: 'test-config-warn',
         from: 'sourceToken',
         to: 'apiKey',
-        fromEnv: ['NUXT_BETTER_STACK_SOURCE_TOKEN', 'BETTER_STACK_SOURCE_TOKEN'],
-        toEnv: ['NUXT_BETTER_STACK_API_KEY', 'BETTER_STACK_API_KEY'],
       },
     )
     expect(warnSpy).toHaveBeenCalledWith(
-      '[evlog/test-config-warn] `sourceToken` is deprecated, use `apiKey` instead. (Env: BETTER_STACK_SOURCE_TOKEN → BETTER_STACK_API_KEY)',
+      '[evlog/test-config-warn] `sourceToken` is deprecated, use `apiKey` instead.',
     )
   })
 
@@ -55,8 +53,6 @@ describe('applyDeprecatedAlias', () => {
         adapter: 'test-config-copy',
         from: 'token',
         to: 'apiKey',
-        fromEnv: ['NUXT_AXIOM_TOKEN', 'AXIOM_TOKEN'],
-        toEnv: ['NUXT_AXIOM_API_KEY', 'AXIOM_API_KEY'],
       },
     )
     expect(result).toEqual({ token: 'xaat-legacy', apiKey: 'xaat-legacy' })
@@ -68,8 +64,6 @@ describe('applyDeprecatedAlias', () => {
       adapter: 'test-config-once',
       from: 'sourceToken' as const,
       to: 'apiKey' as const,
-      fromEnv: ['BETTER_STACK_SOURCE_TOKEN'],
-      toEnv: ['BETTER_STACK_API_KEY'],
     }
     applyDeprecatedAlias({ sourceToken: 'a' }, opts)
     applyDeprecatedAlias({ sourceToken: 'b' }, opts)
