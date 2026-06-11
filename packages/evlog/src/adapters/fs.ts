@@ -26,6 +26,17 @@ const FS_FIELDS: ConfigField<FsConfig>[] = [
 ]
 
 const gitignoreWritten = new Set<string>()
+let warnedFsEdgeRuntime = false
+
+function isEdgeRuntime(): boolean {
+  return process.env.NEXT_RUNTIME === 'edge'
+}
+
+function warnFsEdgeRuntimeOnce(): void {
+  if (warnedFsEdgeRuntime) return
+  warnedFsEdgeRuntime = true
+  console.warn('[evlog/fs] File system drain is not available on the Edge runtime. Use evlog/memory or a HTTP adapter instead.')
+}
 
 async function ensureGitignore(dir: string): Promise<void> {
   const normalized = dir.replace(/[\\/]/g, sep)
@@ -139,6 +150,10 @@ export function createFsDrain(overrides?: Partial<FsConfig>) {
   return defineDrain<FsConfig>({
     name: 'fs',
     resolve: async () => {
+      if (isEdgeRuntime()) {
+        warnFsEdgeRuntimeOnce()
+        return null
+      }
       const resolved = await resolveAdapterConfig<FsConfig>('fs', FS_FIELDS, overrides)
       return {
         dir: resolved.dir ?? '.evlog/logs',

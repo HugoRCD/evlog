@@ -149,8 +149,11 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "setMinLevel",
   ],
   "./next/instrumentation": [
-    "createInstrumentation",
     "defineNodeInstrumentation",
+  ],
+  "./next/instrumentation/create": [
+    "DEFAULT_CAPTURE_OUTPUT_IGNORE",
+    "createInstrumentation",
   ],
   "./next/stream": [
     "defineStreamedInstrumentation",

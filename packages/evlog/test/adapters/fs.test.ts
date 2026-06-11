@@ -315,5 +315,26 @@ describe('fs adapter', () => {
       const [filePath] = defined(mockedAppendFile.mock.calls[0], 'appendFile call')
       expect(filePath).toBe(join('.evlog/logs', '2026-03-14.jsonl'))
     })
+
+    it('warns once and skips writes on edge runtime', async () => {
+      process.env.NEXT_RUNTIME = 'edge'
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      try {
+        vi.resetModules()
+        const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')
+        const drain = createFsDrainFresh({ dir: '.evlog/logs' })
+
+        await drain(createDrainContext({ action: 'edge_skip' }))
+        await drain(createDrainContext({ action: 'edge_skip_again' }))
+
+        expect(warnSpy).toHaveBeenCalledTimes(1)
+        expect(warnSpy.mock.calls[0]?.[0]).toContain('[evlog/fs]')
+        expect(mockedAppendFile).not.toHaveBeenCalled()
+      } finally {
+        delete process.env.NEXT_RUNTIME
+        warnSpy.mockRestore()
+      }
+    })
   })
 })

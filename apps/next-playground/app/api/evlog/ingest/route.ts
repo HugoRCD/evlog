@@ -38,8 +38,9 @@ export async function POST(request: NextRequest) {
     source: 'client',
   }
 
-  // Log the ingested client event server-side
-  console.log('[CLIENT LOG]', JSON.stringify(wideEvent))
+  if (process.env.NODE_ENV === 'development') {
+    console.log('[CLIENT LOG]', JSON.stringify(wideEvent))
+  }
 
   return new Response(null, { status: 204 })
 }

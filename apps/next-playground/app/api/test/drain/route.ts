@@ -28,7 +28,7 @@ export const GET = withEvlog(async () => {
 
   return Response.json({
     success: true,
-    message: 'Drain test event emitted — check your terminal and configured adapters',
+    message: 'Drain test event emitted — check .evlog/logs/ and configured adapters',
     timestamp: new Date().toISOString(),
   })
 })

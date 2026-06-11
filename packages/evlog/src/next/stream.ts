@@ -30,7 +30,7 @@
 
 import { startStreamServer, type StreamServerOptions } from '../stream'
 import type { DrainContext } from '../types'
-import { createInstrumentation, type InstrumentationOptions } from './instrumentation'
+import { createInstrumentation, type InstrumentationOptions } from './instrumentation-create'
 
 export interface StreamedInstrumentationOptions extends InstrumentationOptions {
   /**
@@ -80,7 +80,7 @@ export function defineStreamedInstrumentation(options: StreamedInstrumentationOp
 
     const composedDrain = composeDrains(userDrain, serverDrain)
     const inner = createInstrumentation({ ...rest, drain: composedDrain })
-    inner.register()
+    await inner.register()
   }
 
   // We intentionally instantiate a "zero-time" inner just for onRequestError —
