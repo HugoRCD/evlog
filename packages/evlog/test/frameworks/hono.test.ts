@@ -176,6 +176,61 @@ describe('evlog/hono', () => {
     expect(logValue).toBeUndefined()
   })
 
+  describe('streaming responses', () => {
+    it('can consume a streaming response body after middleware wraps it', async () => {
+      const { drain } = createPipelineSpies()
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+
+      app.get('/api/stream', () => {
+        const encoder = new TextEncoder()
+        const stream = new ReadableStream<Uint8Array>({
+          start(controller) {
+            controller.enqueue(encoder.encode('chunk1'))
+            controller.enqueue(encoder.encode('chunk2'))
+            controller.close()
+          },
+        })
+        return new Response(stream, {
+          headers: { 'content-type': 'text/event-stream', 'x-vercel-ai-ui-message-stream': 'v1' },
+        })
+      })
+
+      const res = await app.request('/api/stream')
+      expect(res.status).toBe(200)
+      // Body must not be locked — consuming it should succeed
+      const text = await res.text()
+      expect(text).toBe('chunk1chunk2')
+
+      await waitForDrainCalls(drain)
+      assertHttpEventEmitted(drain, { path: '/api/stream', status: 200 })
+    })
+
+    it('defers drain until stream completes', async () => {
+      const { drain } = createPipelineSpies()
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+
+      const { createDeferredStream } = await import('../helpers/stream')
+      const source = createDeferredStream()
+
+      app.get('/api/defer', () => {
+        return new Response(source.stream, {
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      })
+
+      const res = await app.request('/api/defer')
+      expect(res.status).toBe(200)
+      expect(drain).not.toHaveBeenCalled()
+
+      source.close()
+      await res.text()
+      await waitForDrainCalls(drain)
+      assertHttpEventEmitted(drain, { path: '/api/defer', status: 200 })
+    })
+  })
+
   describe('drain / enrich / keep', () => {
     it('calls drain with emitted event (shared helpers)', async () => {
       const { drain } = createPipelineSpies()

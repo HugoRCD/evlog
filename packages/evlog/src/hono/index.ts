@@ -63,11 +63,8 @@ export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
     try {
       await next()
       if (shouldDeferEmitForResponse(c.res)) {
-        const response = new Response(c.res.body, {
-          status: c.res.status,
-          headers: c.res.headers,
-        })
-        return finishResponse(response, { status: response.status })
+        c.res = await finishResponse(c.res, { status: c.res.status })
+        return
       }
       await finish({ status: c.res.status })
     } catch (error) {
