@@ -1,5 +1,30 @@
 # evlog
 
+## 2.19.1
+
+### Patch Changes
+
+- [#379](https://github.com/HugoRCD/evlog/pull/379) [`8ede2c2`](https://github.com/HugoRCD/evlog/commit/8ede2c2d648156b1e6f05ec8fb015100bb6d5560) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Adapter error and deprecation messages now show canonical environment variable names only (`BETTER_STACK_API_KEY`, `AXIOM_API_KEY`, `SENTRY_DSN`, etc.). `NUXT_*` aliases still resolve silently for backward compatibility, but are no longer mentioned in console output or documentation.
+
+  The OTLP adapter now also accepts the shorter `OTLP_ENDPOINT` / `OTLP_HEADERS` env vars as aliases for the standard `OTEL_EXPORTER_OTLP_ENDPOINT` / `OTEL_EXPORTER_OTLP_HEADERS`.
+
+- [#381](https://github.com/HugoRCD/evlog/pull/381) [`6f21121`](https://github.com/HugoRCD/evlog/commit/6f2112127861f31660182e6ebe5b47ef66911301) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix duplicate terminal output when Next.js `captureOutput` is enabled: pretty-print writes use the native stdout handle registered at patch time and passthrough is skipped unless `silent: true`. Next.js dev stacks are source-mapped to original TypeScript (like Nitro) via a Next-only enricher that does not bundle nitropack/youch; stored stacks are compacted in dev (production stacks are kept intact) and useless `.next`/`node:` snippet previews are skipped. The primary `at` line now points at your route/handler file instead of Next `route-modules` internals.
+
+- [#373](https://github.com/HugoRCD/evlog/pull/373) [`4c51970`](https://github.com/HugoRCD/evlog/commit/4c5197095b9717c9f725b52c0796d1b6b62814cc) Thanks [@jmcgoldrick](https://github.com/jmcgoldrick)! - Fix `evlog/nitro/v3` pulling in the optional `h3` peer. The v3 plugin shared a deferred-drain helper from the v2 module, which imports `getHeaders` from `h3`, so the v3 bundle referenced `h3` even though the v3 runtime never uses it. Consumers that don't install `h3` directly (e.g. Nitro v3 / TanStack Start on Vite) failed to build with `"getHeaders" is not exported by "__vite-optional-peer-dep:h3:evlog"`. The helper now lives in an h3-free module, so the v3 path no longer references `h3`.
+
+- [#380](https://github.com/HugoRCD/evlog/pull/380) [`af238a2`](https://github.com/HugoRCD/evlog/commit/af238a24470b39910024b561989170e857244d54) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Split Next.js instrumentation into an Edge-safe gate (`evlog/next/instrumentation`) and a Node-only factory (`evlog/next/instrumentation/create`) so root `instrumentation.ts` no longer pulls the logger, audit, or file-system helpers into the Edge bundle. `defineNodeInstrumentation` now accepts an options object directly (no `import().then()` in user code). Filter known Next.js Edge bundler warnings from `captureOutput` (`CaptureOutputOptions`: `stdout`, `stderr`, `ignore`). The FS adapter warns once and skips writes when `NEXT_RUNTIME` is `edge`.
+
+- [#375](https://github.com/HugoRCD/evlog/pull/375) [`83ec28f`](https://github.com/HugoRCD/evlog/commit/83ec28f98e32809e4a86c16900bead2b7b1a69e3) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix Nitro v2 error responses hanging in Nuxt/Nitro apps after thrown API errors. The Nitro v2 error handler now ends the Node response directly instead of relying on h3 `send()`, so clients receive the expected JSON error response.
+
+- [#376](https://github.com/HugoRCD/evlog/pull/376) [`4c13bb0`](https://github.com/HugoRCD/evlog/commit/4c13bb0043c5acca4bd8e99638740396a557ead0) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Hardening and performance improvements across the package:
+  - **Redaction**: path matchers are now precompiled once per resolved config instead of on every event, and case-insensitive leaf lookups are O(1).
+  - **Pipeline**: the idle flush scheduling timer is `unref()`'d so it never holds a Node process open on shutdown — call `flush()` to deliver buffered events before exit (unchanged, documented contract). Retry backoff timers stay ref'd so in-flight batches are not dropped mid-retry.
+  - **Ingest endpoint**: request bodies are capped at 32KB (413 beyond) and parsed as strict JSON.
+  - **Audit**: `stableStringify` guards against circular references in audit `changes` instead of recursing forever; shared (non-circular) references keep stable signatures.
+  - **Toolkit**: new `applyDeprecatedAlias` helper to map deprecated config fields onto their replacement with a one-time warning, used by the Axiom and Better Stack adapters.
+  - **Vite**: warns when `sourceLocation` is enabled for a production build (source paths embedded in the client bundle).
+  - Published packages now declare `engines.node >= 18`.
+
 ## 2.19.0
 
 ### Minor Changes
