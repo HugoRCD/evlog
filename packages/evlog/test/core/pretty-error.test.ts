@@ -6,6 +6,7 @@ import { createError } from '../../src/error'
 import { createRequestLogger, initLogger } from '../../src/logger'
 import {
   buildErrorEntries,
+  compactStackForStorage,
   normalizeErrorContext,
   parseStackFrames,
   pickPrimaryFrame,
@@ -109,6 +110,57 @@ at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
     const primary = pickPrimaryFrame(parseStackFrames(stack))
     expect(primary).toBeUndefined()
   })
+
+  it('skips node internal frames when picking snippet locations', () => {
+    const stack = `EvlogError: Payment method declined
+    at AsyncLocalStorage.run (node:internal/async_local_storage/async_context_frame:63:14)
+    at Object.handler (file:///Users/dev/project/apps/next-playground/app/api/test/structured-error/route.ts:7:9)`
+    const primary = pickPrimaryFrame(parseStackFrames(stack))
+    expect(primary?.file).toContain('structured-error/route.ts')
+    expect(primary?.line).toBe(7)
+  })
+
+  it('prefers app route.ts over Next route-modules after dev stack enrichment', () => {
+    const stack = `EvlogError: Payment method declined
+    at <unknown> (app/api/test/structured-error/route.ts:7:25)
+    at AppRouteRouteModule.do (webpack://next/src/server/route-modules/app-route/module.ts:631:21)
+    at <unknown> (webpack://next/src/server/route-modules/app-route/module.ts:844:24)`
+    const frames = parseStackFrames(stack)
+    const primary = pickPrimaryFrame(frames)
+    expect(primary?.file).toContain('structured-error/route.ts')
+    expect(primary?.line).toBe(7)
+
+    const entries = buildErrorEntries({
+      message: 'Payment method declined',
+      stack,
+      why: 'Card declined',
+    }, { snippet: false, stackDepth: 3, compact: false })
+    const children = entries[0]?.children ?? []
+    const locationLine = children.find(line => line.includes('structured-error/route.ts'))
+    expect(locationLine).toBeDefined()
+    expect(children.find(line => line.includes('route-modules'))).toBeUndefined()
+  })
+})
+
+describe('compactStackForStorage', () => {
+  it('returns the stack unchanged when only build output and node_modules frames remain', () => {
+    const stack = `EvlogError: Payment method declined
+    at createError (/Users/dev/project/packages/evlog/src/error.ts:699:12)
+    at Object.handler (/Users/dev/project/apps/next-playground/.next/dev/server/chunks/route.js:5372:176)
+    at async /Users/dev/project/node_modules/next/dist/server/base-server.js:934:17
+    at async /Users/dev/project/node_modules/next/dist/server/lib/start-server.js:225:13`
+
+    expect(compactStackForStorage(stack)).toBe(stack)
+  })
+
+  it('keeps app source frames when present', () => {
+    const stack = `Error: boom
+    at Object.handler (file:///Users/dev/project/server/api/test.get.ts:100:0)
+    at async file:///Users/dev/project/node_modules/h3/dist/index.mjs:2017:19`
+
+    expect(compactStackForStorage(stack)).toBe(`Error: boom
+at Object.handler (file:///Users/dev/project/server/api/test.get.ts:100:0)`)
+  })
 })
 
 describe('readCodeSnippet', () => {
@@ -136,6 +188,10 @@ describe('readCodeSnippet', () => {
       { line: 3, content: 'throw new Error(\'boom\')', isErrorLine: true },
       { line: 4, content: 'line 4', isErrorLine: false },
     ])
+  })
+
+  it('skips bundled .next paths even when a reader is registered', () => {
+    expect(readCodeSnippet('/Users/dev/project/.next/dev/server/chunks/route.js', 42)).toBeNull()
   })
 })
 

@@ -4,11 +4,27 @@ import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact'
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
-import { buildErrorEntries, PRETTY_ERROR_TREE_SPACER, registerPrettyErrorSnippetReader } from './shared/pretty-error'
+import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER, registerPrettyErrorSnippetReader } from './shared/pretty-error'
 import type { ResolvedPrettyError } from './shared/dev-terminal'
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { EvlogError } from './error'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
+
+const nativeStdoutWrite =
+  typeof process !== 'undefined' && typeof process.stdout?.write === 'function'
+    ? process.stdout.write.bind(process.stdout)
+    : undefined
+
+/** Cross-bundle global slot for the native stdout write registered by captureOutput patching. */
+export interface EvlogProcessOutputGlobal {
+  __evlogNativeStdoutWrite?: typeof process.stdout.write
+}
+
+function writePrettyStdout(text: string): void {
+  const global = globalThis as EvlogProcessOutputGlobal
+  const write = global.__evlogNativeStdoutWrite ?? nativeStdoutWrite
+  write?.(text)
+}
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
@@ -563,12 +579,11 @@ function flushPrettyLines(lines: string[]): void {
   if (lines.length === 0) return
   const text = `${lines.join('\n')}\n`
   if (
-    typeof process !== 'undefined'
-    && typeof process.stdout?.write === 'function'
+    nativeStdoutWrite
     && !isBrowser()
     && process.env.VITEST !== 'true'
   ) {
-    process.stdout.write(text)
+    writePrettyStdout(text)
     return
   }
   console.log(lines.join('\n'))
@@ -875,7 +890,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       const errorObj: Record<string, unknown> = {
         name: err.name,
         message: err.message,
-        stack: err.stack,
+        stack: isDev() ? compactStackForStorage(err.stack) : err.stack,
       }
       const errRecord = err as unknown as Record<string, unknown>
       for (const k of ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'cause', 'internal'] as const) {
