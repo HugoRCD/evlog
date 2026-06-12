@@ -13,6 +13,7 @@ import {
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
 import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+import { createDeferredStream } from '../helpers/stream'
 
 describeStandardHttpMatrix({
   name: 'hono',
@@ -324,6 +325,68 @@ describe('evlog/hono', () => {
 
       expect(drain).not.toHaveBeenCalled()
       expect(enrich).not.toHaveBeenCalled()
+    })
+  })
+
+  describe('streaming responses', () => {
+    it('does not lock the response body when the handler returns a streaming SSE response (#382)', async () => {
+      const { drain } = createPipelineSpies()
+      let closeStream!: () => void
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/stream', () => {
+        const { stream, close } = createDeferredStream()
+        closeStream = close
+        return new Response(stream, {
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      })
+
+      const res = await app.request('/api/stream')
+      expect(res.status).toBe(200)
+
+      // Body must not be locked — @hono/node-server calls body.getReader() to
+      // stream to the client after app.fetch() resolves.
+      expect(res.body).not.toBeNull()
+      expect(res.body?.locked).toBe(false)
+
+      closeStream()
+      await res.text()
+      await waitForDrainCalls(drain)
+      assertHttpEventEmitted(drain, { path: '/api/stream', status: 200 })
+    })
+
+    it('defers drain until the SSE stream closes and captures mid-stream context (#321)', async () => {
+      const { drain } = createPipelineSpies()
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      let closeStream!: () => void
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/chat', (c) => {
+        const log = c.get('log')
+        const { stream, close } = createDeferredStream()
+        closeStream = close
+        queueMicrotask(() => {
+          log.set({ ai: { calls: 1, totalTokens: 42 } })
+        })
+        return new Response(stream, {
+          headers: { 'content-type': 'text/event-stream' },
+        })
+      })
+
+      const res = await app.request('/api/chat')
+      expect(drain).not.toHaveBeenCalled()
+
+      closeStream()
+      await expect(res.text()).resolves.toBe('hello world')
+      await vi.waitFor(() => {
+        expect(drain).toHaveBeenCalledTimes(1)
+      })
+
+      expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
+      expect(drain.mock.calls[0]?.[0]?.event?.ai).toEqual({ calls: 1, totalTokens: 42 })
     })
   })
 })

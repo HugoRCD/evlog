@@ -63,11 +63,11 @@ export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
     try {
       await next()
       if (shouldDeferEmitForResponse(c.res)) {
-        const response = new Response(c.res.body, {
-          status: c.res.status,
-          headers: c.res.headers,
-        })
-        return finishResponse(response, { status: response.status })
+        // Assign directly — Hono's compose ignores middleware return values when
+        // context.finalized is already true, so returning the wrapped response
+        // would leave c.res with a locked body stream.
+        c.res = await finishResponse(c.res, { status: c.res.status })
+        return
       }
       await finish({ status: c.res.status })
     } catch (error) {
