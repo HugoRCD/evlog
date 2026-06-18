@@ -430,7 +430,7 @@ describe('enrichers - empty/missing headers (T8)', () => {
 const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
 
 function setOtelGlobal(traceId: string, spanId: string): void {
-  ;(globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
+  (globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
     trace: {
       getActiveSpan: () => ({
         spanContext: () => ({ traceId, spanId, traceFlags: 1 }),
@@ -495,7 +495,7 @@ describe('createOtelSpanEnricher', () => {
   })
 
   it('is a no-op when getActiveSpan returns undefined', () => {
-    ;(globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
+    (globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
       trace: { getActiveSpan: () => undefined },
     }
     const ctx = createContext({})
