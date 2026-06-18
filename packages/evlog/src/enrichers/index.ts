@@ -195,6 +195,89 @@ export function createTraceContextEnricher(options: EnricherOptions = {}): (ctx:
   }
 }
 
+/** Minimal types for accessing the active OTel span context from the global registry. */
+interface OtelSpanContext {
+  traceId: string
+  spanId: string
+  traceFlags: number
+}
+
+interface OtelSpan {
+  spanContext(): OtelSpanContext
+}
+
+interface OtelTraceApi {
+  getActiveSpan(): OtelSpan | undefined
+}
+
+interface OtelApiGlobal {
+  trace?: OtelTraceApi
+}
+
+/** Symbol key used by @opentelemetry/api to register its global singleton. */
+const OTEL_API_GLOBAL_KEY = Symbol.for('opentelemetry.js.api.1')
+
+const INVALID_TRACE_ID = '0'.repeat(32)
+const INVALID_SPAN_ID = '0'.repeat(16)
+
+function isValidOtelSpanContext(ctx: OtelSpanContext): boolean {
+  return (
+    /^[\da-f]{32}$/i.test(ctx.traceId) && ctx.traceId !== INVALID_TRACE_ID
+    && /^[\da-f]{16}$/i.test(ctx.spanId) && ctx.spanId !== INVALID_SPAN_ID
+  )
+}
+
+/**
+ * Enrich events with trace context from the active OpenTelemetry span.
+ * Sets `event.traceId` and `event.spanId` from the current OTel span context.
+ *
+ * This is a zero-dependency bridge: it reads from `@opentelemetry/api`'s global
+ * singleton when the OTel SDK is running, and is a no-op otherwise.
+ *
+ * Use this alongside the OTLP drain to correlate evlog events with OTel traces
+ * automatically — including inside background jobs and internal operations that
+ * don't pass through an HTTP layer.
+ *
+ * @example
+ * ```ts
+ * import { createOtelSpanEnricher } from 'evlog/enrichers'
+ *
+ * app.use(evlog({ enrich: createOtelSpanEnricher() }))
+ * ```
+ */
+export function createOtelSpanEnricher(options: EnricherOptions = {}): (ctx: EnrichContext) => void {
+  // Resolved once per enricher instance on first call; null means OTel is not present.
+  let traceApi: OtelTraceApi | null | undefined
+
+  return (ctx) => {
+    if (traceApi === undefined) {
+      try {
+        const g = globalThis as Record<symbol, OtelApiGlobal | undefined>
+        traceApi = g[OTEL_API_GLOBAL_KEY]?.trace ?? null
+      } catch {
+        traceApi = null
+      }
+    }
+    if (!traceApi) return
+
+    let spanCtx: OtelSpanContext | undefined
+    try {
+      spanCtx = traceApi.getActiveSpan()?.spanContext()
+    } catch {
+      return
+    }
+
+    if (!spanCtx || !isValidOtelSpanContext(spanCtx)) return
+
+    if (options.overwrite || ctx.event.traceId === undefined) {
+      ctx.event.traceId = spanCtx.traceId
+    }
+    if (options.overwrite || ctx.event.spanId === undefined) {
+      ctx.event.spanId = spanCtx.spanId
+    }
+  }
+}
+
 /**
  * Compose every built-in enricher into a single async enricher, in the order
  * `userAgent → geo → requestSize → traceContext`.

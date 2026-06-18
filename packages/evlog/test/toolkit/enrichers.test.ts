@@ -1,7 +1,7 @@
-import { describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it } from 'vitest'
 import type { EnrichContext, WideEvent } from '../../src/types'
 import type { GeoInfo, UserAgentInfo } from '../../src/enrichers'
-import { createGeoEnricher, createRequestSizeEnricher, createTraceContextEnricher, createUserAgentEnricher, createDefaultEnrichers } from '../../src/enrichers'
+import { createGeoEnricher, createOtelSpanEnricher, createRequestSizeEnricher, createTraceContextEnricher, createUserAgentEnricher, createDefaultEnrichers } from '../../src/enrichers'
 
 function createContext(headers: Record<string, string>, responseHeaders?: Record<string, string>): EnrichContext {
   const event: WideEvent = {
@@ -424,6 +424,83 @@ describe('enrichers - empty/missing headers (T8)', () => {
       requestBytes: 512,
       responseBytes: undefined,
     })
+  })
+})
+
+const OTEL_API_KEY = Symbol.for('opentelemetry.js.api.1')
+
+function setOtelGlobal(traceId: string, spanId: string): void {
+  ;(globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
+    trace: {
+      getActiveSpan: () => ({
+        spanContext: () => ({ traceId, spanId, traceFlags: 1 }),
+      }),
+    },
+  }
+}
+
+function clearOtelGlobal(): void {
+  delete (globalThis as Record<symbol, unknown>)[OTEL_API_KEY]
+}
+
+describe('createOtelSpanEnricher', () => {
+  afterEach(() => {
+    clearOtelGlobal()
+  })
+
+  it('is a no-op when OTel API is not present', () => {
+    clearOtelGlobal()
+    const ctx = createContext({})
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBeUndefined()
+    expect(ctx.event.spanId).toBeUndefined()
+  })
+
+  it('sets traceId and spanId from active OTel span', () => {
+    setOtelGlobal('0af7651916cd43dd8448eb211c80319c', 'b7ad6b7169203331')
+    const ctx = createContext({})
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBe('0af7651916cd43dd8448eb211c80319c')
+    expect(ctx.event.spanId).toBe('b7ad6b7169203331')
+  })
+
+  it('skips invalid span context (all-zero trace ID)', () => {
+    setOtelGlobal('0'.repeat(32), 'b7ad6b7169203331')
+    const ctx = createContext({})
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBeUndefined()
+  })
+
+  it('skips invalid span context (all-zero span ID)', () => {
+    setOtelGlobal('0af7651916cd43dd8448eb211c80319c', '0'.repeat(16))
+    const ctx = createContext({})
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBeUndefined()
+  })
+
+  it('preserves existing traceId when overwrite is false (default)', () => {
+    setOtelGlobal('0af7651916cd43dd8448eb211c80319c', 'b7ad6b7169203331')
+    const ctx = createContext({})
+    ctx.event.traceId = 'existing-trace-id'
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBe('existing-trace-id')
+  })
+
+  it('overwrites existing traceId when overwrite is true', () => {
+    setOtelGlobal('0af7651916cd43dd8448eb211c80319c', 'b7ad6b7169203331')
+    const ctx = createContext({})
+    ctx.event.traceId = 'existing-trace-id'
+    createOtelSpanEnricher({ overwrite: true })(ctx)
+    expect(ctx.event.traceId).toBe('0af7651916cd43dd8448eb211c80319c')
+  })
+
+  it('is a no-op when getActiveSpan returns undefined', () => {
+    ;(globalThis as Record<symbol, unknown>)[OTEL_API_KEY] = {
+      trace: { getActiveSpan: () => undefined },
+    }
+    const ctx = createContext({})
+    createOtelSpanEnricher()(ctx)
+    expect(ctx.event.traceId).toBeUndefined()
   })
 })
 
