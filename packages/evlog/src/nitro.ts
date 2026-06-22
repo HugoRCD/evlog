@@ -126,7 +126,7 @@ function acceptIncludes(accept: string | undefined, mediaType: string): boolean 
 }
 
 function isNitroApiPath(pathname: string): boolean {
-  return pathname.startsWith('/api/')
+  return pathname === '/api' || pathname.startsWith('/api/')
 }
 
 /**

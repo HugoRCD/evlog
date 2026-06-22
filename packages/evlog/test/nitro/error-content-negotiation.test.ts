@@ -45,6 +45,13 @@ describe('shouldSerializeNitroErrorAsJson', () => {
     )).toBe(true)
   })
 
+  it('serializes plain errors on the /api root path', () => {
+    expect(shouldSerializeNitroErrorAsJson(
+      request('/api', { accept: 'text/html', 'sec-fetch-dest': 'document' }),
+      null,
+    )).toBe(true)
+  })
+
   it('serializes plain errors for JSON-only Accept headers', () => {
     expect(shouldSerializeNitroErrorAsJson(
       request('/page', { accept: 'application/json' }),
