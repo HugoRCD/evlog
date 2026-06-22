@@ -65,6 +65,11 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "createBrowserDrain",
     "createBrowserLogDrain",
   ],
+  "./catalog": [
+    "defineAuditCatalog",
+    "defineError",
+    "defineErrorCatalog",
+  ],
   "./client": [
     "clearIdentity",
     "initLog",

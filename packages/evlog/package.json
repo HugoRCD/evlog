@@ -134,6 +134,11 @@
       "import": "./dist/browser.mjs",
       "default": "./dist/browser.mjs"
     },
+    "./catalog": {
+      "types": "./dist/catalog.d.mts",
+      "import": "./dist/catalog.mjs",
+      "default": "./dist/catalog.mjs"
+    },
     "./next": {
       "types": "./dist/next/index.d.mts",
       "import": "./dist/next/index.mjs",
@@ -285,6 +290,9 @@
       ],
       "browser": [
         "./dist/browser.d.mts"
+      ],
+      "catalog": [
+        "./dist/catalog.d.mts"
       ],
       "next": [
         "./dist/next/index.d.mts"

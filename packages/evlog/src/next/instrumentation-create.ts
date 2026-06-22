@@ -1,3 +1,4 @@
+import { registerDiskPrettyErrorSnippetReader } from '../shared/register-disk-snippet'
 import type { DrainContext, EnvironmentContext, LogLevel, Log, SamplingConfig } from '../types'
 import type {
   NextInstrumentationErrorContext,
@@ -190,7 +191,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
     if (registered) return
     if (registerPromise) return registerPromise
 
-    registerPromise = loadLogger().then(({ initLogger, lockLogger, log }) => {
+    registerPromise = loadLogger().then(async ({ initLogger, lockLogger, log }) => {
       initLogger({
         enabled: options.enabled,
         env: {
@@ -205,6 +206,9 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
         drain: options.drain,
       })
       lockLogger()
+      if (process.env.NEXT_RUNTIME === 'nodejs') {
+        await registerDiskPrettyErrorSnippetReader()
+      }
 
       if (captureOutputOptions && process.env.NEXT_RUNTIME === 'nodejs') {
         applyCaptureOutput(captureOutputOptions, log, options.silent ?? false)

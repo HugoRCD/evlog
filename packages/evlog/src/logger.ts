@@ -4,7 +4,7 @@ import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact'
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
-import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER, registerPrettyErrorSnippetReader } from './shared/pretty-error'
+import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } from './shared/pretty-error'
 import type { ResolvedPrettyError } from './shared/dev-terminal'
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { EvlogError } from './error'
@@ -138,14 +138,6 @@ export function initLogger(config: LoggerConfig = {}): void {
 
   if (globalPluginRunner.plugins.length > 0) {
     void globalPluginRunner.runSetup({ env: { ...globalEnv } })
-  }
-
-  if (!isBrowser() && typeof process !== 'undefined' && process.versions?.node) {
-    void import('./shared/pretty-error-snippet.node.js').then((mod) => {
-      registerPrettyErrorSnippetReader(mod.readCodeSnippetFromDisk)
-    }).catch(() => {
-      registerPrettyErrorSnippetReader(null)
-    })
   }
 
   const hasAnyDrain = !!globalDrain || globalPluginRunner.hasDrain

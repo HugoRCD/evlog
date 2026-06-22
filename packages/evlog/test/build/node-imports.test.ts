@@ -1,0 +1,84 @@
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs'
+import { dirname, resolve } from 'node:path'
+import { describe, expect, it } from 'vitest'
+
+const distDir = resolve(import.meta.dirname, '../../dist')
+const catalogDist = resolve(distDir, 'catalog.mjs')
+const distExists = existsSync(catalogDist)
+
+if (!distExists) {
+  console.warn('[evlog test] Skipping dist node imports: dist/ not found. Run `pnpm --filter evlog run build` first.')
+}
+
+function readDist(relativePath: string): string {
+  return readFileSync(resolve(distDir, relativePath), 'utf8')
+}
+
+function listDistFiles(): string[] {
+  const out: string[] = []
+  const walk = (dir: string, prefix = '') => {
+    for (const entry of readdirSync(dir)) {
+      const rel = prefix ? `${prefix}/${entry}` : entry
+      const abs = resolve(dir, entry)
+      if (statSync(abs).isDirectory()) walk(abs, rel)
+      else if (entry.endsWith('.mjs')) out.push(rel)
+    }
+  }
+  walk(distDir)
+  return out
+}
+
+function collectRelativeImports(entryPath: string): string[] {
+  const seen = new Set<string>()
+  const imports: string[] = []
+  const importRe = /from\s+["'](\.[^"']+)["']/g
+
+  const walk = (relativePath: string, fromDir = distDir) => {
+    const abs = resolve(fromDir, relativePath)
+    if (seen.has(abs)) return
+    seen.add(abs)
+    const source = readFileSync(abs, 'utf8')
+    let match: RegExpExecArray | null
+    const currentDir = dirname(abs)
+    while ((match = importRe.exec(source))) {
+      const next = match[1].replace(/^\.\//, '')
+      imports.push(next)
+      walk(next, currentDir)
+    }
+  }
+
+  walk(entryPath)
+  return imports
+}
+
+function assertNoNodeBuiltins(source: string, label: string): void {
+  expect(source, label).not.toMatch(/import\s*\(\s*['"]node:(crypto|fs|path|module)['"]/)
+  expect(source, label).not.toMatch(/from\s+['"]node:(crypto|fs|path|module)['"]/)
+  expect(source, label).not.toContain('pretty-error-snippet.node')
+}
+
+describe.skipIf(!distExists)('dist node built-in imports (#387)', () => {
+  it('audit graph does not import Node built-ins', () => {
+    const auditChunk = listDistFiles().find(f => /^audit-[^/]+\.mjs$/.test(f))
+    expect(auditChunk, 'expected hashed audit chunk').toBeDefined()
+    assertNoNodeBuiltins(readDist(auditChunk!), auditChunk!)
+  })
+
+  it('audit-action entry stays isomorphic', () => {
+    assertNoNodeBuiltins(readDist('audit-action.mjs'), 'audit-action.mjs')
+  })
+
+  it('catalog entry stays lean and Node-free', () => {
+    const source = readDist('catalog.mjs')
+    assertNoNodeBuiltins(source, 'catalog.mjs')
+    expect(source).toMatch(/from "\.\/audit-action\.mjs"/)
+
+    const graph = collectRelativeImports('catalog.mjs')
+    expect(graph).not.toContain('audit.mjs')
+    expect(graph.some(path => /^audit-/.test(path) && !path.startsWith('audit-action'))).toBe(false)
+  })
+
+  it('index entry does not pull pretty-error-snippet.node', () => {
+    assertNoNodeBuiltins(readDist('index.mjs'), 'index.mjs')
+  })
+})

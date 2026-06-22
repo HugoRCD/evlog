@@ -1,5 +1,6 @@
 import type { FastifyPluginCallback, FastifyRequest } from 'fastify'
 import type { AuditableLogger } from '../audit'
+import { registerDiskPrettyErrorSnippetReader } from '../shared/register-disk-snippet'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
@@ -7,6 +8,8 @@ import { createLoggerStorage } from '../shared/storage'
 const { storage, useLogger } = createLoggerStorage(
   'plugin context. Make sure app.register(evlog) is called before your routes.',
 )
+
+void registerDiskPrettyErrorSnippetReader()
 
 export type EvlogFastifyOptions = BaseEvlogOptions
 
