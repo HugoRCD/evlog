@@ -1,32 +1,18 @@
-import type { AuditActor, AuditActionDefinition, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
+import type { AuditActor, AuditFields, AuditPatchOp, AuditTarget, DrainContext, EnrichContext, FieldContext, RedactConfig, RequestLogger, WideEvent } from './types'
 import { createLogger } from './logger'
 import { compileRedactPathMatchers, redactValueByPaths } from './redact'
 import { getHeader as getSharedHeader } from './shared/headers'
+import { defineAuditAction } from './shared/define-audit-action'
+import type { AuditInput, DefineAuditActionOptions, DefinedAuditAction } from './shared/define-audit-action'
+
+export { defineAuditAction }
+export type { AuditInput, DefineAuditActionOptions, DefinedAuditAction }
 
 /**
  * Current version of the audit envelope. Bumped when `AuditFields` evolves
  * in a backward-incompatible way so downstream pipelines can branch on it.
  */
 export const AUDIT_SCHEMA_VERSION = 1
-
-/**
- * Input accepted by `log.audit()`, `audit()`, and `withAudit()`.
- *
- * `outcome` defaults to `'success'`. Internal fields populated by the audit
- * pipeline (`idempotencyKey`, `context`, `signature`, `prevHash`, `hash`) are
- * stripped — pass them through `log.set({ audit })` if you really need to.
- */
-export interface AuditInput {
-  action: string
-  actor: AuditActor
-  target?: AuditTarget
-  outcome?: AuditFields['outcome']
-  reason?: string
-  changes?: AuditFields['changes']
-  causationId?: string
-  correlationId?: string
-  version?: number
-}
 
 /**
  * @internal Stable JSON stringification with deterministic key order.
@@ -389,85 +375,6 @@ export interface AuditDiffOptions {
   includeAfter?: boolean
 }
 
-/** Options for {@link defineAuditAction}. Same shape as {@link AuditCatalogEntry}. */
-export type DefineAuditActionOptions = AuditActionDefinition
-
-/**
- * Define a typed audit action with optional fixed target type and catalog metadata.
- *
- * Returns a curried helper that fills in the action name (and target shape
- * if provided) so call sites stay terse and the action set is discoverable
- * in one place. Metadata (`description`, `severity`, `requiresChanges`, …)
- * is exposed on the factory for introspection, docs, and review tooling.
- *
- * @example
- * ```ts
- * const refund = defineAuditAction('invoice.refund', {
- *   target: 'invoice',
- *   severity: 'high',
- *   requiresChanges: true,
- *   redactPaths: ['cardNumber'],
- * })
- *
- * log.audit(refund({
- *   actor: { type: 'user', id: user.id },
- *   target: { id: 'inv_889' }, // type inferred as 'invoice'
- *   outcome: 'success',
- * }))
- * ```
- */
-export function defineAuditAction<
-  const TAction extends string,
-  const TOptions extends DefineAuditActionOptions = DefineAuditActionOptions,
->(action: TAction, options?: TOptions): DefinedAuditAction<TAction, TOptions> {
-  const targetType = options?.target
-  const factory = ((input) => {
-    const merged: AuditInput = {
-      ...(input as AuditInput),
-      action,
-    }
-    if (targetType && input.target && !input.target.type) {
-      merged.target = { ...input.target, type: targetType } as AuditTarget
-    }
-    return merged
-  }) as DefinedAuditAction<TAction, TOptions>
-
-  Object.defineProperties(factory, {
-    action: { value: action, enumerable: true },
-    target: { value: options?.target, enumerable: true },
-    description: { value: options?.description, enumerable: true },
-    severity: { value: options?.severity, enumerable: true },
-    requiresChanges: { value: options?.requiresChanges, enumerable: true },
-    requiresReason: { value: options?.requiresReason, enumerable: true },
-    redactPaths: { value: options?.redactPaths, enumerable: true },
-  })
-
-  return factory
-}
-
-/**
- * Return type of {@link defineAuditAction}. Accepts a partial input (no
- * `action`, target type pre-filled when provided).
- */
-export type DefinedAuditAction<
-  TAction extends string = string,
-  TOptions extends DefineAuditActionOptions = DefineAuditActionOptions,
-> =
-  & ((
-    input: TOptions['target'] extends string
-      ? Omit<AuditInput, 'action' | 'target'> & { target?: Omit<AuditTarget, 'type'> & { type?: TOptions['target'] } }
-      : Omit<AuditInput, 'action'>,
-  ) => AuditInput)
-  & {
-    readonly action: TAction
-    readonly target: TOptions['target']
-    readonly description: TOptions['description']
-    readonly severity: TOptions['severity']
-    readonly requiresChanges: TOptions['requiresChanges']
-    readonly requiresReason: TOptions['requiresReason']
-    readonly redactPaths: TOptions['redactPaths']
-  }
-
 /**
  * Test helper that captures every audit event emitted while it is active.
  *
@@ -794,15 +701,17 @@ export function signed(drain: DrainFn, options: SignedOptions): DrainFn {
 
 /**
  * @internal Resolve the Web Crypto SubtleCrypto interface. Available natively
- * in browsers, Node 19+, Bun, Deno, and Cloudflare Workers. Falls back to
- * Node's `webcrypto` for Node 18 (where `globalThis.crypto` is gated behind
- * a flag). The dynamic import keeps `node:crypto` out of browser bundles.
+ * in browsers, Node 19+, Bun, Deno, Cloudflare Workers, and Convex. Requires
+ * `globalThis.crypto.subtle` — no `node:crypto` fallback so non-Node bundlers
+ * can import the main entrypoint without resolving Node built-ins (#387).
  */
-async function getSubtle(): Promise<SubtleCrypto> {
-  const c = (globalThis as { crypto?: { subtle?: SubtleCrypto } }).crypto
-  if (c?.subtle) return c.subtle
-  const mod = await import(/* @vite-ignore */ 'node:crypto') as { webcrypto: { subtle: SubtleCrypto } }
-  return mod.webcrypto.subtle
+function getSubtle(): SubtleCrypto {
+  const subtle = globalThis.crypto?.subtle
+  if (subtle) return subtle
+  throw new Error(
+    '[evlog/audit] Web Crypto is not available. signed() requires globalThis.crypto.subtle '
+    + '(Node 19+, modern browsers, Cloudflare Workers, Convex, Bun, Deno).',
+  )
 }
 
 function normalizeAlgo(algorithm: string): string {
@@ -831,13 +740,12 @@ function bufToHex(buf: ArrayBuffer): string {
 }
 
 async function digestHex(algorithm: string, data: string): Promise<string> {
-  const subtle = await getSubtle()
-  const buf = await subtle.digest(normalizeAlgo(algorithm), new TextEncoder().encode(data))
+  const buf = await getSubtle().digest(normalizeAlgo(algorithm), new TextEncoder().encode(data))
   return bufToHex(buf)
 }
 
 async function hmacHex(algorithm: string, secret: string, data: string): Promise<string> {
-  const subtle = await getSubtle()
+  const subtle = getSubtle()
   const hash = normalizeAlgo(algorithm)
   const key = await subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash }, false, ['sign'])
   const sig = await subtle.sign('HMAC', key, new TextEncoder().encode(data))

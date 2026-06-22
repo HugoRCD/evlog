@@ -20,6 +20,7 @@ export default defineConfig({
     'runtime/server/routes/_evlog/stream-info.get': 'src/runtime/server/routes/_evlog/stream-info.get.ts',
     'runtime/utils/parseError': 'src/runtime/utils/parseError.ts',
     'error': 'src/error.ts',
+    'catalog': 'src/catalog.ts',
     'logger': 'src/logger.ts',
     'utils': 'src/utils.ts',
     'types': 'src/types.ts',
