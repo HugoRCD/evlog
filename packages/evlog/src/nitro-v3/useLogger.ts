@@ -1,5 +1,5 @@
 import type { HTTPEvent } from 'nitro/h3'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 
 /**
  * Returns the request logger attached to the given Nitro v3 HTTP event.
@@ -17,9 +17,9 @@ import type { RequestLogger } from '../types'
  *   log.set({ foo: 'bar' })
  * })
  */
-export function useLogger<T extends object = Record<string, unknown>>(event: HTTPEvent, service?: string): RequestLogger<T> {
+export function useLogger<T extends object = Record<string, unknown>>(event: HTTPEvent, service?: string): AuditableLogger<T> {
   const ctx = event.req.context as Record<string, unknown> | undefined
-  const log = ctx?.log as RequestLogger<T> | undefined
+  const log = ctx?.log as AuditableLogger<T> | undefined
 
   if (!log) {
     throw new Error(
@@ -29,8 +29,7 @@ export function useLogger<T extends object = Record<string, unknown>>(event: HTT
   }
 
   if (service) {
-    const untyped = log as unknown as RequestLogger
-    untyped.set({ service })
+    log.set({ service })
   }
 
   return log

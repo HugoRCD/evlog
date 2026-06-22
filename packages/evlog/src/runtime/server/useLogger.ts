@@ -1,4 +1,5 @@
-import type { RequestLogger, ServerEvent } from '../../types'
+import type { AuditableLogger } from '../../audit'
+import type { ServerEvent } from '../../types'
 
 /**
  * Returns the request logger attached to the given server event.
@@ -32,8 +33,8 @@ import type { RequestLogger, ServerEvent } from '../../types'
  * log.set({ user: { id: '123', plan: 'pro' } }) // OK
  * log.set({ foo: 'bar' })                        // TS error
  */
-export function useLogger<T extends object = Record<string, unknown>>(event: ServerEvent, service?: string): RequestLogger<T> {
-  const log = event.context.log as RequestLogger<T> | undefined
+export function useLogger<T extends object = Record<string, unknown>>(event: ServerEvent, service?: string): AuditableLogger<T> {
+  const log = event.context.log as AuditableLogger<T> | undefined
 
   if (!log) {
     throw new Error(
@@ -43,8 +44,7 @@ export function useLogger<T extends object = Record<string, unknown>>(event: Ser
   }
 
   if (service) {
-    const untyped = log as unknown as RequestLogger
-    untyped.set({ service })
+    log.set({ service })
   }
 
   return log

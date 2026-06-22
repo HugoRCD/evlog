@@ -747,6 +747,9 @@ export interface RequestLogger<T extends object = Record<string, unknown>> {
    * Available on every logger returned by `createLogger()` / `createRequestLogger()`
    * and on framework loggers exposed via `useLogger()` / `c.get('log')` etc.
    *
+   * Optional on the base {@link RequestLogger} interface for structural typing;
+   * always present (required) on {@link import('./audit').AuditableLogger}.
+   *
    * @example
    * ```ts
    * log.audit({
@@ -921,7 +924,7 @@ export interface RequestLoggerOptions {
  * H3 event context with evlog logger attached
  */
 export interface H3EventContext {
-  log?: RequestLogger
+  log?: import('./audit').AuditableLogger
   requestId?: string
   status?: number
   /** Internal: start time for duration calculation in tail sampling */

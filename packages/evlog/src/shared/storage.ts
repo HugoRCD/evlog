@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 
 /**
  * Create a request-scoped `AsyncLocalStorage` and matching `useLogger`
@@ -11,9 +11,9 @@ import type { RequestLogger } from '../types'
  *   app.use(evlog()) is registered before your routes."`.
  */
 export function createLoggerStorage(contextHint: string) {
-  const storage = new AsyncLocalStorage<RequestLogger>()
+  const storage = new AsyncLocalStorage<AuditableLogger>()
 
-  function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
+  function useLogger<T extends object = Record<string, unknown>>(): AuditableLogger<T> {
     const logger = storage.getStore()
     if (!logger) {
       throw new Error(
@@ -21,7 +21,7 @@ export function createLoggerStorage(contextHint: string) {
       )
     }
     /** @internal ALS store is untyped; cast satisfies the caller's generic `T`. */
-    return logger as RequestLogger<T>
+    return logger as AuditableLogger<T>
   }
 
   return { storage, useLogger }

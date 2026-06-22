@@ -1,7 +1,7 @@
 import type { ServerResponse } from 'node:http'
 import type { Request } from 'express'
 import type { DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 import { extractSafeNodeHeaders } from '../shared/headers'
@@ -27,13 +27,13 @@ export interface EvlogModuleAsyncOptions {
 
 declare module 'http' {
   interface IncomingMessage {
-    log?: RequestLogger
+    log?: AuditableLogger
   }
 }
 
 declare module 'express-serve-static-core' {
   interface Request {
-    log?: RequestLogger
+    log?: AuditableLogger
   }
 }
 

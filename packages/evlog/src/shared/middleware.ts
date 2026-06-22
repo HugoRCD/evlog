@@ -1,4 +1,5 @@
 import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteConfig, TailSamplingContext, WideEvent } from '../types'
+import type { AuditableLogger } from '../audit'
 import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, markWideEventDrainStarted, shouldKeep } from '../logger'
 import { isGloballyRedacted, redactEvent, resolveRedactConfig } from '../redact'
 import { extractErrorStatus } from './errors'
@@ -43,7 +44,7 @@ export interface MiddlewareLoggerOptions extends BaseEvlogOptions {
 }
 
 export interface MiddlewareLoggerResult {
-  logger: RequestLogger
+  logger: AuditableLogger
   finish: (opts?: { status?: number; error?: Error }) => Promise<WideEvent | null>
   /**
    * Finish request logging, deferring emit until a streaming response body completes.

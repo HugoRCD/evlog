@@ -1,7 +1,7 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 
-export const evlogStorage = new AsyncLocalStorage<RequestLogger>()
+export const evlogStorage = new AsyncLocalStorage<AuditableLogger>()
 
 /**
  * Get the current request-scoped logger.
@@ -18,7 +18,7 @@ export const evlogStorage = new AsyncLocalStorage<RequestLogger>()
  * })
  * ```
  */
-export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
+export function useLogger<T extends object = Record<string, unknown>>(): AuditableLogger<T> {
   const logger = evlogStorage.getStore()
   if (!logger) {
     throw new Error(
@@ -26,5 +26,5 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
       + 'Wrap your route handler or server action with withEvlog().',
     )
   }
-  return logger as RequestLogger<T>
+  return logger as AuditableLogger<T>
 }

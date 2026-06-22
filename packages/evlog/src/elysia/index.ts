@@ -1,13 +1,13 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Elysia } from 'elysia'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 
-const storage = new AsyncLocalStorage<RequestLogger>()
+const storage = new AsyncLocalStorage<AuditableLogger>()
 
-const activeLoggers = new WeakSet<RequestLogger>()
+const activeLoggers = new WeakSet<AuditableLogger>()
 
 export type EvlogElysiaOptions = BaseEvlogOptions
 
@@ -29,7 +29,7 @@ export type EvlogElysiaOptions = BaseEvlogOptions
  * }
  * ```
  */
-export function useLogger<T extends object = Record<string, unknown>>(): RequestLogger<T> {
+export function useLogger<T extends object = Record<string, unknown>>(): AuditableLogger<T> {
   const logger = storage.getStore()
   if (!logger || !activeLoggers.has(logger)) {
     throw new Error(
@@ -37,7 +37,7 @@ export function useLogger<T extends object = Record<string, unknown>>(): Request
       + 'Make sure app.use(evlog()) is registered before your routes.',
     )
   }
-  return logger as RequestLogger<T>
+  return logger as AuditableLogger<T>
 }
 
 interface ElysiaContext {
@@ -74,7 +74,7 @@ const integration = defineFrameworkIntegration<ElysiaContext>({
 interface RequestState {
   finish: (opts?: { status?: number; error?: Error }) => Promise<unknown>
   skipped: boolean
-  logger: RequestLogger
+  logger: AuditableLogger
 }
 
 /**
@@ -114,7 +114,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       requestState.set(request, { finish, skipped, logger })
     })
     .derive({ as: 'global' }, ({ request }) => {
-      return { log: requestState.get(request)?.logger as RequestLogger }
+      return { log: requestState.get(request)?.logger as AuditableLogger }
     })
     .onAfterResponse({ as: 'global' }, async ({ request, set }) => {
       const state = requestState.get(request)
@@ -122,7 +122,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       emitted.add(request)
       await state.finish({ status: set.status as number || 200 })
       activeLoggers.delete(state.logger)
-      storage.enterWith(undefined as unknown as RequestLogger)
+      storage.enterWith(undefined as unknown as AuditableLogger)
     })
     .onError({ as: 'global' }, async ({ request, error }) => {
       const state = requestState.get(request)
@@ -132,6 +132,6 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       state.logger.error(err)
       await state.finish({ error: err })
       activeLoggers.delete(state.logger)
-      storage.enterWith(undefined as unknown as RequestLogger)
+      storage.enterWith(undefined as unknown as AuditableLogger)
     })
 }

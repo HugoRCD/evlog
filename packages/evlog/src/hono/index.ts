@@ -1,5 +1,5 @@
 import type { Context, MiddlewareHandler } from 'hono'
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { shouldDeferEmitForResponse } from '../shared/streamResponse'
@@ -20,7 +20,7 @@ export type EvlogHonoOptions = BaseEvlogOptions
  * })
  * ```
  */
-export type EvlogVariables = { Variables: { log: RequestLogger } }
+export type EvlogVariables = { Variables: { log: AuditableLogger } }
 
 const integration = defineFrameworkIntegration<Context>({
   name: 'hono',

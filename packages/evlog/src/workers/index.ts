@@ -1,5 +1,6 @@
 import { initLogger, createRequestLogger } from '../logger'
-import type { LoggerConfig, RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
+import type { LoggerConfig } from '../types'
 
 /**
  * Minimal Cloudflare Workers execution context (`fetch` third argument).
@@ -96,7 +97,7 @@ export function defineWorkerFetch<TEnv = unknown>(
     request: Request,
     env: TEnv,
     ctx: WorkerExecutionContext,
-    log: RequestLogger,
+    log: AuditableLogger,
   ) => Response | Promise<Response>,
 ): {
   fetch: (request: Request, env: TEnv, ctx: WorkerExecutionContext) => Promise<Response>
@@ -138,7 +139,7 @@ function pickCfContext(request: Request): Record<string, unknown> {
  * }
  * ```
  */
-export function createWorkersLogger<T extends object = Record<string, unknown>>(request: Request, options: WorkersLoggerOptions = {}): RequestLogger<T> {
+export function createWorkersLogger<T extends object = Record<string, unknown>>(request: Request, options: WorkersLoggerOptions = {}): AuditableLogger<T> {
   const url = new URL(request.url)
   const cfRay = request.headers.get('cf-ray') ?? undefined
   const traceparent = request.headers.get('traceparent') ?? undefined
@@ -157,7 +158,7 @@ export function createWorkersLogger<T extends object = Record<string, unknown>>(
   })
 
   // Cast needed: CF-specific enrichment fields (cfRay, traceparent, etc.) aren't in user's T
-  const untyped = log as unknown as RequestLogger
+  const untyped = log as unknown as AuditableLogger
   untyped.set({
     cfRay,
     traceparent,
