@@ -1,5 +1,12 @@
 # evlog-community-enricher-skeleton
 
+## 5.0.2
+
+### Patch Changes
+
+- Updated dependencies [[`aa394e5`](https://github.com/HugoRCD/evlog/commit/aa394e534102a06d7fbd50d4503636db7214660e), [`ffdd28f`](https://github.com/HugoRCD/evlog/commit/ffdd28f915dffaa82072da506ca35afd2c0beb30), [`467d615`](https://github.com/HugoRCD/evlog/commit/467d615bdaf1ce0bc7caceed2fdc9c50ed654e79), [`6eb0957`](https://github.com/HugoRCD/evlog/commit/6eb0957d03c69fffbac2390c6e2bc84cf42fbb4b)]:
+  - evlog@2.19.2
+
 ## 5.0.1
 
 ### Patch Changes
