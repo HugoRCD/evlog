@@ -1,7 +1,7 @@
 // Import from specific subpath — the barrel 'nitropack/runtime' re-exports from
 // internal/app.mjs which imports virtual modules that crash outside rollup builds.
 import { defineNitroErrorHandler } from 'nitropack/runtime/internal/error/utils'
-import { getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
+import { getRequestHeader, getRequestURL, setResponseHeader, setResponseStatus } from 'h3'
 import type { H3Event } from 'h3'
 import {
   resolveEvlogError,
@@ -9,6 +9,7 @@ import {
   buildPlainNitroErrorBody,
   serializeEvlogErrorResponse,
   markH3ErrorHandled,
+  shouldSerializeNitroErrorAsJson,
   shouldSuppressNitroDevOverlay,
   suppressNitroDevOverlay,
 } from '../nitro'
@@ -36,6 +37,16 @@ function endNodeResponse(event: H3Event, body: string): void {
  * sanitizing internal error details in production for 5xx errors.
  */
 export default defineNitroErrorHandler(async (error, event, ctx) => {
+  const evlogError = resolveEvlogError(error)
+  const requestUrl = getRequestURL(event, { xForwardedHost: true })
+
+  if (!shouldSerializeNitroErrorAsJson({
+    pathname: requestUrl.pathname,
+    getHeader: name => getRequestHeader(event, name),
+  }, evlogError)) {
+    return
+  }
+
   const suppressOverlay = shouldSuppressNitroDevOverlay()
 
   // Nitro v2 always passes `ctx`, but a missing context (e.g. the handler
@@ -49,10 +60,8 @@ export default defineNitroErrorHandler(async (error, event, ctx) => {
     suppressNitroDevOverlay(error)
   }
 
-  const evlogError = resolveEvlogError(error)
-
   const isDev = process.env.NODE_ENV === 'development'
-  const url = getRequestURL(event, { xForwardedHost: true }).pathname
+  const url = requestUrl.pathname
 
   if (!evlogError) {
     const body = buildPlainNitroErrorBody(error, url, isDev)

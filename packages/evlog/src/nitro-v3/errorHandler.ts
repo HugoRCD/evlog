@@ -5,6 +5,7 @@ import {
   extractErrorStatus,
   buildPlainNitroErrorBody,
   serializeEvlogErrorResponse,
+  shouldSerializeNitroErrorAsJson,
   shouldSuppressNitroDevOverlay,
   suppressNitroDevOverlay,
   markH3ErrorHandled,
@@ -21,7 +22,29 @@ import type { NitroErrorHandlerContext } from '../shared/nitro-types'
  * export { default } from 'evlog/nitro/v3/errorHandler'
  * ```
  */
+function getNitroV3RequestHeader(
+  headers: Headers | Record<string, string | string[] | undefined>,
+  name: string,
+): string | undefined {
+  if (headers instanceof Headers) {
+    return headers.get(name) ?? undefined
+  }
+  const lower = name.toLowerCase()
+  const value = headers[lower] ?? headers[name]
+  return Array.isArray(value) ? value[0] : value
+}
+
 export default defineErrorHandler(async (error, event, ctx: NitroErrorHandlerContext) => {
+  const evlogError = resolveEvlogError(error)
+  const requestUrl = parseURL(event.req.url)
+
+  if (!shouldSerializeNitroErrorAsJson({
+    pathname: requestUrl.pathname,
+    getHeader: name => getNitroV3RequestHeader(event.req.headers, name),
+  }, evlogError)) {
+    return
+  }
+
   const suppressOverlay = shouldSuppressNitroDevOverlay()
 
   if (!suppressOverlay) {
@@ -34,9 +57,8 @@ export default defineErrorHandler(async (error, event, ctx: NitroErrorHandlerCon
     suppressNitroDevOverlay(error)
   }
 
-  const url = parseURL(event.req.url).pathname
+  const url = requestUrl.pathname
   const isDev = process.env.NODE_ENV === 'development'
-  const evlogError = resolveEvlogError(error)
 
   const body = evlogError
     ? serializeEvlogErrorResponse(evlogError, url)

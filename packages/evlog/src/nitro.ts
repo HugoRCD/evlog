@@ -115,6 +115,59 @@ export function resolveEvlogError(error: Error): Error | null {
 
 export { extractErrorStatus } from './shared/errors'
 
+/** Request metadata used to decide JSON vs framework error-page rendering. */
+export interface NitroErrorRequestContext {
+  pathname: string
+  getHeader(name: string): string | undefined
+}
+
+function acceptIncludes(accept: string | undefined, mediaType: string): boolean {
+  return accept?.toLowerCase().includes(mediaType) ?? false
+}
+
+function isNitroApiPath(pathname: string): boolean {
+  return pathname.startsWith('/api/')
+}
+
+/**
+ * Whether evlog's Nitro error handler should flush a JSON body itself.
+ *
+ * Returns `false` for document/page requests so Nitro can delegate to the next
+ * handler in the chain (e.g. Nuxt's `error.vue` renderer). EvlogError and API
+ * routes always serialize as JSON.
+ *
+ * @internal
+ */
+export function shouldSerializeNitroErrorAsJson(
+  request: NitroErrorRequestContext,
+  evlogError: Error | null,
+): boolean {
+  if (evlogError) return true
+
+  const { pathname, getHeader } = request
+
+  if (isNitroApiPath(pathname)) return true
+
+  const secFetchDest = getHeader('sec-fetch-dest')
+  if (secFetchDest === 'document') return false
+
+  const secFetchMode = getHeader('sec-fetch-mode')
+  if (secFetchMode === 'navigate') return false
+
+  const accept = getHeader('accept')
+
+  if (getHeader('x-requested-with')?.toLowerCase() === 'xmlhttprequest') return true
+
+  if (acceptIncludes(accept, 'application/json') && !acceptIncludes(accept, 'text/html')) {
+    return true
+  }
+
+  if (acceptIncludes(accept, 'text/html')) return false
+
+  // fetch/curl without HTML signals — preserve standalone Nitro JSON behavior
+  return true
+}
+
 /**
  * Mark an h3 event handled synchronously.
  * Nitro chains a built-in dev handler after custom handlers; `send()` defers

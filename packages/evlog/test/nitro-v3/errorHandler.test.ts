@@ -16,9 +16,20 @@ import { resetNitroDevOverlayCache, shouldSuppressNitroDevOverlay } from '../../
 const defaultHandlerMock = vi.fn().mockResolvedValue(undefined)
 
 const mockEvent = {
-  req: { url: 'http://localhost/api/test' },
+  req: {
+    url: 'http://localhost/api/test',
+    headers: new Headers(),
+  },
   _handled: false,
-} as { req: { url: string }; _handled: boolean }
+} as { req: { url: string; headers: Headers }; _handled: boolean }
+
+function setMockHeaders(headers: Record<string, string>) {
+  mockEvent.req.headers = new Headers(headers)
+}
+
+function setMockPath(pathname: string) {
+  mockEvent.req.url = `http://localhost${pathname}`
+}
 
 function invokeErrorHandler(error: Error, event = mockEvent) {
   return errorHandler(error, event, { defaultHandler: defaultHandlerMock })
@@ -36,6 +47,8 @@ describe('nitro-v3 errorHandler', () => {
     delete globalThis.__EVLOG_CONFIG__
     resetNitroDevOverlayCache()
     mockEvent._handled = false
+    setMockPath('/api/test')
+    mockEvent.req.headers = new Headers()
   })
 
   it('marks the h3 event handled so Nitro dev handler does not run', async () => {
@@ -206,6 +219,43 @@ describe('nitro-v3 errorHandler', () => {
       const body = await readJson(await invokeErrorHandler(error))
       expect(body.message).toBe('Invalid email format')
       expect(body.statusMessage).toBe('Invalid email format')
+    })
+  })
+
+  describe('HTML page delegation (#390)', () => {
+    it('returns undefined for plain errors on document navigation', async () => {
+      setMockPath('/user/does-not-exist')
+      setMockHeaders({
+        accept: 'text/html,application/xhtml+xml',
+        'sec-fetch-dest': 'document',
+      })
+
+      const error = Object.assign(new Error('nope'), { statusCode: 404 })
+      const response = await invokeErrorHandler(error)
+
+      expect(response).toBeUndefined()
+      expect(mockEvent._handled).toBe(false)
+      expect(defaultHandlerMock).not.toHaveBeenCalled()
+    })
+
+    it('still serializes EvlogError on document navigation', async () => {
+      setMockPath('/checkout')
+      setMockHeaders({
+        accept: 'text/html',
+        'sec-fetch-dest': 'document',
+      })
+
+      const evlogError = Object.assign(new Error('Payment failed'), {
+        name: 'EvlogError',
+        status: 402,
+        statusCode: 402,
+        data: { why: 'Card declined' },
+      })
+
+      const response = await invokeErrorHandler(evlogError)
+
+      expect(response?.status).toBe(402)
+      expect(await readJson(response!)).toMatchObject({ statusCode: 402, data: { why: 'Card declined' } })
     })
   })
 })

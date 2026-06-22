@@ -10,12 +10,17 @@ declare global {
 const mockSetResponseStatus = vi.fn<(event: H3Event, status: number) => void>()
 const mockSetResponseHeader = vi.fn<(event: H3Event, name: string, value: string) => void>()
 const mockGetRequestURL = vi.fn<(event: H3Event, options?: { xForwardedHost?: boolean }) => { pathname: string }>(() => ({ pathname: '/api/test' }))
+const mockGetRequestHeader = vi.fn<(event: H3Event, name: string) => string | undefined>((event, name) => {
+  const headers = (event as typeof mockEvent).node.req.headers as Record<string, string> | undefined
+  return headers?.[name.toLowerCase()] ?? headers?.[name]
+})
 const mockResponseEnd = vi.fn<(body?: string) => void>()
 
 vi.mock('h3', () => ({
   setResponseStatus: (event: H3Event, status: number) => mockSetResponseStatus(event, status),
   setResponseHeader: (event: H3Event, name: string, value: string) => mockSetResponseHeader(event, name, value),
   getRequestURL: (event: H3Event, options?: { xForwardedHost?: boolean }) => mockGetRequestURL(event, options),
+  getRequestHeader: (event: H3Event, name: string) => mockGetRequestHeader(event, name),
 }))
 
 import { createError } from '../../src/error'
@@ -23,9 +28,9 @@ import errorHandler from '../../src/nitro/errorHandler'
 import { resetNitroDevOverlayCache, shouldSuppressNitroDevOverlay } from '../../src/nitro'
 
 const mockEvent = {
-  node: { req: {}, res: { writableEnded: false, end: mockResponseEnd } },
+  node: { req: { headers: {} as Record<string, string> }, res: { writableEnded: false, end: mockResponseEnd } },
   _handled: false,
-} as unknown as H3Event & { _handled: boolean; node: { res: { writableEnded: boolean; end: typeof mockResponseEnd } } }
+} as unknown as H3Event & { _handled: boolean; node: { req: { headers: Record<string, string> }; res: { writableEnded: boolean; end: typeof mockResponseEnd } } }
 
 const defaultHandlerMock = vi.fn().mockResolvedValue(undefined)
 
@@ -57,6 +62,8 @@ describe('errorHandler', () => {
     resetNitroDevOverlayCache()
     mockEvent._handled = false
     mockEvent.node.res.writableEnded = false
+    mockEvent.node.req.headers = {}
+    mockGetRequestURL.mockReturnValue({ pathname: '/api/test' })
   })
 
   it('marks the h3 event handled so Nitro dev handler does not run', async () => {
@@ -250,6 +257,74 @@ describe('errorHandler', () => {
       const sentBody = readResponseBody()
       expect(sentBody.message).toBe('Invalid email format')
       expect(sentBody.statusMessage).toBe('Invalid email format')
+    })
+  })
+
+  describe('HTML page delegation (#390)', () => {
+    it('does not flush JSON for plain errors on document navigation', async () => {
+      mockGetRequestURL.mockReturnValue({ pathname: '/user/does-not-exist' })
+      mockEvent.node.req.headers = {
+        accept: 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'sec-fetch-dest': 'document',
+      }
+
+      const error = Object.assign(new Error('nope'), { statusCode: 404, statusMessage: 'nope' })
+      await invokeErrorHandler(error)
+
+      expect(mockResponseEnd).not.toHaveBeenCalled()
+      expect(mockEvent._handled).toBe(false)
+      expect(defaultHandlerMock).not.toHaveBeenCalled()
+    })
+
+    it('still serializes EvlogError on document navigation', async () => {
+      mockGetRequestURL.mockReturnValue({ pathname: '/checkout' })
+      mockEvent.node.req.headers = {
+        accept: 'text/html',
+        'sec-fetch-dest': 'document',
+      }
+
+      const evlogError = Object.assign(new Error('Payment failed'), {
+        name: 'EvlogError',
+        status: 402,
+        statusCode: 402,
+        data: { why: 'Card declined' },
+      })
+
+      await invokeErrorHandler(evlogError)
+
+      expect(mockResponseEnd).toHaveBeenCalled()
+      expect(readResponseBody().statusCode).toBe(402)
+    })
+  })
+
+  describe('chained Nitro error handlers (#390)', () => {
+    it('passes HTML page errors to the next handler in the chain', async () => {
+      const frameworkHandler = vi.fn().mockResolvedValue(
+        new Response('<html>error page</html>', { status: 404, headers: { 'Content-Type': 'text/html' } }),
+      )
+
+      mockGetRequestURL.mockReturnValue({ pathname: '/missing-page' })
+      mockEvent.node.req.headers = {
+        accept: 'text/html',
+        'sec-fetch-mode': 'navigate',
+      }
+
+      const error = Object.assign(new Error('Not Found'), { statusCode: 404 })
+      const handlers = [testErrorHandler, frameworkHandler]
+
+      let response: Response | undefined
+      for (const handler of handlers) {
+        const result = await handler(error, mockEvent, { defaultHandler: defaultHandlerMock })
+        if (result) {
+          response = result as Response
+          break
+        }
+      }
+
+      expect(mockResponseEnd).not.toHaveBeenCalled()
+      expect(frameworkHandler).toHaveBeenCalledOnce()
+      expect(response?.status).toBe(404)
+      expect(await response?.text()).toContain('error page')
     })
   })
 })
