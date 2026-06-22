@@ -1,5 +1,37 @@
 # evlog
 
+## 2.19.2
+
+### Patch Changes
+
+- [#393](https://github.com/HugoRCD/evlog/pull/393) [`aa394e5`](https://github.com/HugoRCD/evlog/commit/aa394e534102a06d7fbd50d4503636db7214660e) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix: type framework loggers as AuditableLogger with required `.audit()`
+
+  `useLogger()`, `c.get('log')`, `req.log`, and other integration surfaces now return `AuditableLogger` instead of `RequestLogger`, so `.audit()` type-checks without optional chaining. Matches runtime behavior from `createRequestLogger()`.
+
+  Closes [#389](https://github.com/HugoRCD/evlog/issues/389)
+
+- [#392](https://github.com/HugoRCD/evlog/pull/392) [`ffdd28f`](https://github.com/HugoRCD/evlog/commit/ffdd28f915dffaa82072da506ca35afd2c0beb30) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix: keep Node built-ins out of the main entrypoint bundle
+
+  Non-Node bundlers (Convex, etc.) failed when importing `defineErrorCatalog` from `evlog` because the main bundle transitively referenced `node:crypto` and `pretty-error-snippet.node` (`node:fs`, `node:path`, `node:module`). The audit signer now uses `globalThis.crypto.subtle` only, disk snippet loading is registered from Node-only integration entrypoints instead of `initLogger`, and catalog utilities live in a dedicated `evlog/catalog` subpath backed by a lean `audit-action` module.
+
+  Closes [#387](https://github.com/HugoRCD/evlog/issues/387)
+
+- [#391](https://github.com/HugoRCD/evlog/pull/391) [`467d615`](https://github.com/HugoRCD/evlog/commit/467d615bdaf1ce0bc7caceed2fdc9c50ed654e79) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix(nuxt): restore `error.vue` rendering for SSR page errors
+
+  With `evlog/nuxt` installed, every non-API SSR error (404/500) was returned as raw Nitro JSON instead of rendering the framework error page. The Nitro error handler now delegates document/HTML navigations to the next handler in Nitro's chain (Nuxt's `error.vue` renderer) while still serializing JSON for API routes and `EvlogError` responses.
+
+  Closes [#390](https://github.com/HugoRCD/evlog/issues/390)
+
+- [#384](https://github.com/HugoRCD/evlog/pull/384) [`6eb0957`](https://github.com/HugoRCD/evlog/commit/6eb0957d03c69fffbac2390c6e2bc84cf42fbb4b) Thanks [@nadaniels](https://github.com/nadaniels)! - fix(hono): resolve "ReadableStream is locked" error with AI SDK streaming responses
+
+  Using `createUIMessageStreamResponse` or `createAgentUIStreamResponse` from the Vercel AI SDK inside a Hono route would throw `ERR_INVALID_STATE: ReadableStream is locked` when running under `@hono/node-server`.
+
+  **Root cause:** The middleware called `createObservedBody(c.res.body)` (which calls `body.getReader()`, locking the stream) and then relied on Hono's `compose` to update `c.res` with the wrapped response via the middleware return value. However, Hono skips that update when `context.finalized` is already `true` — which is always the case after a route handler returns a `Response`. This left `c.res` pointing at the original response whose body was now locked, so `@hono/node-server`'s subsequent `response.body.getReader()` call threw.
+
+  **Fix:** Explicitly assign `c.res = await finishResponse(c.res, ...)` instead of returning the wrapped response, so `c.res` is always updated regardless of `context.finalized`.
+
+  Closes [#382](https://github.com/HugoRCD/evlog/issues/382)
+
 ## 2.19.1
 
 ### Patch Changes
