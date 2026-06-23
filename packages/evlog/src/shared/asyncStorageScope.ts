@@ -1,13 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-/** Prototype surface patched by {@link patchAsyncLocalStorageEnterWith}. */
-type AsyncLocalStoragePrototype = Pick<
-  AsyncLocalStorage<unknown>,
-  'getStore' | 'run'
-> & {
-  enterWith?: unknown
-}
-
 /**
  * Whether this runtime implements native `AsyncLocalStorage.enterWith()`.
  * Cloudflare Workers omit it; Node.js and Bun provide it.
@@ -20,8 +12,8 @@ export function supportsAsyncLocalStorageEnterWith(
 
 /**
  * Bind `value` to `storage` for the current async execution context.
- * Uses native `enterWith()` when available; otherwise relies on the polyfill
- * installed by {@link installAsyncLocalStorageEnterWithPolyfill}.
+ * Uses native `enterWith()` when available; otherwise relies on
+ * {@link patchAsyncLocalStorageEnterWith}.
  */
 export function bindAsyncLocalStorage<T>(
   storage: AsyncLocalStorage<T>,
@@ -36,63 +28,7 @@ export function clearAsyncLocalStorage<T>(storage: AsyncLocalStorage<T>): void {
 }
 
 /**
- * Polyfill `enterWith()` on a single `AsyncLocalStorage` prototype.
- *
- * Used by {@link installAsyncLocalStorageEnterWithPolyfill} and by unit tests
- * through a dedicated subclass so the global prototype is never mutated in
- * parallel Vitest workers.
- */
-export function patchAsyncLocalStorageEnterWith(
-  prototype: AsyncLocalStoragePrototype,
-): void {
-  if (supportsAsyncLocalStorageEnterWith(prototype)) return
-
-  const fallbackStores = new WeakMap<object, unknown>()
-  const runDepth = new WeakMap<object, number>()
-  const originalGetStore = prototype.getStore
-  const originalRun = prototype.run
-
-  Object.defineProperty(prototype, 'enterWith', {
-    configurable: true,
-    writable: true,
-    value(this: object, store: unknown): void {
-      fallbackStores.set(this, store)
-    },
-  })
-
-  Object.defineProperty(prototype, 'run', {
-    configurable: true,
-    writable: true,
-    value(
-      this: object,
-      store: unknown,
-      callback: (...args: unknown[]) => unknown,
-      ...args: unknown[]
-    ): unknown {
-      runDepth.set(this, (runDepth.get(this) ?? 0) + 1)
-      try {
-        return originalRun.call(this, store, callback, ...args)
-      } finally {
-        const depth = (runDepth.get(this) ?? 1) - 1
-        if (depth <= 0) runDepth.delete(this)
-        else runDepth.set(this, depth)
-      }
-    },
-  })
-
-  Object.defineProperty(prototype, 'getStore', {
-    configurable: true,
-    writable: true,
-    value(this: object): unknown {
-      const active = originalGetStore.call(this)
-      if ((runDepth.get(this) ?? 0) > 0) return active
-      return active !== undefined ? active : fallbackStores.get(this)
-    },
-  })
-}
-
-/**
- * Install an `enterWith()` polyfill when the runtime omits it (Cloudflare Workers).
+ * Polyfill `enterWith()` on a single `AsyncLocalStorage` instance.
  *
  * Elysia's lifecycle is split across hooks (`onRequest` → handler → `onAfterResponse`).
  * Unlike Express or Fastify, there is no single `next()` boundary to wrap in
@@ -104,6 +40,48 @@ export function patchAsyncLocalStorageEnterWith(
  * isolation when multiple requests interleave in the same isolate. Prefer `{ log }`
  * from derive for concurrent Workers handlers.
  */
-export function installAsyncLocalStorageEnterWithPolyfill(): void {
-  patchAsyncLocalStorageEnterWith(AsyncLocalStorage.prototype)
+export function patchAsyncLocalStorageEnterWith<T>(
+  storage: AsyncLocalStorage<T>,
+): void {
+  if (supportsAsyncLocalStorageEnterWith(storage)) return
+
+  let fallbackStore: T | undefined
+  let runDepth = 0
+  const originalGetStore = storage.getStore.bind(storage)
+  const originalRun = storage.run.bind(storage)
+
+  Object.defineProperty(storage, 'enterWith', {
+    configurable: true,
+    writable: true,
+    value(store: T): void {
+      fallbackStore = store
+    },
+  })
+
+  Object.defineProperty(storage, 'run', {
+    configurable: true,
+    writable: true,
+    value<TReturn>(
+      store: T,
+      callback: (...args: unknown[]) => TReturn,
+      ...args: unknown[]
+    ): TReturn {
+      runDepth++
+      try {
+        return originalRun(store, callback, ...args)
+      } finally {
+        runDepth--
+      }
+    },
+  })
+
+  Object.defineProperty(storage, 'getStore', {
+    configurable: true,
+    writable: true,
+    value(): T | undefined {
+      if (runDepth > 0) return originalGetStore()
+      const active = originalGetStore()
+      return active !== undefined ? active : fallbackStore
+    },
+  })
 }

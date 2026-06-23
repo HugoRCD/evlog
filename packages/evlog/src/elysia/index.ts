@@ -4,15 +4,14 @@ import type { AuditableLogger } from '../audit'
 import {
   bindAsyncLocalStorage,
   clearAsyncLocalStorage,
-  installAsyncLocalStorageEnterWithPolyfill,
+  patchAsyncLocalStorageEnterWith,
 } from '../shared/asyncStorageScope'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 
-installAsyncLocalStorageEnterWithPolyfill()
-
 const storage = new AsyncLocalStorage<AuditableLogger>()
+patchAsyncLocalStorageEnterWith(storage)
 
 const activeLoggers = new WeakSet<AuditableLogger>()
 

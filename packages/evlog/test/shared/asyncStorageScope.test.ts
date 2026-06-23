@@ -3,7 +3,6 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { Elysia } from 'elysia'
 import { initLogger } from '../../src/logger'
 import {
-  installAsyncLocalStorageEnterWithPolyfill,
   patchAsyncLocalStorageEnterWith,
   supportsAsyncLocalStorageEnterWith,
 } from '../../src/shared/asyncStorageScope'
@@ -21,10 +20,9 @@ function createWorkersLikeStorage<T = unknown>(): AsyncLocalStorage<T> {
     writable: true,
     value: undefined,
   })
-  patchAsyncLocalStorageEnterWith(
-    LocalAsyncLocalStorage.prototype as Parameters<typeof patchAsyncLocalStorageEnterWith>[0],
-  )
-  return new LocalAsyncLocalStorage()
+  const storage = new LocalAsyncLocalStorage()
+  patchAsyncLocalStorageEnterWith(storage)
+  return storage
 }
 
 function delay(ms = 1) {
@@ -45,12 +43,32 @@ describe('asyncStorageScope', () => {
   })
 
   it('is a no-op when enterWith already exists', () => {
-    const before = AsyncLocalStorage.prototype.getStore
+    const storage = new AsyncLocalStorage<string>()
+    const beforeGetStore = AsyncLocalStorage.prototype.getStore
 
-    installAsyncLocalStorageEnterWithPolyfill()
+    patchAsyncLocalStorageEnterWith(storage)
 
-    expect(typeof AsyncLocalStorage.prototype.enterWith).toBe('function')
-    expect(AsyncLocalStorage.prototype.getStore).toBe(before)
+    storage.enterWith('request-logger')
+    expect(storage.getStore()).toBe('request-logger')
+    expect(AsyncLocalStorage.prototype.getStore).toBe(beforeGetStore)
+  })
+
+  it('patches only the provided storage instance', () => {
+    class LocalAsyncLocalStorage extends AsyncLocalStorage<string> {}
+    Object.defineProperty(LocalAsyncLocalStorage.prototype, 'enterWith', {
+      configurable: true,
+      writable: true,
+      value: undefined,
+    })
+
+    const patched = new LocalAsyncLocalStorage()
+    const untouched = new LocalAsyncLocalStorage()
+
+    patchAsyncLocalStorageEnterWith(patched)
+
+    patched.enterWith('evlog')
+    expect(patched.getStore()).toBe('evlog')
+    expect(untouched.enterWith).toBeUndefined()
   })
 
   it('polyfills enterWith for runtimes that omit it', async () => {
