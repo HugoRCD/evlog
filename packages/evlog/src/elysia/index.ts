@@ -1,7 +1,11 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Elysia } from 'elysia'
 import type { AuditableLogger } from '../audit'
-import { installAsyncLocalStorageEnterWithPolyfill } from '../shared/asyncStorageScope'
+import {
+  bindAsyncLocalStorage,
+  clearAsyncLocalStorage,
+  installAsyncLocalStorageEnterWithPolyfill,
+} from '../shared/asyncStorageScope'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
@@ -18,9 +22,10 @@ export type EvlogElysiaOptions = BaseEvlogOptions
  * Get the request-scoped logger from anywhere in the call stack.
  * Must be called inside a request handled by the `evlog()` plugin.
  *
- * Elysia uses `storage.enterWith()` so the logger stays available across async
- * boundaries between lifecycle hooks. On Cloudflare Workers, a small polyfill
- * provides the same API because the runtime omits native `enterWith()`.
+ * Elysia binds the logger with `enterWith()` because its lifecycle hooks are
+ * separate from the route handler. On Cloudflare Workers, a small polyfill
+ * provides `enterWith()` when the runtime omits it. Prefer `{ log }` from
+ * derive when multiple requests may interleave in the same isolate.
  *
  * @example
  * ```ts
@@ -114,7 +119,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       const ctx: ElysiaContext = { request, path: url.pathname, headers }
       const { logger, finish, skipped } = integration.start(ctx, options)
       if (!skipped) {
-        storage.enterWith(logger)
+        bindAsyncLocalStorage(storage, logger)
       }
       requestState.set(request, { finish, skipped, logger })
     })
@@ -127,7 +132,7 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       emitted.add(request)
       await state.finish({ status: set.status as number || 200 })
       activeLoggers.delete(state.logger)
-      storage.enterWith(undefined as unknown as AuditableLogger)
+      clearAsyncLocalStorage(storage)
     })
     .onError({ as: 'global' }, async ({ request, error }) => {
       const state = requestState.get(request)
@@ -137,6 +142,6 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       state.logger.error(err)
       await state.finish({ error: err })
       activeLoggers.delete(state.logger)
-      storage.enterWith(undefined as unknown as AuditableLogger)
+      clearAsyncLocalStorage(storage)
     })
 }
