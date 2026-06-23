@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { initLogger } from '../../src/logger'
@@ -386,6 +387,37 @@ describe('evlog/elysia', () => {
       await waitForDrainCalls(drain)
 
       expect(findEventViaDrain(drain, e => e.fromService === true)).toBeDefined()
+    })
+
+    it('works when AsyncLocalStorage.enterWith is unavailable (#394)', async () => {
+      const { drain } = createPipelineSpies()
+      const { enterWith } = AsyncLocalStorage.prototype
+      Object.defineProperty(AsyncLocalStorage.prototype, 'enterWith', {
+        configurable: true,
+        value: undefined,
+      })
+
+      const { installAsyncLocalStorageEnterWithPolyfill } = await import('../../src/shared/asyncStorageScope')
+      installAsyncLocalStorageEnterWithPolyfill()
+
+      try {
+        const app = new Elysia()
+          .use(evlog({ drain }))
+          .get('/api/test', () => {
+            useLogger().set({ workerSafe: true })
+            return { ok: true }
+          })
+
+        await request(app, '/api/test')
+        await waitForDrainCalls(drain)
+
+        expect(findEventViaDrain(drain, e => e.workerSafe === true)).toBeDefined()
+      } finally {
+        Object.defineProperty(AsyncLocalStorage.prototype, 'enterWith', {
+          configurable: true,
+          value: enterWith,
+        })
+      }
     })
   })
 })

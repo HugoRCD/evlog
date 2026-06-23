@@ -1,9 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { Elysia } from 'elysia'
 import type { AuditableLogger } from '../audit'
+import { installAsyncLocalStorageEnterWithPolyfill } from '../shared/asyncStorageScope'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
+
+installAsyncLocalStorageEnterWithPolyfill()
 
 const storage = new AsyncLocalStorage<AuditableLogger>()
 
@@ -15,9 +18,9 @@ export type EvlogElysiaOptions = BaseEvlogOptions
  * Get the request-scoped logger from anywhere in the call stack.
  * Must be called inside a request handled by the `evlog()` plugin.
  *
- * Unlike other frameworks, Elysia uses `storage.enterWith()` which persists
- * beyond the request lifecycle. This accessor additionally checks `activeLoggers`
- * to ensure the logger belongs to an in-flight request.
+ * Elysia uses `storage.enterWith()` so the logger stays available across async
+ * boundaries between lifecycle hooks. On Cloudflare Workers, a small polyfill
+ * provides the same API because the runtime omits native `enterWith()`.
  *
  * @example
  * ```ts
@@ -110,7 +113,9 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       const headers = (request.headers).toJSON?.() ?? Object.fromEntries(request.headers.entries())
       const ctx: ElysiaContext = { request, path: url.pathname, headers }
       const { logger, finish, skipped } = integration.start(ctx, options)
-      storage.enterWith(logger)
+      if (!skipped) {
+        storage.enterWith(logger)
+      }
       requestState.set(request, { finish, skipped, logger })
     })
     .derive({ as: 'global' }, ({ request }) => {
