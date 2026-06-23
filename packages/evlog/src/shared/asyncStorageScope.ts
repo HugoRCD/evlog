@@ -1,26 +1,42 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
-type AsyncLocalStoragePrototype = Pick<AsyncLocalStorage<unknown>, 'getStore' | 'run'> & {
-  enterWith?: (store: unknown) => void
+type AsyncLocalStorageLike = {
+  getStore(): unknown
+  run(
+    store: unknown,
+    callback: (...args: unknown[]) => unknown,
+    ...args: unknown[]
+  ): unknown
+  enterWith?(store: unknown): void
 }
+
+type AsyncLocalStorageInstance = object
+
+type BoundGetStore = (this: AsyncLocalStorageInstance) => unknown
+type BoundRun = (
+  this: AsyncLocalStorageInstance,
+  store: unknown,
+  callback: (...args: unknown[]) => unknown,
+  ...args: unknown[]
+) => unknown
 
 /**
  * Polyfill `enterWith()` on a single AsyncLocalStorage prototype. Used by
  * {@link installAsyncLocalStorageEnterWithPolyfill} and unit tests via a subclass
  * so global `AsyncLocalStorage` is never mutated in parallel test workers.
  */
-export function patchAsyncLocalStorageEnterWith(prototype: AsyncLocalStoragePrototype): void {
+export function patchAsyncLocalStorageEnterWith(prototype: AsyncLocalStorageLike): void {
   if (typeof prototype.enterWith === 'function') return
 
-  const fallbackStores = new WeakMap<AsyncLocalStorage<unknown>, unknown>()
-  const runDepth = new WeakMap<AsyncLocalStorage<unknown>, number>()
-  const originalGetStore = prototype.getStore
-  const originalRun = prototype.run
+  const fallbackStores = new WeakMap<AsyncLocalStorageInstance, unknown>()
+  const runDepth = new WeakMap<AsyncLocalStorageInstance, number>()
+  const originalGetStore = prototype.getStore as BoundGetStore
+  const originalRun = prototype.run as BoundRun
 
   Object.defineProperty(prototype, 'enterWith', {
     configurable: true,
     writable: true,
-    value: function enterWith(this: AsyncLocalStorage<unknown>, store: unknown) {
+    value(this: AsyncLocalStorageInstance, store: unknown): void {
       fallbackStores.set(this, store)
     },
   })
@@ -28,7 +44,12 @@ export function patchAsyncLocalStorageEnterWith(prototype: AsyncLocalStorageProt
   Object.defineProperty(prototype, 'run', {
     configurable: true,
     writable: true,
-    value: function run(this: AsyncLocalStorage<unknown>, store, callback, ...args) {
+    value(
+      this: AsyncLocalStorageInstance,
+      store: unknown,
+      callback: (...args: unknown[]) => unknown,
+      ...args: unknown[]
+    ): unknown {
       runDepth.set(this, (runDepth.get(this) ?? 0) + 1)
       try {
         return originalRun.call(this, store, callback, ...args)
@@ -43,7 +64,7 @@ export function patchAsyncLocalStorageEnterWith(prototype: AsyncLocalStorageProt
   Object.defineProperty(prototype, 'getStore', {
     configurable: true,
     writable: true,
-    value: function getStore(this: AsyncLocalStorage<unknown>) {
+    value(this: AsyncLocalStorageInstance): unknown {
       const active = originalGetStore.call(this)
       if ((runDepth.get(this) ?? 0) > 0) return active
       return active !== undefined ? active : fallbackStores.get(this)
@@ -63,5 +84,5 @@ export function patchAsyncLocalStorageEnterWith(prototype: AsyncLocalStorageProt
  * paired `enterWith(logger)` / `enterWith(undefined)` calls on a single request.
  */
 export function installAsyncLocalStorageEnterWithPolyfill(): void {
-  patchAsyncLocalStorageEnterWith(AsyncLocalStorage.prototype)
+  patchAsyncLocalStorageEnterWith(AsyncLocalStorage.prototype as AsyncLocalStorageLike)
 }
