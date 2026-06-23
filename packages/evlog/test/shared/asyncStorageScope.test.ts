@@ -25,6 +25,20 @@ function createWorkersLikeStorage<T = unknown>(): AsyncLocalStorage<T> {
   return storage
 }
 
+function createThrowingEnterWithStorage<T = unknown>(): AsyncLocalStorage<T> {
+  class LocalAsyncLocalStorage extends AsyncLocalStorage<T> {}
+  Object.defineProperty(LocalAsyncLocalStorage.prototype, 'enterWith', {
+    configurable: true,
+    writable: true,
+    value() {
+      throw new Error('asyncLocalStorage.enterWith() is not implemented')
+    },
+  })
+  const storage = new LocalAsyncLocalStorage()
+  patchAsyncLocalStorageEnterWith(storage)
+  return storage
+}
+
 function delay(ms = 1) {
   return new Promise((resolve) => {
     setImmediate(resolve)
@@ -40,6 +54,19 @@ async function request(app: { handle: (req: Request) => Promise<Response> }, pat
 describe('asyncStorageScope', () => {
   it('detects native enterWith support', () => {
     expect(supportsAsyncLocalStorageEnterWith(new AsyncLocalStorage<string>())).toBe(true)
+  })
+
+  it('detects throwing enterWith as unsupported', () => {
+    class LocalAsyncLocalStorage extends AsyncLocalStorage<string> {}
+    Object.defineProperty(LocalAsyncLocalStorage.prototype, 'enterWith', {
+      configurable: true,
+      writable: true,
+      value() {
+        throw new Error('asyncLocalStorage.enterWith() is not implemented')
+      },
+    })
+
+    expect(supportsAsyncLocalStorageEnterWith(new LocalAsyncLocalStorage())).toBe(false)
   })
 
   it('is a no-op when enterWith already exists', () => {
@@ -82,6 +109,16 @@ describe('asyncStorageScope', () => {
 
     storage.enterWith(undefined as unknown as string)
     expect(storage.getStore()).toBeUndefined()
+  })
+
+  it('polyfills when enterWith exists but throws at runtime', async () => {
+    const storage = createThrowingEnterWithStorage<string>()
+
+    storage.enterWith('request-logger')
+    expect(storage.getStore()).toBe('request-logger')
+
+    await Promise.resolve()
+    expect(storage.getStore()).toBe('request-logger')
   })
 
   it('supports elysia-style request scope usage (#394)', async () => {

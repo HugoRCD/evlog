@@ -1,13 +1,21 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 
 /**
- * Whether this runtime implements native `AsyncLocalStorage.enterWith()`.
- * Cloudflare Workers omit it; Node.js and Bun provide it.
+ * Whether this runtime provides a working native `AsyncLocalStorage.enterWith()`.
+ *
+ * Cloudflare Workers expose `enterWith` on the prototype but throw when it is
+ * called, so a `typeof` check alone is not enough — we probe with a call.
  */
 export function supportsAsyncLocalStorageEnterWith(
   storage: { enterWith?: unknown },
 ): boolean {
-  return typeof storage.enterWith === 'function'
+  if (typeof storage.enterWith !== 'function') return false
+  try {
+    storage.enterWith(undefined)
+    return true
+  } catch {
+    return false
+  }
 }
 
 /**
