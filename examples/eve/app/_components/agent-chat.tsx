@@ -15,6 +15,7 @@ import {
 } from "@/components/ai-elements/prompt-input";
 import { cn } from "@/lib/utils";
 import { AgentMessage } from "./agent-message";
+import { EveLogo } from "./eve-logo";
 
 const AGENT_NAME = 'Clearbill Support'
 const DEMO_TAGLINE = 'Each turn → one evlog wide event (customer, order, refund, audit).'
@@ -68,7 +69,8 @@ export function AgentChat() {
     <main className="flex h-dvh flex-col overflow-hidden bg-background text-foreground">
       {isEmpty ? null : (
         <header className="flex h-14 shrink-0 items-center justify-center gap-3 pl-4 pr-2">
-          <span className="flex min-w-0 items-center gap-2">
+          <span className="flex min-w-0 items-center gap-2.5">
+            <EveLogo size={22} />
             <span className="truncate text-muted-foreground text-sm">{AGENT_NAME}</span>
             <StatusDot status={agent.status} />
           </span>
@@ -124,9 +126,10 @@ export function AgentChat() {
       >
         {isEmpty ? (
           <div className="flex w-full flex-col items-center gap-6 text-center">
-            <div className="flex flex-col items-center gap-2">
+            <div className="flex flex-col items-center gap-3">
+              <EveLogo size={72} />
               <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">
-                evlog × Eve demo
+                evlog × eve demo
               </p>
               <h1 className="font-medium text-4xl tracking-tighter sm:text-5xl">{AGENT_NAME}</h1>
               <p className="max-w-md text-muted-foreground text-sm leading-relaxed">{DEMO_TAGLINE}</p>

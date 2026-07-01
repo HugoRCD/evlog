@@ -1,4 +1,4 @@
-/** Fake support CRM data for the evlog × Eve demo — no external API. */
+/** Fake support CRM data for the evlog × eve demo — no external API. */
 
 export interface SupportCustomer {
   readonly id: string

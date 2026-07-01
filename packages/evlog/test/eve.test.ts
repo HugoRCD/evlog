@@ -244,7 +244,7 @@ describe('evlog/eve', () => {
   })
 
   it('useTurnLogger throws outside an active turn', () => {
-    expect(() => useTurnLogger()).toThrow(/outside an evlog Eve turn/)
+    expect(() => useTurnLogger()).toThrow(/outside an evlog eve turn/)
   })
 
   it('keep callback can force-keep failed tool turns', async () => {
@@ -304,7 +304,7 @@ describe('evlog/eve', () => {
     expect(event?.message).toEqual({ received: 'hello from user' })
   })
 
-  it('shares turn state across separate evlog/eve module instances (Eve authored-module bundles)', async () => {
+  it('shares turn state across separate evlog/eve module instances (eve authored-module bundles)', async () => {
     const spies = createPipelineSpies()
     const hookModule = await import('../src/eve/index')
     hookModule.resetEvlogEveForTests()

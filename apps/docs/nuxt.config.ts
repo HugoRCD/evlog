@@ -32,9 +32,13 @@ export default defineNuxtConfig({
   },
 
   fonts: {
+    defaults: {
+      // Full variable axis — discrete weights from @nuxt/ui defaults render too thin on Chromium.
+      weights: ['100 900'],
+    },
     families: [
-      { name: 'Geist', weights: [400, 500, 600, 700], global: true },
-      { name: 'Geist Mono', weights: [400, 500, 600, 700], global: true },
+      { name: 'Geist', weights: ['100 900'], global: true },
+      { name: 'Geist Mono', weights: ['100 900'], global: true },
       {
         name: 'Geist Pixel Line',
         src: '/fonts/GeistPixel-Line.woff2',

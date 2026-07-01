@@ -1,4 +1,4 @@
-# evlog + Eve — Support refund demo
+# evlog + eve — Support refund demo
 
 A **support copilot** for a fake SaaS ("Clearbill"). A rep asks for a refund → the agent looks up the customer and order → issues the refund (with **human approval** when amount > $100).
 
@@ -73,4 +73,4 @@ Requires `POSTHOG_API_KEY` in the repo root `.env` for the drain (events still l
 | `agent/tools/issue_refund.ts` | Refund + approval gate + audit fields |
 | `agent/hooks/evlog.ts` | Wide event per turn, tail-keep on refunds/audit |
 
-Docs: https://evlog.dev/use-cases/eve/overview
+Docs: https://evlog.dev/use-cases/eve

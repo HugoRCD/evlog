@@ -103,7 +103,7 @@ function ensureInit(options: EvlogEveOptions): void {
 }
 
 /**
- * Access the turn-scoped logger from an Eve tool `execute()` handler.
+ * Access the turn-scoped logger from an eve tool `execute()` handler.
  *
  * Pass the tool context (`ctx`) so evlog can resolve the active session turn.
  * Throws when called outside a turn tracked by {@link defineEvlogHook}.
@@ -126,7 +126,7 @@ export function useTurnLogger(ctx?: EveTurnSessionContext): AuditableLogger {
 
   if (!sessionId || !turnId) {
     throw new Error(
-      '[evlog] useTurnLogger() was called outside an evlog Eve turn. '
+      '[evlog] useTurnLogger() was called outside an evlog eve turn. '
       + 'Add agent/hooks/evlog.ts with defineEvlogHook() and pass ctx from the tool handler.',
     )
   }
@@ -266,19 +266,19 @@ function runSafe(fn: () => void | Promise<void>): void {
     try {
       await fn()
     } catch (err) {
-      console.error('[evlog] Eve hook handler failed:', err)
+      console.error('[evlog] eve hook handler failed:', err)
     }
   })()
 }
 
 /**
- * Create an Eve stream hook that emits one evlog wide event per agent turn.
+ * Create an eve stream hook that emits one evlog wide event per agent turn.
  *
- * Export the result as the default export of `agent/hooks/evlog.ts`. Eve
+ * Export the result as the default export of `agent/hooks/evlog.ts`. eve
  * auto-discovers hook files; evlog maps turn lifecycle events to a wide event
  * with AI usage, tool executions, and your drain/enrich/keep pipeline.
  *
- * Complements Eve Agent Runs and OpenTelemetry — it does not replace them.
+ * Complements eve Agent Runs and OpenTelemetry — it does not replace them.
  *
  * @example
  * ```ts
@@ -310,7 +310,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
             },
           })
         } catch (err) {
-          console.error('[evlog] Eve hook handler failed:', err)
+          console.error('[evlog] eve hook handler failed:', err)
         }
       },
 
@@ -367,7 +367,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
         try {
           await finishTurn(ctx.session.id, event.data.turnId, { status: 200 })
         } catch (err) {
-          console.error('[evlog] Eve hook handler failed:', err)
+          console.error('[evlog] eve hook handler failed:', err)
         }
       },
 
@@ -387,7 +387,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           error.name = event.data.code
           await finishTurn(ctx.session.id, event.data.turnId, { error, status: 500 })
         } catch (err) {
-          console.error('[evlog] Eve hook handler failed:', err)
+          console.error('[evlog] eve hook handler failed:', err)
         }
       },
     },

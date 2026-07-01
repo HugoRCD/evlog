@@ -560,7 +560,7 @@ export default async function fetch(request: Request) {
 
 See the full [orpc example](https://github.com/HugoRCD/evlog/tree/main/examples/orpc) for a complete working project.
 
-## Eve
+## eve
 
 ```typescript
 // agent/hooks/evlog.ts
@@ -581,7 +581,7 @@ const log = useTurnLogger(ctx)
 log.set({ order: { id: input.orderId } })
 ```
 
-`defineEvlogHook()` maps Eve turn lifecycle events to one wide event per turn. Use `useTurnLogger(ctx)` in tools for business context. Complements Eve Agent Runs and OpenTelemetry — see the [Eve use case](https://evlog.dev/use-cases/eve/overview).
+`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Use `useTurnLogger(ctx)` in tools for business context. Complements eve Agent Runs and OpenTelemetry — see the [eve use case](https://evlog.dev/use-cases/eve).
 
 See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
 
@@ -1413,7 +1413,7 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
-| **Eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useTurnLogger } from 'evlog/eve'` ([example](./examples/eve)) |
+| **eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useTurnLogger } from 'evlog/eve'` ([example](./examples/eve)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |

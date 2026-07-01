@@ -20,8 +20,9 @@ const mono = Geist_Mono({
 })
 
 export const metadata: Metadata = {
-  title: 'Clearbill Support — evlog × Eve',
+  title: 'Clearbill Support — evlog × eve',
   description: 'Support refund demo: one evlog wide event per agent turn with customer, order, and audit context.',
+  icons: { icon: '/eve-logo.svg', apple: '/eve-logo.svg' },
 }
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
