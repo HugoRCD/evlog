@@ -25,12 +25,33 @@ function extractBlockComments(source: string): string[] {
   return comments
 }
 
+const STAR_SLASH_GLOB_CONFIG = {
+  env: { service: 'example' },
+  exclude: ['/api/graphs/**/changes', '/api/graphs/*/changes'],
+} as const
+
 /** JS stand-in for runtime expression sites Nitro replace touches (declare lines are erased). */
 const IDENTIFIER_FRAGMENT = [
   'typeof __EVLOG_CONFIG__ === "undefined"',
   '(__EVLOG_CONFIG__ === null)',
   '(typeof __EVLOG_CONFIG__ !== "object")',
   'void (__EVLOG_CONFIG__)',
+].join('\n')
+
+/** Pre-fix JSDoc shape from issue #397: replace token spelled inside a block comment. */
+const BUGGY_INLINE_COMMENT_FIXTURE = [
+  '/**',
+  ` * 1. \`${INLINE_REPLACE_TOKEN}\` — inlined at build time by the evlog Nitro module.`,
+  ' */',
+  IDENTIFIER_FRAGMENT,
+].join('\n')
+
+/** Post-fix JSDoc shape: inline config documented without spelling the replace token. */
+const FIXED_INLINE_COMMENT_FIXTURE = [
+  '/**',
+  ' * 1. Build-time inlined config literal — baked in via nitro.options.replace.',
+  ' */',
+  IDENTIFIER_FRAGMENT,
 ].join('\n')
 
 /**
@@ -41,7 +62,35 @@ function toJsReplaceFragment(source: string): string {
   return `${extractBlockComments(source).join('\n')}\n${IDENTIFIER_FRAGMENT}`
 }
 
+function assertParseableAfterReplace(source: string, config: Record<string, unknown>): void {
+  const replaced = applyNitroInlineReplace(source, config)
+  expect(() => parse(replaced, { ecmaVersion: 'latest', sourceType: 'module' })).not.toThrow()
+}
+
 describe('nitro config inline replace (issue #397)', () => {
+  describe('comment collision with star-slash globs', () => {
+    it('breaks parse when the replace token is spelled inside a block comment', () => {
+      const replaced = applyNitroInlineReplace(BUGGY_INLINE_COMMENT_FIXTURE, STAR_SLASH_GLOB_CONFIG)
+
+      expect(() => parse(replaced, { ecmaVersion: 'latest', sourceType: 'module' })).toThrow()
+    })
+
+    it('stays parseable when block comments avoid the replace token', () => {
+      assertParseableAfterReplace(FIXED_INLINE_COMMENT_FIXTURE, STAR_SLASH_GLOB_CONFIG)
+    })
+
+    it('stays parseable via toJsReplaceFragment on comment-bearing fixed input', () => {
+      const fixedCommentSource = [
+        '/**',
+        ' * 1. Build-time inlined config literal — baked in via nitro.options.replace.',
+        ' */',
+        'declare const __EVLOG_CONFIG__: unknown',
+      ].join('\n')
+
+      assertParseableAfterReplace(toJsReplaceFragment(fixedCommentSource), STAR_SLASH_GLOB_CONFIG)
+    })
+  })
+
   for (const relativePath of NITRO_INLINE_SOURCES) {
     const absolutePath = resolve(import.meta.dirname, relativePath)
     const source = readFileSync(absolutePath, 'utf8')
@@ -54,13 +103,7 @@ describe('nitro config inline replace (issue #397)', () => {
     })
 
     it(`${label} stays parseable after Nitro replace with star-slash globs`, () => {
-      const fragment = toJsReplaceFragment(source)
-      const replaced = applyNitroInlineReplace(fragment, {
-        env: { service: 'example' },
-        exclude: ['/api/graphs/**/changes', '/api/graphs/*/changes'],
-      })
-
-      expect(() => parse(replaced, { ecmaVersion: 'latest', sourceType: 'module' })).not.toThrow()
+      assertParseableAfterReplace(toJsReplaceFragment(source), STAR_SLASH_GLOB_CONFIG)
     })
   }
 })
