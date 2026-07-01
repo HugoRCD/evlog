@@ -560,6 +560,31 @@ export default async function fetch(request: Request) {
 
 See the full [orpc example](https://github.com/HugoRCD/evlog/tree/main/examples/orpc) for a complete working project.
 
+## Eve
+
+```typescript
+// agent/hooks/evlog.ts
+import { defineEvlogHook } from 'evlog/eve'
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineEvlogHook({
+  init: { env: { service: 'my-agent' } },
+  drain: createAxiomDrain(),
+})
+```
+
+```typescript
+// agent/tools/my_tool.ts — inside execute()
+import { useTurnLogger } from 'evlog/eve'
+
+const log = useTurnLogger(ctx)
+log.set({ order: { id: input.orderId } })
+```
+
+`defineEvlogHook()` maps Eve turn lifecycle events to one wide event per turn. Use `useTurnLogger(ctx)` in tools for business context. Complements Eve Agent Runs and OpenTelemetry — see the [Eve use case](https://evlog.dev/use-cases/eve/overview).
+
+See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
+
 ## Browser
 
 Use the `log` API on the client side for structured browser logging:
@@ -1388,6 +1413,7 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
+| **Eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useTurnLogger } from 'evlog/eve'` ([example](./examples/eve)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |
