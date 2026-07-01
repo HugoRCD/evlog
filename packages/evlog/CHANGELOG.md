@@ -1,5 +1,15 @@
 # evlog
 
+## 2.19.3
+
+### Patch Changes
+
+- [#395](https://github.com/HugoRCD/evlog/pull/395) [`a024f4c`](https://github.com/HugoRCD/evlog/commit/a024f4ce8adc5bf2857fc2d077dfeae4827ef519) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix(elysia): support Cloudflare Workers without AsyncLocalStorage.enterWith
+
+  Cloudflare Workers omit native `AsyncLocalStorage.enterWith()`. The Elysia integration now installs a small polyfill on load so `useLogger()` keeps working in typical `wrangler dev` flows. `{ log }` from derive remains the safest option when multiple requests may interleave in the same isolate.
+
+  Closes [#394](https://github.com/HugoRCD/evlog/issues/394)
+
 ## 2.19.2
 
 ### Patch Changes
