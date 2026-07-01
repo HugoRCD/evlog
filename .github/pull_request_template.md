@@ -44,6 +44,7 @@ scope.
 - nitro (Nitro plugin)
 - nuxt (Nuxt module)
 - orpc (oRPC integration)
+- eve (Eve agent integration)
 - otlp (OTLP drain adapter)
 - playground (the playground app)
 - posthog (PostHog drain adapter)

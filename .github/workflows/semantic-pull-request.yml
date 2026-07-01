@@ -33,6 +33,7 @@ jobs:
             docs
             dx
             elysia
+            eve
             express
             fastify
             fs
