@@ -9,9 +9,9 @@
  *
  * **Strategy**
  *
- * 1. `__EVLOG_CONFIG__` — build-time literal baked in by the evlog Nitro
- *    modules via `nitro.options.replace`. When present, all runtime probing is
- *    skipped (see issue #312: Vercel + Bun crashes if the v3 probe runs).
+ * 1. Build-time inlined config literal — baked in via `nitro.options.replace`
+ *    by the evlog Nitro modules. When present, all runtime probing is skipped
+ *    (see issue #312: Vercel + Bun crashes if the v3 probe runs).
  * 2. `process.env.__EVLOG_CONFIG` — JSON set by evlog Nitro modules during
  *    build; survives into runtime on platforms that propagate build env vars.
  * 3. Computed module IDs — `['a','b'].join('/')` passed to `import()` so emitted
@@ -153,8 +153,9 @@ function evlogSlice(config: Record<string, any>): EvlogConfig | undefined {
  * Options for evlog Nitro plugins (nitropack v2 and Nitro v3).
  *
  * Lookup order:
- * 1. `__EVLOG_CONFIG__` — inlined at build time by the evlog Nitro module.
- *    Hits in every deployed bundle and skips runtime probing entirely.
+ * 1. {@link readEvlogConfigFromInline} — build-time literal inlined by the
+ *    evlog Nitro module. Hits in every deployed bundle and skips runtime
+ *    probing entirely.
  * 2. `process.env.__EVLOG_CONFIG`
  * 3. The active runtime declared by {@link setActiveNitroRuntime} — either
  *    Nitro v3 `runtime-config` or nitropack internal config, never both.
@@ -209,9 +210,9 @@ export async function resolveEvlogConfigForNitroPlugin(): Promise<EvlogConfig | 
  * been declared (standalone use outside Nitro), falls back to the historical
  * order: nitropack v2 first, then Nitro v3.
  *
- * When `__EVLOG_CONFIG__` was inlined at build time, returns a synthetic
- * `{ evlog: <inlined> }` record so adapters can read `runtimeConfig.evlog.*`
- * without triggering the dynamic import (issue #312).
+ * When build-time config was inlined (see {@link readEvlogConfigFromInline}),
+ * returns a synthetic `{ evlog: <inlined> }` record so adapters can read
+ * `runtimeConfig.evlog.*` without triggering the dynamic import (issue #312).
  */
 export async function getNitroRuntimeConfigRecord(): Promise<Record<string, any> | undefined> {
   const inline = readEvlogConfigFromInline()
