@@ -45,12 +45,14 @@ apps/web/.data
 apps/chat/.data
 .codex/environments/
 .claude/
+.eve/
 
 # Local-only working notes (intentions, follow-ups, brain dumps)
 .notes/
 
 # Local bug repro scripts (not versioned)
 examples/repro/
+examples/eve/.eve
 packages/evlog/test/nitro-v3/fixture/.wrangler
 apps/nuxthub-playground/.data
 .next/
