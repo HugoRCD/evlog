@@ -1151,6 +1151,36 @@ describe('silent option', () => {
   })
 })
 
+describe('pretty dev timestamp consistency', () => {
+  const timestampPattern = /\d{2}:\d{2}:\d{2}\.\d{3}/
+
+  beforeEach(() => {
+    vi.stubEnv('NODE_ENV', 'development')
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    initLogger({ pretty: true })
+  })
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+    vi.restoreAllMocks()
+  })
+
+  it('includes timestamp in dev pretty wide event and tagged log headers', () => {
+    const logSpy = vi.mocked(console.log)
+
+    log.info({ message: 'Test' })
+    log.warn('server', 'test')
+
+    expect(logSpy).toHaveBeenCalledTimes(2)
+
+    const wideOutput = String(logSpy.mock.calls[0]![0])
+    const taggedOutput = String(logSpy.mock.calls[1]![0])
+
+    expect(wideOutput).toMatch(timestampPattern)
+    expect(taggedOutput).toMatch(timestampPattern)
+  })
+})
+
 describe('pretty-print tool input serialization', () => {
   beforeEach(() => {
     vi.spyOn(console, 'log').mockImplementation(() => {})

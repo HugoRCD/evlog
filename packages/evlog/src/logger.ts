@@ -605,11 +605,7 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     styles.push(cssColors.dim, cssColors.reset, lc, cssColors.reset, cssColors.cyan, cssColors.reset)
   } else {
     const lc = getLevelColor(levelLabel)
-    if (isDev()) {
-      parts.push(`${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
-    } else {
-      parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
-    }
+    parts.push(`${colors.dim}${ts}${colors.reset} ${lc}${levelLabel.toUpperCase()}${colors.reset} ${colors.cyan}[${service}]${colors.reset}`)
   }
 
   if (rest.method && rest.path) {
