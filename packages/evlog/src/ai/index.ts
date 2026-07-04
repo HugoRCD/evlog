@@ -928,7 +928,7 @@ function adaptV7ToolEvent(event: V7ToolExecutionEndEvent) {
 }
 
 function recordGenerationEnd(state: AccumulatorState, log: RequestLogger): void {
-  if (state.generationStartTime) {
+  if (state.generationStartTime !== undefined) {
     state.totalDurationMs = Date.now() - state.generationStartTime
   }
   flushState(log, state)

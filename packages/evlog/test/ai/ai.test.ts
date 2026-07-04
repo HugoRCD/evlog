@@ -4,6 +4,7 @@ import type { RequestLogger } from '../../src/types'
 import { createAILogger, createAIMiddleware, createEvlogIntegration, type EvlogTelemetry } from '../../src/ai'
 import { createLogger, mergeWideEventFields } from '../../src/logger'
 import { defined } from '../helpers/defined'
+import { withFakeTimers } from '../helpers/timers'
 
 interface MockLogger extends RequestLogger {
   setCalls: Array<Record<string, unknown>>
@@ -1683,16 +1684,17 @@ describe('createAILogger', () => {
     })
 
     it('computes totalDurationMs from onStart to onFinish', async () => {
-      const log = createMockLogger()
-      const integration = createEvlogIntegration(log)
+      await withFakeTimers(() => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
 
-      callIntegrationOnStart(integration)
-      await new Promise(resolve => setTimeout(resolve, 20))
-      callIntegrationOnFinish(integration)
+        callIntegrationOnStart(integration)
+        vi.advanceTimersByTime(20)
+        callIntegrationOnFinish(integration)
 
-      const aiData = getLastAiData(log)
-      expect(aiData.totalDurationMs).toBeTypeOf('number')
-      expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
+        const aiData = getLastAiData(log)
+        expect(aiData.totalDurationMs).toBe(20)
+      })
     })
 
     it('handles string errors from tool execution', () => {
@@ -1772,16 +1774,17 @@ describe('createAILogger', () => {
       })
 
       it('computes totalDurationMs from onStart to onEnd', async () => {
-        const log = createMockLogger()
-        const integration = createEvlogIntegration(log)
+        await withFakeTimers(() => {
+          const log = createMockLogger()
+          const integration = createEvlogIntegration(log)
 
-        callIntegrationOnStart(integration)
-        await new Promise(resolve => setTimeout(resolve, 20))
-        callIntegrationOnEnd(integration)
+          callIntegrationOnStart(integration)
+          vi.advanceTimersByTime(20)
+          callIntegrationOnEnd(integration)
 
-        const aiData = getLastAiData(log)
-        expect(aiData.totalDurationMs).toBeTypeOf('number')
-        expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
+          const aiData = getLastAiData(log)
+          expect(aiData.totalDurationMs).toBe(20)
+        })
       })
 
       it('auto-captures embeddings via onEmbedEnd', () => {
