@@ -560,6 +560,32 @@ export default async function fetch(request: Request) {
 
 See the full [orpc example](https://github.com/HugoRCD/evlog/tree/main/examples/orpc) for a complete working project.
 
+## eve
+
+```typescript
+// agent/hooks/evlog.ts
+import { defineEvlogHook } from 'evlog/eve'
+import { createAxiomDrain } from 'evlog/axiom'
+
+export default defineEvlogHook({
+  init: { env: { service: 'my-agent' } },
+  drain: createAxiomDrain(),
+  maxSessions: 256,
+})
+```
+
+```typescript
+// agent/tools/my_tool.ts — inside execute()
+import { useLogger } from 'evlog/eve'
+
+const log = useLogger()
+log.set({ order: { id: input.orderId } })
+```
+
+`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools — the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override. Complements eve Agent Runs and OpenTelemetry — see the [eve use case](https://evlog.dev/use-cases/eve).
+
+See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
+
 ## Browser
 
 Use the `log` API on the client side for structured browser logging:
@@ -1388,6 +1414,7 @@ try {
 | **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
 | **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
 | **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
+| **eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useLogger } from 'evlog/eve'` ([example](./examples/eve)) |
 | **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |

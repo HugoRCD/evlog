@@ -228,6 +228,12 @@ export async function getNitroRuntimeConfigRecord(): Promise<Record<string, any>
     return nitropack ? nitropack.useRuntimeConfig() : undefined
   }
 
+  // Next.js (and other non-Nitro hosts) ship without a Nitro builder — probing
+  // nitropack runtime modules only loads stub implementations and warns.
+  if (activeNitroRuntime === undefined && process.env.NEXT_RUNTIME !== undefined) {
+    return undefined
+  }
+
   const nitropack = await getNitropackRuntime()
   if (nitropack) return nitropack.useRuntimeConfig()
 

@@ -238,6 +238,13 @@ describe('startStreamServer', () => {
     expect(res.status).toBe(405)
   })
 
+  it('returns 404 for non-SSE paths so health probes do not get 200', async () => {
+    server = await startStreamServer({ urlFileDir: dir, banner: false })
+
+    const res = await fetch(`${server.url}/eve/v1/health`)
+    expect(res.status).toBe(404)
+  })
+
   it('handles CORS preflight (OPTIONS)', async () => {
     server = await startStreamServer({ urlFileDir: dir, banner: false })
 

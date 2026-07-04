@@ -770,6 +770,26 @@ describe('tail sampling', () => {
     expect(infoSpy).toHaveBeenCalledTimes(1)
   })
 
+  it('strips _auditForceKeep from emitted events when _forceKeep is set', () => {
+    initLogger({
+      pretty: false,
+      sampling: {
+        rates: { info: 0 },
+      },
+    })
+
+    const logger = createRequestLogger({ method: 'GET', path: '/test' })
+    logger.audit({
+      action: 'invoice.refund',
+      actor: { type: 'user', id: 'u1' },
+      target: { type: 'invoice', id: 'inv_1' },
+    })
+    const event = logger.emit({ _forceKeep: true })
+
+    expect(event).toBeDefined()
+    expect(event).not.toHaveProperty('_auditForceKeep')
+  })
+
   it('head sampling still works when no tail conditions match', () => {
     initLogger({
       pretty: false,

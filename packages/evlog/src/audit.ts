@@ -477,14 +477,24 @@ export function consumeAuditForceKeep(context: Record<string, unknown>): boolean
   return false
 }
 
+/** @internal True when `audit` has the minimum fields required before emit decoration. */
+function isCompleteAuditFields(a: unknown): a is AuditFields {
+  if (!a || typeof a !== 'object') return false
+  const audit = a as AuditFields
+  return typeof audit.action === 'string'
+    && typeof audit.actor?.type === 'string'
+    && typeof audit.actor?.id === 'string'
+}
+
 /**
  * @internal Decorate the audit field on an event right before drain — fills
  * in the deterministic idempotency key. Called by the logger pipeline so
  * it works for both `log.audit()` and direct `log.set({ audit })` paths.
+ * Skips partial/legacy shapes that omit required actor fields.
  */
 export function finalizeAudit(event: WideEvent): void {
   const a = event.audit as AuditFields | undefined
-  if (!a) return
+  if (!isCompleteAuditFields(a)) return
   const decorated = decorateAudit(a, String(event.timestamp))
   event.audit = decorated
   _testCollector?.(decorated, event)

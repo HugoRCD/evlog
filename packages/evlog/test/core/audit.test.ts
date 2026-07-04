@@ -9,6 +9,7 @@ import {
   auditRedactPreset,
   buildAuditFields,
   defineAuditAction,
+  finalizeAudit,
   mockAudit,
   signed,
   withAudit,
@@ -455,6 +456,36 @@ describe('signed() — hash-chain', () => {
     })
     await drain(createDrainCtx({ audit: { action: 'a', actor: { type: 'user', id: 'u1' }, outcome: 'success' } }))
     expect((defined(defined(calls[0], 'audit event').audit, 'audit') as AuditFields).prevHash).toBe('previous-hash-from-disk')
+  })
+})
+
+describe('finalizeAudit', () => {
+  it('skips partial audit objects missing actor fields', () => {
+    const event: WideEvent = {
+      timestamp: '2026-06-25T12:00:00.000Z',
+      level: 'info',
+      service: 'test',
+      environment: 'test',
+      audit: { action: 'refund.issued' } as AuditFields,
+    }
+    expect(() => finalizeAudit(event)).not.toThrow()
+    expect(event.audit).toEqual({ action: 'refund.issued' })
+  })
+
+  it('decorates complete audit objects with an idempotency key', () => {
+    const event: WideEvent = {
+      timestamp: '2026-06-25T12:00:00.000Z',
+      level: 'info',
+      service: 'test',
+      environment: 'test',
+      audit: buildAuditFields({
+        action: 'refund.issued',
+        actor: { type: 'agent', id: 'bot' },
+        target: { type: 'order', id: '4821' },
+      }),
+    }
+    finalizeAudit(event)
+    expect((event.audit as AuditFields).idempotencyKey).toMatch(/^[\da-f]{32}$/)
   })
 })
 

@@ -443,6 +443,16 @@ export async function startStreamServer(options: StreamServerOptions = {}): Prom
       return
     }
 
+    // Only the root path is SSE — stray GETs (e.g. health probes) must not
+    // return 200 or tooling that scans stdout for loopback URLs can mis-detect
+    // this server as something else (eve/next dev proxy is one real case).
+    if (url.pathname !== '/' && url.pathname !== '') {
+      writeCors(res)
+      res.writeHead(404)
+      res.end('not found')
+      return
+    }
+
     writeCors(res)
     res.writeHead(200, {
       'Content-Type': 'text/event-stream; charset=utf-8',
