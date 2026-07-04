@@ -1,8 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import type { LanguageModelV3, LanguageModelV3CallOptions, LanguageModelV3FinishReason, LanguageModelV3StreamPart } from '@ai-sdk/provider'
-import type { OnFinishEvent, OnStartEvent, OnToolCallFinishEvent, TelemetryIntegration } from 'ai'
 import type { RequestLogger } from '../../src/types'
-import { createAILogger, createAIMiddleware, createEvlogIntegration } from '../../src/ai'
+import { createAILogger, createAIMiddleware, createEvlogIntegration, type EvlogTelemetry } from '../../src/ai'
 import { createLogger, mergeWideEventFields } from '../../src/logger'
 import { defined } from '../helpers/defined'
 
@@ -83,21 +82,29 @@ function getLastAiData(log: MockLogger): Record<string, unknown> {
   return defined(log.setCalls.at(-1)?.ai, 'last ai payload') as Record<string, unknown>
 }
 
-function callIntegrationOnStart(integration: TelemetryIntegration, event?: Partial<OnStartEvent>) {
+function callIntegrationOnStart(integration: EvlogTelemetry, event?: Record<string, unknown>) {
   defined(integration.onStart, 'onStart')({
     model: { provider: 'anthropic', modelId: 'claude-sonnet-4.6' },
     maxRetries: 0,
     ...event,
-  } as OnStartEvent)
+  })
 }
 
-/** createEvlogIntegration ignores the onFinish payload — cast kept in one place. */
-function callIntegrationOnFinish(integration: TelemetryIntegration) {
-  defined(integration.onFinish, 'onFinish')({} as OnFinishEvent)
+/** createEvlogIntegration ignores the onFinish/onEnd payload — cast kept in one place. */
+function callIntegrationOnFinish(integration: EvlogTelemetry) {
+  if (integration.onFinish) {
+    integration.onFinish({})
+    return
+  }
+  defined(integration.onEnd, 'onEnd')({})
+}
+
+function callIntegrationOnEnd(integration: EvlogTelemetry) {
+  defined(integration.onEnd, 'onEnd')({})
 }
 
 function callIntegrationOnToolCallFinish(
-  integration: TelemetryIntegration,
+  integration: EvlogTelemetry,
   input: {
     toolName: string
     durationMs: number
@@ -118,11 +125,69 @@ function callIntegrationOnToolCallFinish(
     experimental_context: undefined,
   }
 
-  const event: OnToolCallFinishEvent = input.success
-    ? { ...base, success: true, output: input.output ?? {} }
-    : { ...base, success: false, error: input.error ?? new Error('failed') }
+  const event = input.success
+    ? { ...base, success: true as const, output: input.output ?? {} }
+    : { ...base, success: false as const, error: input.error ?? new Error('failed') }
 
-  defined(integration.onToolCallFinish, 'onToolCallFinish')(event as OnToolCallFinishEvent)
+  defined(integration.onToolCallFinish, 'onToolCallFinish')(event)
+}
+
+function callIntegrationOnToolExecutionEnd(
+  integration: EvlogTelemetry,
+  input: {
+    toolName: string
+    toolExecutionMs: number
+    success: boolean
+    output?: unknown
+    error?: unknown
+  },
+) {
+  const toolOutput = input.success
+    ? { type: 'tool-result' as const, output: input.output ?? {} }
+    : { type: 'tool-error' as const, error: input.error ?? new Error('failed') }
+
+  defined(integration.onToolExecutionEnd, 'onToolExecutionEnd')({
+    callId: 'call-1',
+    toolCall: { toolName: input.toolName, toolCallId: 'tc1', input: {} },
+    toolExecutionMs: input.toolExecutionMs,
+    toolContext: undefined,
+    toolOutput,
+    messages: [],
+  })
+}
+
+function callIntegrationOnEmbedEnd(
+  integration: EvlogTelemetry,
+  input: {
+    modelId?: string
+    tokens?: number
+    dimensions?: number
+    count?: number
+  } = {},
+) {
+  const count = input.count ?? 1
+  defined(integration.onEmbedEnd, 'onEmbedEnd')({
+    callId: 'embed-1',
+    embedCallId: 'embed-call-1',
+    operationId: 'ai.embed.doEmbed',
+    provider: 'openai',
+    modelId: input.modelId ?? 'text-embedding-3-small',
+    values: Array.from({ length: count }, (_, i) => `value-${i}`),
+    embeddings: [{ length: input.dimensions ?? 1536 }],
+    usage: { tokens: input.tokens ?? 10 },
+  })
+}
+
+function callIntegrationOnAbort(integration: EvlogTelemetry, reason?: unknown) {
+  defined(integration.onAbort, 'onAbort')({
+    callId: 'call-1',
+    steps: [],
+    ...(reason !== undefined ? { reason } : {}),
+  })
+}
+
+function callIntegrationOnError(integration: EvlogTelemetry, error: unknown) {
+  defined(integration.onError, 'onError')(error)
 }
 
 function createMockModel(overrides?: Partial<{ provider: string, modelId: string }>): MockLanguageModel {
@@ -707,7 +772,7 @@ describe('createAILogger', () => {
 
       const wrappedModel = ai.wrap('anthropic/claude-sonnet-4.6')
       expect(wrappedModel).toBeDefined()
-      expect(wrappedModel.specificationVersion).toBe('v3')
+      expect(['v3', 'v4']).toContain(wrappedModel.specificationVersion)
     })
   })
 
@@ -1491,14 +1556,19 @@ describe('createAILogger', () => {
   })
 
   describe('createEvlogIntegration', () => {
-    it('returns a valid TelemetryIntegration', () => {
+    it('returns a valid telemetry integration with v6 and v7 hooks', () => {
       const log = createMockLogger()
       const integration = createEvlogIntegration(log)
 
       expect(integration).toBeDefined()
       expect(integration.onStart).toBeTypeOf('function')
       expect(integration.onToolCallFinish).toBeTypeOf('function')
+      expect(integration.onToolExecutionEnd).toBeTypeOf('function')
       expect(integration.onFinish).toBeTypeOf('function')
+      expect(integration.onEnd).toBeTypeOf('function')
+      expect(integration.onEmbedEnd).toBeTypeOf('function')
+      expect(integration.onAbort).toBeTypeOf('function')
+      expect(integration.onError).toBeTypeOf('function')
     })
 
     it('captures tool execution timing and success', () => {
@@ -1652,6 +1722,112 @@ describe('createAILogger', () => {
 
       const aiData = getLastAiData(log)
       expect(aiData.tools).toBeUndefined()
+    })
+
+    describe('AI SDK v7 hooks', () => {
+      it('captures tool execution via onToolExecutionEnd', () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnStart(integration)
+        callIntegrationOnToolExecutionEnd(integration, {
+          toolName: 'getWeather',
+          toolExecutionMs: 150,
+          success: true,
+          output: { temperature: 22 },
+        })
+        callIntegrationOnEnd(integration)
+
+        const aiData = getLastAiData(log)
+        const tools = aiData.tools as Array<Record<string, unknown>>
+        expect(tools).toHaveLength(1)
+        expect(tools[0]).toEqual({
+          name: 'getWeather',
+          durationMs: 150,
+          success: true,
+        })
+      })
+
+      it('captures tool errors via onToolExecutionEnd', () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnStart(integration)
+        callIntegrationOnToolExecutionEnd(integration, {
+          toolName: 'searchDB',
+          toolExecutionMs: 50,
+          success: false,
+          error: new Error('Connection refused'),
+        })
+        callIntegrationOnEnd(integration)
+
+        const aiData = getLastAiData(log)
+        const tools = aiData.tools as Array<Record<string, unknown>>
+        expect(tools[0]).toEqual({
+          name: 'searchDB',
+          durationMs: 50,
+          success: false,
+          error: 'Connection refused',
+        })
+      })
+
+      it('computes totalDurationMs from onStart to onEnd', async () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnStart(integration)
+        await new Promise(resolve => setTimeout(resolve, 20))
+        callIntegrationOnEnd(integration)
+
+        const aiData = getLastAiData(log)
+        expect(aiData.totalDurationMs).toBeTypeOf('number')
+        expect(aiData.totalDurationMs as number).toBeGreaterThanOrEqual(15)
+      })
+
+      it('auto-captures embeddings via onEmbedEnd', () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnEmbedEnd(integration, {
+          modelId: 'text-embedding-3-small',
+          tokens: 42,
+          dimensions: 1536,
+          count: 3,
+        })
+
+        const aiData = getLastAiData(log)
+        expect(aiData.calls).toBe(1)
+        expect(aiData.inputTokens).toBe(42)
+        expect(aiData.embedding).toEqual({
+          model: 'text-embedding-3-small',
+          tokens: 42,
+          dimensions: 1536,
+          count: 3,
+        })
+      })
+
+      it('records abort via onAbort', () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnStart(integration)
+        callIntegrationOnAbort(integration, new Error('User cancelled'))
+
+        const aiData = getLastAiData(log)
+        expect(aiData.finishReason).toBe('abort')
+        expect(aiData.error).toBe('User cancelled')
+        expect(aiData.totalDurationMs).toBeTypeOf('number')
+      })
+
+      it('records unrecoverable errors via onError', () => {
+        const log = createMockLogger()
+        const integration = createEvlogIntegration(log)
+
+        callIntegrationOnError(integration, new Error('Provider unavailable'))
+
+        const aiData = getLastAiData(log)
+        expect(aiData.error).toBe('Provider unavailable')
+      })
     })
   })
 

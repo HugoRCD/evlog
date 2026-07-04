@@ -392,7 +392,7 @@
     "@nuxt/test-utils": "^4.0.3",
     "@orpc/client": "^1.14.2",
     "@orpc/server": "^1.14.2",
-    "ai": "^6.0.168",
+    "ai": "^7.0.0",
     "@stryker-mutator/core": "^9.6.1",
     "@stryker-mutator/vitest-runner": "^9.6.1",
     "@sveltejs/kit": "^2.59.0",

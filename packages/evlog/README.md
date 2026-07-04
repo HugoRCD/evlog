@@ -820,7 +820,9 @@ See [the Audit Logs guide](https://evlog.dev/use-cases/audit/overview) for compl
 
 ## AI SDK Integration
 
-Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Requires `ai >= 6.0.0`.
+Capture token usage, tool calls, model info, and streaming metrics from the [Vercel AI SDK](https://ai-sdk.dev) into wide events. Compatible with AI SDK v6 and v7 (`ai >= 6.0.168`). AI SDK v7 requires Node.js 22+.
+
+For tool execution timing, abort tracking, and auto embed capture, pass `createEvlogIntegration(ai)` to `telemetry.integrations` (v7) or `experimental_telemetry.integrations` (v6).
 
 ```typescript
 import { streamText } from 'ai'
