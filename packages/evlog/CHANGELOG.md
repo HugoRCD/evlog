@@ -1,5 +1,33 @@
 # evlog
 
+## 2.20.0
+
+### Minor Changes
+
+- [#404](https://github.com/HugoRCD/evlog/pull/404) [`f5df8ff`](https://github.com/HugoRCD/evlog/commit/f5df8ffd6a564d3d807caa85838dd479102eee25) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add AI SDK v7 compatibility for `evlog/ai`. `createEvlogIntegration()` now implements both v6 hooks (`onToolCallFinish`, `onFinish`) and v7 hooks (`onToolExecutionEnd`, `onEnd`, `onEmbedEnd`, `onAbort`, `onError`). On v7, embeddings are auto-captured via `onEmbedEnd` when telemetry is enabled, and abort/error lifecycle events are written to the wide event. Pass the integration via `telemetry.integrations` (v7) or `experimental_telemetry.integrations` (v6). Exports a new `EvlogTelemetry` type.
+
+- [#399](https://github.com/HugoRCD/evlog/pull/399) [`b1d04d0`](https://github.com/HugoRCD/evlog/commit/b1d04d0ec4d22af3102bc13c252112091fffc8c4) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/eve` with `defineEvlogHook()` for one wide event per agent turn and `useLogger()` in tools (AsyncLocalStorage on `turn.started`; pass `ctx` only when ALS is unavailable) — full drain, enrich, and tail-sampling pipeline. Tracks tool durations (including post-approval resumes), session context carry-over with LRU eviction (`maxSessions`), slim `eve.phase` / `eve.sessionTurns` fields, and compact HITL `approval`. The turn logger is bound via AsyncLocalStorage on `turn.started`; pass `ctx` when ALS is unavailable. Turn state is shared via `globalThis` when eve bundles hooks and tools separately. `finalizeAudit()` no longer crashes on partial `audit` objects missing `actor` fields. Fixes `_auditForceKeep` leaking on force-kept events and skips Nitro runtime probes on Next.js hosts.
+
+### Patch Changes
+
+- [#395](https://github.com/HugoRCD/evlog/pull/395) [`a024f4c`](https://github.com/HugoRCD/evlog/commit/a024f4ce8adc5bf2857fc2d077dfeae4827ef519) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix(elysia): support Cloudflare Workers without AsyncLocalStorage.enterWith
+
+  Cloudflare Workers omit native `AsyncLocalStorage.enterWith()`. The Elysia integration now installs a small polyfill on load so `useLogger()` keeps working in typical `wrangler dev` flows. `{ log }` from derive remains the safest option when multiple requests may interleave in the same isolate.
+
+  Closes [#394](https://github.com/HugoRCD/evlog/issues/394)
+
+- [#401](https://github.com/HugoRCD/evlog/pull/401) [`bf5705b`](https://github.com/HugoRCD/evlog/commit/bf5705bcef3f6be9fb2d0a605138cc77a2284058) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # fix(nitro): avoid comment collision when inlining config with `*/` globs
+
+  Nitro's textual `nitro.options.replace` substitution was also rewriting JSDoc that mentioned the inline config token. Route globs containing `*/` (for example `/api/graphs/**/changes`) could terminate block comments early and break production builds with Rolldown parse errors.
+
+  Closes [#397](https://github.com/HugoRCD/evlog/issues/397)
+
+- [#402](https://github.com/HugoRCD/evlog/pull/402) [`4f80f39`](https://github.com/HugoRCD/evlog/commit/4f80f399bddc832af4ce7e610c9ec5425dde8bd2) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix dev pretty output so structured wide events include a timestamp, matching tagged logs.
+
+  Closes [#396](https://github.com/HugoRCD/evlog/issues/396)
+
+- [#399](https://github.com/HugoRCD/evlog/pull/399) [`b1d04d0`](https://github.com/HugoRCD/evlog/commit/b1d04d0ec4d22af3102bc13c252112091fffc8c4) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix stream server mis-detection when co-located with eve dev: return 404 (not SSE 200) for non-root GET paths, and re-bind the turn logger on `actions.requested` so tool handlers can resolve `useLogger()`.
+
 ## 2.19.2
 
 ### Patch Changes
