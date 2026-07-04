@@ -5,6 +5,7 @@ import {
   resetEvlogEveForTests,
   defineEvlogHook,
   useLogger,
+  detachActiveTurnLoggerForTests,
 } from '../src/eve/index'
 import {
   assertDrainCalledWith,
@@ -355,6 +356,31 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain)
     const event = findEventViaDrain(spies.drain, () => true)
     expect(event?.business).toEqual({ tenant: 'als-acme' })
+  })
+
+  it('useLogger resolves from the sole active turn without ctx or ALS', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+
+    detachActiveTurnLoggerForTests()
+
+    const log = useLogger()
+    log.set({ business: { tenant: 'active-turn' } })
+
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.business).toEqual({ tenant: 'active-turn' })
   })
 
   it('useLogger throws outside an active turn', () => {

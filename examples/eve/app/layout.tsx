@@ -27,8 +27,8 @@ export const metadata: Metadata = {
 
 export default function RootLayout({ children }: { readonly children: ReactNode }) {
   return (
-    <html className={cn(sans.variable, mono.variable)} lang="en">
-      <body>
+    <html className={cn(sans.variable, mono.variable, "dark")} lang="en">
+      <body className="bg-[#0c0c0c] antialiased">
         <TooltipProvider>{children}</TooltipProvider>
       </body>
     </html>

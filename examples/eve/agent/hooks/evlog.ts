@@ -5,7 +5,7 @@ import { createDrainPipeline } from 'evlog/pipeline'
 
 const batchedFsDrain = createDrainPipeline<DrainContext>({
   batch: { size: 5, intervalMs: 2000 },
-})(createFsDrain({ dir: '.evlog/logs' }))
+})(createFsDrain())
 
 export default defineEvlogHook({
   init: { env: { service: 'clearbill-support-agent' } },

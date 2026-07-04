@@ -1,5 +1,5 @@
-import { AgentChat } from "@/app/_components/agent-chat";
+import { DemoApp } from "@/app/_components/demo-app";
 
 export default function Page() {
-  return <AgentChat />;
+  return <DemoApp />;
 }

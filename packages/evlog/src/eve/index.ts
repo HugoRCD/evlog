@@ -255,9 +255,10 @@ function resolveTurnLogger(ctx: EveTurnSessionContext): AuditableLogger {
  * Turn-scoped logger for eve tool `execute()` handlers.
  *
  * When {@link defineEvlogHook} is registered, the logger is bound via
- * AsyncLocalStorage on `turn.started`, so `useLogger()` works without
- * arguments inside tool handlers. Pass eve tool `ctx` as a fallback when
- * ALS is unavailable in your runtime.
+ * AsyncLocalStorage on `turn.started`. Inside tool handlers, `useLogger()`
+ * resolves from ALS when it propagated, otherwise from the sole active turn
+ * in the process (typical eve dev). Pass eve tool `ctx` only when multiple
+ * sessions are active concurrently.
  *
  * @example
  * ```ts
@@ -271,6 +272,14 @@ function resolveTurnLogger(ctx: EveTurnSessionContext): AuditableLogger {
  * })
  * ```
  */
+function resolveActiveTurnLogger(): AuditableLogger | null {
+  const active = activeTurnBySession()
+  if (active.size !== 1) return null
+
+  const [sessionId, turnId] = active.entries().next().value!
+  return turnStates().get(turnKey(sessionId, turnId))?.logger ?? null
+}
+
 export function useLogger(ctx?: EveTurnSessionContext): AuditableLogger {
   const fromStorage = turnLoggerStorage.getStore()
   if (fromStorage && activeTurnLoggers.has(fromStorage)) {
@@ -280,6 +289,9 @@ export function useLogger(ctx?: EveTurnSessionContext): AuditableLogger {
   if (ctx?.session?.id) {
     return resolveTurnLogger(ctx)
   }
+
+  const active = resolveActiveTurnLogger()
+  if (active) return active
 
   throw new Error(
     '[evlog] useLogger() was called outside an evlog eve turn. '
@@ -691,6 +703,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
         runSafe(() => {
           const state = getTurnState(ctx.session.id, event.data.turnId)
           if (!state) return
+          bindTurnLogger(state.logger)
           const startedAt = Date.now()
           for (const action of event.data.actions) {
             if (action.kind === 'tool-call') {
@@ -833,6 +846,12 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
       },
     },
   })
+}
+
+/** @internal Simulates eve tool execution where AsyncLocalStorage did not propagate. */
+export function detachActiveTurnLoggerForTests(): void {
+  const logger = turnLoggerStorage.getStore()
+  if (logger) unbindTurnLogger(logger)
 }
 
 /** @internal Resets module state between unit tests. */
