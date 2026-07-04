@@ -38,8 +38,7 @@ export default defineEventHandler(async (event) => {
     model,
     prompt: 'Say hello.',
     maxOutputTokens: 200,
-    experimental_telemetry: {
-      isEnabled: true,
+    telemetry: {
       integrations: [createEvlogIntegration(ai)],
     },
   })

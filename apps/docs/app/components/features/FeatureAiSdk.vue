@@ -188,8 +188,7 @@ function setView(view: 'without' | 'with') {
 <span class="text-violet-400">const</span> result = <span class="text-amber-400">streamText</span>({
   <span class="text-sky-400">model</span>: ai.<span class="text-amber-400">wrap</span>(<span class="text-emerald-400">'anthropic/claude-sonnet-4.6'</span>),
   messages,
-  <span class="text-sky-400">experimental_telemetry</span>: {
-    <span class="text-sky-400">isEnabled</span>: <span class="text-violet-400">true</span>,
+  <span class="text-sky-400">telemetry</span>: {
     <span class="text-sky-400">integrations</span>: [<span class="text-amber-400">createEvlogIntegration</span>(ai)],
   },
 })</code></pre>

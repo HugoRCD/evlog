@@ -87,8 +87,7 @@ export default defineEventHandler(async (event) => {
       instructions: systemPrompt,
       tools: { queryEvents },
       stopWhen: stepCountIs(5),
-      experimental_telemetry: {
-        isEnabled: true,
+      telemetry: {
         integrations: [createEvlogIntegration(ai)],
       },
     })

@@ -968,8 +968,7 @@ const agent = new ToolLoopAgent({
   model: ai.wrap('anthropic/claude-sonnet-4.6'),
   tools: { searchWeb, queryDatabase },
   stopWhen: stepCountIs(5),
-  experimental_telemetry: {
-    isEnabled: true,
+  telemetry: {
     integrations: [createEvlogIntegration(ai)],
   },
 })
@@ -1014,7 +1013,7 @@ Anti-patterns to detect:
 | Manual token tracking in `onFinish` | `ai.wrap()` — middleware captures automatically |
 | `console.log('tokens:', result.usage)` | `ai.wrap()` — structured `ai.*` fields in wide event |
 | No AI observability | Add `createAILogger(log)` + `ai.wrap()` |
-| No tool execution timing | Add `createEvlogIntegration(ai)` to `experimental_telemetry.integrations` |
+| No tool execution timing | Add `createEvlogIntegration(ai)` to `telemetry.integrations` |
 | Manual cost calculation | Use `cost` option in `createAILogger()` |
 
 ---
