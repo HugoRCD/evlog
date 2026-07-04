@@ -24,7 +24,7 @@
     "example:express": "dotenv -- turbo run dev --filter=evlog-express-example",
     "example:elysia": "dotenv -- turbo run dev --filter=evlog-elysia-example",
     "example:orpc": "dotenv -- turbo run dev --filter=evlog-orpc-example",
-    "example:eve": "dotenv -- pnpm --filter evlog-eve-example dev",
+    "example:eve": "dotenv -- turbo run dev --filter=evlog-eve-example",
     "example:fastify": "dotenv -- turbo run dev --filter=evlog-fastify-example",
     "example:nestjs": "dotenv -- turbo run dev --filter=evlog-nestjs-example",
     "example:sveltekit": "dotenv -- turbo run dev --filter=evlog-sveltekit-example",

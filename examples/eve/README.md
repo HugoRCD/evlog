@@ -55,7 +55,10 @@ Compare with order **#1102** ($49) — same flow, **no approval** (under the $10
 
 ## Run
 
+From the monorepo root (Turbo runs `evlog` dev:prepare so `evlog/eve` resolves):
+
 ```bash
+pnpm install
 pnpm run example:eve
 ```
 

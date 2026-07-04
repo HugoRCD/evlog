@@ -1,7 +1,7 @@
 import { defineHook, type HookContext, type HookDefinition } from 'eve/hooks'
 import type { AuditableLogger } from '../audit'
 import type { AIToolExecution, AIEventData } from '../ai/index'
-import { initLogger } from '../logger'
+import { initLogger, isLoggerLocked } from '../logger'
 import type { LoggerConfig } from '../types'
 import type { BaseEvlogOptions, MiddlewareLoggerOptions } from '../shared/middleware'
 import { createMiddlewareLogger } from '../shared/middleware'
@@ -97,7 +97,9 @@ let initialized = false
 
 function ensureInit(options: EvlogEveOptions): void {
   if (isEveInitialized()) return
-  initLogger(options.init ?? { env: { service: 'eve-agent' } })
+  if (!isLoggerLocked()) {
+    initLogger(options.init ?? { env: { service: 'eve-agent' } })
+  }
   setEveInitialized(true)
   initialized = true
 }
@@ -253,11 +255,14 @@ async function finishTurn(
   const state = turnStates().get(key)
   if (!state) return
 
-  flushAi(state)
-  await state.finish(opts)
-  turnStates().delete(key)
-  if (activeTurnBySession().get(sessionId) === turnId) {
-    activeTurnBySession().delete(sessionId)
+  try {
+    flushAi(state)
+    await state.finish(opts)
+  } finally {
+    turnStates().delete(key)
+    if (activeTurnBySession().get(sessionId) === turnId) {
+      activeTurnBySession().delete(sessionId)
+    }
   }
 }
 

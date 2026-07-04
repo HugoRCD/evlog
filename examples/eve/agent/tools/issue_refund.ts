@@ -7,6 +7,10 @@ import { fakeLatency } from '../lib/fake-latency.js'
 /** Refunds above this amount require human approval in the demo. */
 export const REFUND_APPROVAL_THRESHOLD_USD = 100
 
+function orderRequiresApproval(order: { amount: number } | undefined): boolean {
+  return (order?.amount ?? 0) > REFUND_APPROVAL_THRESHOLD_USD
+}
+
 export default defineTool({
   description: 'Issue a refund on a paid Clearbill order. Amounts over $100 require human approval.',
   inputSchema: z.object({
@@ -15,7 +19,7 @@ export default defineTool({
   }),
   needsApproval: ({ toolInput }) => {
     const order = findOrder(String(toolInput?.orderId ?? ''))
-    return (order?.amount ?? 0) > REFUND_APPROVAL_THRESHOLD_USD
+    return orderRequiresApproval(order)
   },
   async execute({ orderId, reason }, ctx) {
     await fakeLatency(900, 1600)
@@ -35,7 +39,7 @@ export default defineTool({
         amount: order.amount,
         currency: order.currency,
         reason,
-        requiresApproval: order.amount > REFUND_APPROVAL_THRESHOLD_USD,
+        requiresApproval: orderRequiresApproval(order),
       },
     })
     log.audit({
