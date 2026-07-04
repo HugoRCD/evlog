@@ -1,5 +1,5 @@
 import { defineTool } from 'eve/tools'
-import { useTurnLogger } from 'evlog/eve'
+import { useLogger } from 'evlog/eve'
 import { z } from 'zod'
 import { findOrder } from '../lib/support-data.js'
 import { fakeLatency } from '../lib/fake-latency.js'
@@ -21,7 +21,7 @@ export default defineTool({
     const order = findOrder(String(toolInput?.orderId ?? ''))
     return orderRequiresApproval(order)
   },
-  async execute({ orderId, reason }, ctx) {
+  async execute({ orderId, reason }) {
     await fakeLatency(900, 1600)
 
     const order = findOrder(orderId)
@@ -32,14 +32,14 @@ export default defineTool({
       return { ok: false, error: 'already_refunded', orderId }
     }
 
-    const log = useTurnLogger(ctx)
+    const log = useLogger()
     log.set({
       refund: {
         orderId: order.id,
         amount: order.amount,
         currency: order.currency,
         reason,
-        requiresApproval: orderRequiresApproval(order),
+        status: 'refunded',
       },
     })
     log.audit({

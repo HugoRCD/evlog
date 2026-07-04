@@ -1,5 +1,5 @@
 import { defineTool } from 'eve/tools'
-import { useTurnLogger } from 'evlog/eve'
+import { useLogger } from 'evlog/eve'
 import { z } from 'zod'
 import { findCustomer } from '../lib/support-data.js'
 import { fakeLatency } from '../lib/fake-latency.js'
@@ -9,7 +9,7 @@ export default defineTool({
   inputSchema: z.object({
     query: z.string().describe('Customer slug, name, or cust_* id'),
   }),
-  async execute({ query }, ctx) {
+  async execute({ query }) {
     await fakeLatency(450, 950)
 
     const customer = findCustomer(query)
@@ -17,7 +17,7 @@ export default defineTool({
       return { found: false, query }
     }
 
-    const log = useTurnLogger(ctx)
+    const log = useLogger()
     log.set({
       customer: {
         id: customer.id,

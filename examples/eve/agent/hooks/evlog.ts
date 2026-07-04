@@ -5,7 +5,7 @@ import { createDrainPipeline } from 'evlog/pipeline'
 
 const batchedFsDrain = createDrainPipeline<DrainContext>({
   batch: { size: 5, intervalMs: 2000 },
-})(createFsDrain())
+})(createFsDrain({ dir: '.evlog/logs' }))
 
 export default defineEvlogHook({
   init: { env: { service: 'clearbill-support-agent' } },
@@ -20,8 +20,8 @@ export default defineEvlogHook({
     if (tools?.some(tool => !tool.success)) {
       ctx.shouldKeep = true
     }
-    const refund = context.refund as { amount?: number, requiresApproval?: boolean } | undefined
-    if (refund?.requiresApproval || (refund?.amount ?? 0) > 100) {
+    const refund = context.refund as { amount?: number, status?: string } | undefined
+    if (refund?.status === 'refunded' || (refund?.amount ?? 0) > 100) {
       ctx.shouldKeep = true
     }
     if (context.audit) {

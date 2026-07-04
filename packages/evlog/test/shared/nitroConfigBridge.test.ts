@@ -143,4 +143,14 @@ describe('nitroConfigBridge — active runtime', () => {
     expect(config).toEqual({ env: { service: 'svc-v3' } })
     expect(importSpy.mock.calls.map(c => c[0])).toContain('nitro/runtime-config')
   })
+
+  it('skips Nitro runtime probes on Next.js hosts without an active Nitro runtime', async () => {
+    vi.stubEnv('NEXT_RUNTIME', 'nodejs')
+    const { bridge, importSpy } = await loadBridgeWithMocks()
+
+    const record = await bridge.getNitroRuntimeConfigRecord()
+
+    expect(record).toBeUndefined()
+    expect(importSpy).not.toHaveBeenCalled()
+  })
 })

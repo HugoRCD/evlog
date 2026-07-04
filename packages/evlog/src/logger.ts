@@ -951,9 +951,10 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
       const level: LogLevel = manualLevel ?? (hasError ? 'error' : hasWarn ? 'warn' : 'info')
 
       let forceKeep = false
+      const auditForceKeep = consumeAuditForceKeep(context)
       if (overrides?._forceKeep) {
         forceKeep = true
-      } else if (consumeAuditForceKeep(context)) {
+      } else if (auditForceKeep) {
         forceKeep = true
       } else if (globalSampling.keep?.length) {
         const status = (overrides as Record<string, unknown> | undefined)?.status ?? context.status

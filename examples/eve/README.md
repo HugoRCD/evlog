@@ -72,7 +72,7 @@ Requires `POSTHOG_API_KEY` in the repo root `.env` for the drain (events still l
 | --- | --- |
 | `agent/instructions.md` | Support copilot persona + fake CRM table |
 | `agent/lib/support-data.ts` | Acme Corp & Startup Inc fake data |
-| `agent/tools/lookup_*.ts` | CRM lookups → `useTurnLogger(ctx)` |
+| `agent/tools/lookup_*.ts` | CRM lookups → `useLogger()` |
 | `agent/tools/issue_refund.ts` | Refund + approval gate + audit fields |
 | `agent/hooks/evlog.ts` | Wide event per turn, tail-keep on refunds/audit |
 

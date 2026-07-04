@@ -1,5 +1,5 @@
 import { defineTool } from 'eve/tools'
-import { useTurnLogger } from 'evlog/eve'
+import { useLogger } from 'evlog/eve'
 import { z } from 'zod'
 import { findOrder } from '../lib/support-data.js'
 import { fakeLatency } from '../lib/fake-latency.js'
@@ -9,7 +9,7 @@ export default defineTool({
   inputSchema: z.object({
     orderId: z.string(),
   }),
-  async execute({ orderId }, ctx) {
+  async execute({ orderId }) {
     await fakeLatency(350, 750)
 
     const order = findOrder(orderId)
@@ -17,7 +17,7 @@ export default defineTool({
       return { found: false, orderId }
     }
 
-    const log = useTurnLogger(ctx)
+    const log = useLogger()
     log.set({
       order: {
         id: order.id,

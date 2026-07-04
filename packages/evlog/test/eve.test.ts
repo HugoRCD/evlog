@@ -4,7 +4,7 @@ import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
   defineEvlogHook,
-  useTurnLogger,
+  useLogger,
 } from '../src/eve/index'
 import {
   assertDrainCalledWith,
@@ -17,6 +17,7 @@ import {
 
 const SESSION_ID = 'sess_abc'
 const TURN_ID = 'turn_0'
+const TURN_ID_1 = 'turn_1'
 
 function hookContext(overrides: Partial<HookContext> = {}): HookContext {
   return {
@@ -39,24 +40,34 @@ function toolContext(turnId = TURN_ID) {
 async function runTurn(
   hook: ReturnType<typeof defineEvlogHook>,
   options: {
+    turnId?: string
     fail?: boolean
     steps?: number
-    toolResults?: Array<{ toolName: string, status: 'completed' | 'failed' | 'rejected' }>
+    toolResults?: Array<{
+      toolName: string
+      callId?: string
+      status: 'completed' | 'failed' | 'rejected'
+      delayMs?: number
+    }>
+    toolRequests?: Array<{ toolName: string, callId: string }>
     message?: string
+    inputRequests?: Array<{ requestId: string, toolName: string, prompt: string }>
+    subagents?: Array<{ phase: 'called' | 'completed', callId: string, name: string }>
   } = {},
 ) {
+  const turnId = options.turnId ?? TURN_ID
   const ctx = hookContext()
   const events = hook.events!
 
   events['turn.started']!({
     type: 'turn.started',
-    data: { sequence: 0, turnId: TURN_ID },
+    data: { sequence: 0, turnId },
   }, ctx)
 
   if (options.message !== undefined) {
     events['message.received']!({
       type: 'message.received',
-      data: { message: options.message, sequence: 1, turnId: TURN_ID },
+      data: { message: options.message, sequence: 1, turnId },
     }, ctx)
   }
 
@@ -68,7 +79,7 @@ async function runTurn(
         finishReason: i === stepCount - 1 ? 'stop' : 'tool-calls',
         sequence: 2 + i,
         stepIndex: i,
-        turnId: TURN_ID,
+        turnId,
         usage: {
           inputTokens: 100,
           outputTokens: 50,
@@ -78,15 +89,90 @@ async function runTurn(
     }, ctx)
   }
 
+  for (const [index, req] of (options.toolRequests ?? []).entries()) {
+    events['actions.requested']!({
+      type: 'actions.requested',
+      data: {
+        actions: [
+          {
+            callId: req.callId,
+            kind: 'tool-call',
+            toolName: req.toolName,
+            input: {},
+          },
+        ],
+        sequence: 5 + index,
+        stepIndex: 0,
+        turnId,
+      },
+    }, ctx)
+  }
+
+  for (const [index, req] of (options.inputRequests ?? []).entries()) {
+    events['input.requested']!({
+      type: 'input.requested',
+      data: {
+        requests: [
+          {
+            requestId: req.requestId,
+            prompt: req.prompt,
+            action: {
+              callId: `call_${req.toolName}`,
+              kind: 'tool-call',
+              toolName: req.toolName,
+              input: {},
+            },
+          },
+        ],
+        sequence: 7 + index,
+        stepIndex: 0,
+        turnId,
+      },
+    }, ctx)
+  }
+
+  for (const [index, sub] of (options.subagents ?? []).entries()) {
+    if (sub.phase === 'called') {
+      events['subagent.called']!({
+        type: 'subagent.called',
+        data: {
+          callId: sub.callId,
+          childSessionId: `child_${sub.callId}`,
+          sessionId: SESSION_ID,
+          sequence: 20 + index,
+          name: sub.name,
+          toolName: 'delegate',
+          turnId,
+          workflowId: 'wf_1',
+        },
+      }, ctx)
+    } else {
+      events['subagent.completed']!({
+        type: 'subagent.completed',
+        data: {
+          callId: sub.callId,
+          output: 'done',
+          subagentName: sub.name,
+        },
+      }, ctx)
+    }
+  }
+
   for (const [index, tool] of (options.toolResults ?? []).entries()) {
+    if (tool.delayMs) await new Promise(r => setTimeout(r, tool.delayMs))
     events['action.result']!({
       type: 'action.result',
       data: {
-        result: { toolName: tool.toolName },
+        result: {
+          callId: tool.callId ?? `call_${tool.toolName}`,
+          kind: 'tool-result',
+          toolName: tool.toolName,
+          output: {},
+        },
         sequence: 10 + index,
         stepIndex: 0,
         status: tool.status,
-        turnId: TURN_ID,
+        turnId,
         ...(tool.status === 'failed'
           ? { error: { code: 'TOOL_FAILED', message: 'tool broke' } }
           : {}),
@@ -101,13 +187,13 @@ async function runTurn(
         code: 'TURN_ERROR',
         message: 'turn exploded',
         sequence: 99,
-        turnId: TURN_ID,
+        turnId,
       },
     }, ctx)
   } else {
     await events['turn.completed']!({
       type: 'turn.completed',
-      data: { sequence: 99, turnId: TURN_ID },
+      data: { sequence: 99, turnId },
     }, ctx)
   }
 }
@@ -160,23 +246,28 @@ describe('evlog/eve', () => {
     })
   })
 
-  it('records tool executions from action.result', async () => {
+  it('records tool executions with duration from actions.requested', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })
 
     await runTurn(hook, {
+      toolRequests: [{ toolName: 'get_weather', callId: 'call_weather' }],
       toolResults: [
-        { toolName: 'get_weather', status: 'completed' },
-        { toolName: 'search', status: 'failed' },
+        { toolName: 'get_weather', callId: 'call_weather', status: 'completed', delayMs: 15 },
+        { toolName: 'search', callId: 'call_search', status: 'failed' },
       ],
     })
 
     await waitForDrainCalls(spies.drain)
     const event = findEventViaDrain(spies.drain, () => true)
-    expect(event?.ai?.tools).toEqual([
-      { name: 'get_weather', durationMs: 0, success: true },
-      { name: 'search', durationMs: 0, success: false, error: 'tool broke' },
-    ])
+    expect(event?.ai?.tools?.[0]?.name).toBe('get_weather')
+    expect(event?.ai?.tools?.[0]?.durationMs).toBeGreaterThan(0)
+    expect(event?.ai?.tools?.[1]).toEqual({
+      name: 'search',
+      durationMs: 0,
+      success: false,
+      error: 'tool broke',
+    })
   })
 
   it('emits a valid wide event on turn.completed', async () => {
@@ -220,7 +311,7 @@ describe('evlog/eve', () => {
     await expect(runTurn(hook)).resolves.toBeUndefined()
   })
 
-  it('useTurnLogger returns the active turn logger', async () => {
+  it('useLogger returns the active turn logger via ctx', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })
     const ctx = hookContext()
@@ -230,7 +321,7 @@ describe('evlog/eve', () => {
       data: { sequence: 0, turnId: TURN_ID },
     }, ctx)
 
-    const log = useTurnLogger(toolContext())
+    const log = useLogger(toolContext())
     log.set({ business: { tenant: 'acme' } })
 
     await hook.events!['turn.completed']!({
@@ -243,8 +334,311 @@ describe('evlog/eve', () => {
     expect(event?.business).toEqual({ tenant: 'acme' })
   })
 
-  it('useTurnLogger throws outside an active turn', () => {
-    expect(() => useTurnLogger()).toThrow(/outside an evlog eve turn/)
+  it('useLogger resolves from AsyncLocalStorage after turn.started', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+
+    const log = useLogger()
+    log.set({ business: { tenant: 'als-acme' } })
+
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.business).toEqual({ tenant: 'als-acme' })
+  })
+
+  it('useLogger throws outside an active turn', () => {
+    expect(() => useLogger()).toThrow(/outside an evlog eve turn/)
+  })
+
+  it('carries business context across turns in the same session', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    const log = useLogger(toolContext())
+    log.set({
+      customer: { slug: 'acme' },
+      order: { id: '4821' },
+    })
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+    const log2 = useLogger(toolContext(TURN_ID_1))
+    log2.set({ refund: { amount: 890 } })
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 2, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+    expect(secondTurn?.customer).toEqual({ slug: 'acme' })
+    expect(secondTurn?.order).toEqual({ id: '4821' })
+    expect(secondTurn?.refund).toEqual({ amount: 890 })
+  })
+
+  it('records approval approved and tool duration after cross-turn resume', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+    const callId = 'call_issue_refund'
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    events['actions.requested']!({
+      type: 'actions.requested',
+      data: {
+        actions: [
+          {
+            callId,
+            kind: 'tool-call',
+            toolName: 'issue_refund',
+            input: {},
+          },
+        ],
+        sequence: 1,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+    events['input.requested']!({
+      type: 'input.requested',
+      data: {
+        requests: [
+          {
+            requestId: 'req_1',
+            prompt: 'Approve refund of $890?',
+            action: {
+              callId,
+              kind: 'tool-call',
+              toolName: 'issue_refund',
+              input: {},
+            },
+          },
+        ],
+        sequence: 2,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 3, turnId: TURN_ID },
+    }, ctx)
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+    events['step.started']!({
+      type: 'step.started',
+      data: { sequence: 4, stepIndex: 0, turnId: TURN_ID_1 },
+    }, ctx)
+    await new Promise(r => setTimeout(r, 15))
+    events['action.result']!({
+      type: 'action.result',
+      data: {
+        result: {
+          callId,
+          kind: 'tool-result',
+          toolName: 'issue_refund',
+          output: {},
+        },
+        sequence: 5,
+        stepIndex: 0,
+        status: 'completed',
+        turnId: TURN_ID_1,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 6, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const firstTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID))
+    const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+    expect(firstTurn?.approval).toMatchObject({
+      status: 'pending',
+      tool: 'issue_refund',
+    })
+    expect(secondTurn?.approval).toMatchObject({
+      status: 'approved',
+      tool: 'issue_refund',
+    })
+    expect(secondTurn?.ai?.tools?.[0]?.durationMs).toBeGreaterThan(0)
+  })
+
+  it('tracks session turn count and phase across approval turns', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+    const callId = 'call_issue_refund'
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    events['input.requested']!({
+      type: 'input.requested',
+      data: {
+        requests: [
+          {
+            requestId: 'req_1',
+            prompt: 'Approve refund of $890?',
+            action: {
+              callId,
+              kind: 'tool-call',
+              toolName: 'issue_refund',
+              input: {},
+            },
+          },
+        ],
+        sequence: 1,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 2, turnId: TURN_ID },
+    }, ctx)
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: {
+        result: {
+          callId,
+          kind: 'tool-result',
+          toolName: 'issue_refund',
+          output: {},
+        },
+        sequence: 3,
+        stepIndex: 0,
+        status: 'completed',
+        turnId: TURN_ID_1,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 4, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const firstTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID))
+    const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+
+    expect(firstTurn?.eve?.phase).toBe('awaiting-approval')
+    expect(firstTurn?.eve?.sessionTurns).toBe(1)
+    expect(secondTurn?.eve?.sessionTurns).toBe(2)
+    expect(secondTurn?.approval).toMatchObject({ status: 'approved', tool: 'issue_refund' })
+    expect(secondTurn?.path).toContain(TURN_ID_1)
+    expect(firstTurn?.path).toContain(TURN_ID)
+  })
+
+  it('records approval pending and rejected tool results', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      inputRequests: [
+        {
+          requestId: 'req_1',
+          toolName: 'issue_refund',
+          prompt: 'Approve refund of $890?',
+        },
+      ],
+      toolResults: [
+        {
+          toolName: 'issue_refund',
+          callId: 'call_issue_refund',
+          status: 'rejected',
+        },
+      ],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve?.phase).toBe('rejected')
+    expect(event?.approval).toMatchObject({
+      status: 'rejected',
+      tool: 'issue_refund',
+    })
+    expect(event?.ai?.tools?.[0]).toMatchObject({
+      name: 'issue_refund',
+      success: false,
+      error: 'rejected',
+    })
+  })
+
+  it('estimates cost when cost map and model are configured', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      cost: { 'anthropic/claude-sonnet-4.6': { input: 3, output: 15 } },
+      model: 'anthropic/claude-sonnet-4.6',
+    })
+
+    await runTurn(hook)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.ai?.model).toBe('anthropic/claude-sonnet-4.6')
+    expect(event?.ai?.estimatedCost).toBeGreaterThan(0)
+  })
+
+  it('records subagent.called and subagent.completed', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      subagents: [
+        { phase: 'called', callId: 'sub_1', name: 'researcher' },
+        { phase: 'completed', callId: 'sub_1', name: 'researcher' },
+      ],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve?.subagents).toEqual([
+      {
+        callId: 'sub_1',
+        name: 'researcher',
+        toolName: 'delegate',
+        childSessionId: 'child_sub_1',
+        status: 'completed',
+        output: 'done',
+      },
+    ])
   })
 
   it('keep callback can force-keep failed tool turns', async () => {
@@ -281,7 +675,7 @@ describe('evlog/eve', () => {
     assertEnrichBeforeDrain(spies.enrich, spies.drain)
   })
 
-  it('redacts message.received by default', async () => {
+  it('omits message.received content by default', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })
 
@@ -289,8 +683,7 @@ describe('evlog/eve', () => {
 
     await waitForDrainCalls(spies.drain)
     const event = findEventViaDrain(spies.drain, () => true)
-    expect(event?.message).toEqual({ receivedRedacted: true })
-    expect(event?.message).not.toHaveProperty('received')
+    expect(event?.message).toBeUndefined()
   })
 
   it('includes truncated message when redactMessage is false', async () => {
@@ -302,6 +695,28 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain)
     const event = findEventViaDrain(spies.drain, () => true)
     expect(event?.message).toEqual({ received: 'hello from user' })
+  })
+
+  it('uses continuing instead of raw continuationToken', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext({
+      channel: { kind: 'http', continuationToken: 'very-long-opaque-token-value' },
+    })
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.channel).toMatchObject({ kind: 'http', continuing: true })
+    expect(event?.channel).not.toHaveProperty('continuationToken')
   })
 
   it('shares turn state across separate evlog/eve module instances (eve authored-module bundles)', async () => {
@@ -320,7 +735,7 @@ describe('evlog/eve', () => {
 
     vi.resetModules()
     const toolModule = await import('../src/eve/index')
-    const log = toolModule.useTurnLogger(toolContext())
+    const log = toolModule.useLogger(toolContext())
     log.set({ business: { tenant: 'acme' } })
 
     await hook.events!['turn.completed']!({
@@ -345,7 +760,49 @@ describe('evlog/eve', () => {
 
     await runTurn(hook)
 
-    expect(() => useTurnLogger(toolContext())).toThrow(/could not find a logger/)
+    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+  })
+
+  it('evicts oldest sessions when maxSessions is exceeded', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, maxSessions: 1 })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: 'turn_old' },
+    }, { ...ctx, session: { id: 'sess_old' } })
+    useLogger({ session: { id: 'sess_old', turn: { id: 'turn_old' } } })
+      .set({ customer: { slug: 'old' } })
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: 'turn_old' },
+    }, { ...ctx, session: { id: 'sess_old' } })
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    useLogger(toolContext()).set({ customer: { slug: 'new' } })
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+    const log = useLogger(toolContext(TURN_ID_1))
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 2, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 3)
+    const latestTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+    expect(latestTurn?.customer).toEqual({ slug: 'new' })
+    expect(latestTurn?.customer).not.toEqual({ slug: 'old' })
   })
 
   it('does not reinitialize an existing logger on first turn', async () => {
