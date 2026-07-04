@@ -106,6 +106,7 @@ let globalSilent = false
 /** Minimum level for the global `log` API only (`ownsEvent === false`). Default: all levels. */
 let globalMinLevel: LogLevel = 'debug'
 let _locked = false
+let _loggerInitialized = false
 let globalPluginRunner: PluginRunner = getEmptyPluginRunner()
 
 /**
@@ -144,6 +145,8 @@ export function initLogger(config: LoggerConfig = {}): void {
   if (globalSilent && !hasAnyDrain && !config._suppressDrainWarning) {
     console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
   }
+
+  _loggerInitialized = true
 }
 
 /**
@@ -176,6 +179,13 @@ export function lockLogger(): void {
  */
 export function isLoggerLocked(): boolean {
   return _locked
+}
+
+/**
+ * @internal Whether {@link initLogger} has completed at least once.
+ */
+export function isLoggerInitialized(): boolean {
+  return _loggerInitialized
 }
 
 /**

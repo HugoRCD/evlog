@@ -1,7 +1,7 @@
 import { defineHook, type HookContext, type HookDefinition } from 'eve/hooks'
 import type { AuditableLogger } from '../audit'
 import type { AIToolExecution, AIEventData } from '../ai/index'
-import { initLogger, isLoggerLocked } from '../logger'
+import { initLogger, isLoggerInitialized, isLoggerLocked } from '../logger'
 import type { LoggerConfig } from '../types'
 import type { BaseEvlogOptions, MiddlewareLoggerOptions } from '../shared/middleware'
 import { createMiddlewareLogger } from '../shared/middleware'
@@ -97,7 +97,7 @@ let initialized = false
 
 function ensureInit(options: EvlogEveOptions): void {
   if (isEveInitialized()) return
-  if (!isLoggerLocked()) {
+  if (!isLoggerLocked() && !isLoggerInitialized()) {
     initLogger(options.init ?? { env: { service: 'eve-agent' } })
   }
   setEveInitialized(true)

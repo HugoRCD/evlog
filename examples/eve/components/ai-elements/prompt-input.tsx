@@ -452,6 +452,59 @@ export interface PromptInputMessage {
   files: FileUIPart[];
 }
 
+type PromptInputFileError = {
+  code: "max_files" | "max_file_size" | "accept";
+  message: string;
+};
+
+function createDropHandlers(add: (files: FileList) => void) {
+  const onDragOver = (e: DragEvent) => {
+    if (e.dataTransfer?.types?.includes("Files")) {
+      e.preventDefault();
+    }
+  };
+  const onDrop = (e: DragEvent) => {
+    if (e.dataTransfer?.types?.includes("Files")) {
+      e.preventDefault();
+    }
+    if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
+      add(e.dataTransfer.files);
+    }
+  };
+  return { onDragOver, onDrop };
+}
+
+function validateIncomingFiles(
+  fileList: File[] | FileList,
+  options: {
+    matchesAccept: (file: File) => boolean;
+    maxFileSize?: number;
+    onError?: (err: PromptInputFileError) => void;
+  },
+): File[] | null {
+  const incoming = [...fileList];
+  const accepted = incoming.filter((file) => options.matchesAccept(file));
+  if (incoming.length && accepted.length === 0) {
+    options.onError?.({
+      code: "accept",
+      message: "No files match the accepted types.",
+    });
+    return null;
+  }
+
+  const withinSize = (file: File) => (options.maxFileSize ? file.size <= options.maxFileSize : true);
+  const sized = accepted.filter(withinSize);
+  if (accepted.length > 0 && sized.length === 0) {
+    options.onError?.({
+      code: "max_file_size",
+      message: "All files exceed the maximum size.",
+    });
+    return null;
+  }
+
+  return sized;
+}
+
 export type PromptInputProps = Omit<HTMLAttributes<HTMLFormElement>, "onSubmit" | "onError"> & {
   // e.g., "image/*" or leave undefined for any
   accept?: string;
@@ -537,22 +590,8 @@ export const PromptInput = ({
 
   const addLocal = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
+      const sized = validateIncomingFiles(fileList, { matchesAccept, maxFileSize, onError });
+      if (!sized) {
         return;
       }
 
@@ -597,22 +636,8 @@ export const PromptInput = ({
   // Wrapper that validates files before calling provider's add
   const addWithProviderValidation = useCallback(
     (fileList: File[] | FileList) => {
-      const incoming = [...fileList];
-      const accepted = incoming.filter((f) => matchesAccept(f));
-      if (incoming.length && accepted.length === 0) {
-        onError?.({
-          code: "accept",
-          message: "No files match the accepted types.",
-        });
-        return;
-      }
-      const withinSize = (f: File) => (maxFileSize ? f.size <= maxFileSize : true);
-      const sized = accepted.filter(withinSize);
-      if (accepted.length > 0 && sized.length === 0) {
-        onError?.({
-          code: "max_file_size",
-          message: "All files exceed the maximum size.",
-        });
+      const sized = validateIncomingFiles(fileList, { matchesAccept, maxFileSize, onError });
+      if (!sized) {
         return;
       }
 
@@ -689,19 +714,7 @@ export const PromptInput = ({
       return;
     }
 
-    const onDragOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes("Files")) {
-        e.preventDefault();
-      }
-    };
-    const onDrop = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes("Files")) {
-        e.preventDefault();
-      }
-      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        add(e.dataTransfer.files);
-      }
-    };
+    const { onDragOver, onDrop } = createDropHandlers(add);
     form.addEventListener("dragover", onDragOver);
     form.addEventListener("drop", onDrop);
     return () => {
@@ -715,19 +728,7 @@ export const PromptInput = ({
       return;
     }
 
-    const onDragOver = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes("Files")) {
-        e.preventDefault();
-      }
-    };
-    const onDrop = (e: DragEvent) => {
-      if (e.dataTransfer?.types?.includes("Files")) {
-        e.preventDefault();
-      }
-      if (e.dataTransfer?.files && e.dataTransfer.files.length > 0) {
-        add(e.dataTransfer.files);
-      }
-    };
+    const { onDragOver, onDrop } = createDropHandlers(add);
     document.addEventListener("dragover", onDragOver);
     document.addEventListener("drop", onDrop);
     return () => {

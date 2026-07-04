@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { HookContext } from 'eve/hooks'
-import { initLogger, lockLogger } from '../src/logger'
+import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
   defineEvlogHook,
@@ -348,10 +348,9 @@ describe('evlog/eve', () => {
     expect(() => useTurnLogger(toolContext())).toThrow(/could not find a logger/)
   })
 
-  it('does not reinitialize a locked logger on first turn', async () => {
+  it('does not reinitialize an existing logger on first turn', async () => {
     resetEvlogEveForTests()
     initLogger({ env: { service: 'existing-app' } })
-    lockLogger()
 
     const initSpy = vi.spyOn(await import('../src/logger'), 'initLogger')
     const spies = createPipelineSpies()
