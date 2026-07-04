@@ -519,6 +519,113 @@ describe('evlog/eve', () => {
     expect(secondTurn?.ai?.tools?.[0]?.durationMs).toBeGreaterThan(0)
   })
 
+  it('consumes the matching callId when multiple pending approvals share a toolName', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+    const callIdA = 'call_refund_a'
+    const callIdB = 'call_refund_b'
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    events['actions.requested']!({
+      type: 'actions.requested',
+      data: {
+        actions: [
+          { callId: callIdA, kind: 'tool-call', toolName: 'issue_refund', input: {} },
+          { callId: callIdB, kind: 'tool-call', toolName: 'issue_refund', input: {} },
+        ],
+        sequence: 1,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+    events['input.requested']!({
+      type: 'input.requested',
+      data: {
+        requests: [
+          {
+            requestId: 'req_a',
+            prompt: 'Approve refund A?',
+            action: { callId: callIdA, kind: 'tool-call', toolName: 'issue_refund', input: {} },
+          },
+          {
+            requestId: 'req_b',
+            prompt: 'Approve refund B?',
+            action: { callId: callIdB, kind: 'tool-call', toolName: 'issue_refund', input: {} },
+          },
+        ],
+        sequence: 2,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 3, turnId: TURN_ID },
+    }, ctx)
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: {
+        result: {
+          callId: callIdB,
+          kind: 'tool-result',
+          toolName: 'issue_refund',
+          output: { refundId: 'rfnd_b' },
+        },
+        sequence: 4,
+        stepIndex: 0,
+        status: 'completed',
+        turnId: TURN_ID_1,
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 5, turnId: TURN_ID_1 },
+    }, ctx)
+
+    events['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 2, turnId: 'turn_2' },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: {
+        result: {
+          callId: callIdA,
+          kind: 'tool-result',
+          toolName: 'issue_refund',
+          output: { refundId: 'rfnd_a' },
+        },
+        sequence: 6,
+        stepIndex: 0,
+        status: 'completed',
+        turnId: 'turn_2',
+      },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 7, turnId: 'turn_2' },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 3)
+    const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+    const thirdTurn = findEventViaDrain(spies.drain, e => e.path?.includes('turn_2'))
+
+    expect(secondTurn?.approval).toMatchObject({ status: 'approved', tool: 'issue_refund' })
+    expect(secondTurn?.ai?.tools?.[0]?.success).toBe(true)
+    expect(thirdTurn?.approval).toMatchObject({ status: 'approved', tool: 'issue_refund' })
+    expect(thirdTurn?.ai?.tools?.[0]?.success).toBe(true)
+  })
+
   it('tracks session turn count and phase across approval turns', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })

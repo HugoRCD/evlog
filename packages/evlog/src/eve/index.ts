@@ -425,12 +425,14 @@ function getSessionPendingActions(sessionId: string): Map<string, PendingAction>
 function trackPendingAction(
   sessionId: string,
   turnId: string,
-  callId: string,
-  toolName: string,
-  startedAt = Date.now(),
+  action: { callId: string, toolName: string, startedAt?: number },
 ): void {
   touchSession(sessionId)
-  getSessionPendingActions(sessionId).set(callId, { toolName, startedAt, turnId })
+  getSessionPendingActions(sessionId).set(action.callId, {
+    toolName: action.toolName,
+    startedAt: action.startedAt ?? Date.now(),
+    turnId,
+  })
 }
 
 function resolveToolDurationMs(
@@ -458,7 +460,7 @@ function consumeSessionApproval(
   const list = sessionApprovals().get(sessionId)
   if (!list?.length) return undefined
   const index = list.findIndex(approval =>
-    (callId ? approval.callId === callId : false) || approval.toolName === toolName,
+    callId ? approval.callId === callId : approval.toolName === toolName,
   )
   if (index === -1) return undefined
   const [approval] = list.splice(index, 1)
@@ -707,13 +709,11 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           const startedAt = Date.now()
           for (const action of event.data.actions) {
             if (action.kind === 'tool-call') {
-              trackPendingAction(
-                ctx.session.id,
-                event.data.turnId,
-                action.callId,
-                action.toolName,
+              trackPendingAction(ctx.session.id, event.data.turnId, {
+                callId: action.callId,
+                toolName: action.toolName,
                 startedAt,
-              )
+              })
             }
           }
         })
@@ -854,7 +854,7 @@ export function detachActiveTurnLoggerForTests(): void {
   if (logger) unbindTurnLogger(logger)
 }
 
-/** @internal Resets module state between unit tests. */
+/** @internal Resets module state between unit tests. Clears turn maps, session context, and the Eve init flag. */
 export function resetEvlogEveForTests(): void {
   clearAsyncLocalStorage(turnLoggerStorage)
   turnStates().clear()
