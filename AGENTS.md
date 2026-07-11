@@ -6,8 +6,8 @@ TypeScript logging library focused on wide events and structured error handling.
 
 ```bash
 pnpm install                       # install deps
+pnpm run dev:prepare               # generate types (required before lint/typecheck after a fresh install)
 pnpm run dev                       # start playground
-pnpm run dev:prepare               # generate types
 pnpm run build:package             # build the package
 pnpm run test                      # run tests (vitest)
 pnpm run lint                      # lint all packages
@@ -17,6 +17,8 @@ cd packages/evlog && pnpm run release  # publish
 ```
 
 > Use `corepack enable` once so the `packageManager` field in `package.json` pins the right pnpm version automatically.
+>
+> After a clean `pnpm install`, run `pnpm run dev:prepare` before `pnpm run lint` / `typecheck`. Packages like `@evlog/nuxthub` extend generated `.nuxt/tsconfig.json` files; without prepare, turbo lint fails on missing extends.
 
 ## Monorepo Structure
 
