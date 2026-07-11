@@ -119,11 +119,7 @@ A task is complete when **all** of the following pass:
 
 ### Nuxt auto-import types
 
-Nuxt/Nitro resolve `typeFrom` to a filesystem path and strip the extension. Our dts build emits `.d.mts` (`fixedExtension: true`); TypeScript bundler resolution does **not** load `.d.mts` for extensionless paths, so generated `typeof import('.../dist/index').useLogger` becomes `any`.
-
-Always:
-- Set `typeFrom: 'evlog'` / `'evlog/client'` on `addImports` / `addServerImports` (keeps bare specifiers when Nuxt recognizes the dependency)
-- Run `scripts/mirror-dts.mjs` after `tsdown` so sibling `.d.ts` files exist for extensionless resolution
+When registering Nuxt/Nitro auto-imports from resolved `dist/` paths, always set `typeFrom: 'evlog'` (server) or `typeFrom: 'evlog/client'` (client). Without it, generated `typeof import('.../dist/...').useLogger` resolves as `any`. With `typeFrom`, Nuxt emits `typeof import('evlog').useLogger`, which types correctly via package exports.
 
 ## Boundaries
 
