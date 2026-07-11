@@ -420,26 +420,32 @@ export default defineNuxtModule<ModuleOptions>({
       {
         name: 'log',
         from: resolver.resolve('../runtime/client/log'),
+        typeFrom: 'evlog/client',
       },
       {
         name: 'setIdentity',
         from: resolver.resolve('../runtime/client/log'),
+        typeFrom: 'evlog/client',
       },
       {
         name: 'clearIdentity',
         from: resolver.resolve('../runtime/client/log'),
+        typeFrom: 'evlog/client',
       },
       {
         name: 'setMinLevel',
         from: resolver.resolve('../runtime/client/log'),
+        typeFrom: 'evlog/client',
       },
       {
         name: 'createEvlogError',
         from: resolver.resolve('../error'),
+        typeFrom: 'evlog',
       },
       {
         name: 'parseError',
         from: resolver.resolve('../runtime/utils/parseError'),
+        typeFrom: 'evlog',
       },
     ])
 
@@ -447,14 +453,17 @@ export default defineNuxtModule<ModuleOptions>({
       {
         name: 'useLogger',
         from: resolver.resolve('../runtime/server/useLogger'),
+        typeFrom: 'evlog',
       },
       {
         name: 'log',
         from: resolver.resolve('../logger'),
+        typeFrom: 'evlog',
       },
       {
         name: 'createEvlogError',
         from: resolver.resolve('../error'),
+        typeFrom: 'evlog',
       },
     ])
 

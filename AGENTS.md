@@ -117,6 +117,14 @@ A task is complete when **all** of the following pass:
 6. If adapter/enricher/integration: the matching `.agents/skills/create-*/SKILL.md` was followed
 7. A changeset is included for any user-facing change (`pnpm changeset`)
 
+### Nuxt auto-import types
+
+Nuxt/Nitro resolve `typeFrom` to a filesystem path and strip the extension. Our dts build emits `.d.mts` (`fixedExtension: true`); TypeScript bundler resolution does **not** load `.d.mts` for extensionless paths, so generated `typeof import('.../dist/index').useLogger` becomes `any`.
+
+Always:
+- Set `typeFrom: 'evlog'` / `'evlog/client'` on `addImports` / `addServerImports` (keeps bare specifiers when Nuxt recognizes the dependency)
+- Run `scripts/mirror-dts.mjs` after `tsdown` so sibling `.d.ts` files exist for extensionless resolution
+
 ## Boundaries
 
 **Always do:**

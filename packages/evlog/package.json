@@ -364,9 +364,9 @@
     "README.md"
   ],
   "scripts": {
-    "build": "tsdown",
+    "build": "tsdown && node ./scripts/mirror-dts.mjs",
     "dev": "tsdown --watch",
-    "dev:prepare": "tsdown",
+    "dev:prepare": "tsdown && node ./scripts/mirror-dts.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "bench": "vitest bench bench/core/ && cp bench/results.json bench/baseline/bench.json && tsx bench/scripts/report.ts",
