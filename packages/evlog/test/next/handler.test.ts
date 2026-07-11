@@ -150,6 +150,35 @@ describe('withEvlog', () => {
     expect(drainCtx.request.path).toBe('/api/test')
   })
 
+  it('applies createEvlog redact.paths to the main request event (#408)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({
+      pretty: false,
+      redact: {
+        builtins: false,
+        paths: ['secret'],
+      },
+      drain: drainMock,
+    })
+
+    const handler = withEvlog((_: Request) => {
+      const logger = defined(evlogStorage.getStore(), 'request logger')
+      logger.set({ secret: 'must-not-leak' })
+      return new Response('ok')
+    })
+
+    await handler(new Request('http://localhost/api/redaction', { method: 'POST' }))
+
+    expect(drainMock).toHaveBeenCalledTimes(1)
+    const [[drainCtx]] = drainMock.mock.calls
+    expect(drainCtx.event.secret).toBe('[REDACTED]')
+
+    expect(consoleSpy).toHaveBeenCalled()
+    const [[output]] = consoleSpy.mock.calls
+    const parsed = JSON.parse(output)
+    expect(parsed.secret).toBe('[REDACTED]')
+  })
+
   it('calls enrich callback before drain', async () => {
     const callOrder: string[] = []
     const withEvlog = createWithEvlog({
