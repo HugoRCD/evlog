@@ -117,10 +117,6 @@ A task is complete when **all** of the following pass:
 6. If adapter/enricher/integration: the matching `.agents/skills/create-*/SKILL.md` was followed
 7. A changeset is included for any user-facing change (`pnpm changeset`)
 
-### Nuxt auto-import types
-
-When registering Nuxt/Nitro auto-imports from resolved `dist/` paths, always set `typeFrom: 'evlog'` (server) or `typeFrom: 'evlog/client'` (client). Without it, generated `typeof import('.../dist/...').useLogger` resolves as `any`. With `typeFrom`, Nuxt emits `typeof import('evlog').useLogger`, which types correctly via package exports.
-
 ## Boundaries
 
 **Always do:**
