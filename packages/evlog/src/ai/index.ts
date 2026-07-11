@@ -204,12 +204,15 @@ export interface AILogger {
    * Also works with pre-wrapped models (e.g. from supermemory, guardrails):
    * `ai.wrap(withSupermemory(base, orgId))` composes correctly.
    *
-   * @example
+   * @example Gateway model string
    * ```ts
    * const ai = createAILogger(log)
    * const model = ai.wrap('anthropic/claude-sonnet-4.6')
+   * ```
    *
-   * // Also accepts a model object (V3 or V4)
+   * @example Provider model object (V3 or V4)
+   * ```ts
+   * const ai = createAILogger(log)
    * const model = ai.wrap(anthropic('claude-sonnet-4.6'))
    * ```
    */
