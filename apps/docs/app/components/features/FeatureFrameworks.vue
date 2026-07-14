@@ -13,7 +13,6 @@ const activeTab = ref(0)
 const frameworkRows = [
   [
     { name: 'Nuxt', icon: 'i-simple-icons-nuxtdotjs', tab: 0 },
-    { name: 'Script', icon: 'i-lucide-terminal', tab: 12 },
     { name: 'Next.js', icon: 'i-simple-icons-nextdotjs', tab: 1 },
     { name: 'SvelteKit', icon: 'i-simple-icons-svelte', tab: 2 },
     { name: 'Nitro', icon: 'i-custom-nitro', tab: 3 },
@@ -28,6 +27,7 @@ const frameworkRows = [
     { name: 'Elysia', icon: 'i-custom-elysia', tab: 10 },
     { name: 'oRPC', icon: 'i-lucide-network', tab: 13 },
     { name: 'Cloudflare', icon: 'i-simple-icons-cloudflare', tab: 11 },
+    { name: 'Script', icon: 'i-lucide-terminal', tab: 12 },
     { name: 'Vite', icon: 'i-custom-vite', link: '/reference/vite-plugin' },
   ],
 ]
