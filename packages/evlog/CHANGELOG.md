@@ -1,5 +1,17 @@
 # evlog
 
+## 2.21.0
+
+### Minor Changes
+
+- [#410](https://github.com/HugoRCD/evlog/pull/410) [`30208db`](https://github.com/HugoRCD/evlog/commit/30208db84348e78ec3150cc6bfdf01a7557fd277) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add AI SDK v7 `LanguageModelV4` wrap/middleware support in `evlog/ai`. `createAILogger().wrap()` and `createAIMiddleware()` now use V4-native middleware (`specificationVersion: 'v4'`) while still accepting V3 models (AI SDK upgrades them via `wrapLanguageModel`). `wrap()` is typed against `LanguageModel` from `ai`, so V3, V4, and gateway model strings all type-check on AI SDK v7.
+
+### Patch Changes
+
+- [#409](https://github.com/HugoRCD/evlog/pull/409) [`0fc4e80`](https://github.com/HugoRCD/evlog/commit/0fc4e8080c2b1e1f7da9329de191e1f3ac77ca72) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix `createEvlog({ redact })` / `withEvlog` so custom `redact` rules apply to the main Next.js request wide event (console output and drain), not only forked child events.
+
+- [#412](https://github.com/HugoRCD/evlog/pull/412) [`b4d4baf`](https://github.com/HugoRCD/evlog/commit/b4d4baf840e707f4b09d31cb51d6e9a7fb483e45) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix Nuxt auto-import types for `useLogger`, `log`, `parseError`, and related helpers. The Nuxt module now ships explicit type templates that resolve through `evlog` / `evlog/client` package exports instead of Nitro's extensionless `dist/` paths, which typed as `any`.
+
 ## 2.20.0
 
 ### Minor Changes
