@@ -175,7 +175,7 @@ exports[`telemetry notice > matches snapshot without ANSI colors 1`] = `
   evlog telemetry — anonymous usage enabled
   │ status  my-tool telemetry status
   │ opt-out my-tool telemetry disable
-  │ docs    evlog.dev › telemetry (https://evlog.dev/use-cases/telemetry/overview)
+  │ docs    evlog.dev › telemetry (https://evlog.dev/use-cases/telemetry)
 
 "
 `;

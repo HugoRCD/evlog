@@ -8,7 +8,7 @@
 [![npm downloads](https://img.shields.io/npm/dm/@evlog/telemetry?color=black)](https://npm.chart.dev/@evlog/telemetry)
 [![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
-[![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev/use-cases/telemetry/overview)
+[![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev/use-cases/telemetry)
 [![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
 **Digging through logs is not observability. It's hope.**
@@ -63,10 +63,10 @@ const main = withTelemetry(
 runMain(main)
 ```
 
-Scripts and GitHub Actions: `createTelemetry()` / `createGitHubActionsTelemetry()` — see the [docs](https://evlog.dev/use-cases/telemetry/overview).
+Scripts and GitHub Actions: `createTelemetry()` / `createGitHubActionsTelemetry()` — see the [docs](https://evlog.dev/use-cases/telemetry).
 
 ## Docs
 
-Full guide: [evlog.dev — Tool telemetry](https://evlog.dev/use-cases/telemetry/overview)
+Full guide: [evlog.dev — Tool telemetry](https://evlog.dev/use-cases/telemetry)
 
 Example playground: [`examples/telemetry-playground`](../../examples/telemetry-playground) in the evlog monorepo.

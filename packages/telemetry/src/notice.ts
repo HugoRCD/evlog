@@ -2,7 +2,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { getTelemetryDir } from './paths'
 
-const DOCS_URL = 'https://evlog.dev/use-cases/telemetry/overview'
+const DOCS_URL = 'https://evlog.dev/use-cases/telemetry'
 const DOCS_LABEL = 'evlog.dev › telemetry'
 
 const c = {
