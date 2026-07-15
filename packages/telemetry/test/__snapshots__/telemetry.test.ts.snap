@@ -1,0 +1,210 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`telemetry disclosure > matches snapshot for default envelope 1`] = `
+"# Telemetry disclosure — evlog-cli
+
+## Standard envelope (always collected)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| \`event\` | string | Always \`run\`. |
+| \`command\` | string | Command name, auto-captured from citty. |
+| \`durationMs\` | number | Run duration in milliseconds. |
+| \`outcome\` | string | \`success\` or \`error\`. |
+| \`errorCode\` | string | From typed CLI errors when present. |
+| \`flags\` | object | Parsed flags — booleans/numbers as values, strings as presence unless allowlisted. |
+| \`tool.name\` | string | Tool name declared at setup. |
+| \`tool.version\` | string | Tool version declared at setup. |
+| \`env.node\` | string | Node.js version. |
+| \`env.ci\` | boolean | Whether running in CI. |
+| \`env.provider\` | string | null | CI provider when detected. |
+| \`env.tty\` | boolean | Whether stdout is a TTY. |
+| \`env.agent\` | string | null | AI coding agent when detected (claude, cursor, codex, …). |
+| \`machineId\` | string | Hashed anonymous machine id; omitted in ephemeral CI. |
+| \`custom\` | object | Consumer-provided fields via telemetry.set() — numbers/booleans by default. |
+
+## Opt out
+
+- \`DO_NOT_TRACK=1\`
+- \`EVLOG_TELEMETRY=0\`
+- \`evlog telemetry disable\` (persisted preference)
+
+## Debug
+
+Set \`EVLOG_TELEMETRY_DEBUG=1\` to print would-be payloads to stderr."
+`;
+
+exports[`telemetry disclosure > matches snapshot with collect extensions 1`] = `
+{
+  "extensions": {
+    "fields": {
+      "framework": [
+        "nuxt",
+        "next",
+      ],
+    },
+    "flags": {
+      "format": [
+        "json",
+        "csv",
+      ],
+    },
+  },
+  "markdown": "# Telemetry disclosure — evlog-cli
+
+## Standard envelope (always collected)
+
+| Field | Type | Description |
+| --- | --- | --- |
+| \`event\` | string | Always \`run\`. |
+| \`command\` | string | Command name, auto-captured from citty. |
+| \`durationMs\` | number | Run duration in milliseconds. |
+| \`outcome\` | string | \`success\` or \`error\`. |
+| \`errorCode\` | string | From typed CLI errors when present. |
+| \`flags\` | object | Parsed flags — booleans/numbers as values, strings as presence unless allowlisted. |
+| \`tool.name\` | string | Tool name declared at setup. |
+| \`tool.version\` | string | Tool version declared at setup. |
+| \`env.node\` | string | Node.js version. |
+| \`env.ci\` | boolean | Whether running in CI. |
+| \`env.provider\` | string | null | CI provider when detected. |
+| \`env.tty\` | boolean | Whether stdout is a TTY. |
+| \`env.agent\` | string | null | AI coding agent when detected (claude, cursor, codex, …). |
+| \`machineId\` | string | Hashed anonymous machine id; omitted in ephemeral CI. |
+| \`custom\` | object | Consumer-provided fields via telemetry.set() — numbers/booleans by default. |
+
+## Allowlisted flag values
+
+- \`--format\`: \`json\`, \`csv\`
+
+## Allowlisted custom fields
+
+- \`framework\`: \`nuxt\`, \`next\`
+
+## Opt out
+
+- \`DO_NOT_TRACK=1\`
+- \`EVLOG_TELEMETRY=0\`
+- \`evlog telemetry disable\` (persisted preference)
+
+## Debug
+
+Set \`EVLOG_TELEMETRY_DEBUG=1\` to print would-be payloads to stderr.",
+  "standard": [
+    {
+      "description": "Always \`run\`.",
+      "field": "event",
+      "type": "string",
+    },
+    {
+      "description": "Command name, auto-captured from citty.",
+      "field": "command",
+      "type": "string",
+    },
+    {
+      "description": "Run duration in milliseconds.",
+      "field": "durationMs",
+      "type": "number",
+    },
+    {
+      "description": "\`success\` or \`error\`.",
+      "field": "outcome",
+      "type": "string",
+    },
+    {
+      "description": "From typed CLI errors when present.",
+      "field": "errorCode",
+      "type": "string",
+    },
+    {
+      "description": "Parsed flags — booleans/numbers as values, strings as presence unless allowlisted.",
+      "field": "flags",
+      "type": "object",
+    },
+    {
+      "description": "Tool name declared at setup.",
+      "field": "tool.name",
+      "type": "string",
+    },
+    {
+      "description": "Tool version declared at setup.",
+      "field": "tool.version",
+      "type": "string",
+    },
+    {
+      "description": "Node.js version.",
+      "field": "env.node",
+      "type": "string",
+    },
+    {
+      "description": "Whether running in CI.",
+      "field": "env.ci",
+      "type": "boolean",
+    },
+    {
+      "description": "CI provider when detected.",
+      "field": "env.provider",
+      "type": "string | null",
+    },
+    {
+      "description": "Whether stdout is a TTY.",
+      "field": "env.tty",
+      "type": "boolean",
+    },
+    {
+      "description": "AI coding agent when detected (claude, cursor, codex, …).",
+      "field": "env.agent",
+      "type": "string | null",
+    },
+    {
+      "description": "Hashed anonymous machine id; omitted in ephemeral CI.",
+      "field": "machineId",
+      "type": "string",
+    },
+    {
+      "description": "Consumer-provided fields via telemetry.set() — numbers/booleans by default.",
+      "field": "custom",
+      "type": "object",
+    },
+  ],
+  "version": 1,
+}
+`;
+
+exports[`telemetry notice > matches snapshot without ANSI colors 1`] = `
+"
+  evlog telemetry — anonymous usage enabled
+  │ status  my-tool telemetry status
+  │ opt-out my-tool telemetry disable
+  │ docs    evlog.dev › telemetry (https://evlog.dev/use-cases/telemetry/overview)
+
+"
+`;
+
+exports[`telemetry payload snapshot > matches enriched run event shape 1`] = `
+{
+  "command": "doctor",
+  "custom": {
+    "checksFailed": 0,
+  },
+  "durationMs": 42,
+  "env": {
+    "agent": null,
+    "ci": false,
+    "node": "20.11",
+    "provider": null,
+    "tty": true,
+  },
+  "event": "run",
+  "flags": {
+    "json": true,
+  },
+  "idempotencyKey": "d83e92e8aa2186d25a139b8ea34b02cc",
+  "machineId": "ab3f0123456789ab",
+  "outcome": "success",
+  "timestamp": "2026-07-14T12:00:00.000Z",
+  "tool": {
+    "name": "evlog-cli",
+    "version": "0.1.0",
+  },
+}
+`;

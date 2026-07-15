@@ -1,0 +1,16 @@
+{
+  "name": "evlog-telemetry-playground-example",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "cli": "tsx cli.ts",
+    "smoke": "tsx smoke.ts"
+  },
+  "dependencies": {
+    "citty": "^0.1.6",
+    "@evlog/telemetry": "workspace:*"
+  },
+  "devDependencies": {
+    "tsx": "^4.20.7"
+  }
+}

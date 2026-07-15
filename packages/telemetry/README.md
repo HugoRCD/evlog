@@ -1,0 +1,72 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/HugoRCD/evlog/main/assets/evlog-banner.gif" width="100%" alt="evlog — Digging through logs is not observability. It's hope" />
+</p>
+
+# @evlog/telemetry
+
+[![npm version](https://img.shields.io/npm/v/@evlog/telemetry?color=black)](https://npmjs.com/package/@evlog/telemetry)
+[![npm downloads](https://img.shields.io/npm/dm/@evlog/telemetry?color=black)](https://npm.chart.dev/@evlog/telemetry)
+[![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
+[![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev/use-cases/telemetry/overview)
+[![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
+
+**Digging through logs is not observability. It's hope.**
+
+**Wide-event telemetry for CLIs and automation** — the same one-event-per-run model as [evlog](https://evlog.dev), built for tools that run on someone else's machine.
+
+Ship usage insight without shipping a analytics SDK: wrap your [citty](https://github.com/unjs/citty) command tree (or call `createTelemetry()` in scripts) and get **one structured event per command** — command name, sanitized flags, duration, outcome, and optional counters via `telemetry.set()`.
+
+## Why evlog telemetry
+
+| Problem | How this package solves it |
+| --- | --- |
+| Per-command analytics boilerplate | `withTelemetry()` walks your citty tree — one event per `run` handler |
+| Leaking paths, tokens, or raw `argv` | Privacy by shape: booleans/numbers captured, strings presence-only unless allowlisted |
+| Short-lived CI runs losing data | Disk-buffered NDJSON outbox drains on the next invocation |
+| Disclosure drift | `generateDisclosure()` derives markdown + JSON from your runtime config |
+| Telemetry breaking the host tool | Never throws, never blocks exit; `flush()` hard-capped at 500ms |
+
+Opt-out is first-class: `DO_NOT_TRACK`, `EVLOG_TELEMETRY=0`, or a persisted `telemetry disable` that purges undelivered data.
+
+## Install
+
+```bash
+pnpm add @evlog/telemetry
+```
+
+## Quick start (citty)
+
+```ts
+import { defineCommand, runMain } from 'citty'
+import { withTelemetry, defineTelemetryCommands, telemetry } from '@evlog/telemetry'
+
+const TOOL = 'my-tool'
+const VERSION = '1.0.0'
+
+const main = withTelemetry(
+  defineCommand({
+    meta: { name: TOOL, version: VERSION },
+    subCommands: {
+      doctor: {
+        meta: { name: 'doctor' },
+        run() {
+          telemetry.set({ checksFailed: 0 })
+        },
+      },
+      telemetry: defineTelemetryCommands({ name: TOOL }),
+    },
+  }),
+  { name: TOOL, version: VERSION },
+)
+
+runMain(main)
+```
+
+Scripts and GitHub Actions: `createTelemetry()` / `createGitHubActionsTelemetry()` — see the [docs](https://evlog.dev/use-cases/telemetry/overview).
+
+## Docs
+
+Full guide: [evlog.dev — Tool telemetry](https://evlog.dev/use-cases/telemetry/overview)
+
+Example playground: [`examples/telemetry-playground`](../../examples/telemetry-playground) in the evlog monorepo.

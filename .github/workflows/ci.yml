@@ -109,4 +109,4 @@ jobs:
       - name: Build package
         run: pnpm run build:package
       - name: Publish
-        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub'
+        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/telemetry'
