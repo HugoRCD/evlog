@@ -15,7 +15,7 @@ import { createTelemetry, generateDisclosure, telemetry } from '@evlog/telemetry
 const TOOL = 'evlog-telemetry-playground'
 
 function outboxPath(): string {
-  const base = process.env.XDG_CONFIG_HOME ?? join(homedir(), '.config')
+  const base = process.env.XDG_CONFIG_HOME || join(homedir(), '.config')
   return join(base, TOOL, 'telemetry', 'outbox.ndjson')
 }
 

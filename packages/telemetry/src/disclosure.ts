@@ -18,6 +18,7 @@ const STANDARD_FIELDS: Array<{ field: string, type: string, description: string 
   { field: 'custom', type: 'object', description: 'Consumer-provided fields via telemetry.set() — numbers/booleans by default.' },
 ]
 
+/** Machine-readable disclosure schema plus rendered markdown for docs/CLI. */
 export interface DisclosureDocument {
   version: 1
   standard: typeof STANDARD_FIELDS

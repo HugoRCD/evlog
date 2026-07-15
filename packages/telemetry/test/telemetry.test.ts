@@ -3,12 +3,18 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resolveConsent, purgeOutbox } from '../src/consent'
-import { sanitizeFlags, sanitizeCustom } from '../src/sanitize'
+import { sanitizeFlags, sanitizeCustom, sanitizeSystemCustom } from '../src/sanitize'
 import { computeRunIdempotencyKey } from '../src/idempotency'
 import { generateDisclosure, exampleRunEvent } from '../src/disclosure'
 import { TelemetryOutbox } from '../src/outbox'
 import { formatTelemetryNotice } from '../src/notice'
-import { createTelemetry, telemetry, _resetActiveTelemetryForTests } from '../src/create'
+import {
+  createTelemetry,
+  telemetry,
+  disableTelemetry,
+  enableTelemetry,
+  _resetActiveTelemetryForTests,
+} from '../src/create'
 
 const TOOL = 'evlog-test'
 
@@ -16,7 +22,8 @@ describe('telemetry consent', () => {
   const { env } = process
 
   beforeEach(() => {
-    process.env = { ...env, XDG_CONFIG_HOME: undefined }
+    process.env = { ...env }
+    delete process.env.XDG_CONFIG_HOME
     delete process.env.DO_NOT_TRACK
     delete process.env.EVLOG_TELEMETRY
   })
@@ -72,6 +79,19 @@ describe('telemetry sanitize', () => {
     )
     expect(out).toEqual({ framework: 'nuxt' })
   })
+
+  it('allowlists system-injected custom keys only', () => {
+    expect(sanitizeSystemCustom({
+      ghaAction: 'checkout',
+      ghaEvent: 'push',
+      secret: 'nope',
+    })).toEqual({ ghaAction: 'checkout', ghaEvent: 'push' })
+  })
+
+  it('truncates long system custom strings', () => {
+    const long = 'x'.repeat(200)
+    expect(sanitizeSystemCustom({ ghaAction: long }).ghaAction).toHaveLength(128)
+  })
 })
 
 describe('telemetry outbox', () => {
@@ -111,6 +131,57 @@ describe('telemetry outbox', () => {
     await purgeOutbox(TOOL)
     expect(await outbox.readAll()).toHaveLength(0)
   })
+
+  it('excludes expired events on read', async () => {
+    const dir = join(base, TOOL, 'telemetry')
+    await mkdir(dir, { recursive: true })
+    const stale = { event: exampleRunEvent({ idempotencyKey: 'stale' }), storedAt: Date.now() - 60_000 }
+    const fresh = { event: exampleRunEvent({ idempotencyKey: 'fresh' }), storedAt: Date.now() }
+    await writeFile(
+      join(dir, 'outbox.ndjson'),
+      `${JSON.stringify(stale) }\n${JSON.stringify(fresh) }\n`,
+    )
+    const outbox = new TelemetryOutbox({ toolName: TOOL, maxEventAgeMs: 30_000 })
+    const read = await outbox.readAll()
+    expect(read).toHaveLength(1)
+    expect(read[0]?.idempotencyKey).toBe('fresh')
+  })
+
+  it('serializes concurrent appends without corrupting the outbox', async () => {
+    const outbox = new TelemetryOutbox({ toolName: TOOL })
+    await Promise.all(
+      Array.from({ length: 20 }, (_, i) =>
+        outbox.append(exampleRunEvent({ idempotencyKey: `key-${i}` })),
+      ),
+    )
+    const read = await outbox.readAll()
+    expect(read).toHaveLength(20)
+    expect(new Set(read.map(e => e.idempotencyKey)).size).toBe(20)
+  })
+
+  it('recovers a stale lock from a dead pid', async () => {
+    const dir = join(base, TOOL, 'telemetry')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      join(dir, 'outbox.lock'),
+      JSON.stringify({ pid: 99_999_999, acquiredAt: Date.now() }),
+    )
+    const outbox = new TelemetryOutbox({ toolName: TOOL })
+    await outbox.append(exampleRunEvent({ idempotencyKey: 'recovered' }))
+    expect(await outbox.readAll()).toHaveLength(1)
+  })
+
+  it('recovers a stale lock by age', async () => {
+    const dir = join(base, TOOL, 'telemetry')
+    await mkdir(dir, { recursive: true })
+    await writeFile(
+      join(dir, 'outbox.lock'),
+      JSON.stringify({ pid: process.pid, acquiredAt: Date.now() - 60_000 }),
+    )
+    const outbox = new TelemetryOutbox({ toolName: TOOL, lockStaleMs: 30_000 })
+    await outbox.append(exampleRunEvent({ idempotencyKey: 'aged-out' }))
+    expect(await outbox.readAll()).toHaveLength(1)
+  })
 })
 
 describe('telemetry flush', () => {
@@ -149,6 +220,28 @@ describe('telemetry flush', () => {
     const outbox = new TelemetryOutbox({ toolName: TOOL })
     const events = await outbox.readAll()
     expect(events[0]?.custom).toEqual({ checksFailed: 2, ok: true })
+  })
+
+  it('stops recording after disableTelemetry on the active instance', async () => {
+    const instance = createTelemetry({ name: TOOL, version: '0.0.0' })
+    await instance.run('before', () => undefined)
+    await disableTelemetry(TOOL)
+    expect(instance.enabled).toBe(false)
+    await instance.run('after', () => undefined)
+    const outbox = new TelemetryOutbox({ toolName: TOOL })
+    expect(await outbox.readAll()).toHaveLength(0)
+  })
+
+  it('resumes recording after enableTelemetry on the active instance', async () => {
+    const instance = createTelemetry({ name: TOOL, version: '0.0.0' })
+    await disableTelemetry(TOOL)
+    await enableTelemetry(TOOL)
+    expect(instance.enabled).toBe(true)
+    await instance.run('again', () => undefined)
+    const outbox = new TelemetryOutbox({ toolName: TOOL })
+    const events = await outbox.readAll()
+    expect(events).toHaveLength(1)
+    expect(events[0]?.command).toBe('again')
   })
 })
 

@@ -12,7 +12,7 @@ import {
 import { buildEnvInfo, resolveMachineId } from './enrich'
 import { computeRunIdempotencyKey } from './idempotency'
 import { TelemetryOutbox } from './outbox'
-import { sanitizeCustom, sanitizeFlags } from './sanitize'
+import { sanitizeCustom, sanitizeFlags, sanitizeSystemCustom } from './sanitize'
 import { getRunContext, runWithContext } from './storage'
 import type {
   CollectFields,
@@ -34,8 +34,8 @@ function isCliError(err: unknown): err is TelemetryCliError {
 }
 
 class InternalTelemetry implements TelemetryHandle {
-  readonly enabled: boolean
-  private readonly options: TelemetryOptions
+  private _enabled: boolean
+  readonly options: TelemetryOptions
   private readonly outbox: TelemetryOutbox
   private readonly drain: TelemetryDrain
   private machineId?: string
@@ -43,7 +43,7 @@ class InternalTelemetry implements TelemetryHandle {
 
   constructor(options: TelemetryOptions, enabled: boolean) {
     this.options = options
-    this.enabled = enabled
+    this._enabled = enabled
     this.outbox = new TelemetryOutbox({
       toolName: options.name,
       maxBufferBytes: options.maxBufferBytes,
@@ -57,8 +57,17 @@ class InternalTelemetry implements TelemetryHandle {
     this.drain = composeDrains(...drains)
   }
 
+  get enabled(): boolean {
+    return this._enabled
+  }
+
+  /** @internal Update runtime consent for the active instance. */
+  setEnabled(enabled: boolean): void {
+    this._enabled = enabled
+  }
+
   async init(): Promise<void> {
-    if (!this.enabled) return
+    if (!this._enabled) return
     this.machineId = await resolveMachineId(this.options.name)
     await this.flushBacklog()
   }
@@ -68,13 +77,13 @@ class InternalTelemetry implements TelemetryHandle {
     fn: () => T | Promise<T>,
     opts?: { flags?: Record<string, unknown>, systemCustom?: Record<string, string> },
   ): Promise<T> {
-    if (!this.enabled) return fn()
+    if (!this._enabled) return fn()
 
     await this.maybeShowNotice()
     const started = Date.now()
     const timestamp = new Date().toISOString()
     const ctx = {
-      custom: { ...(opts?.systemCustom ?? {}) } as Record<string, boolean | number | string>,
+      custom: sanitizeSystemCustom(opts?.systemCustom) as Record<string, boolean | number | string>,
       collect: this.options.collect,
     }
     let outcome: RunOutcome = 'success'
@@ -102,7 +111,7 @@ class InternalTelemetry implements TelemetryHandle {
   }
 
   async flush(): Promise<void> {
-    if (!this.enabled) return
+    if (!this._enabled) return
     const timeoutMs = this.options.flushTimeoutMs ?? 500
     try {
       await Promise.race([
@@ -212,6 +221,9 @@ export const telemetry = {
 
 /** Disable telemetry and purge the local outbox. */
 export async function disableTelemetry(toolName: string): Promise<void> {
+  if (activeHandle?.options.name === toolName) {
+    activeHandle.setEnabled(false)
+  }
   await writePreference(toolName, 'disabled')
   await purgeOutbox(toolName)
 }
@@ -219,6 +231,10 @@ export async function disableTelemetry(toolName: string): Promise<void> {
 /** Enable telemetry (persisted preference). */
 export async function enableTelemetry(toolName: string): Promise<void> {
   await writePreference(toolName, 'enabled')
+  if (activeHandle?.options.name === toolName) {
+    activeHandle.setEnabled(true)
+    void activeHandle.init()
+  }
 }
 
 /** @internal Test hook */

@@ -1,8 +1,15 @@
 import { readFileSync } from 'node:fs'
-import { mkdir, writeFile, unlink } from 'node:fs/promises'
+import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getTelemetryDir } from './paths'
+import { TelemetryOutbox } from './outbox'
 
+/**
+ * Persisted telemetry consent state for a tool.
+ * - `unset` — no explicit choice; default consent applies.
+ * - `enabled` — user opted in via `telemetry enable`.
+ * - `disabled` — user opted out via `telemetry disable`.
+ */
 export type TelemetryPreference = 'enabled' | 'disabled' | 'unset'
 
 interface PreferenceFile {
@@ -43,9 +50,5 @@ export async function writePreference(toolName: string, preference: TelemetryPre
 
 /** Remove the outbox on opt-out (retroactive on undelivered data). */
 export async function purgeOutbox(toolName: string): Promise<void> {
-  try {
-    await unlink(join(getTelemetryDir(toolName), 'outbox.ndjson'))
-  } catch {
-    // absent is fine
-  }
+  await new TelemetryOutbox({ toolName }).purge()
 }

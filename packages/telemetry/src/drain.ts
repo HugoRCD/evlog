@@ -1,5 +1,9 @@
 import type { RunEvent } from './types'
 
+/**
+ * Drain function that attempts delivery for buffered run events.
+ * @returns `true` when at least one downstream sink reports successful delivery.
+ */
 export type TelemetryDrain = (events: RunEvent[]) => Promise<boolean>
 
 /** Resolve endpoint: env override → baked-in option → undefined (outbox-only). */

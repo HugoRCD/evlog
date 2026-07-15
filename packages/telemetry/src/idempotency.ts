@@ -19,8 +19,9 @@ function stableStringify(value: unknown, ancestors = new WeakSet<object>()): str
 
 function fnv1a32(input: string, seed: number): number {
   let h = seed >>> 0
-  for (let i = 0; i < input.length; i++) {
-    h ^= input.charCodeAt(i) & 0xff
+  const bytes = new TextEncoder().encode(input)
+  for (const byte of bytes) {
+    h ^= byte
     h = Math.imul(h, 0x01000193) >>> 0
   }
   return h >>> 0

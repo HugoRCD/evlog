@@ -1,4 +1,25 @@
-import type { CollectConfig } from './types'
+/** Allowlisted system-injected custom keys (e.g. GitHub Actions metadata). */
+const SYSTEM_CUSTOM_KEYS = new Set(['ghaAction', 'ghaEvent'])
+const MAX_SYSTEM_STRING_LEN = 128
+
+/**
+ * Sanitize framework-injected custom fields before they enter the event envelope.
+ * Only allowlisted keys pass through; values are truncated to a bounded length.
+ */
+export function sanitizeSystemCustom(
+  input: Record<string, string> | undefined,
+): Record<string, string> {
+  if (!input) return {}
+
+  const out: Record<string, string> = {}
+  for (const [key, value] of Object.entries(input)) {
+    if (!SYSTEM_CUSTOM_KEYS.has(key) || typeof value !== 'string') continue
+    const trimmed = value.trim()
+    if (!trimmed) continue
+    out[key] = trimmed.slice(0, MAX_SYSTEM_STRING_LEN)
+  }
+  return out
+}
 
 /**
  * Sanitize citty-parsed flags by shape — never reads raw argv.
