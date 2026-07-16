@@ -11,19 +11,19 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@comark/nuxt": "^0.3.1",
-    "@nuxt/content": "^3.13.0",
-    "@nuxt/ui": "^4.7.0",
-    "@nuxtjs/sitemap": "^8.0.14",
+    "@comark/nuxt": "^0.5.1",
+    "@nuxt/content": "^3.15.0",
+    "@nuxt/ui": "^4.9.0",
+    "@nuxtjs/sitemap": "^8.2.2",
     "@vercel/analytics": "^2.0.1",
-    "better-sqlite3": "^12.9.0",
+    "better-sqlite3": "^12.11.1",
     "nuxt": "^4.4.2",
-    "shiki": "4.0.2",
-    "tailwindcss": "^4.2.4"
+    "shiki": "4.3.1",
+    "tailwindcss": "^4.3.2"
   },
   "devDependencies": {
-    "eslint": "^9.39.4",
+    "eslint": "^9.39.5",
     "typescript": "^6.0.3",
-    "vue-tsc": "^3.2.7"
+    "vue-tsc": "^3.3.7"
   }
 }

@@ -17,15 +17,15 @@
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "better-sqlite3": "^12.9.0",
-    "docus": "^5.10.1",
-    "motion-v": "^2.2.1",
+    "better-sqlite3": "^12.11.1",
+    "docus": "^5.12.3",
+    "motion-v": "^2.3.0",
     "nuxt": "^4.4.4",
-    "nuxt-studio": "^1.6.1",
-    "satori": "^0.19.3",
-    "shaders": "^2.5.109"
+    "nuxt-studio": "^1.7.0",
+    "satori": "^0.28.0",
+    "shaders": "^2.5.135"
   },
   "devDependencies": {
-    "eslint": "^9.39.4"
+    "eslint": "^9.39.5"
   }
 }
