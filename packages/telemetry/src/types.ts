@@ -87,11 +87,18 @@ export interface TelemetryOptions<
   sampling?: number
 }
 
+type CustomFieldValue<T extends readonly string[] | undefined> =
+  T extends readonly (infer S extends string)[] ? boolean | number | S : boolean | number
+
 /**
  * Custom fields accepted by {@link telemetry.set} — numbers and booleans always;
  * strings only when declared in `collect.fields` (enforced at runtime).
  */
-export type CustomFields<TFields extends CollectFields = {}> = Record<string, boolean | number | undefined>
+export type CustomFields<TFields extends CollectFields = {}> = {
+  [K in string]: K extends keyof TFields
+    ? CustomFieldValue<TFields[K]>
+    : boolean | number | undefined
+}
 
 /** Error shape recognised for automatic `errorCode` capture. */
 export interface TelemetryCliError {
@@ -102,7 +109,10 @@ export interface TelemetryCliError {
 /**
  * Handle returned by {@link createTelemetry}.
  */
-export interface TelemetryHandle {
+export interface TelemetryHandle<
+  TFlags extends CollectFlags = {},
+  TFields extends CollectFields = {},
+> {
   /** Run an async unit of work as a single telemetry event. */
   run: <T>(
     command: string,
@@ -113,6 +123,11 @@ export interface TelemetryHandle {
   flush: () => Promise<void>
   /** Whether telemetry is active (consent granted). */
   enabled: boolean
+  /**
+   * Set custom fields for the active run.
+   * Prefer this over the ambient {@link telemetry.set} for allowlisted string autocomplete.
+   */
+  set: (fields: CustomFields<TFields>) => void
 }
 
 /** @internal Mutable run context stored in ALS during `run()`. */

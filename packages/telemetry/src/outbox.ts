@@ -186,15 +186,20 @@ export class TelemetryOutbox {
       }
     }
 
-    // oldest-first drop when still over budget
-    while (kept.length > 0) {
-      const body = kept.map(s => `${JSON.stringify(s) }\n`).join('')
-      if (Buffer.byteLength(body, 'utf-8') <= this.maxBytes) break
-      kept.shift()
+    const serialized = kept.map(s => `${JSON.stringify(s)}\n`)
+    let totalBytes = serialized.reduce(
+      (sum, line) => sum + Buffer.byteLength(line, 'utf-8'),
+      0,
+    )
+
+    let dropFrom = 0
+    while (dropFrom < serialized.length && totalBytes > this.maxBytes) {
+      totalBytes -= Buffer.byteLength(serialized[dropFrom]!, 'utf-8')
+      dropFrom++
     }
 
     const tmp = `${this.outboxPath}.tmp`
-    await writeFile(tmp, kept.map(s => `${JSON.stringify(s) }\n`).join(''), 'utf-8')
+    await writeFile(tmp, serialized.slice(dropFrom).join(''), 'utf-8')
     await rename(tmp, this.outboxPath)
   }
 

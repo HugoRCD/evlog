@@ -33,8 +33,8 @@ async function main() {
   try {
     const raw = await readFile(outbox, 'utf-8')
     lines = raw.trim().split('\n').filter(Boolean).length
-  } catch {
-    // opt-out or first run
+  } catch (err) {
+    if ((err as NodeJS.ErrnoException).code !== 'ENOENT') throw err
   }
 
   process.stderr.write(`\n[telemetry:smoke] outbox: ${outbox}\n`)

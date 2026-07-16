@@ -1,5 +1,6 @@
 import { describe, expectTypeOf, it } from 'vitest'
-import { telemetry } from '../src/create'
+import { createTelemetry, telemetry } from '../src/create'
+import type { CustomFields } from '../src/types'
 
 describe('telemetry.set typing', () => {
   it('accepts numbers and booleans without collect', () => {
@@ -9,5 +10,27 @@ describe('telemetry.set typing', () => {
   it('rejects undeclared string fields at compile time', () => {
     // @ts-expect-error framework requires collect.fields declaration
     expectTypeOf(telemetry.set).toBeCallableWith({ framework: 'nuxt' })
+  })
+
+  it('accepts allowlisted strings in CustomFields', () => {
+    type Fields = { framework: readonly ['nuxt', 'next'] }
+    expectTypeOf<CustomFields<Fields>>().toMatchTypeOf<{ framework: 'nuxt' }>()
+  })
+})
+
+describe('TelemetryHandle.set typing', () => {
+  it('accepts allowlisted strings from collect.fields', () => {
+    const handle = createTelemetry({
+      name: 'test',
+      version: '1.0.0',
+      collect: { fields: { framework: ['nuxt', 'next'] as const } },
+    })
+    expectTypeOf(handle.set).toBeCallableWith({ framework: 'nuxt', ok: true })
+  })
+
+  it('rejects undeclared string fields on the handle', () => {
+    const handle = createTelemetry({ name: 'test', version: '1.0.0' })
+    // @ts-expect-error framework requires collect.fields declaration
+    expectTypeOf(handle.set).toBeCallableWith({ framework: 'nuxt' })
   })
 })

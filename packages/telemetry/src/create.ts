@@ -27,21 +27,24 @@ import type {
 import { getTelemetryDir } from './paths'
 import { formatTelemetryNotice, isInteractiveTerminal, wasNoticeShown } from './notice'
 
-let activeHandle: InternalTelemetry | null = null
+let activeHandle: InternalTelemetry<any, any> | null = null
 
 function isCliError(err: unknown): err is TelemetryCliError {
   return typeof err === 'object' && err !== null && typeof (err as TelemetryCliError).code === 'string'
 }
 
-class InternalTelemetry implements TelemetryHandle {
+class InternalTelemetry<
+  TFlags extends CollectFlags = {},
+  TFields extends CollectFields = {},
+> implements TelemetryHandle<TFlags, TFields> {
   private _enabled: boolean
-  readonly options: TelemetryOptions
+  readonly options: TelemetryOptions<TFlags, TFields>
   private readonly outbox: TelemetryOutbox
   private readonly drain: TelemetryDrain
   private machineId?: string
   private noticeShown = false
 
-  constructor(options: TelemetryOptions, enabled: boolean) {
+  constructor(options: TelemetryOptions<TFlags, TFields>, enabled: boolean) {
     this.options = options
     this._enabled = enabled
     this.outbox = new TelemetryOutbox({
@@ -59,6 +62,16 @@ class InternalTelemetry implements TelemetryHandle {
 
   get enabled(): boolean {
     return this._enabled
+  }
+
+  set(fields: CustomFields<TFields>): void {
+    const ctx = getRunContext()
+    if (!ctx) return
+    ctx.custom = sanitizeCustom(
+      fields as Record<string, unknown>,
+      ctx.custom,
+      ctx.collect,
+    )
   }
 
   /** @internal Update runtime consent for the active instance. */
@@ -195,9 +208,9 @@ class InternalTelemetry implements TelemetryHandle {
 export function createTelemetry<
   TFlags extends CollectFlags = {},
   TFields extends CollectFields = {},
->(options: TelemetryOptions<TFlags, TFields>): TelemetryHandle {
+>(options: TelemetryOptions<TFlags, TFields>): TelemetryHandle<TFlags, TFields> {
   const enabled = resolveConsent(options.name)
-  const instance = new InternalTelemetry(options, enabled)
+  const instance = new InternalTelemetry<TFlags, TFields>(options, enabled)
   activeHandle = instance
   void instance.init()
   return instance
@@ -206,6 +219,8 @@ export function createTelemetry<
 /**
  * Ambient custom-field setter — works anywhere inside an active `run()` scope.
  * Accepts numbers and booleans by default; strings require `collect.fields`.
+ * Prefer {@link TelemetryHandle.set} on the handle returned by {@link createTelemetry}
+ * for allowlisted string autocomplete.
  */
 export const telemetry = {
   set(fields: CustomFields): void {
@@ -245,6 +260,6 @@ export function _resetActiveTelemetryForTests(): void {
 
 /** @internal Test hook */
 // eslint-disable-next-line @typescript-eslint/naming-convention
-export function _getActiveTelemetryForTests(): InternalTelemetry | null {
+export function _getActiveTelemetryForTests(): InternalTelemetry<any, any> | null {
   return activeHandle
 }

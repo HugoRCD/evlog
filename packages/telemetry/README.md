@@ -15,7 +15,7 @@
 
 **Wide-event telemetry for CLIs and automation** — the same one-event-per-run model as [evlog](https://evlog.dev), built for tools that run on someone else's machine.
 
-Ship usage insight without shipping a analytics SDK: wrap your [citty](https://github.com/unjs/citty) command tree (or call `createTelemetry()` in scripts) and get **one structured event per command** — command name, sanitized flags, duration, outcome, and optional counters via `telemetry.set()`.
+Ship usage insight without shipping an analytics SDK: wrap your [citty](https://github.com/unjs/citty) command tree (or call `createTelemetry()` in scripts) and get **one structured event per command** — command name, sanitized flags, duration, outcome, and optional counters via `telemetry.set()`.
 
 ## Why evlog telemetry
 

@@ -1,7 +1,10 @@
-import type { TelemetryHandle, TelemetryOptions } from './types'
+import type { CollectFields, CollectFlags, TelemetryHandle, TelemetryOptions } from './types'
 import { createTelemetry } from './create'
 
-export interface GitHubActionsTelemetryOptions extends TelemetryOptions {
+export interface GitHubActionsTelemetryOptions<
+  TFlags extends CollectFlags = {},
+  TFields extends CollectFields = {},
+> extends TelemetryOptions<TFlags, TFields> {
   /** Override detected action name. Defaults to `GITHUB_ACTION`. */
   actionName?: string
   /** Override detected event type. Defaults to `GITHUB_EVENT_NAME`. */
@@ -12,9 +15,12 @@ export interface GitHubActionsTelemetryOptions extends TelemetryOptions {
  * Thin helper for GitHub Actions — enriches with action metadata from env only.
  * Never reads repository content.
  */
-export function createGitHubActionsTelemetry(
-  options: GitHubActionsTelemetryOptions,
-): TelemetryHandle {
+export function createGitHubActionsTelemetry<
+  TFlags extends CollectFlags = {},
+  TFields extends CollectFields = {},
+>(
+  options: GitHubActionsTelemetryOptions<TFlags, TFields>,
+): TelemetryHandle<TFlags, TFields> {
   const base = createTelemetry(options)
   const action = options.actionName ?? process.env.GITHUB_ACTION ?? 'unknown'
   const eventType = options.eventType ?? process.env.GITHUB_EVENT_NAME ?? 'unknown'
