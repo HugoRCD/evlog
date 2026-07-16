@@ -55,6 +55,7 @@ scope.
 - stream (in-process stream + stream server)
 - sveltekit (SvelteKit integration)
 - tanstack-start (TanStack Start integration)
+- telemetry (`@evlog/telemetry` package)
 - vite (Vite plugin)
 - workers (Cloudflare Workers adapter)
 -->

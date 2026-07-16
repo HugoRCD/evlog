@@ -54,6 +54,7 @@ jobs:
             stream
             sveltekit
             tanstack-start
+            telemetry
             vite
             workers
           types: |
