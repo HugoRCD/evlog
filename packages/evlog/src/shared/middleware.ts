@@ -6,6 +6,7 @@ import { extractErrorStatus } from './errors'
 import type { EvlogPlugin, PluginRunner } from './plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './plugin'
 import { shouldLog, getServiceForPath } from './routes'
+import { extendDeferredDrain } from './deferred-drain'
 import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from './streamResponse'
 
 /**
@@ -32,6 +33,15 @@ export interface BaseEvlogOptions {
   redact?: boolean | RedactConfig
   /** Plugins for this middleware, merged with globally-registered ones. */
   plugins?: EvlogPlugin[]
+  /**
+   * Serverless runtime hook (Cloudflare Workers `ExecutionContext#waitUntil`,
+   * Vercel Edge `@vercel/functions`, …). When set, enrich still runs before the
+   * response returns but drain work is registered with `waitUntil` instead of
+   * being awaited — same behavior as `evlog/workers` and the Nitro plugin.
+   *
+   * Pass a bound method per request, e.g. `ctx.waitUntil.bind(ctx)`.
+   */
+  waitUntil?: (promise: Promise<unknown>) => void
 }
 
 /** Internal options accepted by `createMiddlewareLogger`. */
@@ -173,7 +183,12 @@ export async function runEnrichAndDrain(
     if (hasPluginDrain) {
       tasks.push(runner.runDrain(drainCtx))
     }
-    await Promise.all(tasks)
+    const drainPromise = Promise.all(tasks)
+    if (options.waitUntil) {
+      extendDeferredDrain(drainPromise, options.waitUntil)
+      return
+    }
+    await drainPromise
   }
 }
 
