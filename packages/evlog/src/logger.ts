@@ -360,6 +360,9 @@ function formatValue(value: unknown): string {
   if (value === null || value === undefined) {
     return String(value)
   }
+  if (Array.isArray(value)) {
+    return JSON.stringify(value)
+  }
   if (isPlainObject(value)) {
     const pairs: string[] = []
     for (const [k, v] of Object.entries(value)) {

@@ -1226,3 +1226,34 @@ describe('pretty-print tool input serialization', () => {
     expect(() => logger.emit()).not.toThrow()
   })
 })
+
+describe('pretty-print array field values', () => {
+  beforeEach(() => {
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    initLogger({ pretty: true })
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('serializes top-level array of objects as JSON instead of [object Object]', () => {
+    log.info({ action: 'demo', issues: [{ code: 'invalid_union', path: [], message: 'Invalid input' }] })
+
+    const logSpy = vi.mocked(console.log)
+    const output = logSpy.mock.calls.map(call => String(call[0])).join('\n')
+
+    expect(output).not.toContain('[object Object]')
+    expect(output).toContain('[{"code":"invalid_union","path":[],"message":"Invalid input"}]')
+  })
+
+  it('serializes array of strings', () => {
+    log.info({ action: 'test', tags: ['a', 'b', 'c'] })
+
+    const logSpy = vi.mocked(console.log)
+    const output = logSpy.mock.calls.map(call => String(call[0])).join('\n')
+
+    expect(output).not.toContain('[object Object]')
+    expect(output).toContain('["a","b","c"]')
+  })
+})
