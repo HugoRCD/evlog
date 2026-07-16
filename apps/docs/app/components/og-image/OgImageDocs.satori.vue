@@ -37,6 +37,8 @@ const titleShadowWrapped =
   '0 0 10px rgba(255,255,255,0.28), 0 0 28px rgba(255,255,255,0.12), 0 0 56px rgba(255,255,255,0.05)'
 
 const titleStyle = computed(() => {
+  const textShadow = titleLen.value <= 32 ? titleShadowSoft : titleShadowWrapped
+
   if (usePixelTitle.value) {
     return {
       fontFamily: 'Geist Pixel Line',
@@ -45,7 +47,7 @@ const titleStyle = computed(() => {
       lineHeight: 1.06,
       letterSpacing: '-0.02em',
       color: '#fafafa',
-      textShadow: titleShadowSoft,
+      textShadow,
     }
   }
   const n = titleLen.value
@@ -56,31 +58,9 @@ const titleStyle = computed(() => {
     lineHeight: 1.08,
     letterSpacing: '-0.03em',
     color: '#fafafa',
-    textShadow: titleShadowSoft,
+    textShadow,
   }
 })
-
-const titleBloomDuplicate = computed(() => titleLen.value <= 32)
-
-const titleStyleBloom = computed(() => {
-  const { textShadow: _textShadow, ...rest } = titleStyle.value
-  return {
-    ...rest,
-    color: 'rgba(255,255,255,0.92)',
-  }
-})
-
-const titleStyleFront = computed(() => ({
-  ...titleStyle.value,
-  textShadow:
-    '0 0 2px rgba(255,255,255,0.35), 0 0 14px rgba(255,255,255,0.08)',
-  position: 'relative' as const,
-}))
-
-const titleStyleNoDuplicate = computed(() => ({
-  ...titleStyle.value,
-  textShadow: titleShadowWrapped,
-}))
 
 const periodStyle = computed(() => {
   const key = usePixelTitle.value ? pixelTitleSize.value : titleStyle.value.fontSize
@@ -178,35 +158,9 @@ function truncate(str: string, max: number) {
 
         <div class="flex flex-row flex-wrap items-end gap-0 max-w-[1080px]">
           <div
-            v-if="titleBloomDuplicate"
-            class="flex flex-row items-end"
-            style="position: relative;"
-          >
-            <div
-              aria-hidden="true"
-              class="flex"
-              :class="{ 'font-pixel': usePixelTitle }"
-              :style="{
-                ...titleStyleBloom,
-                position: 'absolute',
-                left: '0',
-                top: '0',
-                filter: 'blur(11px)',
-                opacity: 0.42,
-                whiteSpace: 'nowrap',
-              }"
-            >
-              {{ titleText }}
-            </div>
-            <div class="flex" :class="{ 'font-pixel': usePixelTitle }" :style="titleStyleFront">
-              {{ titleText }}
-            </div>
-          </div>
-          <div
-            v-else
             class="flex max-w-[1000px]"
             :class="{ 'font-pixel': usePixelTitle }"
-            :style="titleStyleNoDuplicate"
+            :style="titleStyle"
           >
             {{ titleText }}
           </div>
@@ -229,7 +183,7 @@ function truncate(str: string, max: number) {
       </div>
 
       <div class="flex flex-col px-14 pb-11 pt-2 gap-3 shrink-0">
-        <div class="flex w-full h-px" style="background-color: rgba(255,255,255,0.1)" />
+        <div class="flex w-full h-px" style="background-color: rgba(255,255,255,0.10)" />
         <div class="flex flex-row justify-between items-center gap-8">
           <div
             class="flex text-[13px] tracking-[0.18em] font-semibold uppercase"

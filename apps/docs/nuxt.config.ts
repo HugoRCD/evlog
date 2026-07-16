@@ -3,8 +3,16 @@ import { redirects } from './config/redirects'
 export default defineNuxtConfig({
   extends: ['docus'],
 
+  experimental: {
+    appManifest: true,
+    emitRouteChunkError: 'automatic-immediate',
+    checkOutdatedBuildInterval: 60_000,
+  },
+
   routeRules: {
-    '/': { prerender: true },
+    '/': { prerender: true, headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
+    '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
+    '/**': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
     ...redirects,
   },
 
@@ -60,9 +68,8 @@ export default defineNuxtConfig({
     // the Vercel build rendering /_og/s/* routes, so keeping generated images avoids
     // rerendering unchanged docs pages on every deployment.
     buildCache: true,
-    // Custom OgImageDocs.satori.vue has complex shadow/blur effects that slow Satori down.
-    // 15s default makes some pages timeout during prerender, which means Vercel hits the
-    // zero-runtime route at runtime and returns 500 ("Not supported in zeroRuntime mode").
+    // Simplified OgImageDocs.satori.vue (text-shadow only) keeps prerender under timeout.
+    // Missing prerendered assets fall back to /og.png via server/middleware/01-og-fallback.ts.
     defaults: {
       // Satori cannot parse woff2 — keep woff2 in @nuxt/fonts for the browser, TTF here for OG images.
       fonts: [
@@ -109,9 +116,13 @@ export default defineNuxtConfig({
         'html',
         'js',
         'json',
+        'jsonc',
+        'jsonl',
+        'kusto',
         'md',
         'mdc',
         'shell',
+        'sql',
         'toml',
         'ts',
         'tsx',
