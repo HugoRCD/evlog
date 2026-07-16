@@ -240,6 +240,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "composeEnrichers",
     "composeKeep",
     "composePlugins",
+    "createLoggerStorage",
     "createMiddlewareLogger",
     "createPluginRunner",
     "defineDrain",

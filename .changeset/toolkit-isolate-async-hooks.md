@@ -1,10 +1,5 @@
 ---
-'evlog': major
+'evlog': minor
 ---
 
-Move `createLoggerStorage` to `evlog/toolkit/storage` so the main `evlog/toolkit` entry no longer imports `node:async_hooks`. Custom integrations that only need middleware helpers can run on Cloudflare Workers without `nodejs_compat`.
-
-```ts
-import { defineFrameworkIntegration } from 'evlog/toolkit'
-import { createLoggerStorage } from 'evlog/toolkit/storage'
-```
+Add `evlog/toolkit/storage` for `createLoggerStorage` so edge/Workers integrations can import ALS separately. The main `evlog/toolkit` barrel still re-exports it for compatibility; prefer `evlog/toolkit/storage` when you need to keep `node:async_hooks` out of bundles that do not tree-shake unused exports.

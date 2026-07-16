@@ -66,7 +66,7 @@ All integrations share the same core utilities. **Never reimplement logic that e
 | `extractSafeNodeHeaders` | `../shared/headers` | Convert Node.js `IncomingHttpHeaders` → filtered `Record<string, string>` (Express, Fastify, NestJS) |
 | `BaseEvlogOptions` | `../shared/middleware` | Base user-facing options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `plugins` |
 | `MiddlewareLoggerOptions` | `../shared/middleware` | Internal options type extending `BaseEvlogOptions` with `method`, `path`, `requestId`, `headers` |
-| `createLoggerStorage` | `../shared/storage` (`evlog/toolkit/storage`) | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()` |
+| `createLoggerStorage` | `../shared/storage` (`evlog/toolkit` or `evlog/toolkit/storage`) | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()`. Prefer `evlog/toolkit/storage` on Workers / edge. |
 
 `defineFrameworkIntegration` automatically:
 

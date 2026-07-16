@@ -18,10 +18,8 @@ describe('evlog/toolkit barrel exports', () => {
     expect(toolkit.extractSafeNodeHeaders).toBeTypeOf('function')
   })
 
-  it('does not export createLoggerStorage (lives on evlog/toolkit/storage)', () => {
-    expect(
-      Object.prototype.hasOwnProperty.call(toolkit, 'createLoggerStorage'),
-    ).toBe(false)
+  it('exports createLoggerStorage (also available from evlog/toolkit/storage)', () => {
+    expect(toolkit.createLoggerStorage).toBeTypeOf('function')
   })
 
   it('exports extractErrorStatus', () => {
@@ -46,6 +44,10 @@ describe('evlog/toolkit barrel exports', () => {
 describe('evlog/toolkit/storage', () => {
   it('exports createLoggerStorage', () => {
     expect(toolkitStorage.createLoggerStorage).toBeTypeOf('function')
+  })
+
+  it('is the same helper as the toolkit barrel re-export', () => {
+    expect(toolkitStorage.createLoggerStorage).toBe(toolkit.createLoggerStorage)
   })
 })
 
@@ -81,16 +83,10 @@ describe('extractErrorStatus', () => {
 
 const distDir = join(dirname(fileURLToPath(import.meta.url)), '../../dist')
 
-describe.skipIf(!existsSync(join(distDir, 'toolkit.mjs')))(
-  'toolkit dist isolation',
+describe.skipIf(!existsSync(join(distDir, 'toolkit/storage.mjs')))(
+  'toolkit/storage dist entry',
   () => {
-    it('does not reference node:async_hooks in the main toolkit entry', () => {
-      const source = readFileSync(join(distDir, 'toolkit.mjs'), 'utf8')
-      expect(source).not.toMatch(/node:async_hooks/)
-      expect(source).not.toMatch(/createLoggerStorage/)
-    })
-
-    it('keeps createLoggerStorage on the toolkit/storage entry', () => {
+    it('ships createLoggerStorage with node:async_hooks on the dedicated entry', () => {
       const source = readFileSync(join(distDir, 'toolkit/storage.mjs'), 'utf8')
       expect(source).toMatch(/node:async_hooks/)
       expect(source).toMatch(/createLoggerStorage/)
