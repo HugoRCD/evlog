@@ -9,15 +9,15 @@
   },
   "dependencies": {
     "@evlog/nuxthub": "workspace:*",
-    "@libsql/client": "^0.17.3",
-    "@ai-sdk/vue": "^4.0.7",
-    "@nuxthub/core": "^0.10.7",
-    "ai": "^7.0.0",
+    "@libsql/client": "^0.17.4",
+    "@ai-sdk/vue": "^4.0.28",
+    "@nuxthub/core": "^0.10.8",
+    "ai": "^7.0.28",
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "evlog": "workspace:*",
     "mdc-syntax": "^1.0.0",
     "nuxt": "^4.4.2",
-    "zod": "^4.3.6"
+    "zod": "^4.4.3"
   }
 }

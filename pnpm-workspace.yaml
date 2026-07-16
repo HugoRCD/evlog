@@ -20,9 +20,9 @@ allowBuilds:
 
 overrides:
   minimark: 0.2.0
-  '@nuxtjs/mcp-toolkit': ^0.16.1
+  '@nuxtjs/mcp-toolkit': ^0.18.0
   # eve 0.12 requires AI SDK 7 when resolved from the example package tree.
-  eve>ai: ^7.0.0
+  eve>ai: ^7.0.28
 
 minimumReleaseAge: 2880
 
@@ -38,3 +38,7 @@ minimumReleaseAgeExclude:
   - 'ai'
   # Other
   - '@databuddy/nuxt'
+  - '@changesets/cli@2.31.1'
+  - eve@0.24.3
+  - satori@0.28.0
+  - tsdown@0.22.8
