@@ -12,7 +12,6 @@ export default defineNuxtConfig({
   routeRules: {
     '/': { prerender: true, headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
     '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
-    '/_og/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
     '/**': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
     ...redirects,
   },

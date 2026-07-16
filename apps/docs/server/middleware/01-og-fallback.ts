@@ -1,4 +1,4 @@
-import { getRequestURL, sendRedirect } from 'h3'
+import { sendRedirect, setResponseHeader } from 'h3'
 
 /**
  * When zeroRuntime is enabled, nuxt-og-image throws at runtime if a static OG
@@ -10,11 +10,14 @@ export default defineEventHandler((event) => {
     return
   }
 
-  const { pathname } = getRequestURL(event)
+  const [pathname] = event.path.split('?')
 
   if (!pathname.startsWith('/_og/s/')) {
     return
   }
 
+  // Do not inherit immutable cache from routeRules — this redirect must not
+  // stick after a later deploy prerenders the real per-page OG asset.
+  setResponseHeader(event, 'cache-control', 'no-store')
   return sendRedirect(event, '/og.png', 302)
 })
