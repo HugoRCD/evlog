@@ -4,10 +4,11 @@ import { useSubNavigation } from '#imports'
 const appConfig = useAppConfig()
 const site = useSiteConfig()
 const route = useRoute()
-const { isEnabled: isAssistantEnabled } = useAssistant()
+const { isEnabled: isAssistantEnabled, isOpen: isAssistantOpen } = useAssistant()
 const { subNavigationMode } = useSubNavigation()
 
 const isHome = computed(() => route.path === '/')
+const assistantPanelWidth = '24rem'
 const links = computed(() => appConfig.github?.url
   ? [
     {
@@ -19,15 +20,35 @@ const links = computed(() => appConfig.github?.url
   ]
   : [])
 
-const headerUi = computed(() => isHome.value
-  ? { root: 'fixed inset-x-0 top-0 bg-transparent backdrop-blur-none border-transparent z-50', center: 'flex-1' }
-  : { center: 'flex-1' })
+const headerUi = computed(() => {
+  const homeFixed = 'fixed top-0 left-0 bg-transparent backdrop-blur-none border-transparent z-50 transition-[right] duration-200 ease-linear'
+
+  if (isHome.value) {
+    return {
+      root: homeFixed,
+      center: 'flex-1',
+    }
+  }
+
+  return { center: 'flex-1' }
+})
+
+const headerStyle = computed(() => {
+  if (!isHome.value) {
+    return undefined
+  }
+
+  return {
+    right: isAssistantEnabled.value && isAssistantOpen.value ? assistantPanelWidth : '0px',
+  }
+})
 </script>
 
 <template>
   <Blur v-if="isHome" position="both" class="z-10" />
   <UHeader
     :ui="headerUi"
+    :style="headerStyle"
     :class="{ 'flex flex-col': subNavigationMode === 'header' }"
     to="/"
     :title="appConfig.header?.title || site.name"
