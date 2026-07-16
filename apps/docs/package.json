@@ -13,7 +13,7 @@
   "dependencies": {
     "@databuddy/nuxt": "^2.4.20",
     "@nuxt/fonts": "0.14.0",
-    "@nuxt/ui": "^4.7.1",
+    "@nuxt/ui": "^4.10.0",
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
