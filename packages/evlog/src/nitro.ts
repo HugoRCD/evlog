@@ -252,7 +252,7 @@ export function buildPlainNitroErrorBody(
     url,
     status,
     statusCode: status,
-    statusText: statusMessage,
+    statusText: message,
     statusMessage,
     message,
     error: true,
