@@ -46,8 +46,6 @@ export default defineAppConfig({
       primary: 'blue',
       neutral: 'zinc',
     },
-    // USidebar defaults to z-10; UHeader is z-50 sticky/fixed, so the assistant
-    // panel was painted underneath and looked like it started below the header.
     sidebar: {
       slots: {
         container: 'fixed inset-y-0 z-50 hidden h-svh w-(--sidebar-width) lg:flex',
