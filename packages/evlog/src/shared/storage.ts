@@ -6,6 +6,9 @@ import type { AuditableLogger } from '../audit'
  * accessor. Every framework that exposes `useLogger()` (Express, Fastify,
  * NestJS, SvelteKit) calls this once at module level.
  *
+ * Import from `evlog/toolkit/storage` — not `evlog/toolkit` — so consumers that
+ * only need middleware helpers are not forced to resolve `node:async_hooks`.
+ *
  * @param contextHint - Appended to the error message when `useLogger()` is
  *   called outside of a request, e.g. `"middleware context. Make sure
  *   app.use(evlog()) is registered before your routes."`.

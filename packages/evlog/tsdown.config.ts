@@ -58,6 +58,7 @@ export default defineConfig({
     'vite/index': 'src/vite/index.ts',
     'client': 'src/client.ts',
     'toolkit': 'src/shared/index.ts',
+    'toolkit/storage': 'src/shared/storage.ts',
     'ai/index': 'src/ai/index.ts',
     'better-auth/index': 'src/better-auth/index.ts',
   },

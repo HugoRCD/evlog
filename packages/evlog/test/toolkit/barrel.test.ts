@@ -1,5 +1,9 @@
+import { existsSync, readFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { fileURLToPath } from 'node:url'
 import { describe, expect, it } from 'vitest'
 import * as toolkit from '../../src/shared/index'
+import * as toolkitStorage from '../../src/shared/storage'
 
 describe('evlog/toolkit barrel exports', () => {
   it('exports createMiddlewareLogger', () => {
@@ -14,8 +18,10 @@ describe('evlog/toolkit barrel exports', () => {
     expect(toolkit.extractSafeNodeHeaders).toBeTypeOf('function')
   })
 
-  it('exports createLoggerStorage', () => {
-    expect(toolkit.createLoggerStorage).toBeTypeOf('function')
+  it('does not export createLoggerStorage (lives on evlog/toolkit/storage)', () => {
+    expect(
+      Object.prototype.hasOwnProperty.call(toolkit, 'createLoggerStorage'),
+    ).toBe(false)
   })
 
   it('exports extractErrorStatus', () => {
@@ -34,6 +40,12 @@ describe('evlog/toolkit barrel exports', () => {
     expect(toolkit.attachForkToLogger).toBeTypeOf('function')
     expect(toolkit.forkBackgroundLogger).toBeTypeOf('function')
     expect(toolkit.runEnrichAndDrain).toBeTypeOf('function')
+  })
+})
+
+describe('evlog/toolkit/storage', () => {
+  it('exports createLoggerStorage', () => {
+    expect(toolkitStorage.createLoggerStorage).toBeTypeOf('function')
   })
 })
 
@@ -66,3 +78,22 @@ describe('extractErrorStatus', () => {
     expect(toolkit.extractErrorStatus({ status: '404' })).toBe(404)
   })
 })
+
+const distDir = join(dirname(fileURLToPath(import.meta.url)), '../../dist')
+
+describe.skipIf(!existsSync(join(distDir, 'toolkit.mjs')))(
+  'toolkit dist isolation',
+  () => {
+    it('does not reference node:async_hooks in the main toolkit entry', () => {
+      const source = readFileSync(join(distDir, 'toolkit.mjs'), 'utf8')
+      expect(source).not.toMatch(/node:async_hooks/)
+      expect(source).not.toMatch(/createLoggerStorage/)
+    })
+
+    it('keeps createLoggerStorage on the toolkit/storage entry', () => {
+      const source = readFileSync(join(distDir, 'toolkit/storage.mjs'), 'utf8')
+      expect(source).toMatch(/node:async_hooks/)
+      expect(source).toMatch(/createLoggerStorage/)
+    })
+  },
+)

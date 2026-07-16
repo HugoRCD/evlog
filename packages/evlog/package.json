@@ -225,6 +225,11 @@
       "import": "./dist/toolkit.mjs",
       "default": "./dist/toolkit.mjs"
     },
+    "./toolkit/storage": {
+      "types": "./dist/toolkit/storage.d.mts",
+      "import": "./dist/toolkit/storage.mjs",
+      "default": "./dist/toolkit/storage.mjs"
+    },
     "./ai": {
       "types": "./dist/ai/index.d.mts",
       "import": "./dist/ai/index.mjs",
@@ -350,6 +355,9 @@
       ],
       "toolkit": [
         "./dist/toolkit.d.mts"
+      ],
+      "toolkit/storage": [
+        "./dist/toolkit/storage.d.mts"
       ],
       "ai": [
         "./dist/ai/index.d.mts"

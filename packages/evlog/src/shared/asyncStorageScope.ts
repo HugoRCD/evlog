@@ -1,4 +1,17 @@
-import { AsyncLocalStorage } from 'node:async_hooks'
+/**
+ * Structural stand-in for `AsyncLocalStorage` so this module does not import
+ * `node:async_hooks`. Callers that construct storage (Elysia, eve) keep their
+ * own value imports.
+ */
+export interface AsyncLocalStorageLike<T> {
+  enterWith: (store: T) => void
+  getStore: () => T | undefined
+  run: <TReturn>(
+    store: T,
+    callback: (...args: unknown[]) => TReturn,
+    ...args: unknown[]
+  ) => TReturn
+}
 
 /**
  * Whether this runtime provides a working native `AsyncLocalStorage.enterWith()`.
@@ -11,7 +24,8 @@ export function supportsAsyncLocalStorageEnterWith(
 ): boolean {
   if (typeof storage.enterWith !== 'function') return false
   try {
-    storage.enterWith(undefined)
+    const enterWith = storage.enterWith as (store: undefined) => void
+    enterWith(undefined)
     return true
   } catch {
     return false
@@ -24,14 +38,14 @@ export function supportsAsyncLocalStorageEnterWith(
  * {@link patchAsyncLocalStorageEnterWith}.
  */
 export function bindAsyncLocalStorage<T>(
-  storage: AsyncLocalStorage<T>,
+  storage: AsyncLocalStorageLike<T>,
   value: T,
 ): void {
   storage.enterWith(value)
 }
 
 /** Clear a value previously bound with {@link bindAsyncLocalStorage}. */
-export function clearAsyncLocalStorage<T>(storage: AsyncLocalStorage<T>): void {
+export function clearAsyncLocalStorage<T>(storage: AsyncLocalStorageLike<T>): void {
   storage.enterWith(undefined as unknown as T)
 }
 
@@ -49,7 +63,7 @@ export function clearAsyncLocalStorage<T>(storage: AsyncLocalStorage<T>): void {
  * from derive for concurrent Workers handlers.
  */
 export function patchAsyncLocalStorageEnterWith<T>(
-  storage: AsyncLocalStorage<T>,
+  storage: AsyncLocalStorageLike<T>,
 ): void {
   if (supportsAsyncLocalStorageEnterWith(storage)) return
 
