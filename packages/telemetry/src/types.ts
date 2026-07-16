@@ -88,17 +88,19 @@ export interface TelemetryOptions<
 }
 
 type CustomFieldValue<T extends readonly string[] | undefined> =
-  T extends readonly (infer S extends string)[] ? boolean | number | S : boolean | number
+  T extends readonly string[] ? boolean | number | T[number] : boolean | number
 
 /**
  * Custom fields accepted by {@link telemetry.set} — numbers and booleans always;
  * strings only when declared in `collect.fields` (enforced at runtime).
+ *
+ * When `collect.fields` is non-empty, only declared keys accept allowlisted strings.
+ * Add undeclared counters with a second `set()` call or the ambient {@link telemetry.set}.
  */
-export type CustomFields<TFields extends CollectFields = {}> = {
-  [K in string]: K extends keyof TFields
-    ? CustomFieldValue<TFields[K]>
-    : boolean | number | undefined
-}
+export type CustomFields<TFields extends CollectFields = {}> =
+  keyof TFields extends never
+    ? Record<string, boolean | number | undefined>
+    : { [K in keyof TFields]?: CustomFieldValue<TFields[K]> }
 
 /** Error shape recognised for automatic `errorCode` capture. */
 export interface TelemetryCliError {

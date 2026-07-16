@@ -12,9 +12,9 @@ describe('telemetry.set typing', () => {
     expectTypeOf(telemetry.set).toBeCallableWith({ framework: 'nuxt' })
   })
 
-  it('accepts allowlisted strings in CustomFields', () => {
+  it('types allowlisted string values on declared keys', () => {
     type Fields = { framework: readonly ['nuxt', 'next'] }
-    expectTypeOf<CustomFields<Fields>>().toMatchTypeOf<{ framework: 'nuxt' }>()
+    expectTypeOf<'nuxt'>().toMatchTypeOf<NonNullable<CustomFields<Fields>['framework']>>()
   })
 })
 
@@ -25,7 +25,7 @@ describe('TelemetryHandle.set typing', () => {
       version: '1.0.0',
       collect: { fields: { framework: ['nuxt', 'next'] as const } },
     })
-    expectTypeOf(handle.set).toBeCallableWith({ framework: 'nuxt', ok: true })
+    expectTypeOf(handle.set).toBeCallableWith({ framework: 'nuxt' })
   })
 
   it('rejects undeclared string fields on the handle', () => {
