@@ -12,6 +12,10 @@ on:
 permissions:
   contents: read
 
+env:
+  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
+  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+
 jobs:
   lint:
     runs-on: ubuntu-latest
@@ -24,10 +28,13 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
       - name: Lint
-        run: pnpm run lint
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm exec turbo run lint --affected
+          else
+            pnpm run lint
+          fi
 
   typecheck:
     runs-on: ubuntu-latest
@@ -40,10 +47,13 @@ jobs:
           cache: 'pnpm'
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
       - name: Typecheck
-        run: pnpm run typecheck
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            pnpm exec turbo run typecheck --affected
+          else
+            pnpm run typecheck
+          fi
 
   test:
     runs-on: ubuntu-latest
