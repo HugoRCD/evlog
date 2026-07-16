@@ -1,5 +1,21 @@
 # evlog
 
+## 2.22.0
+
+### Minor Changes
+
+- [#430](https://github.com/HugoRCD/evlog/pull/430) [`31c251f`](https://github.com/HugoRCD/evlog/commit/31c251f2670ebb5a771e259ee01b802fcc33a99d) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `evlog/toolkit/storage` for `createLoggerStorage` so edge/Workers integrations can import ALS separately. The main `evlog/toolkit` barrel still re-exports it for compatibility; prefer `evlog/toolkit/storage` when you need to keep `node:async_hooks` out of bundles that do not tree-shake unused exports. Drop the barrel re-export at the next major.
+
+- [#429](https://github.com/HugoRCD/evlog/pull/429) [`1e325b9`](https://github.com/HugoRCD/evlog/commit/1e325b9cdc0567cb5e1937dbd4bf29e6879a97a6) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Add `waitUntil` support to `createMiddlewareLogger` and `defineFrameworkIntegration` so custom framework integrations can defer async drains on Cloudflare Workers and Vercel Edge without blocking the response. Pass `waitUntil` per request (e.g. `ctx.waitUntil.bind(ctx)`) or declare `extractWaitUntil` on the integration manifest.
+
+### Patch Changes
+
+- [#419](https://github.com/HugoRCD/evlog/pull/419) [`1953cfe`](https://github.com/HugoRCD/evlog/commit/1953cfe27e355fe36888985b43017e5ba152b2fc) Thanks [@crtwheel](https://github.com/crtwheel)! - fix: pretty printer shows `[object Object]` for array field values
+
+- [#428](https://github.com/HugoRCD/evlog/pull/428) [`ec13863`](https://github.com/HugoRCD/evlog/commit/ec1386379dd0330a467e4a503f232f486d4f7dfc) Thanks [@HugoRCD](https://github.com/HugoRCD)! - fix(nitro): preserve h3 HTTPError `message` in JSON error responses instead of overwriting it with `statusText`
+
+  ***
+
 ## 2.21.0
 
 ### Minor Changes
