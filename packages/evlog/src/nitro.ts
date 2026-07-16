@@ -240,19 +240,20 @@ export function buildPlainNitroErrorBody(
   isDev = process.env.NODE_ENV === 'development',
 ): Record<string, unknown> {
   const status = extractErrorStatus(error)
-  const rawMessage = ((error as { statusText?: string }).statusText
+  const shortStatus = (error as { statusText?: string }).statusText
     ?? (error as { statusMessage?: string }).statusMessage
-    ?? error.message) || 'Internal Server Error'
-  const message = isDev
-    ? rawMessage
-    : (status >= 500 ? 'Internal Server Error' : rawMessage)
+  const rawMessage = error.message || shortStatus || 'Internal Server Error'
+  const sanitize = (text: string) =>
+    isDev ? text : (status >= 500 ? 'Internal Server Error' : text)
+  const message = sanitize(rawMessage)
+  const statusMessage = sanitize(shortStatus ?? rawMessage)
 
   return {
     url,
     status,
     statusCode: status,
     statusText: message,
-    statusMessage: message,
+    statusMessage,
     message,
     error: true,
   }
