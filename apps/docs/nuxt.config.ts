@@ -56,6 +56,10 @@ export default defineNuxtConfig({
   },
 
   ogImage: {
+    // Cache prerendered OG image output between CI builds. Cache misses spend most of
+    // the Vercel build rendering /_og/s/* routes, so keeping generated images avoids
+    // rerendering unchanged docs pages on every deployment.
+    buildCache: true,
     // Custom OgImageDocs.satori.vue has complex shadow/blur effects that slow Satori down.
     // 15s default makes some pages timeout during prerender, which means Vercel hits the
     // zero-runtime route at runtime and returns 500 ("Not supported in zeroRuntime mode").
