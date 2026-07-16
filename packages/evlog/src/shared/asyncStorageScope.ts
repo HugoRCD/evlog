@@ -24,8 +24,9 @@ export function supportsAsyncLocalStorageEnterWith(
 ): boolean {
   if (typeof storage.enterWith !== 'function') return false
   try {
-    const enterWith = storage.enterWith as (store: undefined) => void
-    enterWith(undefined)
+    // Must call as a method — unbound enterWith loses `this` and throws on Node.
+    const probe = storage as { enterWith: (store: undefined) => void }
+    probe.enterWith(undefined)
     return true
   } catch {
     return false
