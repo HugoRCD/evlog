@@ -9,6 +9,7 @@ export { withTelemetry } from './citty'
 export { defineTelemetryCommands } from './commands'
 export { createGitHubActionsTelemetry, type GitHubActionsTelemetryOptions } from './github-actions'
 export { generateDisclosure, exampleRunEvent, type DisclosureDocument } from './disclosure'
+export { parseIngestBody, IngestValidationError, type IngestValidatorOptions } from './ingest'
 
 export type {
   RunEvent,

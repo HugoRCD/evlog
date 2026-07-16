@@ -25,9 +25,12 @@ Ship usage insight without shipping a analytics SDK: wrap your [citty](https://g
 | Leaking paths, tokens, or raw `argv` | Privacy by shape: booleans/numbers captured, strings presence-only unless allowlisted |
 | Short-lived CI runs losing data | Disk-buffered NDJSON outbox drains on the next invocation |
 | Disclosure drift | `generateDisclosure()` derives markdown + JSON from your runtime config |
+| Ingestion endpoint | `parseIngestBody()` validates POST bodies server-side — tool allowlist, envelope checks, custom key filter |
 | Telemetry breaking the host tool | Never throws, never blocks exit; `flush()` hard-capped at 500ms |
 
 Opt-out is first-class: `DO_NOT_TRACK`, `EVLOG_TELEMETRY=0`, or a persisted `telemetry disable` that purges undelivered data.
+
+**Size:** ~28 KB ESM (~8.6 KB gzip) · server ingest subpath `@evlog/telemetry/ingest` ~5 KB · `sideEffects: false` · no `evlog` core dependency.
 
 ## Install
 

@@ -23,6 +23,11 @@
       "types": "./dist/index.d.mts",
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
+    },
+    "./ingest": {
+      "types": "./dist/ingest.d.mts",
+      "import": "./dist/ingest.mjs",
+      "default": "./dist/ingest.mjs"
     }
   },
   "main": "./dist/index.mjs",
