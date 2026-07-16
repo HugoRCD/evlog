@@ -34,6 +34,12 @@ export interface FrameworkIntegrationSpec<TCtx> {
   storage?: AsyncLocalStorage<RequestLogger>
   /** Fork lifecycle hooks (only used when `storage` is set). */
   forkLifecycle?: import('./fork').ForkLifecycle
+  /**
+   * Extract platform `waitUntil` from the framework context (Cloudflare Workers
+   * `ExecutionContext`, Vercel Edge, …). Applied on each `start()` call;
+   * per-request `options.waitUntil` takes precedence.
+   */
+  extractWaitUntil?: (ctx: TCtx) => ((promise: Promise<unknown>) => void) | undefined
 }
 
 /** Result returned by {@link FrameworkIntegrationHelpers.start}. */
@@ -101,12 +107,14 @@ export function defineFrameworkIntegration<TCtx>(
     start(ctx, options = {}) {
       const extracted = spec.extractRequest(ctx)
       const headers = normalizeHeaders(extracted.headers)
+      const waitUntil = options.waitUntil ?? spec.extractWaitUntil?.(ctx)
       const middlewareOptions: MiddlewareLoggerOptions = {
         method: extracted.method,
         path: extracted.path,
         requestId: extracted.requestId || crypto.randomUUID(),
         headers,
         ...options,
+        waitUntil,
       }
       const result = createMiddlewareLogger(middlewareOptions)
 

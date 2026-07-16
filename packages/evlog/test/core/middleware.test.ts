@@ -433,6 +433,99 @@ describe('createMiddlewareLogger', () => {
     })
   })
 
+  describe('waitUntil', () => {
+    it('registers drain with waitUntil without awaiting drain completion', async () => {
+      let drainSettled = false
+      const drain = vi.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 20))
+        drainSettled = true
+      })
+      const waitUntil = vi.fn()
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        drain,
+        waitUntil,
+      })
+
+      await finish({ status: 200 })
+
+      expect(waitUntil).toHaveBeenCalledOnce()
+      expect(drainSettled).toBe(false)
+
+      const [[scheduled]] = waitUntil.mock.calls
+      await scheduled
+      expect(drain).toHaveBeenCalledOnce()
+      expect(drainSettled).toBe(true)
+    })
+
+    it('still awaits enrich before registering waitUntil drain', async () => {
+      let enrichDone = false
+      const enrich = vi.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 5))
+        enrichDone = true
+      })
+      const drain = vi.fn()
+      const waitUntil = vi.fn()
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        enrich,
+        drain,
+        waitUntil,
+      })
+
+      await finish({ status: 200 })
+
+      expect(enrichDone).toBe(true)
+      expect(waitUntil).toHaveBeenCalledOnce()
+      const [[scheduled]] = waitUntil.mock.calls
+      await scheduled
+      expect(drain).toHaveBeenCalledOnce()
+    })
+
+    it('awaits drain when waitUntil is not provided', async () => {
+      let drainSettled = false
+      const drain = vi.fn(async () => {
+        await new Promise(resolve => setTimeout(resolve, 5))
+        drainSettled = true
+      })
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        drain,
+      })
+
+      await finish({ status: 200 })
+
+      expect(drainSettled).toBe(true)
+      expect(drain).toHaveBeenCalledOnce()
+    })
+
+    it('preserves this binding when calling waitUntil', async () => {
+      const host = {
+        waitUntil(promise: Promise<unknown>) {
+          void promise
+        },
+      }
+      const waitUntilSpy = vi.spyOn(host, 'waitUntil')
+      const drain = vi.fn()
+
+      const { finish } = createMiddlewareLogger({
+        method: 'GET',
+        path: '/api/test',
+        drain,
+        waitUntil: host.waitUntil.bind(host),
+      })
+
+      await expect(finish({ status: 200 })).resolves.not.toThrow()
+      expect(waitUntilSpy).toHaveBeenCalledOnce()
+    })
+  })
+
   describe('redact', () => {
     it('skips middleware redaction when initLogger already redacted the event', async () => {
       const { drain } = createPipelineSpies()

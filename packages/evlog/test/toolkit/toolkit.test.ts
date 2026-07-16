@@ -609,4 +609,39 @@ describe('defineFrameworkIntegration', () => {
     expect(observed).toBe(logger)
     await finish({ status: 204 })
   })
+
+  it('wires extractWaitUntil into middleware options', async () => {
+    const waitUntil = vi.fn()
+    const integration = defineFrameworkIntegration<{ waitUntil: typeof waitUntil }>({
+      name: 'serverless-test',
+      extractRequest: () => ({ method: 'GET', path: '/api' }),
+      attachLogger: () => {},
+      extractWaitUntil: ctx => ctx.waitUntil,
+    })
+
+    const drain = vi.fn()
+    const { finish } = integration.start({ waitUntil }, { drain, waitUntil: undefined })
+    await finish({ status: 200 })
+    expect(waitUntil).toHaveBeenCalledOnce()
+  })
+
+  it('prefers options.waitUntil over extractWaitUntil', async () => {
+    const ctxWaitUntil = vi.fn()
+    const optionsWaitUntil = vi.fn()
+    const integration = defineFrameworkIntegration<{ waitUntil: typeof ctxWaitUntil }>({
+      name: 'serverless-priority',
+      extractRequest: () => ({ method: 'GET', path: '/api' }),
+      attachLogger: () => {},
+      extractWaitUntil: ctx => ctx.waitUntil,
+    })
+
+    const drain = vi.fn()
+    const { finish } = integration.start(
+      { waitUntil: ctxWaitUntil },
+      { drain, waitUntil: optionsWaitUntil },
+    )
+    await finish({ status: 200 })
+    expect(optionsWaitUntil).toHaveBeenCalledOnce()
+    expect(ctxWaitUntil).not.toHaveBeenCalled()
+  })
 })
