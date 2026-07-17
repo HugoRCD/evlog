@@ -20,27 +20,17 @@ Diagnose your install. Inspect wide events. Audit and map what your app emits.
 ## Usage
 
 ```bash
-npx @evlog/cli doctor              # diagnose the current project
-npx @evlog/cli doctor --json       # machine-readable output on stdout
-npx @evlog/cli doctor --no-header  # skip the branded title + gradient
-```
-
-Or install it as a devDependency:
-
-```bash
 pnpm add -D @evlog/cli
 pnpm evlog doctor
 ```
 
-## Header
+Or without installing:
 
-Every command prints a short branded header (`evlog <command>` + gradient). Disable it when you want quieter output:
-
-| Mechanism | Example |
-| --- | --- |
-| Flag (any command) | `evlog doctor --no-header` |
-| Env (persistent) | `EVLOG_CLI_NO_HEADER=1` or `EVLOG_CLI_HEADER=0` |
-| JSON mode | `evlog doctor --json` (header never printed) |
+```bash
+npx @evlog/cli doctor
+npx @evlog/cli doctor --json
+npx @evlog/cli doctor --cwd apps/web
+```
 
 ## Commands
 
@@ -73,9 +63,23 @@ With `--json`, the payload is the **only** thing written to stdout — everythin
 
 Breaking this shape requires a `schemaVersion` bump.
 
+## Telemetry
+
+The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Opt out anytime:
+
+```bash
+evlog telemetry disable   # or DO_NOT_TRACK=1 / EVLOG_TELEMETRY=0
+```
+
+Full policy: [evlog.dev — telemetry](https://evlog.dev/use-cases/telemetry/overview)
+
+## Quieter output
+
+Commands print a short branded header by default. Skip it with `--no-header`, `EVLOG_CLI_NO_HEADER=1`, or `--json`.
+
 ## Adding a command
 
-1. Create `src/commands/<name>.ts` exporting a **default** citty command via `defineEvlogCommand('name', …)` from `lib/command` — that prints the branded header (`evlog <name>` + gradient) automatically. Pure logic in the same file (or under `lib/`); render via `core/output.ts`. Skip the header yourself only for `--json`.
+1. Create `src/commands/<name>.ts` exporting a **default** citty command via `defineEvlogCommand('name', …)` from `lib/command` — branded header is automatic (skipped for `--json` / `--no-header`). Pure logic in the same file (or under `lib/`); render via `core/output.ts`.
 2. Register it with one import + one line in [`src/commands/index.ts`](src/commands/index.ts).
 
 `src/index.ts` stays a thin shell (meta + `withTelemetry`). Do not embed command bodies there.
@@ -88,17 +92,6 @@ src/
   core/               # context, output, brand, usage
   lib/                # shared constants / helpers
 ```
-
-
-## Telemetry
-
-The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Opt out anytime:
-
-```bash
-evlog telemetry disable   # or DO_NOT_TRACK=1 / EVLOG_TELEMETRY=0
-```
-
-Full policy: [evlog.dev — telemetry](https://evlog.dev/use-cases/telemetry/overview)
 
 ## Docs
 
