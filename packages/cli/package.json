@@ -1,0 +1,70 @@
+{
+  "name": "@evlog/cli",
+  "version": "0.0.0",
+  "description": "The evlog command line — operate your wide events from the terminal: diagnose your setup today, explore, audit, and map your logs next",
+  "author": "HugoRCD <contact@hrcd.fr>",
+  "homepage": "https://evlog.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HugoRCD/evlog.git",
+    "directory": "packages/cli"
+  },
+  "bugs": {
+    "url": "https://github.com/HugoRCD/evlog/issues"
+  },
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=20.0.0"
+  },
+  "bin": {
+    "evlog": "./bin/evlog.mjs"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.mts",
+      "import": "./dist/index.mjs",
+      "default": "./dist/index.mjs"
+    }
+  },
+  "main": "./dist/index.mjs",
+  "types": "./dist/index.d.mts",
+  "files": [
+    "bin",
+    "dist",
+    "README.md"
+  ],
+  "keywords": [
+    "evlog",
+    "cli",
+    "wide-events",
+    "doctor",
+    "citty",
+    "structured-logging",
+    "telemetry"
+  ],
+  "scripts": {
+    "build": "tsdown",
+    "dev": "tsdown --watch",
+    "dev:prepare": "tsdown",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "typecheck": "echo 'Typecheck handled by build'"
+  },
+  "dependencies": {
+    "@evlog/telemetry": "workspace:*",
+    "citty": "^0.2.2",
+    "evlog": "workspace:*"
+  },
+  "devDependencies": {
+    "tsdown": "^0.22.8",
+    "tsx": "^4.23.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.10"
+  },
+  "publishConfig": {
+    "access": "public"
+  }
+}
