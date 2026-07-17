@@ -27,6 +27,7 @@ jobs:
             bench
             better-auth
             better-stack
+            cli
             core
             datadog
             deps
