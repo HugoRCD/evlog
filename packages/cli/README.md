@@ -13,9 +13,9 @@
 
 **Digging through logs is not observability. It's hope.**
 
-The **evlog command line** — operate your [evlog](https://evlog.dev) wide events from the terminal. Binary: `evlog`.
+The official command line for [evlog](https://evlog.dev).
 
-Today it diagnoses your setup (`evlog doctor`); the same skeleton will grow the full surface — exploring logs, auditing, mapping your event catalog, and more.
+Diagnose your install. Inspect wide events. Audit and map what your app emits.
 
 ## Usage
 
