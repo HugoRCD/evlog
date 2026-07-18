@@ -10,7 +10,6 @@ import { shouldLog, getServiceForPath, extractErrorStatus } from '../nitro'
 import { extendDeferredDrain } from '../nitro/deferred-drain'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shared/nitroConfigBridge'
-import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
 import type { EnrichContext, RequestLogger, TailSamplingContext, WideEvent } from '../types'
 import { filterSafeHeaders } from '../utils'
 
@@ -269,19 +268,12 @@ export default definePlugin(async (nitroApp) => {
       await callEnrichAndDrain(hooks, emittedEvent, event, res)
     }
 
-    if (shouldDeferEmitForResponse(res)) {
-      const wrapped = bindStreamingResponseLifecycle(res, async (meta) => {
-        if (meta.error) {
-          log.error(meta.error)
-        }
-        await emitSuccessResponse(meta.status ?? res.status)
-      })
-      if (wrapped !== res && 'res' in event) {
-        (event as { res: Response }).res = wrapped
-      }
-      return
-    }
-
+    // Streaming responses (SSE, NDJSON, chunked) emit at header time: h3 v2's
+    // `onResponse` hook cannot swap the outgoing response (`H3Event.res` is a
+    // getter-only accessor, and `toResponse` sends the original response no
+    // matter what the hook does), so wrapping the body here would only lock the
+    // original stream and break the response. Stream-lifetime metrics are not
+    // observable from this hook.
     await emitSuccessResponse(res.status)
   })
 
