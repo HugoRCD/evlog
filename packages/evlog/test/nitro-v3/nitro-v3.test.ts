@@ -109,13 +109,13 @@ describe.sequential('Nitro v3 Server with evlog', () => {
       expect(text).toContain('data: one')
       expect(text).toContain('data: two')
 
-      // Wait for async logs to be written
-      await new Promise(resolve => setTimeout(resolve, 100))
+      // Wait for the async log write deterministically instead of sleeping
+      await vi.waitFor(
+        () => expect(logs.join('\n')).toMatch(/INFO.*GET \/stream.*200/),
+        { timeout: 1000, interval: 5 },
+      )
 
-      expect(mockFn).toHaveBeenCalled()
       const logOutput = logs.join('\n')
-
-      expect(logOutput).toMatch(/INFO.*GET \/stream.*200/)
       expect(logOutput).toContain('stream:')
       expect(logOutput).toContain('kind=sse')
     } finally {
