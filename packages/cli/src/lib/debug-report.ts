@@ -43,9 +43,13 @@ export function formatDebugReport(
 
   const command = typeof event.command === 'string' ? event.command : undefined
   const cwd = typeof event.cwd === 'string' ? event.cwd : undefined
+  const environment = typeof event.environment === 'string' ? event.environment : undefined
 
   if (command) {
     lines.push(`${paint('dim', 'command')}  ${paint('cyan', command)}`)
+  }
+  if (environment) {
+    lines.push(`${paint('dim', 'env')}      ${paint('cyan', environment)}`)
   }
   if (cwd) {
     lines.push(`${paint('dim', 'cwd')}      ${cwd}`)

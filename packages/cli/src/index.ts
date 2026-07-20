@@ -3,6 +3,7 @@ import { withTelemetry } from '@evlog/telemetry'
 import { subCommands } from './commands'
 import { COMMON_ARGS } from './lib/command'
 import { TOOL_NAME, VERSION } from './lib/constants'
+import { resolveCliEnvironment } from './lib/environment'
 
 /**
  * The evlog CLI command tree, telemetry-wrapped and ready for `runMain()`.
@@ -20,7 +21,12 @@ export const main = withTelemetry(
     },
     subCommands,
   }),
-  { name: TOOL_NAME, version: VERSION },
+  {
+    name: TOOL_NAME,
+    version: VERSION,
+    // Packaged installs report `production`; workspace builds report `development`.
+    environment: resolveCliEnvironment(),
+  },
 )
 
 export { TOOL_NAME, VERSION as version }

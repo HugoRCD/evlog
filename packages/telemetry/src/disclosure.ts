@@ -14,6 +14,7 @@ const STANDARD_FIELDS: Array<{ field: string, type: string, description: string 
   { field: 'env.provider', type: 'string | null', description: 'CI provider when detected.' },
   { field: 'env.tty', type: 'boolean', description: 'Whether stdout is a TTY.' },
   { field: 'env.agent', type: 'string | null', description: 'AI coding agent when detected (claude, cursor, codex, …).' },
+  { field: 'env.environment', type: 'string', description: 'Deploy stage (`development` | `preview` | `production`).' },
   { field: 'machineId', type: 'string', description: 'Hashed anonymous machine id; omitted in ephemeral CI.' },
   { field: 'custom', type: 'object', description: 'Consumer-provided fields via telemetry.set() — numbers/booleans by default.' },
 ]
@@ -105,7 +106,14 @@ export function exampleRunEvent(overrides?: Partial<RunEvent>): RunEvent {
     outcome: 'success',
     flags: { json: true },
     tool: { name: 'evlog-cli', version: '0.1.0' },
-    env: { node: '20.11', ci: false, provider: null, tty: true, agent: null },
+    env: {
+      node: '20.11',
+      ci: false,
+      provider: null,
+      tty: true,
+      agent: null,
+      environment: 'development',
+    },
     machineId: 'ab3f0123456789ab',
     custom: { checksFailed: 0 },
     idempotencyKey: '00000000000000000000000000000000',

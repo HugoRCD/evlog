@@ -71,6 +71,7 @@ describe('withCliDebug', () => {
     expect(event.command).toBe('doctor')
     expect(event.steps).toEqual(['a', 'b'])
     expect(event.service).toBe('evlog-cli')
+    expect(typeof event.environment).toBe('string')
   })
 
   it('records the failed step then wraps unexpected throws', async () => {

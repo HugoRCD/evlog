@@ -12,7 +12,7 @@ export interface ToolInfo {
 }
 
 /**
- * Environment snapshot enriched via `std-env`.
+ * Environment snapshot enriched via `std-env` (+ deploy stage).
  */
 export interface EnvInfo {
   node: string
@@ -20,6 +20,11 @@ export interface EnvInfo {
   provider: string | null
   tty: boolean
   agent: string | null
+  /**
+   * Deploy / runtime stage: `development` | `preview` | `production` (or custom).
+   * From `EVLOG_TELEMETRY_ENV` → `VERCEL_ENV` → {@link TelemetryOptions.environment} → `NODE_ENV` → `development`.
+   */
+  environment: string
 }
 
 /**
@@ -70,6 +75,11 @@ export interface TelemetryOptions<
   name: string
   /** Tool version string. */
   version: string
+  /**
+   * Override `env.environment` on every run event.
+   * Useful when the tool knows its own stage (e.g. packaged CLI → `production`).
+   */
+  environment?: string
   /** Default ingestion endpoint baked in by the author. Overridable via `EVLOG_TELEMETRY_ENDPOINT`. */
   endpoint?: string
   /** Optional allowlists for string flags and custom fields. */

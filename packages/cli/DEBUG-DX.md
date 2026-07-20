@@ -53,6 +53,7 @@ evlog <cmd> --json --debug 2>e.json # stdout = contract, stderr = raw wide event
 - `log.step('name', fn)` / `log.finding(cliErrors.X, { id, status })`
 - `ui.done({ human, json, summary, jsonMode })`
 - Human `--debug` → `formatDebugReport`; `--json --debug` → raw event on stderr
+- `environment` on `--json` / debug / telemetry: packaged install → `production`, workspace → `development` (`EVLOG_CLI_ENV` / `VERCEL_ENV` override)
 
 ## Friction / wishlist
 

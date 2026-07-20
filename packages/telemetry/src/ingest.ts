@@ -176,6 +176,9 @@ function validateEnv(input: unknown): RunEvent['env'] {
   if (env.agent !== null && typeof env.agent !== 'string') {
     throw new IngestValidationError('invalid env.agent')
   }
+  if (typeof env.environment !== 'string' || !env.environment.trim()) {
+    throw new IngestValidationError('invalid env.environment')
+  }
 
   return {
     node: env.node,
@@ -183,6 +186,7 @@ function validateEnv(input: unknown): RunEvent['env'] {
     provider: env.provider,
     tty: env.tty,
     agent: env.agent,
+    environment: env.environment.trim(),
   }
 }
 
