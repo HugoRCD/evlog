@@ -1,11 +1,12 @@
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
-import { formatDoctorReport, runDoctor } from '../src/commands/doctor'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import doctor, { formatDoctorReport, runDoctor } from '../src/commands/doctor'
 import { createContext } from '../src/core/context'
 import type { CliContext } from '../src/core/context'
 import { SCHEMA_VERSION } from '../src/core/output'
+import { resolveCliEnvironment } from '../src/lib/environment'
 
 const tempDirs: string[] = []
 
@@ -33,6 +34,8 @@ function fakeContext(cwd: string, overrides: Partial<CliContext> = {}): CliConte
 }
 
 afterEach(async () => {
+  vi.restoreAllMocks()
+  process.exitCode = undefined
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
@@ -132,57 +135,69 @@ describe('runDoctor', () => {
       '.evlog/logs/2026-07-17.jsonl': '{"event":"request"}\n',
     })
 
-    const result = await runDoctor(fakeContext(cwd))
-    const payload = {
-      schemaVersion: SCHEMA_VERSION,
-      environment: 'development',
+    const out: string[] = []
+    vi.spyOn(process.stdout, 'write').mockImplementation(((chunk: string | Uint8Array) => {
+      out.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString())
+      return true
+    }) as typeof process.stdout.write)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    const run = typeof doctor.run === 'function' ? doctor.run : await doctor.run
+    await run!({
+      args: { json: true, noHeader: true, cwd, debug: false },
+      rawArgs: [],
+      cmd: doctor,
+      data: {},
+    })
+
+    const raw = JSON.parse(out.join('').trim()) as {
+      schemaVersion: number
+      environment: string
       project: {
-        kind: result.project.kind,
-        name: result.project.name,
-        stack: result.project.stack,
-      },
-      checks: result.checks.map(({ id, status, message }) => ({ id, status, message })),
-      summary: result.summary,
+        kind: string
+        name: string | null
+        stack: string[]
+        cwd: string
+        root: string
+        packageDir: string
+      }
+      checks: Array<{ id: string, status: string, message: string, hint?: string }>
+      summary: { ok: number, warn: number, fail: number }
     }
 
-    expect(payload).toMatchInlineSnapshot(`
-      {
-        "checks": [
-          {
-            "id": "node",
-            "message": "v22.0.0",
-            "status": "ok",
-          },
-          {
-            "id": "project",
-            "message": "app",
-            "status": "ok",
-          },
-          {
-            "id": "evlog",
-            "message": "v2.22.0 (^2.0.0)",
-            "status": "ok",
-          },
-          {
-            "id": "logs",
-            "message": "1 file · .evlog/logs",
-            "status": "ok",
-          },
-        ],
-        "environment": "development",
-        "project": {
-          "kind": "single",
-          "name": "app",
-          "stack": [],
-        },
-        "schemaVersion": 2,
-        "summary": {
-          "fail": 0,
-          "ok": 4,
-          "warn": 0,
-        },
-      }
-    `)
+    expect(raw.schemaVersion).toBe(SCHEMA_VERSION)
+    expect(raw.environment).toBe(resolveCliEnvironment())
+    expect(raw.project.cwd).toBe(cwd)
+    expect(raw.project.root).toBe(cwd)
+    expect(raw.project.packageDir).toBe(cwd)
+
+    // Stable contract fields (paths asserted above; node message follows the host).
+    expect({
+      schemaVersion: raw.schemaVersion,
+      environment: raw.environment,
+      project: {
+        kind: raw.project.kind,
+        name: raw.project.name,
+        stack: raw.project.stack,
+      },
+      checks: raw.checks.map(({ id, status, message }) => ({ id, status, message })),
+      summary: raw.summary,
+    }).toEqual({
+      schemaVersion: SCHEMA_VERSION,
+      environment: resolveCliEnvironment(),
+      project: {
+        kind: 'single',
+        name: 'app',
+        stack: [],
+      },
+      checks: [
+        { id: 'node', message: process.version, status: 'ok' },
+        { id: 'project', message: 'app', status: 'ok' },
+        { id: 'evlog', message: 'v2.22.0 (^2.0.0)', status: 'ok' },
+        { id: 'logs', message: '1 file · .evlog/logs', status: 'ok' },
+      ],
+      summary: { fail: 0, ok: 4, warn: 0 },
+    })
   })
 })
 

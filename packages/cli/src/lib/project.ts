@@ -2,6 +2,7 @@ import { access, readFile, readdir, stat } from 'node:fs/promises'
 import { createRequire } from 'node:module'
 import { dirname, join, relative, resolve, sep } from 'node:path'
 
+/** Minimal `package.json` fields used for project / workspace discovery. */
 export interface PackageJson {
   name?: string
   dependencies?: Record<string, string>
@@ -10,8 +11,10 @@ export interface PackageJson {
   workspaces?: string[] | { packages?: string[] }
 }
 
-export type WorkspaceKind = 'single' | 'pnpm' | 'npm' | 'yarn'
+/** How the project is laid out — plain package or a detected workspace tool. */
+export type WorkspaceKind = 'single' | 'pnpm' | 'npm' | 'yarn' | 'bun'
 
+/** Resolved project layout for the directory the user ran from. */
 export interface ProjectInfo {
   /** Directory the user ran from (or `--cwd`). */
   cwd: string
@@ -24,6 +27,7 @@ export interface ProjectInfo {
   packageJson: PackageJson | null
 }
 
+/** Resolved `evlog` install discovered under the project (version + paths). */
 export interface EvlogInstall {
   version: string
   /** Absolute path to the resolved `evlog` package root. */
@@ -67,14 +71,16 @@ export async function readJson<T>(path: string): Promise<T | null> {
 
 async function detectWorkspaceKind(dir: string, pkg: PackageJson | null): Promise<WorkspaceKind | null> {
   if (await exists(join(dir, 'pnpm-workspace.yaml'))) return 'pnpm'
-  if (await exists(join(dir, 'yarn.lock')) && pkg?.workspaces) return 'yarn'
-  if (pkg?.workspaces) return 'npm'
-  return null
+  if (!pkg?.workspaces) return null
+  // Bun uses the npm `workspaces` field; distinguish via lockfile.
+  if (await exists(join(dir, 'bun.lock')) || await exists(join(dir, 'bun.lockb'))) return 'bun'
+  if (await exists(join(dir, 'yarn.lock'))) return 'yarn'
+  return 'npm'
 }
 
 /**
  * Walk up from `start` to locate the nearest package and the workspace root.
- * Handles pnpm / npm / yarn workspaces and plain single packages.
+ * Handles pnpm / bun / npm / yarn workspaces and plain single packages.
  */
 export async function resolveProject(start: string): Promise<ProjectInfo> {
   const cwd = resolve(start)
@@ -91,6 +97,8 @@ export async function resolveProject(start: string): Promise<ProjectInfo> {
       if (!packageDir) {
         packageDir = dir
         packageJson = pkg
+        // Single-package default: root is the nearest package, not a parent.
+        root = dir
       }
       const detected = await detectWorkspaceKind(dir, pkg)
       if (detected) {
@@ -98,8 +106,7 @@ export async function resolveProject(start: string): Promise<ProjectInfo> {
         kind = detected
         break
       }
-      // Keep walking — a parent may be the workspace root.
-      root = dir
+      // Keep walking — a parent may still be a workspace root.
     }
 
     const parent = dirname(dir)
