@@ -45,6 +45,7 @@
       "import": "./dist/index.mjs",
       "default": "./dist/index.mjs"
     },
+    "./package.json": "./package.json",
     "./nuxt": {
       "types": "./dist/nuxt/module.d.mts",
       "import": "./dist/nuxt/module.mjs",

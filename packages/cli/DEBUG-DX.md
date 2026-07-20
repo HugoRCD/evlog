@@ -65,3 +65,5 @@ evlog <cmd> --json --debug 2>e.json # stdout = contract, stderr = raw wide event
 ## Publish note — `workspace:*` deps
 
 `package.json` keeps `"evlog": "workspace:*"` and `"@evlog/telemetry": "workspace:*"` for local linking. **pnpm / `changeset publish` rewrite `workspace:` to real semver** on the tarball.
+
+Doctor resolves the install via `require.resolve('evlog/package.json')` — that subpath is exported on `evlog` (`"./package.json": "./package.json"`).
