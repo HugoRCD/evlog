@@ -25,7 +25,11 @@ describe('createUi', () => {
     ui.json({ ok: true })
 
     expect(err.join('')).toContain('hello')
-    expect(JSON.parse(out.join(''))).toEqual({ schemaVersion: SCHEMA_VERSION, ok: true })
+    expect(JSON.parse(out.join(''))).toEqual({
+      schemaVersion: SCHEMA_VERSION,
+      environment: expect.any(String),
+      ok: true,
+    })
   })
 
   it('done picks json vs human and sets exit code', () => {

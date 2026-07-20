@@ -5,14 +5,39 @@ import { agent, hasTTY, isCI, nodeVersion, provider } from 'std-env'
 import type { EnvInfo } from './types'
 import { getTelemetryDir } from './paths'
 
-/** Build the standard `env` block from std-env. */
-export function buildEnvInfo(): EnvInfo {
+export type ResolveEnvironmentOptions = {
+  /** Process env (defaults to `process.env`). */
+  env?: NodeJS.Dict<string>
+  /** Author override (e.g. packaged CLI → `production`). */
+  override?: string
+}
+
+/**
+ * Deploy / runtime stage for a telemetry run.
+ *
+ * Priority: `EVLOG_TELEMETRY_ENV` → `VERCEL_ENV` → tool `override` → `NODE_ENV` → `development`.
+ */
+export function resolveEnvironment(options: ResolveEnvironmentOptions = {}): string {
+  const env = options.env ?? process.env
+  const explicit = env.EVLOG_TELEMETRY_ENV?.trim()
+  if (explicit) return explicit
+  const vercel = env.VERCEL_ENV?.trim()
+  if (vercel) return vercel
+  if (options.override?.trim()) return options.override.trim()
+  const nodeEnv = env.NODE_ENV?.trim()
+  if (nodeEnv) return nodeEnv
+  return 'development'
+}
+
+/** Build the standard `env` block from std-env (+ deploy stage). */
+export function buildEnvInfo(options: { environment?: string } = {}): EnvInfo {
   return {
     node: nodeVersion ?? process.version.replace(/^v/, ''),
     ci: isCI,
     provider: provider ?? null,
     tty: hasTTY,
     agent: agent ?? null,
+    environment: resolveEnvironment({ override: options.environment }),
   }
 }
 

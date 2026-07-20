@@ -20,6 +20,7 @@ exports[`telemetry disclosure > matches snapshot for default envelope 1`] = `
 | \`env.provider\` | string | null | CI provider when detected. |
 | \`env.tty\` | boolean | Whether stdout is a TTY. |
 | \`env.agent\` | string | null | AI coding agent when detected (claude, cursor, codex, …). |
+| \`env.environment\` | string | Deploy stage (\`development\` | \`preview\` | \`production\`). |
 | \`machineId\` | string | Hashed anonymous machine id; omitted in ephemeral CI. |
 | \`custom\` | object | Consumer-provided fields via telemetry.set() — numbers/booleans by default. |
 
@@ -69,6 +70,7 @@ exports[`telemetry disclosure > matches snapshot with collect extensions 1`] = `
 | \`env.provider\` | string | null | CI provider when detected. |
 | \`env.tty\` | boolean | Whether stdout is a TTY. |
 | \`env.agent\` | string | null | AI coding agent when detected (claude, cursor, codex, …). |
+| \`env.environment\` | string | Deploy stage (\`development\` | \`preview\` | \`production\`). |
 | \`machineId\` | string | Hashed anonymous machine id; omitted in ephemeral CI. |
 | \`custom\` | object | Consumer-provided fields via telemetry.set() — numbers/booleans by default. |
 
@@ -156,6 +158,11 @@ Set \`EVLOG_TELEMETRY_DEBUG=1\` to print would-be payloads to stderr.",
       "type": "string | null",
     },
     {
+      "description": "Deploy stage (\`development\` | \`preview\` | \`production\`).",
+      "field": "env.environment",
+      "type": "string",
+    },
+    {
       "description": "Hashed anonymous machine id; omitted in ephemeral CI.",
       "field": "machineId",
       "type": "string",
@@ -190,6 +197,7 @@ exports[`telemetry payload snapshot > matches enriched run event shape 1`] = `
   "env": {
     "agent": null,
     "ci": false,
+    "environment": "development",
     "node": "20.11",
     "provider": null,
     "tty": true,

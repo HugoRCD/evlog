@@ -1,10 +1,11 @@
+import { resolveCliEnvironment } from '../lib/environment'
 import type { CliContext } from './context'
 
 export const DOCS_URL = 'https://evlog.dev'
 export const DOCS_LABEL = 'evlog.dev'
 
 /** Current CLI result schema. Bump when a `--json` payload shape changes. */
-export const SCHEMA_VERSION = 1
+export const SCHEMA_VERSION = 2
 
 /** Documented exit codes: 0 ok (warns allowed), 1 any fail, 2 usage error. */
 export const EXIT_OK = 0
@@ -122,10 +123,14 @@ export function formatSummary(ctx: Pick<CliContext, 'color'>, summary: CheckSumm
 
 /**
  * Write a `--json` payload — the only thing allowed on stdout in JSON mode.
- * Always includes `schemaVersion`; breaking the shape requires a bump.
+ * Always includes `schemaVersion` and `environment`; breaking the shape requires a bump.
  */
 export function writeJson(payload: Record<string, unknown>): void {
-  process.stdout.write(`${JSON.stringify({ schemaVersion: SCHEMA_VERSION, ...payload })}\n`)
+  process.stdout.write(`${JSON.stringify({
+    schemaVersion: SCHEMA_VERSION,
+    environment: resolveCliEnvironment(),
+    ...payload,
+  })}\n`)
 }
 
 /** Write human-readable output to stderr (stdout is reserved for `--json`). */

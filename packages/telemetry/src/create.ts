@@ -172,7 +172,7 @@ class InternalTelemetry<
       errorCode: parts.errorCode,
       flags: parts.flags,
       tool,
-      env: buildEnvInfo(),
+      env: buildEnvInfo({ environment: this.options.environment }),
       machineId: this.machineId,
       custom: parts.custom,
       idempotencyKey,

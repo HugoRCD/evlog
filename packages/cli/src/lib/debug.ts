@@ -4,6 +4,7 @@ import type { CliContext } from '../core/context'
 import type { CheckStatus } from '../core/output'
 import { VERSION } from './constants'
 import { formatDebugReport } from './debug-report'
+import { resolveCliEnvironment } from './environment'
 import { cliErrors } from './errors'
 
 export type DebugArgs = { debug?: boolean, json?: boolean }
@@ -174,7 +175,11 @@ export function ensureCliDebugLogger(options: { json?: boolean, color?: boolean 
   const color = options.color === true
 
   initLogger({
-    env: { service: 'evlog-cli', version: VERSION },
+    env: {
+      service: 'evlog-cli',
+      version: VERSION,
+      environment: resolveCliEnvironment(),
+    },
     pretty: false,
     silent: true,
     minLevel: 'debug',
@@ -214,6 +219,7 @@ export async function withCliDebug<T>(
   const raw = createCliLogger({
     command: options.command,
     cliVersion: VERSION,
+    environment: resolveCliEnvironment(),
   })
   const log = createCliDebug(raw)
 

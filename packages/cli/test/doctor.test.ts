@@ -135,6 +135,7 @@ describe('runDoctor', () => {
     const result = await runDoctor(fakeContext(cwd))
     const payload = {
       schemaVersion: SCHEMA_VERSION,
+      environment: 'development',
       project: {
         kind: result.project.kind,
         name: result.project.name,
@@ -168,12 +169,13 @@ describe('runDoctor', () => {
             "status": "ok",
           },
         ],
+        "environment": "development",
         "project": {
           "kind": "single",
           "name": "app",
           "stack": [],
         },
-        "schemaVersion": 1,
+        "schemaVersion": 2,
         "summary": {
           "fail": 0,
           "ok": 4,
