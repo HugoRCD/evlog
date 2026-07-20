@@ -52,6 +52,13 @@ export function createStyle(ctx: Pick<CliContext, 'color'>): Style {
 /** Status of a single diagnostic check. */
 export type CheckStatus = 'ok' | 'warn' | 'fail'
 
+/** Shared glyphs for check / finding status (doctor report + debug case file). */
+export const CHECK_STATUS: Record<CheckStatus, { glyph: string, color: StyleCode }> = {
+  ok: { glyph: '✓', color: 'green' },
+  warn: { glyph: '⚠', color: 'yellow' },
+  fail: { glyph: '✗', color: 'red' },
+}
+
 /** One diagnostic check result — commands return these, never print. */
 export interface Check {
   id: string
@@ -79,58 +86,38 @@ export function exitCodeFor(summary: CheckSummary): number {
   return summary.fail > 0 ? EXIT_FAIL : EXIT_OK
 }
 
-const SYMBOLS: Record<CheckStatus, { glyph: string, color: StyleCode }> = {
-  ok: { glyph: '✓', color: 'green' },
-  warn: { glyph: '⚠', color: 'yellow' },
-  fail: { glyph: '✗', color: 'red' },
-}
-
 /**
- * Compact brand header for command output: blue accent bar, bold `evlog`
- * wordmark, cyan command, dim version and docs link. The full ASCII banner
- * belongs to the help — command output stays tight.
+ * Render checks as a blue-railed list with ✓ / ⚠ / ✗, cyan ids, and dim hints.
  */
-export function formatHeader(ctx: CliContext, options: { command?: string, version: string }): string {
-  const { paint, link } = createStyle(ctx)
-  const accent = paint('blue', '▍')
-  const wordmark = paint('bold', 'evlog')
-  const command = options.command ? ` ${paint(['cyan', 'bold'], options.command)}` : ''
-  const version = paint('dim', `· v${options.version} ·`)
-  return `\n  ${accent} ${wordmark}${command} ${version} ${link(DOCS_URL, DOCS_LABEL)}\n`
-}
-
-/**
- * Render checks as a blue-railed, aligned list with ✓ / ⚠ / ✗ and dim hints —
- * same left-rail language as the telemetry notice and the wide-event tree.
- */
-export function formatChecks(ctx: CliContext, checks: Check[]): string {
+export function formatChecks(ctx: Pick<CliContext, 'color'>, checks: Check[]): string {
+  if (checks.length === 0) return ''
   const { paint } = createStyle(ctx)
   const width = Math.max(...checks.map(c => c.id.length))
   const rail = paint('blue', '│')
   const lines: string[] = []
 
   for (const check of checks) {
-    const { glyph, color } = SYMBOLS[check.status]
+    const { glyph, color } = CHECK_STATUS[check.status]
     const symbol = paint(color, glyph)
-    const id = paint('dim', check.id.padEnd(width))
-    lines.push(`  ${rail} ${symbol} ${id}  ${check.message}`)
+    const id = paint('cyan', check.id.padEnd(width))
+    lines.push(`${rail} ${symbol} ${id}  ${check.message}`)
     if (check.hint && check.status !== 'ok') {
-      lines.push(`  ${rail}   ${paint('dim', `└─ ${check.hint}`)}`)
+      lines.push(`${rail}   ${paint('dim', `└ ${check.hint}`)}`)
     }
   }
 
   return lines.join('\n')
 }
 
-/** One-line footer: `3 ok · 1 warn · 0 fail` with blue accent and status colors. */
-export function formatSummary(ctx: CliContext, summary: CheckSummary): string {
+/** One-line footer: `3 ok · 1 warn · 0 fail`. */
+export function formatSummary(ctx: Pick<CliContext, 'color'>, summary: CheckSummary): string {
   const { paint } = createStyle(ctx)
   const parts = [
     paint(summary.ok > 0 ? 'green' : 'dim', `${summary.ok} ok`),
     paint(summary.warn > 0 ? 'yellow' : 'dim', `${summary.warn} warn`),
     paint(summary.fail > 0 ? 'red' : 'dim', `${summary.fail} fail`),
   ]
-  return `\n  ${paint('blue', '▍')} ${parts.join(paint('dim', ' · '))}\n`
+  return parts.join(paint('dim', ' · '))
 }
 
 /**

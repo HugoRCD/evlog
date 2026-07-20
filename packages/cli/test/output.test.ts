@@ -5,10 +5,10 @@ import {
   createStyle,
   exitCodeFor,
   formatChecks,
-  formatHeader,
   formatSummary,
   summarize,
 } from '../src/core/output'
+import { formatCommandHeader } from '../src/core/brand'
 import { createContext } from '../src/core/context'
 import type { Check } from '../src/core/output'
 
@@ -48,26 +48,27 @@ describe('summarize / exitCodeFor', () => {
 describe('rendering', () => {
   it('renders a railed plain-text check list with hints', () => {
     expect(formatChecks(plain, checks)).toMatchInlineSnapshot(`
-      "  │ ✓ node   Node v22.0.0
-        │ ⚠ evlog  evlog is not a dependency
-        │   └─ pnpm add evlog
-        │ ✗ logs   sink unreadable
-        │   └─ check permissions"
+      "│ ✓ node   Node v22.0.0
+      │ ⚠ evlog  evlog is not a dependency
+      │   └ pnpm add evlog
+      │ ✗ logs   sink unreadable
+      │   └ check permissions"
     `)
   })
 
   it('renders the summary footer', () => {
-    expect(formatSummary(plain, summarize(checks))).toBe('\n  ▍ 1 ok · 1 warn · 1 fail\n')
+    expect(formatSummary(plain, summarize(checks))).toBe('1 ok · 1 warn · 1 fail')
   })
 
-  it('renders the branded header without ANSI when colors are off', () => {
-    expect(formatHeader(plain, { command: 'doctor', version: '0.0.0' }))
-      .toBe('\n  ▍ evlog doctor · v0.0.0 · evlog.dev (https://evlog.dev)\n')
+  it('renders the command header without ANSI when colors are off', () => {
+    const out = formatCommandHeader(plain, { command: 'doctor', version: '0.0.0' })
+    expect(out).toContain('evlog doctor v0.0.0')
+    expect(out).not.toContain('\x1B')
   })
 
   it('never leaks ANSI codes in plain mode', () => {
     const output = [
-      formatHeader(plain, { version: '0.0.0' }),
+      formatCommandHeader(plain, { command: 'doctor', version: '0.0.0' }),
       formatChecks(plain, checks),
       formatSummary(plain, summarize(checks)),
     ].join('\n')

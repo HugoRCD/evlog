@@ -97,15 +97,25 @@ describe('runDoctor', () => {
     expect(result.summary.fail).toBeGreaterThan(0)
   })
 
-  it('warns when evlog is declared but not installed', async () => {
+  it('records steps + catalog findings on the debug logger', async () => {
     const cwd = await makeProject({
       'package.json': JSON.stringify({ name: 'app', devDependencies: { evlog: '^2.0.0' } }),
     })
+    const { createCliDebug, createCliLogger, ensureCliDebugLogger } = await import('../src/lib/debug')
+    ensureCliDebugLogger({ json: true })
+    const raw = createCliLogger({ command: 'doctor' })
+    const log = createCliDebug(raw)
 
-    const result = await runDoctor(fakeContext(cwd))
-    const evlog = result.checks.find(c => c.id === 'evlog')
-    expect(evlog?.status).toBe('warn')
-    expect(evlog?.message).toContain('not installed')
+    const result = await runDoctor(fakeContext(cwd), log)
+    expect(result.checks.find(c => c.id === 'evlog')?.status).toBe('warn')
+
+    const ctx = raw.getContext()
+    expect(ctx.steps).toEqual(['resolveProject', 'resolveEvlog', 'detectStack', 'checks', 'done'])
+    expect(Array.isArray(ctx.resolveTried)).toBe(true)
+
+    const findings = ctx.findings as Array<{ code: string }> | undefined
+    expect(findings?.some(f => f.code === 'cli.EVLOG_DECLARED_NOT_INSTALLED')).toBe(true)
+    expect(findings?.some(f => f.code === 'cli.LOGS_SINK_MISSING')).toBe(true)
   })
 
   it('warns outside a Node project', async () => {
@@ -185,7 +195,6 @@ describe('formatDoctorReport', () => {
     const out = formatDoctorReport(ctx, result)
 
     expect(out).not.toContain('\x1B')
-    expect(out).toContain('evlog doctor')
     expect(out).toContain('ENVIRONMENT')
     expect(out).toContain('EVLOG')
     expect(out).toContain('docs')

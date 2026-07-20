@@ -33,6 +33,15 @@ export interface EvlogInstall {
   declaredRange: string | null
 }
 
+/** One probe while resolving `evlog` from the filesystem / require graph. */
+export interface ResolveAttempt {
+  base: string
+  method: 'require' | 'fs'
+  ok: boolean
+  path?: string
+  error?: string
+}
+
 async function exists(path: string): Promise<boolean> {
   try {
     await access(path)
@@ -40,6 +49,11 @@ async function exists(path: string): Promise<boolean> {
   } catch {
     return false
   }
+}
+
+/** Deduplicate path list while preserving order. */
+function uniquePaths(paths: string[]): string[] {
+  return [...new Set(paths)]
 }
 
 /** Read and parse a JSON file; `null` on missing / invalid. */
@@ -126,34 +140,51 @@ function declaredEvlog(pkg: PackageJson | null): { range: string, field: string 
 /**
  * Resolve an installed `evlog` package by walking `node_modules` (hoist-aware)
  * via `createRequire`, then fall back to declared ranges in the local package.json.
+ *
+ * `tried` lists every probe (for `--debug` decision trails).
  */
 export async function resolveEvlog(project: ProjectInfo): Promise<{
   install: EvlogInstall | null
   declared: { range: string, field: string } | null
+  tried: ResolveAttempt[]
 }> {
   const declared = declaredEvlog(project.packageJson)
+  const tried: ResolveAttempt[] = []
 
-  const candidates = [project.packageDir, project.root, project.cwd]
+  // packageDir / root / cwd often collapse to the same path (e.g. bare /tmp)
+  const candidates = uniquePaths([project.packageDir, project.root, project.cwd])
   for (const base of candidates) {
     const pkgJsonPath = join(base, 'package.json')
-    if (!(await exists(pkgJsonPath))) continue
+    if (!(await exists(pkgJsonPath))) {
+      tried.push({ base, method: 'require', ok: false, error: 'no package.json' })
+      continue
+    }
     try {
       const require = createRequire(pkgJsonPath)
       const resolved = require.resolve('evlog/package.json')
       const meta = await readJson<{ version?: string }>(resolved)
       if (meta?.version) {
+        const path = dirname(resolved)
+        tried.push({ base, method: 'require', ok: true, path })
         return {
           install: {
             version: meta.version,
-            path: dirname(resolved),
+            path,
             declaredIn: declared ? project.packageDir : null,
             declaredRange: declared?.range ?? null,
           },
           declared,
+          tried,
         }
       }
-    } catch {
-      // not resolvable from this base
+      tried.push({ base, method: 'require', ok: false, error: 'package.json missing version' })
+    } catch (error) {
+      tried.push({
+        base,
+        method: 'require',
+        ok: false,
+        error: error instanceof Error ? error.message : String(error),
+      })
     }
   }
 
@@ -162,19 +193,23 @@ export async function resolveEvlog(project: ProjectInfo): Promise<{
     const direct = join(base, 'node_modules', 'evlog', 'package.json')
     const meta = await readJson<{ version?: string }>(direct)
     if (meta?.version) {
+      const path = dirname(direct)
+      tried.push({ base, method: 'fs', ok: true, path })
       return {
         install: {
           version: meta.version,
-          path: dirname(direct),
+          path,
           declaredIn: declared ? project.packageDir : null,
           declaredRange: declared?.range ?? null,
         },
         declared,
+        tried,
       }
     }
+    tried.push({ base, method: 'fs', ok: false, error: 'not found' })
   }
 
-  return { install: null, declared }
+  return { install: null, declared, tried }
 }
 
 /** Relative path for display; `.` when identical. */
@@ -191,7 +226,7 @@ export async function findLogsSink(project: ProjectInfo): Promise<{
   dir: string
   files: number
 } | null> {
-  for (const base of [project.cwd, project.packageDir, project.root]) {
+  for (const base of uniquePaths([project.cwd, project.packageDir, project.root])) {
     const dir = join(base, '.evlog', 'logs')
     try {
       await stat(dir)

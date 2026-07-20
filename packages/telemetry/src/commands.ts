@@ -2,6 +2,7 @@ import { defineCommand } from 'citty'
 import { disableTelemetry, enableTelemetry } from './create'
 import { generateDisclosure } from './disclosure'
 import { readPreferenceSync, resolveConsent } from './consent'
+import { getTelemetryDir } from './paths'
 import type { TelemetryOptions } from './types'
 
 /**
@@ -21,7 +22,9 @@ export function defineTelemetryCommands(options: Pick<TelemetryOptions, 'name' |
         run() {
           const enabled = resolveConsent(options.name)
           const pref = readPreferenceSync(options.name)
+          const dir = getTelemetryDir(options.name)
           process.stderr.write(`Telemetry: ${enabled ? 'enabled' : 'disabled'} (preference: ${pref})\n`)
+          process.stderr.write(`Data directory: ${dir}\n`)
           process.stderr.write('\n')
           process.stderr.write(disclosure.markdown)
           process.stderr.write('\n')
