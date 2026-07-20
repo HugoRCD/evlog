@@ -1,8 +1,8 @@
-# @evlog/telemetry
+# @evlog/cli
 
-## 0.1.1
+## 0.1.0
 
-### Patch Changes
+### Minor Changes
 
 - [#431](https://github.com/HugoRCD/evlog/pull/431) [`0b90010`](https://github.com/HugoRCD/evlog/commit/0b90010a614ae4e03ec823592ff3a5eec592dc66) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Introduce the evlog CLI (`@evlog/cli`, binary `evlog`). First release ships `evlog doctor` — diagnoses your setup (Node version, evlog install, local `.evlog/logs` sink) with a branded terminal report or `--json` output — plus `evlog telemetry status|enable|disable`. Opt into debug with `--debug` / `EVLOG_CLI_DEBUG=1`. Commands use `defineEvlogCommand` → `{ cli, log, ui }`: `log.step` / `log.finding(cliErrors.X)` for diagnostics, `ui.done` for human/json/exit. Compact case-file on stderr; raw event with `--json --debug`. Workspace detection covers pnpm, bun (`bun.lock` / `bun.lockb`), npm, and yarn.
 
@@ -10,10 +10,8 @@
 
   `withTelemetry()` is now generic over citty `ArgsDef`, so root commands with typed flags (e.g. `--debug`) type-check cleanly. `evlog telemetry status` (and any tool using `defineTelemetryCommands`) prints the local data directory path. Telemetry `env.environment` is part of the standard envelope; authors may pass `environment` in `TelemetryOptions`.
 
-## 0.1.0
+### Patch Changes
 
-### Minor Changes
-
-- [#417](https://github.com/HugoRCD/evlog/pull/417) [`0a66edf`](https://github.com/HugoRCD/evlog/commit/0a66edf3d67ac4e52050eeacea201e119d530465) Thanks [@HugoRCD](https://github.com/HugoRCD)! - # @evlog/telemetry
-
-  Initial release of `@evlog/telemetry` — evlog's wide-event model for CLIs and automation. One structured event per command via citty `withTelemetry` or `createTelemetry()`, privacy-safe flag capture, disk-buffered outbox, auto-generated disclosure, GitHub Actions helper, and `@evlog/telemetry/ingest` with `parseIngestBody()` for server endpoints. Opt-out via `DO_NOT_TRACK`, `EVLOG_TELEMETRY=0`, or persisted preference.
+- Updated dependencies [[`0b90010`](https://github.com/HugoRCD/evlog/commit/0b90010a614ae4e03ec823592ff3a5eec592dc66), [`573f772`](https://github.com/HugoRCD/evlog/commit/573f772cdb0d69425739c389b780119fbb63259e), [`9b2d3d9`](https://github.com/HugoRCD/evlog/commit/9b2d3d94ad0e922942f35cc6b604db7e8b764fa0)]:
+  - @evlog/telemetry@0.1.1
+  - evlog@2.22.1

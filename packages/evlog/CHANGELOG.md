@@ -1,5 +1,13 @@
 # evlog
 
+## 2.22.1
+
+### Patch Changes
+
+- [#431](https://github.com/HugoRCD/evlog/pull/431) [`573f772`](https://github.com/HugoRCD/evlog/commit/573f772cdb0d69425739c389b780119fbb63259e) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Export `evlog/package.json` so tooling (e.g. `evlog doctor`) can resolve the installed version via `require.resolve('evlog/package.json')` under Node's `exports` map.
+
+- [#433](https://github.com/HugoRCD/evlog/pull/433) [`9b2d3d9`](https://github.com/HugoRCD/evlog/commit/9b2d3d94ad0e922942f35cc6b604db7e8b764fa0) Thanks [@TheLiberal](https://github.com/TheLiberal)! - Fix the Nitro v3 response hook breaking every streaming response (SSE, NDJSON, and `transfer-encoding: chunked` — which includes all tRPC v11 `httpBatchStreamLink` traffic). The hook locked the original response body via `getReader()` and assigned the wrapped response to `event.res`, which is a getter-only accessor on h3 v2, producing `Attempted to assign to readonly property` followed by `ReadableStream is locked` and a 500 for the client. Streaming responses now pass through untouched and the wide event is emitted at header time; stream-lifetime metrics are not observable from h3 v2's `onResponse` hook, which cannot replace the outgoing response.
+
 ## 2.22.0
 
 ### Minor Changes
