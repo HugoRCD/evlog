@@ -90,6 +90,39 @@ describe.sequential('Nitro v3 Server with evlog', () => {
     }
   })
 
+  it.sequential('should pass streaming responses through and emit at header time', async () => {
+    const logs: any[] = []
+    const mockFn = vi.fn((context) => {
+      logs.push(String(context))
+    })
+
+    consola.mockTypes((typeName, type) => mockFn)
+    consola.wrapAll()
+
+    try {
+      const res = await server.fetch(new Request(new URL('/stream', server.url)))
+
+      expect(res.status).toBe(200)
+
+      // The plugin must not lock, wrap, or replace the streaming body
+      const text = await res.text()
+      expect(text).toContain('data: one')
+      expect(text).toContain('data: two')
+
+      // Wait for the async log write deterministically instead of sleeping
+      await vi.waitFor(
+        () => expect(logs.join('\n')).toMatch(/INFO.*GET \/stream.*200/),
+        { timeout: 1000, interval: 5 },
+      )
+
+      const logOutput = logs.join('\n')
+      expect(logOutput).toContain('stream:')
+      expect(logOutput).toContain('kind=sse')
+    } finally {
+      consola.restoreAll()
+    }
+  })
+
   it.sequential('should handle structured errors correctly', async () => {
     const logs: any[] = []
     const mockFn = vi.fn((context) => {
