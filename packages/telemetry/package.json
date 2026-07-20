@@ -64,7 +64,7 @@
   },
   "devDependencies": {
     "@vitest/coverage-v8": "^4.1.10",
-    "tsdown": "^0.22.8",
+    "tsdown": "^0.22.9",
     "tsx": "^4.23.1",
     "typescript": "^6.0.3",
     "vitest": "^4.1.10"
