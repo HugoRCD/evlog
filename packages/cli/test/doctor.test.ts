@@ -142,8 +142,7 @@ describe('runDoctor', () => {
     }) as typeof process.stdout.write)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    const run = typeof doctor.run === 'function' ? doctor.run : await doctor.run
-    await run!({
+    await doctor.run!({
       args: { json: true, noHeader: true, cwd, debug: false },
       rawArgs: [],
       cmd: doctor,
