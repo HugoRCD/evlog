@@ -52,10 +52,6 @@ const GRADIENT_TO = [8, 10, 40] as const
  */
 export const GRADIENT_GLYPH = '▄'
 
-/** Shared left padding for command headers and reports (flush left). */
-export const OUTPUT_PAD = ''
-
-
 /** Accent bar width under command titles. */
 export const HEADER_GRADIENT_WIDTH = 28
 
@@ -122,8 +118,8 @@ export function formatCommandHeader(
   const version = options.version ?? VERSION
   return [
     '',
-    `${OUTPUT_PAD}${paint('bold', 'evlog')} ${paint(['cyan', 'bold'], options.command)} ${paint('dim', `v${version}`)}`,
-    `${OUTPUT_PAD}${gradientRule(ctx, HEADER_GRADIENT_WIDTH)}`,
+    `${paint('bold', 'evlog')} ${paint(['cyan', 'bold'], options.command)} ${paint('dim', `v${version}`)}`,
+    `${gradientRule(ctx, HEADER_GRADIENT_WIDTH)}`,
     '',
   ].join('\n')
 }

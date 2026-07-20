@@ -1,16 +1,18 @@
-import { defineCommand } from 'citty'
 import { telemetry } from '@evlog/telemetry'
-import { OUTPUT_PAD, formatCommandHeader, wantsHeader } from '../core/brand'
-import { createContext } from '../core/context'
 import type { CliContext } from '../core/context'
 import {
+  DOCS_LABEL,
+  DOCS_URL,
   createStyle,
-  exitCodeFor,
+  formatChecks,
+  formatSummary,
   summarize,
-  writeHuman,
-  writeJson,
 } from '../core/output'
 import type { Check, CheckSummary } from '../core/output'
+import { defineEvlogCommand } from '../lib/command'
+import type { CatalogFindingSource, CliDebug } from '../lib/debug'
+import { createNoopCliDebug } from '../lib/debug'
+import { cliErrors } from '../lib/errors'
 import {
   detectStack,
   findLogsSink,
@@ -146,32 +148,120 @@ async function checkLogs(project: ProjectInfo): Promise<Check> {
   }
 }
 
+function findingsForChecks(
+  checks: Check[],
+  resolved: Awaited<ReturnType<typeof resolveEvlog>>,
+): Array<{ source: CatalogFindingSource, id: string, status: Check['status'] }> {
+  const findings: Array<{ source: CatalogFindingSource, id: string, status: Check['status'] }> = []
+
+  for (const check of checks) {
+    if (check.status === 'ok') continue
+
+    if (check.id === 'node' && check.status === 'fail') {
+      findings.push({ source: cliErrors.NODE_TOO_OLD, id: check.id, status: check.status })
+      continue
+    }
+
+    if (check.id === 'project') {
+      findings.push({ source: cliErrors.PROJECT_NO_PACKAGE, id: check.id, status: check.status })
+      continue
+    }
+
+    if (check.id === 'evlog') {
+      findings.push({
+        source: resolved.declared
+          ? cliErrors.EVLOG_DECLARED_NOT_INSTALLED
+          : cliErrors.EVLOG_NOT_FOUND,
+        id: check.id,
+        status: check.status,
+      })
+      continue
+    }
+
+    if (check.id === 'logs') {
+      findings.push({ source: cliErrors.LOGS_SINK_MISSING, id: check.id, status: check.status })
+    }
+  }
+
+  return findings
+}
+
 /**
  * Diagnose the evlog setup for `ctx.cwd` (monorepo-aware).
  * Pure with respect to the context: no printing, no `process.*` access.
  */
-export async function runDoctor(ctx: CliContext): Promise<DoctorResult> {
-  const project = await resolveProject(ctx.cwd)
-  const resolved = await resolveEvlog(project)
-  const stack = detectStack(project.packageJson)
+export async function runDoctor(
+  ctx: CliContext,
+  log: CliDebug = createNoopCliDebug(),
+): Promise<DoctorResult> {
+  const project = await log.step(
+    'resolveProject',
+    () => resolveProject(ctx.cwd),
+    p => ({
+      cwd: ctx.cwd,
+      project: {
+        kind: p.kind,
+        root: p.root,
+        packageDir: p.packageDir,
+        name: p.packageName,
+      },
+    }),
+  )
 
-  const environment: Check[] = [
-    checkNode(ctx),
-    checkProject(project),
-  ]
-  const stackCheck = checkStack(stack, !!resolved.install)
-  if (stackCheck) environment.push(stackCheck)
+  const resolved = await log.step(
+    'resolveEvlog',
+    () => resolveEvlog(project),
+    r => ({
+      evlog: r.install
+        ? { version: r.install.version, path: r.install.path }
+        : { missing: true, declared: r.declared },
+      resolveTried: r.tried,
+    }),
+  )
 
-  const evlog: Check[] = [
-    checkEvlog(project, resolved),
-    await checkLogs(project),
-  ]
+  const stack = await log.step(
+    'detectStack',
+    () => detectStack(project.packageJson),
+    s => ({ stack: s }),
+  )
+
+  const checks = await log.step('checks', async () => {
+    const environment: Check[] = [
+      checkNode(ctx),
+      checkProject(project),
+    ]
+    const stackCheck = checkStack(stack, !!resolved.install)
+    if (stackCheck) environment.push(stackCheck)
+
+    return [
+      ...environment,
+      checkEvlog(project, resolved),
+      await checkLogs(project),
+    ]
+  })
 
   const sections = [
-    { title: 'ENVIRONMENT', checks: environment },
-    { title: 'EVLOG', checks: evlog },
+    {
+      title: 'ENVIRONMENT',
+      checks: checks.filter(c => c.id === 'node' || c.id === 'project' || c.id === 'stack'),
+    },
+    {
+      title: 'EVLOG',
+      checks: checks.filter(c => c.id === 'evlog' || c.id === 'logs'),
+    },
   ]
-  const checks = sections.flatMap(s => s.checks)
+
+  const summary = summarize(checks)
+
+  for (const { source, id, status } of findingsForChecks(checks, resolved)) {
+    log.finding(source, { id, status })
+  }
+
+  log.set({
+    steps: ['done'],
+    summary,
+    checks: checks.map(c => ({ id: c.id, status: c.status })),
+  })
 
   return {
     project: {
@@ -184,57 +274,30 @@ export async function runDoctor(ctx: CliContext): Promise<DoctorResult> {
     },
     checks,
     sections,
-    summary: summarize(checks),
+    summary,
   }
-}
-
-const SYMBOLS = {
-  ok: { glyph: '✓', color: 'green' as const },
-  warn: { glyph: '⚠', color: 'yellow' as const },
-  fail: { glyph: '✗', color: 'red' as const },
 }
 
 /**
- * On-brand doctor report: shared command header (unless disabled), sectioned checks, summary.
+ * On-brand doctor report: sectioned checks + summary.
+ * Command header is owned by {@link defineEvlogCommand}.
  */
 export function formatDoctorReport(ctx: CliContext, result: DoctorResult): string {
   const { paint, link } = createStyle(ctx)
-  const pad = OUTPUT_PAD
   const lines: string[] = []
-
-  if (wantsHeader(ctx)) {
-    lines.push(formatCommandHeader(ctx, { command: 'doctor' }).trimEnd(), '')
-  }
 
   const where = result.project.kind === 'single'
     ? paint('dim', result.project.name ?? result.project.cwd)
     : paint('dim', `${result.project.kind} workspace`)
-  lines.push(`${pad}${where}`)
-  lines.push('')
+  lines.push(where, '')
 
   for (const section of result.sections) {
-    lines.push(`${pad}${paint('dim', section.title)}`)
-    const idWidth = Math.max(...section.checks.map(c => c.id.length))
-    for (const check of section.checks) {
-      const { glyph, color } = SYMBOLS[check.status]
-      const symbol = paint(color, glyph)
-      const id = paint(['cyan'], check.id.padEnd(idWidth))
-      lines.push(`${pad}${paint('blue', '│')} ${symbol} ${id}  ${check.message}`)
-      if (check.hint) {
-        lines.push(`${pad}${paint('blue', '│')}   ${paint('dim', `└ ${check.hint}`)}`)
-      }
-    }
-    lines.push('')
+    lines.push(paint('dim', section.title))
+    lines.push(formatChecks(ctx, section.checks), '')
   }
 
-  const { summary } = result
-  const parts = [
-    paint(summary.ok > 0 ? 'green' : 'dim', `${summary.ok} ok`),
-    paint(summary.warn > 0 ? 'yellow' : 'dim', `${summary.warn} warn`),
-    paint(summary.fail > 0 ? 'red' : 'dim', `${summary.fail} fail`),
-  ]
-  lines.push(`${pad}${parts.join(paint('dim', ' · '))}`)
-  lines.push(`${pad}${paint('dim', 'docs')} ${link('https://evlog.dev', 'evlog.dev')}`)
+  lines.push(formatSummary(ctx, result.summary))
+  lines.push(`${paint('dim', 'docs')} ${link(DOCS_URL, DOCS_LABEL)}`)
   lines.push('')
 
   return lines.join('\n')
@@ -244,16 +307,15 @@ export function formatDoctorReport(ctx: CliContext, result: DoctorResult): strin
  * `evlog doctor` — diagnose the local evlog setup.
  * Logic lives in {@link runDoctor}; this file owns the citty surface.
  */
-export default defineCommand({
+export default defineEvlogCommand('doctor', {
   meta: { name: 'doctor', description: 'Diagnose your evlog setup' },
   args: {
     cwd: { type: 'string', description: 'Project directory (default: current)' },
-    json: { type: 'boolean', description: 'Machine-readable JSON on stdout' },
   },
-  async run({ args }) {
+  async run({ args, cli, log, ui }) {
     const cwd = typeof args.cwd === 'string' && args.cwd.length > 0 ? args.cwd : undefined
-    const ctx = createContext(cwd ? { cwd } : {})
-    const result = await runDoctor(ctx)
+    const ctx = cwd ? { ...cli, cwd } : cli
+    const result = await runDoctor(ctx, log)
 
     telemetry.set({
       checksFailed: result.summary.fail,
@@ -261,16 +323,15 @@ export default defineCommand({
       workspace: result.project.kind !== 'single',
     })
 
-    if (args.json) {
-      writeJson({
+    ui.done({
+      jsonMode: args.json,
+      json: {
         project: result.project,
         checks: result.checks,
         summary: result.summary,
-      })
-    } else {
-      writeHuman(formatDoctorReport(ctx, result))
-    }
-
-    process.exitCode = exitCodeFor(result.summary)
+      },
+      human: formatDoctorReport(ctx, result),
+      summary: result.summary,
+    })
   },
 })

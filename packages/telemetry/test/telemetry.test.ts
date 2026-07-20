@@ -288,3 +288,34 @@ describe('telemetry payload snapshot', () => {
     expect(exampleRunEvent({ idempotencyKey: key })).toMatchSnapshot()
   })
 })
+
+describe('telemetry status command', () => {
+  it('prints the local data directory', async () => {
+    const { defineTelemetryCommands } = await import('../src/commands')
+    const { getTelemetryDir } = await import('../src/paths')
+    const writes: string[] = []
+    const original = process.stderr.write.bind(process.stderr)
+    process.stderr.write = ((chunk: string | Uint8Array) => {
+      writes.push(typeof chunk === 'string' ? chunk : Buffer.from(chunk).toString())
+      return true
+    }) as typeof process.stderr.write
+
+    try {
+      const tree = defineTelemetryCommands({ name: TOOL })
+      const status = tree.subCommands?.status
+      expect(status).toBeDefined()
+      const cmd = typeof status === 'function' ? await status() : await status
+      await cmd!.run?.({
+        args: {},
+        rawArgs: [],
+        data: undefined,
+        cmd: cmd!,
+      })
+      const out = writes.join('')
+      expect(out).toContain(`Data directory: ${getTelemetryDir(TOOL)}`)
+      expect(out).toMatch(/Telemetry: (enabled|disabled)/)
+    } finally {
+      process.stderr.write = original
+    }
+  })
+})

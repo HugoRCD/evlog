@@ -1,6 +1,7 @@
 import { defineCommand } from 'citty'
 import { withTelemetry } from '@evlog/telemetry'
 import { subCommands } from './commands'
+import { COMMON_ARGS } from './lib/command'
 import { TOOL_NAME, VERSION } from './lib/constants'
 
 /**
@@ -13,6 +14,9 @@ export const main = withTelemetry(
       name: 'evlog',
       description: 'evlog — digging through logs is not observability. it\'s hope · https://evlog.dev',
       version: VERSION,
+    },
+    args: {
+      debug: COMMON_ARGS.debug,
     },
     subCommands,
   }),

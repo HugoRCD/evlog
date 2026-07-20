@@ -1,8 +1,8 @@
-import type { CommandDef } from 'citty'
+import type { ArgsDef, CommandDef } from 'citty'
 import { createTelemetry } from './create'
 import type { CollectFields, CollectFlags, TelemetryOptions } from './types'
 
-type AnyCommand = CommandDef & {
+type AnyCommand = CommandDef<ArgsDef> & {
   subCommands?: Record<string, AnyCommand>
 }
 
@@ -47,12 +47,13 @@ function wrapCommand(
  * Returns the wrapped command for `runMain()`.
  */
 export function withTelemetry<
+  const TArgs extends ArgsDef = ArgsDef,
   TFlags extends CollectFlags = {},
   TFields extends CollectFields = {},
 >(
-  command: CommandDef,
+  command: CommandDef<TArgs>,
   options: TelemetryOptions<TFlags, TFields>,
-): CommandDef {
+): CommandDef<TArgs> {
   const instance = createTelemetry(options)
-  return wrapCommand(command as AnyCommand, instance, [], true)
+  return wrapCommand(command as AnyCommand, instance, [], true) as CommandDef<TArgs>
 }

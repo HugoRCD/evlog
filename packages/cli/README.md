@@ -38,6 +38,7 @@ npx @evlog/cli doctor --cwd apps/web
 | --- | --- |
 | `evlog doctor` | Monorepo-aware diagnosis: Node, project/workspace, stack, evlog install, `.evlog/logs` |
 | `evlog doctor --cwd <dir>` | Run against another directory |
+| `evlog doctor --debug` | Same, plus a debug wide event (see Debug) |
 | `evlog telemetry status` | Show telemetry status and disclosure |
 | `evlog telemetry enable` / `disable` | Change telemetry preference (disable purges buffered data) |
 
@@ -77,9 +78,20 @@ Full policy: [evlog.dev — telemetry](https://evlog.dev/use-cases/telemetry/ove
 
 Commands print a short branded header by default. Skip it with `--no-header`, `EVLOG_CLI_NO_HEADER=1`, or `--json`.
 
+## Debug
+
+Emit one debug case file per command with `--debug` or `EVLOG_CLI_DEBUG=1` (dogfoods `evlog`). Human mode prints a compact summary on stderr (`steps`, `findings`, resolve probes). With `--json`, the raw wide event goes to stderr so stdout stays a clean JSON contract. Separate from product telemetry (`@evlog/telemetry`).
+
+```bash
+evlog doctor --debug
+evlog doctor --json --debug   # JSON result on stdout, full debug event on stderr
+```
+
+Maintainer notes on frictions / wishlist: [`DEBUG-DX.md`](./DEBUG-DX.md).
+
 ## Adding a command
 
-1. Create `src/commands/<name>.ts` exporting a **default** citty command via `defineEvlogCommand('name', …)` from `lib/command` — branded header is automatic (skipped for `--json` / `--no-header`). Pure logic in the same file (or under `lib/`); render via `core/output.ts`.
+1. Create `src/commands/<name>.ts` with `defineEvlogCommand('name', { run({ args, cli, log, ui }) { … } })` — header, `--json` / `--debug` / `--no-header`, and debug filet are automatic. Use `log.step` / `log.finding` for diagnostics; `ui.done` / `ui.human` / `ui.json` for output.
 2. Register it with one import + one line in [`src/commands/index.ts`](src/commands/index.ts).
 
 `src/index.ts` stays a thin shell (meta + `withTelemetry`). Do not embed command bodies there.

@@ -1,6 +1,9 @@
 /**
  * Execution context passed to every command.
  * The only place allowed to read `process.*` — commands stay pure and testable.
+ *
+ * Debug instrumentation uses {@link import('../lib/debug').CliDebug} from
+ * {@link import('../lib/command').defineEvlogCommand}, not this object.
  */
 export interface CliContext {
   /** Working directory used to resolve the host project. */
