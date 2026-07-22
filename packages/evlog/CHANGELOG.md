@@ -1,5 +1,11 @@
 # evlog
 
+## 2.22.2
+
+### Patch Changes
+
+- [#438](https://github.com/HugoRCD/evlog/pull/438) [`8f7b5e3`](https://github.com/HugoRCD/evlog/commit/8f7b5e3c933bfd58e910dfa501dbfc0789260cb5) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix `withEvlog` (Next.js) logging a phantom ERROR at status 500 for every `redirect()`/`notFound()`/`forbidden()`/`unauthorized()` call. These APIs throw an internal Next.js control-flow signal that isn't a real error — `withEvlog` now detects it via `unstable_rethrow` and rethrows it untouched instead of logging and emitting an error event.
+
 ## 2.22.1
 
 ### Patch Changes
