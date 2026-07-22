@@ -169,6 +169,66 @@ describe('withEvlog', () => {
     expect(drainMock).not.toHaveBeenCalled()
   })
 
+  it('rethrows forbidden() navigation signals without logging a phantom error (#436)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    const forbiddenError = Object.assign(new Error('NEXT_HTTP_ERROR_FALLBACK'), {
+      digest: 'NEXT_HTTP_ERROR_FALLBACK;403',
+    })
+    const handler = withEvlog((_: Request) => {
+      throw forbiddenError
+    })
+
+    const request = new Request('http://localhost/admin', { method: 'GET' })
+    await expect(handler(request)).rejects.toBe(forbiddenError)
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(consoleSpy).not.toHaveBeenCalled()
+    expect(drainMock).not.toHaveBeenCalled()
+  })
+
+  it('rethrows unauthorized() navigation signals without logging a phantom error (#436)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    const unauthorizedError = Object.assign(new Error('NEXT_HTTP_ERROR_FALLBACK'), {
+      digest: 'NEXT_HTTP_ERROR_FALLBACK;401',
+    })
+    const handler = withEvlog((_: Request) => {
+      throw unauthorizedError
+    })
+
+    const request = new Request('http://localhost/account', { method: 'GET' })
+    await expect(handler(request)).rejects.toBe(unauthorizedError)
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(consoleSpy).not.toHaveBeenCalled()
+    expect(drainMock).not.toHaveBeenCalled()
+  })
+
+  it('rethrows a navigation signal wrapped in error.cause without logging (#436)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    const redirectError = Object.assign(new Error('NEXT_REDIRECT'), {
+      digest: 'NEXT_REDIRECT;replace;/foo;307;',
+    })
+    // Some frameworks/middleware wrap the original error — unstable_rethrow unwraps
+    // `.cause` and rethrows the inner signal, not the outer wrapper.
+    const wrapper = new Error('wrapped', { cause: redirectError })
+    const handler = withEvlog((_: Request) => {
+      throw wrapper
+    })
+
+    const request = new Request('http://localhost/go', { method: 'GET' })
+    await expect(handler(request)).rejects.toBe(redirectError)
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(consoleSpy).not.toHaveBeenCalled()
+    expect(drainMock).not.toHaveBeenCalled()
+  })
+
   it('still logs a real error whose message happens to mention NEXT_REDIRECT (#436)', async () => {
     const withEvlog = createWithEvlog({ pretty: false })
 
