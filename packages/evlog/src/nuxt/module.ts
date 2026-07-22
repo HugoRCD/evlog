@@ -486,7 +486,6 @@ export {}
       filename: 'types/evlog-server.d.ts',
       getContents: () => `declare global {
   const useLogger: typeof import('evlog').useLogger
-  const log: typeof import('evlog').log
   const createEvlogError: typeof import('evlog').createEvlogError
 }
 export {}
@@ -496,7 +495,30 @@ export {}
       // because `$fetch` typings resolve server route return types by
       // importing the route modules directly, which pulls server routes
       // (and therefore these globals) into the app project's typecheck too.
+      // `createEvlogError` is safe to expose in both contexts: it resolves
+      // to the same `evlog` export as the one declared in evlog-client.d.ts.
+      // `log` is intentionally NOT declared here — the server `log` (a
+      // module-level logger for background/non-request code) and the
+      // client `log` (declared in evlog-client.d.ts) are different values
+      // with different types but share the same global name, so it can
+      // only be safely typed within the project that actually needs it.
     }, { nitro: true, nuxt: true })
+
+    addTypeTemplate({
+      filename: 'types/evlog-server-log.d.ts',
+      getContents: () => `declare global {
+  const log: typeof import('evlog').log
+}
+export {}
+`,
+      // Nitro-only: the app tsconfig project already declares a (different)
+      // global `log` via evlog-client.d.ts. Referencing this template there
+      // too would make the two ambient declarations fight over the same
+      // name — since \`skipLibCheck\` is on by default in Nuxt's generated
+      // tsconfigs, TypeScript silently keeps whichever declaration it sees
+      // first instead of erroring, so the losing side's shape goes unused
+      // without warning.
+    }, { nitro: true })
 
     const stripLevels = options.strip ?? ['debug']
     if (stripLevels.length > 0) {
