@@ -1,6 +1,6 @@
 {
   "name": "evlog-community-adapter-skeleton",
-  "version": "8.0.1",
+  "version": "8.0.2",
   "description": "Reference skeleton for a community evlog drain adapter built on defineHttpDrain.",
   "private": true,
   "type": "module",
