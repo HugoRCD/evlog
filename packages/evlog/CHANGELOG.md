@@ -1,5 +1,11 @@
 # evlog
 
+## 2.22.3
+
+### Patch Changes
+
+- [#437](https://github.com/HugoRCD/evlog/pull/437) [`00fadc9`](https://github.com/HugoRCD/evlog/commit/00fadc9573ae8d49b64a5deccd6d2e93ee3ad66b) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Fix `nuxt typecheck` failing with `TS2304: Cannot find name 'useLogger'` (and `createEvlogError`) on server routes. `$fetch`'s return-type inference pulls server routes — and their auto-imported globals — into the app tsconfig project's typecheck too, but the Nuxt module only declared these globals for the server project. `useLogger` and `createEvlogError` are now declared for both projects; the server-only `log` export stays scoped to the server project since it shares its global name with the (differently-typed) client `log`.
+
 ## 2.22.2
 
 ### Patch Changes
