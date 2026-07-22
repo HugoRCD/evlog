@@ -131,6 +131,62 @@ describe('withEvlog', () => {
     expect(parsed.status).toBe(404)
   })
 
+  it('rethrows redirect() navigation signals without logging a phantom error (#436)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    const redirectError = Object.assign(new Error('NEXT_REDIRECT'), {
+      digest: 'NEXT_REDIRECT;replace;/foo;307;',
+    })
+    const handler = withEvlog((_: Request) => {
+      throw redirectError
+    })
+
+    const request = new Request('http://localhost/go', { method: 'GET' })
+    await expect(handler(request)).rejects.toBe(redirectError)
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(consoleSpy).not.toHaveBeenCalled()
+    expect(drainMock).not.toHaveBeenCalled()
+  })
+
+  it('rethrows notFound() navigation signals without logging a phantom error (#436)', async () => {
+    const drainMock = vi.fn()
+    const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
+
+    const notFoundError = Object.assign(new Error('NEXT_HTTP_ERROR_FALLBACK'), {
+      digest: 'NEXT_HTTP_ERROR_FALLBACK;404',
+    })
+    const handler = withEvlog((_: Request) => {
+      throw notFoundError
+    })
+
+    const request = new Request('http://localhost/missing', { method: 'GET' })
+    await expect(handler(request)).rejects.toBe(notFoundError)
+
+    expect(consoleErrorSpy).not.toHaveBeenCalled()
+    expect(consoleSpy).not.toHaveBeenCalled()
+    expect(drainMock).not.toHaveBeenCalled()
+  })
+
+  it('still logs a real error whose message happens to mention NEXT_REDIRECT (#436)', async () => {
+    const withEvlog = createWithEvlog({ pretty: false })
+
+    const handler = withEvlog((_: Request) => {
+      // No `digest` set — unstable_rethrow must not treat this as a navigation signal.
+      throw new Error('something about NEXT_REDIRECT went wrong')
+    })
+
+    const request = new Request('http://localhost/api/test', { method: 'GET' })
+    await expect(handler(request)).rejects.toThrow('something about NEXT_REDIRECT went wrong')
+
+    expect(consoleErrorSpy).toHaveBeenCalled()
+    const [[output]] = consoleErrorSpy.mock.calls
+    const parsed = JSON.parse(output)
+    expect(parsed.level).toBe('error')
+    expect(parsed.status).toBe(500)
+  })
+
   it('calls drain callback with emitted event', async () => {
     const drainMock = vi.fn()
     const withEvlog = createWithEvlog({ pretty: false, drain: drainMock })
