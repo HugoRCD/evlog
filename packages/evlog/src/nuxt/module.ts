@@ -491,7 +491,12 @@ export {}
 }
 export {}
 `,
-    }, { nitro: true })
+      // `nitro: true` puts the reference on the server tsconfig project.
+      // `nuxt: true` also puts it on the app tsconfig project — required
+      // because `$fetch` typings resolve server route return types by
+      // importing the route modules directly, which pulls server routes
+      // (and therefore these globals) into the app project's typecheck too.
+    }, { nitro: true, nuxt: true })
 
     const stripLevels = options.strip ?? ['debug']
     if (stripLevels.length > 0) {
