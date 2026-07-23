@@ -66,7 +66,7 @@ Breaking this shape requires a `schemaVersion` bump.
 
 ## Telemetry
 
-The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Opt out anytime:
+The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Delivered to evlog's own dashboard (`apps/telemetry` in this repo); override with `EVLOG_TELEMETRY_ENDPOINT` to point at your own instance. Opt out anytime:
 
 ```bash
 evlog telemetry disable   # or DO_NOT_TRACK=1 / EVLOG_TELEMETRY=0

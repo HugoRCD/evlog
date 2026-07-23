@@ -1,0 +1,66 @@
+@import "tailwindcss";
+@import "@nuxt/ui";
+
+/*
+ * Brand tokens — mirror `apps/docs/app/assets/css/main.css` verbatim so the
+ * telemetry dashboard matches evlog's actual brand instead of stock Nuxt UI
+ * blue/rounded defaults. Keep in sync with the docs site if the brand changes.
+ */
+@theme static {
+  --color-blue-400: #2853ff;
+  --color-blue-500: #2853ff;
+}
+
+@theme {
+  --font-sans: "Geist", sans-serif;
+  --font-mono: "Geist Mono", monospace;
+  --font-pixel: "Geist Pixel Line", monospace;
+}
+
+:root {
+  --ui-radius: 0;
+  --ui-bg: var(--color-zinc-950);
+  --ui-text-dimmed: var(--color-zinc-400);
+}
+
+/*
+ * `nuxt-charts` (Unovis under the hood) theme — mirrors the styling used by
+ * https://github.com/nuxt-ui-templates/chat's chart tool: transparent
+ * tooltip chrome (each chart supplies its own tooltip via the `#tooltip`
+ * slot), axis/legend colors pulled from Nuxt UI's semantic text tokens, and
+ * a subtle dot-grid background behind the plot area.
+ */
+:root {
+  --vis-tooltip-padding: 0 !important;
+  --vis-tooltip-background-color: transparent !important;
+  --vis-tooltip-border-color: transparent !important;
+
+  --vis-axis-grid-color: rgba(255, 255, 255, 0) !important;
+  --vis-axis-tick-label-color: var(--ui-text-muted) !important;
+  --vis-axis-label-color: var(--ui-text-toned) !important;
+  --vis-legend-label-color: var(--ui-text-muted) !important;
+
+  /* Unovis only auto-swaps this for its own dark-mode selectors
+   * (`html.dark-theme`/`html[data-theme="dark"]`, etc.), which Nuxt UI's
+   * `.dark` class never matches — override directly so the `padAngle` gaps
+   * in `EnvironmentBreakdown`'s donut don't show its light-mode default. */
+  --vis-donut-background-color: transparent !important;
+
+  --dot-pattern-color: #111827;
+}
+
+.dark {
+  --dot-pattern-color: #9ca3af;
+}
+
+.dot-pattern {
+  position: absolute;
+  /* Purely decorative — never intercept hover/click, or it blocks the chart
+   * SVG it overlaps (e.g. breaks Unovis tooltip hover in `DailyActivityChart`). */
+  pointer-events: none;
+  background-image: radial-gradient(var(--dot-pattern-color) 1px, transparent 1px);
+  background-size: 7px 7px;
+  background-position: -8.5px -8.5px;
+  opacity: 20%;
+  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1), transparent 75%);
+}

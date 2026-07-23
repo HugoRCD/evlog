@@ -8,7 +8,12 @@
     "POSTHOG_API_KEY",
     "POSTHOG_HOST",
     "SENTRY_DSN",
-    "BETTER_STACK_SOURCE_TOKEN"
+    "BETTER_STACK_SOURCE_TOKEN",
+    "DATABASE_URL",
+    "ANALYTICS_PASSWORD",
+    "NUXT_SESSION_PASSWORD",
+    "ANALYTICS_ALLOWED_TOOLS",
+    "ANALYTICS_ALLOWED_CUSTOM_KEYS"
   ],
   "globalPassThroughEnv": [
     "CI",
@@ -65,7 +70,7 @@
       "cache": false
     },
     "test": {
-      "dependsOn": ["^dev:prepare"]
+      "dependsOn": ["dev:prepare"]
     },
     "typecheck": {
       "dependsOn": ["dev:prepare"]
