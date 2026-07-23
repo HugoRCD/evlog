@@ -13,13 +13,13 @@ interface DailyActivityPoint {
   errors: number
 }
 
-/** `BarChart` series — one per outcome, colored via Nuxt UI's semantic tokens,
- * darkened off their raw saturated values so they read as deliberate rather
- * than "hyper brut" against the dashboard's near-black background. The error
- * segment is darkened further so it recedes instead of competing with success. */
+/** `BarChart` series — one per outcome, colored via `--chart-*` tokens
+ * (`main.css`) so the bars stay full-saturation on light cards but darken off
+ * their raw values in dark mode, where they'd otherwise read as "hyper brut"
+ * against the dashboard's near-black background. */
 const SERIES: { key: 'success' | 'errors', name: string, color: string }[] = [
-  { key: 'success', name: 'Success', color: 'color-mix(in srgb, var(--ui-success) 75%, black)' },
-  { key: 'errors', name: 'Error', color: 'color-mix(in srgb, var(--ui-error) 55%, black)' },
+  { key: 'success', name: 'Success', color: 'var(--chart-success-color)' },
+  { key: 'errors', name: 'Error', color: 'var(--chart-error-color)' },
 ]
 
 const categories: Record<string, BulletLegendItemInterface> = Object.fromEntries(
@@ -63,7 +63,7 @@ function formatValue(value: number) {
   <UCard :ui="{ header: 'py-4 px-4', body: 'p-0 sm:p-0' }">
     <template #header>
       <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <UIcon name="i-nucleo-chart-line" class="size-5" />
+        <GlassIconTile icon="i-nucleo-chart-line" />
         {{ hourlyMode ? 'Hourly activity' : 'Daily activity' }}
       </h3>
     </template>

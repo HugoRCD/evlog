@@ -5,17 +5,18 @@ const props = defineProps<{
 
 const total = computed(() => props.environments.reduce((sum, e) => sum + e.count, 0))
 
-/** Darkened off Nuxt UI's raw semantic tokens so the ring reads as a
- * deliberate, muted palette rather than a "hyper brut" set of saturated
+/** `--chart-env-*` tokens (`main.css`) — full-saturation on light cards,
+ * darkened off Nuxt UI's raw semantic tokens in dark mode so the ring reads
+ * as a deliberate, muted palette rather than a "hyper brut" set of saturated
  * primaries against the dashboard's near-black background. */
 const colorByEnvironment: Record<string, string> = {
-  production: 'color-mix(in srgb, var(--ui-success) 75%, black)',
-  preview: 'color-mix(in srgb, var(--ui-warning) 75%, black)',
-  development: 'color-mix(in srgb, var(--ui-primary) 85%, black)',
+  production: 'var(--chart-env-production)',
+  preview: 'var(--chart-env-preview)',
+  development: 'var(--chart-env-development)',
 }
 
 function colorFor(environment: string) {
-  return colorByEnvironment[environment] ?? 'color-mix(in srgb, var(--ui-color-neutral-400) 70%, black)'
+  return colorByEnvironment[environment] ?? 'var(--chart-env-neutral)'
 }
 
 function shareOf(count: number) {
@@ -44,7 +45,7 @@ const categories = computed<Record<string, BulletLegendItemInterface>>(() =>
   <UCard :ui="{ header: 'py-4 px-4', body: 'p-4' }">
     <template #header>
       <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <UIcon name="i-nucleo-rocket" class="size-5" />
+        <GlassIconTile icon="i-nucleo-rocket" />
         Environments
       </h3>
     </template>
