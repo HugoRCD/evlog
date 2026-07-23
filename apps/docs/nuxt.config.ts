@@ -1,4 +1,4 @@
-import { redirects } from './config/redirects'
+import { rawRedirects, redirects } from './config/redirects'
 
 export default defineNuxtConfig({
   extends: ['docus'],
@@ -14,6 +14,15 @@ export default defineNuxtConfig({
     '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
     '/**': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
     ...redirects,
+    ...rawRedirects,
+  },
+
+  // Docus defaults to allowing everything. Keep non-content routes (the MCP
+  // JSON-RPC endpoint, the Studio CMS editor) out of the crawl — they 405/302
+  // on a GET and only add noise to Search Console Coverage.
+  robots: {
+    groups: [{ userAgent: '*', allow: '/', disallow: ['/mcp', '/_studio'] }],
+    sitemap: '/sitemap.xml',
   },
 
   modules: [

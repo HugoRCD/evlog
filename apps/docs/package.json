@@ -8,7 +8,8 @@
     "build": "nuxt build",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
-    "typecheck": "vue-tsc --noEmit"
+    "typecheck": "vue-tsc --noEmit",
+    "test": "vitest run"
   },
   "dependencies": {
     "@databuddy/nuxt": "^2.4.20",
@@ -26,6 +27,7 @@
     "shaders": "^2.5.135"
   },
   "devDependencies": {
-    "eslint": "^9.39.5"
+    "eslint": "^9.39.5",
+    "vitest": "^4.1.10"
   }
 }

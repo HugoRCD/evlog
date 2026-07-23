@@ -25,6 +25,16 @@ export const redirects: Record<string, RouteRedirect> = {
   '/use-cases/eve/overview': r('/use-cases/eve'),
   '/use-cases/telemetry': r('/use-cases/telemetry/overview'),
 
+  // New section roots (no content index page — 404 without an explicit redirect)
+  '/start': r('/start/introduction'),
+  '/learn': r('/learn/overview'),
+  '/integrate': r('/integrate/overview'),
+  '/reference': r('/reference/configuration'),
+  '/examples': r('/integrate/frameworks/overview'),
+  '/adapters/cloud': r('/integrate/adapters/overview'),
+  '/adapters/self-hosted': r('/integrate/adapters/overview'),
+  '/use-cases/audit': r('/use-cases/audit/overview'),
+
   // Getting Started → Start + Reference
   '/getting-started/introduction': r('/start/introduction'),
   '/getting-started/installation': r('/start/installation'),
@@ -154,3 +164,17 @@ export const redirects: Record<string, RouteRedirect> = {
   '/enrichers/built-in': r('/use-cases/enrichers'),
   '/enrichers/custom': r('/extend/custom-enrichers'),
 }
+
+/**
+ * Docus mirrors every content page as raw markdown at `/raw/<path>.md` (used by
+ * `/llms.txt`). That catch-all route resolves by content path and is not covered by
+ * the page-level redirects above, so old paths 404 there even though the HTML page
+ * redirects fine. Derive one mirror redirect per entry instead of hand-duplicating
+ * the whole table — anchored targets (`#retention`) have no raw equivalent and are
+ * skipped.
+ */
+export const rawRedirects: Record<string, RouteRedirect> = Object.fromEntries(
+  Object.entries(redirects)
+    .filter(([, entry]) => !entry.redirect.to.includes('#'))
+    .map(([from, entry]) => [`/raw${from}.md`, r(`/raw${entry.redirect.to}.md`)]),
+)
