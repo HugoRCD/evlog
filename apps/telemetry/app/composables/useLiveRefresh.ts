@@ -14,6 +14,14 @@ export interface UseLiveRefreshReturn {
   enabled: Ref<boolean>
   /** Whether a poll actually fires right now (enabled + tab visible + not suspended). */
   active: ComputedRef<boolean>
+  /**
+   * The most recent tick's failure, if any — `null` once a later tick
+   * succeeds. `refresh` itself decides what counts as a failure: Nuxt's
+   * `useFetch`/`useAsyncData` `refresh()` resolves even on a failed request
+   * (the error lands in its `.error` ref instead), so callers polling those
+   * need to re-throw from inside `refresh` for it to surface here.
+   */
+  lastError: Ref<unknown>
   /** Flip the user toggle (pause/resume button). */
   toggle: () => void
 }
@@ -30,6 +38,7 @@ export function useLiveRefresh(refresh: () => Promise<unknown> | unknown, option
   const enabled = ref(true)
   const visible = ref(true)
   const inFlight = ref(false)
+  const lastError = ref<unknown>(null)
 
   const active = computed(() => enabled.value && visible.value && !(options.suspended?.value ?? false))
 
@@ -42,6 +51,9 @@ export function useLiveRefresh(refresh: () => Promise<unknown> | unknown, option
     inFlight.value = true
     try {
       await refresh()
+      lastError.value = null
+    } catch (error) {
+      lastError.value = error
     } finally {
       inFlight.value = false
     }
@@ -64,5 +76,5 @@ export function useLiveRefresh(refresh: () => Promise<unknown> | unknown, option
     if (timer) clearInterval(timer)
   })
 
-  return { enabled, active, toggle }
+  return { enabled, active, lastError, toggle }
 }
