@@ -176,6 +176,14 @@ function validateEnv(input: unknown): RunEvent['env'] {
   if (env.agent !== null && typeof env.agent !== 'string') {
     throw new IngestValidationError('invalid env.agent')
   }
+  // `os`/`arch` were added after the first release — older clients omit them,
+  // so `undefined` is accepted and normalized to `null`.
+  if (env.os !== undefined && env.os !== null && typeof env.os !== 'string') {
+    throw new IngestValidationError('invalid env.os')
+  }
+  if (env.arch !== undefined && env.arch !== null && typeof env.arch !== 'string') {
+    throw new IngestValidationError('invalid env.arch')
+  }
   if (typeof env.environment !== 'string' || !env.environment.trim()) {
     throw new IngestValidationError('invalid env.environment')
   }
@@ -186,6 +194,8 @@ function validateEnv(input: unknown): RunEvent['env'] {
     provider: env.provider,
     tty: env.tty,
     agent: env.agent,
+    os: env.os ?? null,
+    arch: env.arch ?? null,
     environment: env.environment.trim(),
   }
 }

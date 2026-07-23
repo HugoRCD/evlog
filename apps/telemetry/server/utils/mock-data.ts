@@ -1,6 +1,8 @@
 // Explicit import (unlike the rest of `server/utils/`) because this module's
 // pure functions are unit-tested directly with plain vitest, outside Nitro's
 // auto-import context.
+import { dailyBucketCount, dailyBucketKeys, fillDailyActivity, fillHourlyActivity, hourlyBucketKeys } from '../../shared/utils/activity-buckets'
+import { DURATION_BUCKETS, durationBucketIndex, nodeMajor } from '../../shared/utils/duration-buckets'
 import { rangeToCutoff } from './query-filters'
 
 interface WeightedOption {
@@ -24,7 +26,12 @@ const MOCK_ERROR_CODES = ['ENOENT', 'ETIMEDOUT', 'CONFIG_INVALID']
 const MOCK_MACHINE_IDS = Array.from({ length: 12 }, (_, i) => `mock-machine-${i.toString(16).padStart(4, '0')}`)
 const MOCK_NODE_VERSIONS = ['v20.11.1', 'v22.4.0', 'v18.20.2']
 const MOCK_PROVIDERS = [null, 'github_actions', 'vercel', 'netlify']
-const MOCK_AGENTS = [null, 'cursor', 'claude-code', 'copilot']
+const MOCK_AGENTS = [null, null, 'cursor', 'claude-code', 'copilot', 'codex']
+const MOCK_OSES: (WeightedOption & { os: string, archs: string[] })[] = [
+  { os: 'darwin', archs: ['arm64', 'arm64', 'x64'], weight: 0.62 },
+  { os: 'linux', archs: ['x64', 'arm64'], weight: 0.3 },
+  { os: 'win32', archs: ['x64'], weight: 0.08 },
+]
 const MOCK_RUN_COUNT = 420
 const MOCK_DAYS_SPAN = 30
 const MOCK_SEED = 42
@@ -78,6 +85,20 @@ function pickFields(rng: () => number, pool: { key: string, values: (boolean | n
   return fields
 }
 
+/** Deterministic env snapshot for one mock run — mirrors `@evlog/telemetry`'s `EnvInfo`. */
+function buildMockEnv(rng: () => number): RunEnvInfo {
+  const osEntry = weightedPick(rng, MOCK_OSES)
+  return {
+    node: pick(rng, MOCK_NODE_VERSIONS),
+    ci: rng() < 0.2,
+    provider: pick(rng, MOCK_PROVIDERS),
+    tty: rng() < 0.7,
+    agent: pick(rng, MOCK_AGENTS),
+    os: osEntry.os,
+    arch: pick(rng, osEntry.archs),
+  }
+}
+
 let cachedRuns: RunRow[] | undefined
 let cachedDetails: Map<number, RunDetail> | undefined
 
@@ -119,13 +140,7 @@ function ensureMockDataset(): void {
       machineId: pick(rng, MOCK_MACHINE_IDS),
       flags: pickFields(rng, MOCK_FLAG_POOL),
       custom: pickFields(rng, MOCK_CUSTOM_POOL),
-      env: {
-        node: pick(rng, MOCK_NODE_VERSIONS),
-        ci: rng() < 0.2,
-        provider: pick(rng, MOCK_PROVIDERS),
-        tty: rng() < 0.7,
-        agent: pick(rng, MOCK_AGENTS),
-      },
+      env: buildMockEnv(rng),
     }
   })
 
@@ -246,9 +261,98 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
     else group.errors++
     dayGroups.set(day, group)
   }
-  const daily: DailyActivity[] = [...dayGroups.entries()]
-    .sort(([a], [b]) => a.localeCompare(b))
+  // Pre-fill every day/hour bucket in the range so the chart always plots a
+  // full, fixed-width timeline instead of shrinking to whichever days have events.
+  const dailyRows: DailyActivity[] = [...dayGroups.entries()]
     .map(([day, group]) => ({ day, success: group.success, errors: group.errors }))
+  const daily = fillDailyActivity(dailyBucketKeys(dailyBucketCount(filter.range)), dailyRows)
+
+  let hourly: HourlyActivity[] = []
+  if (filter.range === '24h') {
+    const hourGroups = new Map<string, { success: number, errors: number }>()
+    for (const run of runs) {
+      const hour = `${run.timestamp.slice(0, 13)}:00`
+      const group = hourGroups.get(hour) ?? { success: 0, errors: 0 }
+      if (run.outcome === 'success') group.success++
+      else group.errors++
+      hourGroups.set(hour, group)
+    }
+    const hourlyRows: HourlyActivity[] = [...hourGroups.entries()]
+      .map(([hour, group]) => ({ hour, success: group.success, errors: group.errors }))
+    hourly = fillHourlyActivity(hourlyBucketKeys(24), hourlyRows)
+  }
+
+  // env-level aggregations read the full detail record (RunRow has no env block).
+  const envs = runs.map(run => getMockRunDetail(run.id)!.env)
+
+  const agentCounts = new Map<string | null, number>()
+  for (const env of envs) agentCounts.set(env.agent, (agentCounts.get(env.agent) ?? 0) + 1)
+  const agents: AgentCount[] = [...agentCounts.entries()]
+    .map(([agent, count]) => ({ agent, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const ciRuns = envs.filter(env => env.ci).length
+  const providerCounts = new Map<string, number>()
+  for (const env of envs) {
+    if (env.provider) providerCounts.set(env.provider, (providerCounts.get(env.provider) ?? 0) + 1)
+  }
+  const ci: CiStats = {
+    ci: ciRuns,
+    local: envs.length - ciRuns,
+    providers: [...providerCounts.entries()]
+      .map(([provider, count]) => ({ provider, count }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8),
+  }
+
+  const nodeCounts = new Map<string, number>()
+  for (const env of envs) {
+    const major = nodeMajor(env.node)
+    nodeCounts.set(major, (nodeCounts.get(major) ?? 0) + 1)
+  }
+  const nodeVersions: VersionCount[] = [...nodeCounts.entries()]
+    .map(([version, count]) => ({ version, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+
+  const toolVersionCounts = new Map<string, number>()
+  for (const run of runs) toolVersionCounts.set(run.version, (toolVersionCounts.get(run.version) ?? 0) + 1)
+  const toolVersions: VersionCount[] = [...toolVersionCounts.entries()]
+    .map(([version, count]) => ({ version, count }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+
+  const osCounts = new Map<string | null, number>()
+  for (const env of envs) osCounts.set(env.os, (osCounts.get(env.os) ?? 0) + 1)
+  const os: OsCount[] = [...osCounts.entries()]
+    .map(([value, count]) => ({ os: value, count }))
+    .sort((a, b) => b.count - a.count)
+
+  const errorGroups = new Map<string, { count: number, lastSeen: string }>()
+  for (const run of runs) {
+    if (run.outcome !== 'error' || !run.errorCode) continue
+    const group = errorGroups.get(run.errorCode) ?? { count: 0, lastSeen: run.timestamp }
+    group.count++
+    if (run.timestamp > group.lastSeen) group.lastSeen = run.timestamp
+    errorGroups.set(run.errorCode, group)
+  }
+  const errorCodes: ErrorCodeStat[] = [...errorGroups.entries()]
+    .map(([errorCode, group]) => ({ errorCode, count: group.count, lastSeen: group.lastSeen }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 8)
+
+  const sortedDurations = runs.map(r => r.durationMs).sort((a, b) => a - b)
+  const histogramCounts = DURATION_BUCKETS.map(bucket => ({ bucket: bucket.label, count: 0 }))
+  for (const duration of sortedDurations) histogramCounts[durationBucketIndex(duration)]!.count++
+  const durations: DurationStats = {
+    p50: percentile(sortedDurations, 0.5),
+    p95: percentile(sortedDurations, 0.95),
+    histogram: histogramCounts,
+  }
+
+  const lastEventAt = runs.length > 0
+    ? runs.reduce((max, run) => (run.timestamp > max ? run.timestamp : max), runs[0]!.timestamp)
+    : null
 
   return {
     range: filter.range,
@@ -257,8 +361,28 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
     tools,
     commands,
     daily,
+    hourly,
+    agents,
+    ci,
+    nodeVersions,
+    toolVersions,
+    os,
+    errorCodes,
+    durations,
+    lastEventAt,
     mock: true,
   }
+}
+
+/** Linear-interpolated percentile, mirroring Postgres's `percentile_cont`. Expects `sorted` ascending. */
+function percentile(sorted: number[], p: number): number {
+  if (sorted.length === 0) return 0
+  const rank = p * (sorted.length - 1)
+  const low = Math.floor(rank)
+  const high = Math.ceil(rank)
+  const lowValue = sorted[low]!
+  const highValue = sorted[high]!
+  return Math.round(lowValue + (highValue - lowValue) * (rank - low))
 }
 
 export interface MockRunsPageOptions {

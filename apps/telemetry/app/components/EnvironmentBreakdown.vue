@@ -41,9 +41,10 @@ const categories = computed<Record<string, BulletLegendItemInterface>>(() =>
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-5 sm:px-6', body: 'p-5 sm:p-6' }">
+  <UCard :ui="{ header: 'py-4 px-4', body: 'p-4' }">
     <template #header>
-      <h3 class="text-lg font-normal text-highlighted">
+      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
+        <UIcon name="i-nucleo-rocket" class="size-5" />
         Environments
       </h3>
     </template>

@@ -40,4 +40,10 @@ describe('buildEnvInfo', () => {
     expect(typeof info.node).toBe('string')
     expect(typeof info.ci).toBe('boolean')
   })
+
+  it('includes os and arch from the current process', () => {
+    const info = buildEnvInfo()
+    expect(info.os).toBe(process.platform)
+    expect(info.arch).toBe(process.arch)
+  })
 })

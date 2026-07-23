@@ -21,6 +21,8 @@ export const runs = pgTable('runs', {
   envProvider: text(),
   envTty: boolean().notNull(),
   envAgent: text(),
+  envOs: text(),
+  envArch: text(),
   environment: text().notNull(),
   machineId: text(),
   eventTimestamp: timestamp({ withTimezone: true }).notNull(),

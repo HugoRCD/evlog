@@ -20,6 +20,10 @@ export interface EnvInfo {
   provider: string | null
   tty: boolean
   agent: string | null
+  /** Operating system platform (`darwin` | `linux` | `win32`, …) — `null` when unknown. */
+  os: string | null
+  /** CPU architecture (`arm64` | `x64`, …) — `null` when unknown. */
+  arch: string | null
   /**
    * Deploy / runtime stage: `development` | `preview` | `production` (or custom).
    * From `EVLOG_TELEMETRY_ENV` → `VERCEL_ENV` → {@link TelemetryOptions.environment} → `NODE_ENV` → `development`.

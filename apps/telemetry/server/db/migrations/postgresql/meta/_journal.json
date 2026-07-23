@@ -8,6 +8,13 @@
       "when": 1784653455592,
       "tag": "0000_abandoned_robin_chapel",
       "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1784841531402,
+      "tag": "0001_legal_goliath",
+      "breakpoints": true
     }
   ]
 }

@@ -27,6 +27,16 @@ const columns: TableColumn<RunRow>[] = SORTABLE_COLUMNS.map(({ key }) => ({ acce
 
 const data = computed(() => props.runs)
 
+// Rows that arrived on a live poll flash then fade (`.live-flash`), same
+// pattern as the live feed so "new data" reads identically everywhere.
+const { isFresh } = useFreshIds(data)
+
+const tableMeta = {
+  class: {
+    tr: (row: TableRow<RunRow>) => isFresh(row.original.id) ? 'live-flash-fresh' : '',
+  },
+}
+
 function getRowId(row: RunRow) {
   return String(row.id)
 }
@@ -38,8 +48,8 @@ function toggleSort(key: RunSortKey) {
 }
 
 function sortIcon(key: RunSortKey) {
-  if (props.sort !== key) return 'i-lucide-chevrons-up-down'
-  return props.order === 'asc' ? 'i-lucide-chevron-up' : 'i-lucide-chevron-down'
+  if (props.sort !== key) return 'i-nucleo-chevrons-expand'
+  return props.order === 'asc' ? 'i-nucleo-chevron-up' : 'i-nucleo-chevron-down'
 }
 
 function handleSelect(_e: Event, row: TableRow<RunRow>) {
@@ -61,7 +71,7 @@ function shortMachineId(id: string | null) {
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4 sm:px-4', body: 'p-0 sm:p-0' }">
+  <UCard :ui="{ header: 'py-4 px-4', body: 'p-0 sm:p-0' }">
     <template #header>
       <h3 class="text-lg font-normal text-highlighted">
         Recent runs
@@ -73,6 +83,7 @@ function shortMachineId(id: string | null) {
       :columns
       :loading
       :get-row-id
+      :meta="tableMeta"
       :ui="{ tr: 'cursor-pointer transition-colors duration-150', th: 'px-4 py-2.5 text-xs', td: 'px-4 py-2 text-sm' }"
       empty="No runs recorded yet."
       @select="handleSelect"
@@ -110,7 +121,7 @@ function shortMachineId(id: string | null) {
         </UBadge>
       </template>
       <template #durationMs-cell="{ row }">
-        <span class="text-muted">{{ row.original.durationMs }}ms</span>
+        <span class="text-muted tabular-nums">{{ row.original.durationMs }}ms</span>
       </template>
       <template #machineId-cell="{ row }">
         <span class="font-mono text-xs text-muted">{{ shortMachineId(row.original.machineId) }}</span>
