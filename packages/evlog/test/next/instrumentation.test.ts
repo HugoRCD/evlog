@@ -81,6 +81,7 @@ describe('createInstrumentation', () => {
       drain: drainMock,
       sampling: { rates: { info: 50 } },
       stringify: false,
+      redact: { paths: ['error.message', 'error.cause'] },
     })
 
     await runRegister(register)
@@ -93,6 +94,7 @@ describe('createInstrumentation', () => {
     expect(config.drain).toBe(drainMock)
     expect(config.sampling).toEqual({ rates: { info: 50 } })
     expect(config.stringify).toBe(false)
+    expect(config.redact).toEqual({ paths: ['error.message', 'error.cause'] })
   })
 
   it('register() with captureOutput patches stdout and stderr', async () => {

@@ -1,5 +1,5 @@
 import { registerDiskPrettyErrorSnippetReader } from '../shared/register-disk-snippet'
-import type { DrainContext, EnvironmentContext, LogLevel, Log, SamplingConfig } from '../types'
+import type { DrainContext, EnvironmentContext, LogLevel, Log, RedactConfig, SamplingConfig } from '../types'
 import type {
   NextInstrumentationErrorContext,
   NextInstrumentationRequest,
@@ -58,6 +58,8 @@ export interface InstrumentationOptions {
   stringify?: boolean
   /** Drain callback called with every emitted event. */
   drain?: (ctx: DrainContext) => void | Promise<void>
+  /** Auto-redaction configuration for PII protection. @default true in production */
+  redact?: boolean | RedactConfig
   /** Capture stdout/stderr as structured log events (Node.js only). */
   captureOutput?: boolean | CaptureOutputOptions
 }
@@ -204,6 +206,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
         minLevel: options.minLevel,
         stringify: options.stringify,
         drain: options.drain,
+        redact: options.redact,
       })
       lockLogger()
       if (process.env.NEXT_RUNTIME === 'nodejs') {
