@@ -14,8 +14,9 @@ async function onSubmit() {
     await $fetch('/api/login', { method: 'POST', body: { password: password.value } })
     await refreshSession()
     await navigateTo('/')
-  } catch {
-    error.value = 'Invalid password'
+  } catch (err) {
+    const data = (err as { data?: { message?: string } })?.data
+    error.value = data?.message ?? 'Invalid password'
   } finally {
     pending.value = false
   }

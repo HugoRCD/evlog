@@ -24,7 +24,7 @@ See the architecture writeup in the docs: [evlog.dev — telemetry ingest](https
 Click the button above. During setup:
 
 1. Pick a Postgres provider from the Vercel Marketplace (Neon, Supabase, ...) — this auto-injects the connection string. NuxtHub picks up `DATABASE_URL`, `POSTGRES_URL`, or `POSTGRESQL_URL` automatically, so whichever name the integration creates just works.
-2. Set `ANALYTICS_PASSWORD` (the dashboard login) and `NUXT_SESSION_PASSWORD` (32+ random chars — `openssl rand -base64 32`).
+2. Set `ANALYTICS_PASSWORD` (the dashboard login — whatever you want to type in) and `NUXT_SESSION_PASSWORD` (32+ *random* chars from `openssl rand -base64 32` — this is a cookie-encryption secret, not a password you type in, and must not be the same value as `ANALYTICS_PASSWORD`).
 3. Point your tool's telemetry `endpoint` at `https://<your-deployment>/api/telemetry/ingest`.
 
 Table migrations (`server/db/migrations/postgresql/`) apply automatically during `nuxi build`/deploy — nothing to run by hand.
