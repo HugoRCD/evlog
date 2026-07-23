@@ -17,6 +17,7 @@ allowBuilds:
   better-sqlite3: true
   isolated-vm: true
   sharp: true
+  maplibre-gl: false
 
 overrides:
   minimark: 0.2.0

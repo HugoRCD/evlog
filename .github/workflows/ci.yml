@@ -78,6 +78,20 @@ jobs:
         working-directory: packages/evlog
         run: pnpm exec vitest run --shard=${{ matrix.shard }}/4
 
+  telemetry:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test + build (apps/telemetry)
+        run: pnpm exec turbo run test build --filter=evlog-telemetry
+
   coverage:
     runs-on: ubuntu-latest
     steps:
@@ -99,7 +113,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [lint, typecheck, test, coverage]
+    needs: [lint, typecheck, test, telemetry, coverage]
     permissions:
       contents: read
       pull-requests: write

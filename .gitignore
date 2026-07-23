@@ -58,3 +58,4 @@ examples/eve/.eve
 packages/evlog/test/nitro-v3/fixture/.wrangler
 apps/nuxthub-playground/.data
 .next/
+apps/telemetry/.data

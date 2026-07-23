@@ -2,7 +2,7 @@ import { defineCommand } from 'citty'
 import { withTelemetry } from '@evlog/telemetry'
 import { subCommands } from './commands'
 import { COMMON_ARGS } from './lib/command'
-import { TOOL_NAME, VERSION } from './lib/constants'
+import { TELEMETRY_ENDPOINT, TOOL_NAME, VERSION } from './lib/constants'
 import { resolveCliEnvironment } from './lib/environment'
 
 /**
@@ -26,6 +26,7 @@ export const main = withTelemetry(
     version: VERSION,
     // Packaged installs report `production`; workspace builds report `development`.
     environment: resolveCliEnvironment(),
+    endpoint: TELEMETRY_ENDPOINT,
   },
 )
 
