@@ -22,6 +22,8 @@ export async function storeRunEvents(events: RunEvent[]): Promise<void> {
     envProvider: run.env.provider,
     envTty: run.env.tty,
     envAgent: run.env.agent,
+    envOs: run.env.os ?? null,
+    envArch: run.env.arch ?? null,
     environment: run.env.environment,
     machineId: run.machineId ?? null,
     eventTimestamp: new Date(run.timestamp),

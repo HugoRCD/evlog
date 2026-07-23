@@ -16,9 +16,10 @@ const data = computed(() => props.commands)
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4 sm:px-4', body: 'p-0 sm:p-0' }">
+  <UCard :ui="{ header: 'py-4 px-4', body: 'p-0 sm:p-0' }">
     <template #header>
-      <h3 class="text-lg font-normal text-highlighted">
+      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
+        <UIcon name="i-nucleo-tasks" class="size-5" />
         Top commands
       </h3>
     </template>

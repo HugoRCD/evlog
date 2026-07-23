@@ -1,7 +1,11 @@
 <script setup lang="ts">
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   daily: DailyActivity[]
-}>()
+  /** When non-empty (24h range), the chart plots hours instead of days. */
+  hourly?: HourlyActivity[]
+}>(), {
+  hourly: () => [],
+})
 
 interface DailyActivityPoint {
   day: string
@@ -22,8 +26,12 @@ const categories: Record<string, BulletLegendItemInterface> = Object.fromEntries
   SERIES.map(s => [s.key, { name: s.name, color: s.color }]),
 )
 
+const hourlyMode = computed(() => props.hourly.length > 0)
+
 const data = computed<DailyActivityPoint[]>(() =>
-  props.daily.map(d => ({ day: formatDay(d.day), success: d.success, errors: d.errors })),
+  hourlyMode.value
+    ? props.hourly.map(h => ({ day: formatHour(h.hour), success: h.success, errors: h.errors }))
+    : props.daily.map(d => ({ day: formatDay(d.day), success: d.success, errors: d.errors })),
 )
 
 /** `BarChart` doesn't scale ticks by an `xAxis` data key — it plots bars at plain
@@ -41,20 +49,26 @@ function formatDay(day: string) {
   return date.toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
+function formatHour(hour: string) {
+  const date = new Date(`${hour}:00Z`)
+  return date.toLocaleTimeString(undefined, { hour: 'numeric' })
+}
+
 function formatValue(value: number) {
   return value.toLocaleString()
 }
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4 sm:px-4', body: 'p-0 sm:p-0' }">
+  <UCard :ui="{ header: 'py-4 px-4', body: 'p-0 sm:p-0' }">
     <template #header>
-      <h3 class="text-lg font-normal text-highlighted">
-        Daily activity
+      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
+        <UIcon name="i-nucleo-chart-line" class="size-5" />
+        {{ hourlyMode ? 'Hourly activity' : 'Daily activity' }}
       </h3>
     </template>
 
-    <div v-if="daily.length === 0" class="py-6 text-center text-sm text-muted">
+    <div v-if="data.length === 0" class="py-6 text-center text-sm text-muted">
       No data yet for this range.
     </div>
 

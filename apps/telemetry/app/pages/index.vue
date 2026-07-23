@@ -84,7 +84,7 @@ const statsQuery = computed(() => ({
   environment: environment.value === ALL ? undefined : environment.value,
 }))
 
-const { data: stats } = await useFetch<StatsResponse>(
+const { data: stats, refresh: refreshStats } = await useFetch<StatsResponse>(
   '/api/telemetry/stats',
   { query: statsQuery, watch: [statsQuery] },
 )
@@ -108,13 +108,32 @@ const runsQuery = computed(() => ({
   pageSize: PAGE_SIZE,
 }))
 
-const { data: runsData, status: runsStatus } = await useFetch<RunsResponse>(
+const { data: runsData, status: runsStatus, refresh: refreshRuns } = await useFetch<RunsResponse>(
   '/api/telemetry/runs',
   { query: runsQuery, watch: [runsQuery] },
 )
 
 const runs = computed(() => runsData.value?.runs ?? [])
 const runsTotal = computed(() => runsData.value?.total ?? 0)
+
+// Dedicated newest-first page for the live feed — independent from the main
+// table's sort/pagination so sorting by duration doesn't scramble the ticker.
+const feedQuery = computed(() => ({
+  range: range.value,
+  tool: tool.value === ALL ? undefined : tool.value,
+  environment: environment.value === ALL ? undefined : environment.value,
+  sort: 'timestamp',
+  order: 'desc',
+  page: 1,
+  pageSize: 8,
+}))
+
+const { data: feedData, refresh: refreshFeed } = await useFetch<RunsResponse>(
+  '/api/telemetry/runs',
+  { query: feedQuery, watch: [feedQuery] },
+)
+
+const feedRuns = computed(() => feedData.value?.runs ?? [])
 
 function onSortChange({ sort: nextSort, order: nextOrder }: { sort: RunSortKey, order: SortOrder }) {
   sort.value = nextSort
@@ -154,6 +173,14 @@ const totals = computed(() => stats.value?.totals ?? { total: 0, success: 0, err
 
 const successRate = computed(() => totals.value.total > 0 ? Math.round((totals.value.success / totals.value.total) * 100) : 0)
 const errorRate = computed(() => totals.value.total > 0 ? Math.round((totals.value.errors / totals.value.total) * 100) : 0)
+const p95DurationMs = computed(() => stats.value?.durations.p95 ?? 0)
+
+// Live refresh: silent 5s poll of all three fetches — paused while the run
+// detail slideover is open so a manually sorted page never shifts mid-read.
+const { active: liveActive, toggle: toggleLive } = useLiveRefresh(
+  () => Promise.all([refreshStats(), refreshRuns(), refreshFeed()]),
+  { suspended: detailOpen },
+)
 
 async function onLogout() {
   await $fetch('/api/logout', { method: 'POST' })
@@ -163,7 +190,7 @@ async function onLogout() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-10 px-4 py-6 sm:px-8 lg:px-12 lg:py-10">
+  <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-8 lg:px-12 lg:py-8">
     <div class="flex flex-wrap items-center justify-between gap-4">
       <h1 class="flex items-center gap-2">
         <span class="relative flex items-center gap-0.5">
@@ -179,14 +206,16 @@ async function onLogout() {
       </h1>
 
       <div class="flex flex-wrap items-center gap-2">
+        <LiveIndicator :live="liveActive" :last-event-at="stats?.lastEventAt ?? null" @toggle="toggleLive" />
         <USelect v-model="range" :items="rangeOptions" value-key="value" class="w-40" />
         <USelect v-model="tool" :items="toolOptions" value-key="value" class="w-40" />
         <USelect v-model="environment" :items="environmentOptions" value-key="value" class="w-44" />
-        <UButton v-if="hasActiveFilters" variant="ghost" color="neutral" icon="i-lucide-rotate-ccw" @click="resetFilters">
+        <UButton v-if="hasActiveFilters" variant="ghost" color="neutral" icon="i-nucleo-refresh" @click="resetFilters">
           Reset filters
         </UButton>
         <McpConnectButton />
-        <UButton v-if="authRequired" variant="ghost" color="neutral" icon="i-lucide-log-out" @click="onLogout">
+        <UColorModeButton />
+        <UButton v-if="authRequired" variant="ghost" color="neutral" icon="i-nucleo-log-out" @click="onLogout">
           Sign out
         </UButton>
       </div>
@@ -196,30 +225,52 @@ async function onLogout() {
       v-if="stats?.mock"
       class="flex items-center gap-2 border-l-2 border-amber-500/40 bg-elevated/30 px-3 py-2 text-xs text-muted"
     >
-      <UIcon name="i-lucide-flask-conical" class="size-3.5 shrink-0 text-amber-500/60" />
+      <UIcon name="i-nucleo-ufo" class="size-3.5 shrink-0 text-amber-500/60" />
       <p>
         Showing sample data — no runs recorded yet, these are generated events so you can explore the dashboard. It'll switch to real events automatically once the CLI starts posting.
       </p>
     </div>
 
-    <div class="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
-      <StatCard label="Total runs" :value="totals.total.toLocaleString()" icon="i-lucide-terminal" />
-      <StatCard label="Success rate" :value="`${successRate}%`" icon="i-lucide-check-circle-2" />
-      <StatCard label="Error rate" :value="`${errorRate}%`" icon="i-lucide-alert-circle" />
-      <StatCard label="Unique machines" :value="totals.machines.toLocaleString()" icon="i-lucide-monitor" />
-      <StatCard label="Avg duration" :value="`${totals.avgDurationMs}ms`" icon="i-lucide-clock" />
+    <div class="stagger-item grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+      <StatCard label="Total runs" :value="totals.total" icon="i-nucleo-code-editor" />
+      <StatCard label="Success rate" :value="successRate" suffix="%" icon="i-nucleo-clipboard-check" />
+      <StatCard label="Error rate" :value="errorRate" suffix="%" icon="i-nucleo-triangle-warning" />
+      <StatCard label="Unique machines" :value="totals.machines" icon="i-nucleo-laptop-mobile" />
+      <StatCard label="Avg duration" :value="totals.avgDurationMs" suffix="ms" icon="i-nucleo-dial" />
+      <StatCard label="p95 duration" :value="p95DurationMs" suffix="ms" icon="i-nucleo-gauge" />
     </div>
 
-    <div class="grid grid-cols-1 gap-8 lg:grid-cols-3">
+    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
       <div class="lg:col-span-2">
-        <DailyActivityChart :daily="stats?.daily ?? []" />
+        <DailyActivityChart :daily="stats?.daily ?? []" :hourly="stats?.hourly ?? []" />
       </div>
-      <EnvironmentBreakdown :environments="stats?.environments ?? []" />
+      <LiveFeed :runs="feedRuns" @row-click="run => openRunDetail(run.id)" />
     </div>
 
-    <CommandsTable :commands="stats?.commands ?? []" />
+    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      <AgentsBreakdown :agents="stats?.agents ?? []" />
+      <EnvironmentBreakdown :environments="stats?.environments ?? []" />
+      <CiBreakdown :ci="stats?.ci ?? { ci: 0, local: 0, providers: [] }" />
+    </div>
 
-    <div class="flex flex-col gap-4">
+    <!-- Short cards stack in the side column against the tall ones on the
+         left — a card never sits alone next to empty space. -->
+    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
+      <div class="flex flex-col gap-6 lg:col-span-2">
+        <DurationHistogram :durations="stats?.durations ?? { p50: 0, p95: 0, histogram: [] }" />
+        <CommandsTable :commands="stats?.commands ?? []" />
+      </div>
+      <div class="flex flex-col gap-6">
+        <ErrorCodesCard :error-codes="stats?.errorCodes ?? []" />
+        <VersionsCard
+          :node-versions="stats?.nodeVersions ?? []"
+          :tool-versions="stats?.toolVersions ?? []"
+          :os="stats?.os ?? []"
+        />
+      </div>
+    </div>
+
+    <div class="stagger-item flex flex-col gap-4">
       <RunsTable
         :runs
         :loading="runsStatus === 'pending'"

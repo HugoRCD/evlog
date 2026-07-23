@@ -56,13 +56,75 @@ describe('computeMockStats', () => {
     expect(stats.totals.total).toBe(0)
     expect(stats.environments).toEqual([])
     expect(stats.commands).toEqual([])
-    expect(stats.daily).toEqual([])
+    // Daily buckets are always pre-filled for the full range, even with zero runs.
+    expect(stats.daily).toHaveLength(30)
+    expect(stats.daily.every(d => d.success === 0 && d.errors === 0)).toBe(true)
+  })
+
+  it('daily activity always covers the full range, zero-filled where there are no runs', () => {
+    expect(computeMockStats({ range: '7d' }).daily).toHaveLength(7)
+    expect(computeMockStats({ range: '30d' }).daily).toHaveLength(30)
+    const week = computeMockStats({ range: '7d' })
+    // Buckets are calendar days, while the range filter is an exact hour cutoff, so a
+    // sliver of boundary runs can fall just outside the oldest bucket — the sum is a
+    // lower bound on the total rather than an exact match.
+    expect(week.daily.reduce((sum, d) => sum + d.success + d.errors, 0)).toBeLessThanOrEqual(week.totals.total)
+    // Bucket keys are contiguous, ascending calendar days.
+    const days = week.daily.map(d => d.day)
+    expect(days).toEqual([...days].sort())
+    expect(new Set(days).size).toBe(days.length)
   })
 
   it('environment and tool breakdowns sum back up to the total', () => {
     const stats = computeMockStats({ range: '30d' })
     expect(stats.environments.reduce((sum, e) => sum + e.count, 0)).toBe(stats.totals.total)
     expect(stats.tools.reduce((sum, t) => sum + t.count, 0)).toBe(stats.totals.total)
+  })
+
+  it('agent, os, and CI breakdowns sum back up to the total', () => {
+    const stats = computeMockStats({ range: '30d' })
+    expect(stats.agents.reduce((sum, a) => sum + a.count, 0)).toBe(stats.totals.total)
+    expect(stats.os.reduce((sum, o) => sum + o.count, 0)).toBe(stats.totals.total)
+    expect(stats.ci.ci + stats.ci.local).toBe(stats.totals.total)
+    expect(stats.agents.some(a => a.agent === null)).toBe(true)
+  })
+
+  it('error codes only aggregate failed runs and carry a lastSeen timestamp', () => {
+    const stats = computeMockStats({ range: '30d' })
+    expect(stats.errorCodes.reduce((sum, e) => sum + e.count, 0)).toBe(stats.totals.errors)
+    for (const entry of stats.errorCodes) {
+      expect(entry.errorCode.length).toBeGreaterThan(0)
+      expect(new Date(entry.lastSeen).toString()).not.toBe('Invalid Date')
+    }
+  })
+
+  it('duration histogram covers every bucket and sums to the total, p50 ≤ p95', () => {
+    const stats = computeMockStats({ range: '30d' })
+    expect(stats.durations.histogram.length).toBeGreaterThan(0)
+    expect(stats.durations.histogram.reduce((sum, b) => sum + b.count, 0)).toBe(stats.totals.total)
+    expect(stats.durations.p50).toBeLessThanOrEqual(stats.durations.p95)
+    expect(stats.durations.p50).toBeGreaterThan(0)
+  })
+
+  it('hourly activity is only populated on the 24h range, always covers 24 buckets', () => {
+    expect(computeMockStats({ range: '7d' }).hourly).toEqual([])
+    const day = computeMockStats({ range: '24h' })
+    expect(day.hourly).toHaveLength(24)
+    expect(day.hourly.reduce((sum, h) => sum + h.success + h.errors, 0)).toBeLessThanOrEqual(day.totals.total)
+  })
+
+  it('exposes lastEventAt as the newest run timestamp', () => {
+    const stats = computeMockStats({ range: '30d' })
+    const newest = getMockRuns().map(r => r.timestamp).sort().at(-1)
+    expect(stats.lastEventAt).toBe(newest)
+  })
+
+  it('node versions are normalized to majors', () => {
+    const stats = computeMockStats({ range: '30d' })
+    for (const entry of stats.nodeVersions) {
+      expect(entry.version).toMatch(/^\d+$/)
+    }
+    expect(stats.nodeVersions.reduce((sum, v) => sum + v.count, 0)).toBe(stats.totals.total)
   })
 })
 

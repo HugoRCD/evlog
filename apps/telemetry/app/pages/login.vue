@@ -28,7 +28,7 @@ async function onSubmit() {
     <UCard class="w-full max-w-sm">
       <template #header>
         <div class="flex items-center gap-2">
-          <UIcon name="i-lucide-activity" class="size-5 text-primary" />
+          <UIcon name="i-nucleo-chart-line" class="size-5 text-primary" />
           <span class="font-semibold">evlog telemetry</span>
         </div>
       </template>

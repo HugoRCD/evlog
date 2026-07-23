@@ -9,7 +9,7 @@ const customEntries = computed(() => props.run ? Object.entries(props.run.custom
 
 /** Mirrors the icons `StatCard` uses for success/error rate, so the same
  * outcome reads the same way everywhere in the dashboard. */
-const outcomeIcon = computed(() => props.run?.outcome === 'success' ? 'i-lucide-check-circle-2' : 'i-lucide-alert-circle')
+const outcomeIcon = computed(() => props.run?.outcome === 'success' ? 'i-nucleo-circle-check' : 'i-nucleo-circle-warning')
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
@@ -22,7 +22,7 @@ function formatFieldValue(value: boolean | number | string) {
 
 <template>
   <div v-if="loading" class="flex justify-center py-12">
-    <UIcon name="i-lucide-loader-2" class="size-5 animate-spin text-muted" />
+    <UIcon name="i-nucleo-loader" class="size-5 animate-spin text-muted" />
   </div>
 
   <div v-else-if="!run" class="py-12 text-center text-sm text-muted">
@@ -32,7 +32,7 @@ function formatFieldValue(value: boolean | number | string) {
   <div v-else class="flex flex-col divide-y divide-default [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
     <section>
       <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-lucide-info" class="size-3.5 text-muted" />
+        <UIcon name="i-nucleo-circle-info" class="size-3.5 text-muted" />
         <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
           Overview
         </h4>
@@ -84,11 +84,11 @@ function formatFieldValue(value: boolean | number | string) {
            but secondary to outcome/duration/environment above. -->
       <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
         <span class="flex items-center gap-1.5">
-          <UIcon name="i-lucide-calendar-clock" class="size-3" />
+          <UIcon name="i-nucleo-calendar" class="size-3" />
           Occurred {{ formatDateTime(run.timestamp) }}
         </span>
         <span class="flex items-center gap-1.5">
-          <UIcon name="i-lucide-inbox" class="size-3" />
+          <UIcon name="i-nucleo-inbox" class="size-3" />
           Received {{ formatDateTime(run.receivedAt) }}
         </span>
       </div>
@@ -96,7 +96,7 @@ function formatFieldValue(value: boolean | number | string) {
 
     <section>
       <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-lucide-server" class="size-3.5 text-muted" />
+        <UIcon name="i-nucleo-server" class="size-3.5 text-muted" />
         <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
           Environment
         </h4>
@@ -142,12 +142,29 @@ function formatFieldValue(value: boolean | number | string) {
             {{ run.env.agent ?? '—' }}
           </dd>
         </div>
+        <div>
+          <dt class="text-xs text-muted">
+            OS
+          </dt>
+          <dd class="mt-0.5 flex items-center gap-1.5">
+            <UIcon v-if="run.env.os" :name="osIcon(run.env.os)" class="size-3 text-muted" />
+            {{ run.env.os ? osLabel(run.env.os) : '—' }}
+          </dd>
+        </div>
+        <div>
+          <dt class="text-xs text-muted">
+            Arch
+          </dt>
+          <dd class="mt-0.5 font-mono">
+            {{ run.env.arch ?? '—' }}
+          </dd>
+        </div>
       </dl>
     </section>
 
     <section>
       <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-lucide-flag" class="size-3.5 text-muted" />
+        <UIcon name="i-nucleo-flag" class="size-3.5 text-muted" />
         <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
           Flags
         </h4>
@@ -165,7 +182,7 @@ function formatFieldValue(value: boolean | number | string) {
 
     <section>
       <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-lucide-tags" class="size-3.5 text-muted" />
+        <UIcon name="i-nucleo-tags" class="size-3.5 text-muted" />
         <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
           Custom fields
         </h4>
@@ -183,7 +200,7 @@ function formatFieldValue(value: boolean | number | string) {
 
     <section>
       <div class="mb-2 flex items-center gap-1.5">
-        <UIcon name="i-lucide-key" class="size-3 text-dimmed" />
+        <UIcon name="i-nucleo-key" class="size-3 text-dimmed" />
         <h4 class="text-[10px] font-medium uppercase tracking-wide text-dimmed">
           Idempotency key
         </h4>

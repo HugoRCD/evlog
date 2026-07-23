@@ -1,4 +1,11 @@
-import { asc, avg, count, countDistinct, desc, eq, sql } from 'drizzle-orm'
+import { and, asc, avg, count, countDistinct, desc, eq, isNotNull, sql } from 'drizzle-orm'
+
+/** Drivers return `timestamptz` from raw `sql` fragments as strings or Dates — normalize to ISO. */
+function toIsoTimestamp(value: string | Date | null | undefined): string | null {
+  if (value === null || value === undefined) return null
+  const date = value instanceof Date ? value : new Date(value)
+  return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
 
 /**
  * Aggregate totals/environments/tools/commands/daily-activity for a filter —
@@ -14,14 +21,25 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
   const successCount = sql<number>`count(*) filter (where ${schema.runs.outcome} = 'success')`
   const errorCount = sql<number>`count(*) filter (where ${schema.runs.outcome} = 'error')`
   const runCount = sql<number>`count(*)`
+  // Thresholds shared with the mock dataset and the dashboard histogram —
+  // `width_bucket` maps a duration to 0..N matching `DURATION_BUCKETS` indices.
+  // Bounds are compile-time constants (never user input), inlined because
+  // bound parameters lose the int[] typing `width_bucket(anyelement, anyarray)`
+  // resolves against.
+  const bucketBounds = DURATION_BUCKETS.slice(1).map(b => b.min)
+  const bucketIndex = sql<number>`width_bucket(${schema.runs.durationMs}, ${sql.raw(`array[${bucketBounds.join(', ')}]`)})`
+  const nodeMajorExpr = sql<string>`regexp_replace(split_part(${schema.runs.envNode}, '.', 1), '^v', '')`
 
-  const [totals, environments, tools, commands, daily] = await Promise.all([
+  const [totals, environments, tools, commands, daily, hourly, agents, ciTotals, providers, nodeVersions, toolVersions, osBreakdown, errorCodes, histogram] = await Promise.all([
     db.select({
       total: runCount,
       success: successCount,
       errors: errorCount,
       machines: countDistinct(schema.runs.machineId),
       avgDurationMs: sql<number>`coalesce(${avg(schema.runs.durationMs)}, 0)`,
+      p50: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${schema.runs.durationMs}), 0)`,
+      p95: sql<number>`coalesce(percentile_cont(0.95) within group (order by ${schema.runs.durationMs}), 0)`,
+      lastEventAt: sql<string | null>`max(${schema.runs.eventTimestamp})`,
     }).from(schema.runs).where(where),
 
     db.select({ environment: schema.runs.environment, count: runCount })
@@ -53,7 +71,75 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
       .from(schema.runs).where(where)
       .groupBy(sql`1`)
       .orderBy(sql`1 asc`),
+
+    // Hourly resolution only makes sense on the 24h view — skip the query otherwise.
+    filter.range === '24h'
+      ? db.select({
+        hour: sql<string>`to_char(date_trunc('hour', ${schema.runs.eventTimestamp}), 'YYYY-MM-DD"T"HH24:00')`,
+        success: successCount,
+        errors: errorCount,
+      })
+        .from(schema.runs).where(where)
+        .groupBy(sql`1`)
+        .orderBy(sql`1 asc`)
+      : Promise.resolve([]),
+
+    db.select({ agent: schema.runs.envAgent, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(schema.runs.envAgent)
+      .orderBy(desc(runCount)),
+
+    db.select({
+      ci: sql<number>`count(*) filter (where ${schema.runs.envCi})`,
+      local: sql<number>`count(*) filter (where not ${schema.runs.envCi})`,
+    }).from(schema.runs).where(where),
+
+    db.select({ provider: schema.runs.envProvider, count: runCount })
+      .from(schema.runs)
+      .where(and(where, isNotNull(schema.runs.envProvider)))
+      .groupBy(schema.runs.envProvider)
+      .orderBy(desc(runCount))
+      .limit(8),
+
+    db.select({ version: nodeMajorExpr, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(sql`1`)
+      .orderBy(desc(runCount))
+      .limit(8),
+
+    db.select({ version: schema.runs.toolVersion, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(schema.runs.toolVersion)
+      .orderBy(desc(runCount))
+      .limit(8),
+
+    db.select({ os: schema.runs.envOs, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(schema.runs.envOs)
+      .orderBy(desc(runCount)),
+
+    db.select({
+      errorCode: schema.runs.errorCode,
+      count: runCount,
+      lastSeen: sql<string>`max(${schema.runs.eventTimestamp})`,
+    })
+      .from(schema.runs)
+      .where(and(where, eq(schema.runs.outcome, 'error'), isNotNull(schema.runs.errorCode)))
+      .groupBy(schema.runs.errorCode)
+      .orderBy(desc(runCount))
+      .limit(8),
+
+    db.select({ bucket: bucketIndex, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(sql`1`)
+      .orderBy(sql`1 asc`),
   ])
+
+  // Pre-fill every histogram bucket so the chart never changes shape between refreshes.
+  const histogramCounts = DURATION_BUCKETS.map((bucket, index) => ({
+    bucket: bucket.label,
+    count: Number(histogram.find(r => Number(r.bucket) === index)?.count ?? 0),
+  }))
 
   return {
     range: filter.range,
@@ -72,7 +158,38 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
       successRate: Number(r.count) > 0 ? Number(r.success) / Number(r.count) : 0,
       avgDurationMs: Math.round(Number(r.avgDurationMs)),
     })),
-    daily: daily.map(r => ({ day: r.day, success: Number(r.success), errors: Number(r.errors) })),
+    // Pre-fill every day/hour bucket in the range so the chart always plots a
+    // full, fixed-width timeline instead of shrinking to whichever days have events.
+    daily: fillDailyActivity(
+      dailyBucketKeys(dailyBucketCount(filter.range)),
+      daily.map(r => ({ day: r.day, success: Number(r.success), errors: Number(r.errors) })),
+    ),
+    hourly: filter.range === '24h'
+      ? fillHourlyActivity(
+        hourlyBucketKeys(24),
+        hourly.map(r => ({ hour: r.hour, success: Number(r.success), errors: Number(r.errors) })),
+      )
+      : [],
+    agents: agents.map(r => ({ agent: r.agent, count: Number(r.count) })),
+    ci: {
+      ci: Number(ciTotals[0]?.ci ?? 0),
+      local: Number(ciTotals[0]?.local ?? 0),
+      providers: providers.map(r => ({ provider: r.provider!, count: Number(r.count) })),
+    },
+    nodeVersions: nodeVersions.map(r => ({ version: r.version, count: Number(r.count) })),
+    toolVersions: toolVersions.map(r => ({ version: r.version, count: Number(r.count) })),
+    os: osBreakdown.map(r => ({ os: r.os, count: Number(r.count) })),
+    errorCodes: errorCodes.map(r => ({
+      errorCode: r.errorCode!,
+      count: Number(r.count),
+      lastSeen: toIsoTimestamp(r.lastSeen) ?? '',
+    })),
+    durations: {
+      p50: Math.round(Number(totals[0]?.p50 ?? 0)),
+      p95: Math.round(Number(totals[0]?.p95 ?? 0)),
+      histogram: histogramCounts,
+    },
+    lastEventAt: toIsoTimestamp(totals[0]?.lastEventAt),
     mock: false,
   }
 }
@@ -169,6 +286,8 @@ export async function getRunDetailById(id: number): Promise<RunDetail | undefine
       provider: row.envProvider,
       tty: row.envTty,
       agent: row.envAgent,
+      os: row.envOs,
+      arch: row.envArch,
     },
     receivedAt: row.receivedAt.toISOString(),
   }

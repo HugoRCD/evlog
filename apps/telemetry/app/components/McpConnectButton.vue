@@ -48,7 +48,7 @@ async function copyConfig() {
 
 <template>
   <UPopover>
-    <UButton variant="ghost" color="neutral" icon="i-lucide-plug">
+    <UButton variant="ghost" color="neutral" icon="i-nucleo-plug">
       Connect MCP
     </UButton>
 
@@ -77,7 +77,7 @@ async function copyConfig() {
               size="sm"
               :color="copiedUrl ? 'success' : 'neutral'"
               variant="subtle"
-              :icon="copiedUrl ? 'i-lucide-check' : 'i-lucide-copy'"
+              :icon="copiedUrl ? 'i-nucleo-check' : 'i-nucleo-copy'"
               block
               @click="copyUrl"
             >
@@ -96,7 +96,7 @@ async function copyConfig() {
               size="sm"
               :color="copiedConfig ? 'success' : 'neutral'"
               variant="subtle"
-              :icon="copiedConfig ? 'i-lucide-check' : 'i-lucide-copy'"
+              :icon="copiedConfig ? 'i-nucleo-check' : 'i-nucleo-copy'"
               block
               @click="copyConfig"
             >

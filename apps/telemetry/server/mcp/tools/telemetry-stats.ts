@@ -5,7 +5,7 @@ import { z } from 'zod'
  * `server/utils/telemetry-queries.ts`.
  */
 export default defineMcpTool({
-  description: 'Get aggregate evlog CLI telemetry stats for a time range: totals (runs, success/error counts, unique machines, avg duration), a breakdown by environment and by tool, the top commands, and daily success/error activity. Serves generated sample data when the dashboard has no real events yet.',
+  description: 'Get aggregate evlog CLI telemetry stats for a time range: totals (runs, success/error counts, unique machines, avg duration), breakdowns by environment, tool, AI coding agent, CI provider, Node major, tool version and OS, top commands, top error codes, duration percentiles (p50/p95) with a histogram, and daily (plus hourly on 24h) success/error activity. Serves generated sample data when the dashboard has no real events yet.',
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   inputSchema: {
     range: z.enum(['24h', '7d', '30d']).default('7d').describe('Time window to aggregate over.'),

@@ -1,29 +1,38 @@
 <script setup lang="ts">
-defineProps<{
+import NumberFlow, { type Format } from '@number-flow/vue'
+
+withDefaults(defineProps<{
   label: string
-  value: string
+  /** Numeric value — animated (odometer-style) on change via NumberFlow. */
+  value: number
   icon: string
+  /** Unit rendered after the digits (`%`, `ms`, …), animated along with them. */
+  suffix?: string
   sublabel?: string
-}>()
+  /** NumberFlow format options (an `Intl.NumberFormat` subset), e.g. `{ notation: 'compact' }`. */
+  format?: Format
+}>(), {
+  suffix: undefined,
+  sublabel: undefined,
+  format: undefined,
+})
 </script>
 
 <template>
-  <UCard :ui="{ body: 'p-5 sm:p-6' }">
-    <div class="flex items-start justify-between gap-3">
-      <div class="flex flex-col gap-1.5">
-        <p class="text-xs font-medium uppercase tracking-wide text-muted">
+  <UCard :ui="{ body: 'p-4' }">
+    <div class="flex min-w-0 items-start justify-between gap-2">
+      <div class="flex min-w-0 flex-col gap-2">
+        <p class="truncate text-[11px] font-medium uppercase tracking-wider text-muted">
           {{ label }}
         </p>
-        <p class="text-3xl font-bold tracking-tight text-highlighted">
-          {{ value }}
+        <p class="text-2xl font-bold tracking-tight text-highlighted tabular-nums xl:text-3xl">
+          <NumberFlow :value :suffix :format />
         </p>
         <p v-if="sublabel" class="text-xs text-muted">
           {{ sublabel }}
         </p>
       </div>
-      <div class="flex size-9 shrink-0 items-center justify-center bg-elevated text-muted">
-        <UIcon :name="icon" class="size-4" />
-      </div>
+      <UIcon :name="icon" class="size-5 shrink-0 text-dimmed" />
     </div>
   </UCard>
 </template>

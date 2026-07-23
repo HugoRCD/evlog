@@ -27,6 +27,18 @@ export default defineNuxtConfig({
     experimental: { asyncContext: true }, // required for useEvent() in server/mcp/index.ts's middleware
   },
 
+  // Custom Nucleo collection (`i-nucleo-<name>`) — SVGs exported from the
+  // local Nucleo.app library by `scripts/export-nucleo-icons.mjs`. Glass
+  // icons keep their multi-color gradients; outline glyphs use currentColor.
+  icon: {
+    customCollections: [
+      {
+        prefix: 'nucleo',
+        dir: './app/assets/icons/nucleo',
+      }
+    ],
+  },
+
   fonts: {
     defaults: {
       // Full variable axis — discrete weights from @nuxt/ui defaults render too thin on Chromium.

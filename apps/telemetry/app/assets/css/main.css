@@ -19,6 +19,11 @@
 
 :root {
   --ui-radius: 0;
+}
+
+/* Dark-only surface overrides — scoped to `.dark` so the light mode Nuxt UI
+ * ships out of the box (white bg, zinc text ramp) stays intact. */
+.dark {
   --ui-bg: var(--color-zinc-950);
   --ui-text-dimmed: var(--color-zinc-400);
 }
@@ -51,6 +56,105 @@
 
 .dark {
   --dot-pattern-color: #9ca3af;
+}
+
+/*
+ * Motion tokens — strong custom curves (built-in CSS easings are too weak to
+ * read as intentional). Everything animating transform/opacity in the
+ * dashboard shares these.
+ */
+:root {
+  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+/*
+ * Breakdown bar fills (`BreakdownBars`, `CiBreakdown`) — width changes are
+ * expressed as `scaleX` so live refreshes glide on the GPU. Transitions (not
+ * keyframes) so a poll landing mid-animation retargets smoothly.
+ */
+.breakdown-bar {
+  transform-origin: left;
+  transition: transform 250ms var(--ease-out-strong);
+}
+
+/*
+ * Live flash — rows that just arrived on a poll (`LiveFeed`, `RunsTable`)
+ * flash then fade. A one-shot keyframe (not a transition) so it can't hijack
+ * the row's own hover background transition; each row flashes exactly once.
+ */
+.live-flash-fresh {
+  animation: live-flash 900ms ease-out both;
+}
+
+@keyframes live-flash {
+  from {
+    background-color: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+  }
+
+  to {
+    background-color: transparent;
+  }
+}
+
+.feed-enter-active {
+  transition: transform 250ms var(--ease-out-strong), opacity 250ms var(--ease-out-strong);
+}
+
+.feed-enter-from {
+  opacity: 0;
+  transform: translateY(-8px);
+}
+
+.feed-leave-active {
+  /* Out of flow so remaining rows can start moving immediately. */
+  position: absolute;
+  width: 100%;
+  transition: opacity 150ms ease-out;
+}
+
+.feed-leave-to {
+  opacity: 0;
+}
+
+.feed-move {
+  transition: transform 250ms var(--ease-out-strong);
+}
+
+/*
+ * Page-load stagger — sections cascade in (40ms apart, transform+opacity
+ * only). Skipped entirely under reduced motion: content is simply there.
+ */
+@media (prefers-reduced-motion: no-preference) {
+  .stagger-item {
+    animation: stagger-in 400ms var(--ease-out-strong) both;
+  }
+
+  .stagger-item:nth-child(3) { animation-delay: 40ms; }
+  .stagger-item:nth-child(4) { animation-delay: 80ms; }
+  .stagger-item:nth-child(5) { animation-delay: 120ms; }
+  .stagger-item:nth-child(6) { animation-delay: 160ms; }
+  .stagger-item:nth-child(7) { animation-delay: 200ms; }
+  .stagger-item:nth-child(8) { animation-delay: 240ms; }
+}
+
+@keyframes stagger-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .breakdown-bar,
+  .feed-enter-active,
+  .feed-leave-active,
+  .feed-move {
+    transition-duration: 0ms;
+  }
+
+  .live-flash-fresh {
+    animation: none;
+  }
 }
 
 .dot-pattern {

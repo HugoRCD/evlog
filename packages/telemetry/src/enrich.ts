@@ -37,6 +37,8 @@ export function buildEnvInfo(options: { environment?: string } = {}): EnvInfo {
     provider: provider ?? null,
     tty: hasTTY,
     agent: agent ?? null,
+    os: process.platform ?? null,
+    arch: process.arch ?? null,
     environment: resolveEnvironment({ override: options.environment }),
   }
 }
