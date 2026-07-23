@@ -70,6 +70,15 @@ describe('docs redirects', () => {
       expect(rawRedirects).not.toHaveProperty(`/raw${from}.md`)
   })
 
+  it('has no raw mirror for redirects that target the homepage', () => {
+    for (const from of Object.keys(redirects).filter(k => redirects[k].redirect.to === '/'))
+      expect(rawRedirects).not.toHaveProperty(`/raw${from}.md`)
+  })
+
+  it('redirects the duplicate /landing content path to the homepage', () => {
+    expect(redirects['/landing']?.redirect.to).toBe('/')
+  })
+
   // Regression guard: these all 404'd live on evlog.dev before redirects were added —
   // every "new" section root that only has child pages, not its own content file.
   it.each([
