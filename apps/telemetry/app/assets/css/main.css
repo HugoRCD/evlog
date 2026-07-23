@@ -52,10 +52,30 @@
   --vis-donut-background-color: transparent !important;
 
   --dot-pattern-color: #111827;
+
+  /* Full-saturation on light cards — no need to darken toward black when the
+   * surface is already light. */
+  --chart-success-color: var(--ui-success);
+  --chart-error-color: var(--ui-error);
+  --chart-env-production: var(--ui-success);
+  --chart-env-preview: var(--ui-warning);
+  --chart-env-development: var(--ui-primary);
+  --chart-env-neutral: var(--ui-color-neutral-400);
+  --chart-primary-color: var(--ui-primary);
 }
 
 .dark {
   --dot-pattern-color: #9ca3af;
+
+  /* Darkened off their raw saturated values so bars/arcs read as deliberate
+   * rather than "hyper brut" against the dashboard's near-black background. */
+  --chart-success-color: color-mix(in srgb, var(--ui-success) 75%, black);
+  --chart-error-color: color-mix(in srgb, var(--ui-error) 55%, black);
+  --chart-env-production: color-mix(in srgb, var(--ui-success) 75%, black);
+  --chart-env-preview: color-mix(in srgb, var(--ui-warning) 75%, black);
+  --chart-env-development: color-mix(in srgb, var(--ui-primary) 85%, black);
+  --chart-env-neutral: color-mix(in srgb, var(--ui-color-neutral-400) 70%, black);
+  --chart-primary-color: color-mix(in srgb, var(--ui-primary) 85%, black);
 }
 
 /*

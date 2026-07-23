@@ -43,7 +43,7 @@ const empty = computed(() => sections.value.every(s => s.items.length === 0))
   <UCard :ui="{ header: 'py-4 px-4', body: 'px-4 py-3' }">
     <template #header>
       <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <UIcon name="i-nucleo-layers" class="size-5" />
+        <GlassIconTile icon="i-nucleo-layers" />
         Versions & platforms
       </h3>
     </template>

@@ -32,7 +32,7 @@ withDefaults(defineProps<{
           {{ sublabel }}
         </p>
       </div>
-      <UIcon :name="icon" class="size-5 shrink-0 text-dimmed" />
+      <GlassIconTile :icon size="md" />
     </div>
   </UCard>
 </template>

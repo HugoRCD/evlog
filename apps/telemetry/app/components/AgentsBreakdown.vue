@@ -27,7 +27,7 @@ const items = computed<BreakdownBarItem[]>(() => props.agents.map(a => ({
     <template #header>
       <div class="flex items-center justify-between gap-2">
         <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-          <UIcon name="i-nucleo-sparkle" class="size-5" />
+          <GlassIconTile icon="i-nucleo-sparkle" />
           Agents
         </h3>
         <UBadge v-if="total > 0" variant="subtle" color="primary" size="sm" class="tabular-nums">

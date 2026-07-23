@@ -9,7 +9,7 @@ interface HistogramPoint {
 }
 
 const categories: Record<string, BulletLegendItemInterface> = {
-  count: { name: 'Runs', color: 'color-mix(in srgb, var(--ui-primary) 85%, black)' },
+  count: { name: 'Runs', color: 'var(--chart-primary-color)' },
 }
 
 const data = computed<HistogramPoint[]>(() => props.durations.histogram)
@@ -27,7 +27,7 @@ function xFormatter(tick: number) {
     <template #header>
       <div class="flex items-center justify-between gap-2">
         <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-          <UIcon name="i-nucleo-gauge" class="size-5" />
+          <GlassIconTile icon="i-nucleo-gauge" />
           Durations
         </h3>
         <div class="flex items-center gap-1.5">
