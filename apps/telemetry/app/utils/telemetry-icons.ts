@@ -40,6 +40,7 @@ const PROVIDER_ICONS: Record<string, string> = {
   buildkite: 'i-simple-icons-buildkite',
 }
 
+/** Icon for a CI provider — a plain server glyph for providers without a dedicated logo. */
 export function providerIcon(provider: string): string {
   return PROVIDER_ICONS[provider.toLowerCase()] ?? 'i-nucleo-server'
 }
@@ -67,6 +68,7 @@ export function osIcon(os: string | null): string {
   return OS_ICONS[os] ?? 'i-nucleo-laptop'
 }
 
+/** Display label for an OS platform — `null` (older clients) reads as "unknown"; unrecognized platforms keep their raw value. */
 export function osLabel(os: string | null): string {
   if (os === null) return 'unknown'
   return OS_LABELS[os] ?? os

@@ -72,6 +72,7 @@ export interface OsCount {
   count: number
 }
 
+/** Runs grouped by error code, most frequent first. */
 export interface ErrorCodeStat {
   errorCode: string
   count: number
@@ -85,6 +86,7 @@ export interface DurationBucket {
   count: number
 }
 
+/** Duration percentiles plus the histogram (`DurationBucket[]`) backing `DurationHistogram`. */
 export interface DurationStats {
   p50: number
   p95: number

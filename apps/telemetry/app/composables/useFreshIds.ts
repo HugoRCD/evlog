@@ -15,9 +15,10 @@ export function useFreshIds(rows: Ref<{ id: number }[]> | ComputedRef<{ id: numb
       seenIds.value = new Set(next.map(r => r.id))
       return
     }
-    const fresh = next.filter(r => !seenIds.value.has(r.id)).map(r => r.id)
+    const nextIds = new Set(next.map(r => r.id))
+    const fresh = [...nextIds].filter(id => !seenIds.value.has(id))
+    seenIds.value = nextIds
     if (fresh.length === 0) return
-    for (const id of fresh) seenIds.value.add(id)
     freshIds.value = new Set([...freshIds.value, ...fresh])
     setTimeout(() => {
       freshIds.value = new Set([...freshIds.value].filter(id => !fresh.includes(id)))

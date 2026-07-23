@@ -84,7 +84,7 @@ const statsQuery = computed(() => ({
   environment: environment.value === ALL ? undefined : environment.value,
 }))
 
-const { data: stats, refresh: refreshStats } = await useFetch<StatsResponse>(
+const { data: stats, error: statsError, refresh: refreshStats } = await useFetch<StatsResponse>(
   '/api/telemetry/stats',
   { query: statsQuery, watch: [statsQuery] },
 )
@@ -108,7 +108,7 @@ const runsQuery = computed(() => ({
   pageSize: PAGE_SIZE,
 }))
 
-const { data: runsData, status: runsStatus, refresh: refreshRuns } = await useFetch<RunsResponse>(
+const { data: runsData, error: runsError, status: runsStatus, refresh: refreshRuns } = await useFetch<RunsResponse>(
   '/api/telemetry/runs',
   { query: runsQuery, watch: [runsQuery] },
 )
@@ -128,7 +128,7 @@ const feedQuery = computed(() => ({
   pageSize: 8,
 }))
 
-const { data: feedData, refresh: refreshFeed } = await useFetch<RunsResponse>(
+const { data: feedData, error: feedError, refresh: refreshFeed } = await useFetch<RunsResponse>(
   '/api/telemetry/runs',
   { query: feedQuery, watch: [feedQuery] },
 )
@@ -177,8 +177,16 @@ const p95DurationMs = computed(() => stats.value?.durations.p95 ?? 0)
 
 // Live refresh: silent 5s poll of all three fetches — paused while the run
 // detail slideover is open so a manually sorted page never shifts mid-read.
-const { active: liveActive, toggle: toggleLive } = useLiveRefresh(
-  () => Promise.all([refreshStats(), refreshRuns(), refreshFeed()]),
+// `useFetch`'s `refresh()` resolves even on a failed request (the error
+// lands in its `.error` ref instead of rejecting), so re-throw here for
+// `useLiveRefresh` to notice and `LiveIndicator` to stop claiming "Live"
+// while requests are actually failing.
+const { active: liveActive, lastError: liveError, toggle: toggleLive } = useLiveRefresh(
+  async () => {
+    await Promise.all([refreshStats(), refreshRuns(), refreshFeed()])
+    const error = statsError.value ?? runsError.value ?? feedError.value
+    if (error) throw error
+  },
   { suspended: detailOpen },
 )
 
@@ -206,7 +214,7 @@ async function onLogout() {
       </h1>
 
       <div class="flex flex-wrap items-center gap-2">
-        <LiveIndicator :live="liveActive" :last-event-at="stats?.lastEventAt ?? null" @toggle="toggleLive" />
+        <LiveIndicator :live="liveActive" :has-error="!!liveError" :last-event-at="stats?.lastEventAt ?? null" @toggle="toggleLive" />
         <USelect v-model="range" :items="rangeOptions" value-key="value" class="w-40" />
         <USelect v-model="tool" :items="toolOptions" value-key="value" class="w-40" />
         <USelect v-model="environment" :items="environmentOptions" value-key="value" class="w-44" />
@@ -253,8 +261,6 @@ async function onLogout() {
       <CiBreakdown :ci="stats?.ci ?? { ci: 0, local: 0, providers: [] }" />
     </div>
 
-    <!-- Short cards stack in the side column against the tall ones on the
-         left — a card never sits alone next to empty space. -->
     <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
       <div class="flex flex-col gap-6 lg:col-span-2">
         <DurationHistogram :durations="stats?.durations ?? { p50: 0, p95: 0, histogram: [] }" />
