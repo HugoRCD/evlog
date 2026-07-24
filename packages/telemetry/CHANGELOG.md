@@ -1,5 +1,11 @@
 # @evlog/telemetry
 
+## 0.2.0
+
+### Minor Changes
+
+- [#446](https://github.com/HugoRCD/evlog/pull/446) [`c58ded1`](https://github.com/HugoRCD/evlog/commit/c58ded1f45bfb9b7117489667048f7eee1e83406) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Collect `env.os` (operating system platform) and `env.arch` (CPU architecture) on every run event. Both fields are nullable and the ingest validator accepts events from older clients that omit them, so no action is required — update `@evlog/telemetry` on your ingest endpoint to store the new fields.
+
 ## 0.1.2
 
 ### Patch Changes
