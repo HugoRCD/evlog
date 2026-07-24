@@ -92,6 +92,20 @@ jobs:
       - name: Test + build (apps/telemetry)
         run: pnpm exec turbo run test build --filter=evlog-telemetry
 
+  cli:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Test (packages/cli)
+        run: pnpm exec turbo run test --filter=@evlog/cli
+
   coverage:
     runs-on: ubuntu-latest
     steps:
@@ -113,7 +127,7 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [lint, typecheck, test, telemetry, coverage]
+    needs: [lint, typecheck, test, telemetry, coverage, cli]
     permissions:
       contents: read
       pull-requests: write
@@ -133,4 +147,4 @@ jobs:
       - name: Build package
         run: pnpm run build:package
       - name: Publish
-        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/telemetry'
+        run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/telemetry' './packages/cli'
