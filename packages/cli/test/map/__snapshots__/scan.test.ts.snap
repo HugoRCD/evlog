@@ -1,0 +1,956 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`full scan snapshots > next-app-router map snapshot 1`] = `
+{
+  "framework": "next",
+  "generatedAt": "[REDACTED]",
+  "projectName": "next-app-router-fixture",
+  "routes": [
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "middleware.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "middleware.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "middleware.ts",
+      "framework": "next",
+      "handler": null,
+      "id": "3493f1e8a484",
+      "kind": "middleware",
+      "method": null,
+      "path": "*",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "page-error-handling": {
+          "status": "n/a",
+        },
+      },
+      "file": "app/page.tsx",
+      "framework": "next",
+      "handler": null,
+      "id": "cb9f659ac93e",
+      "kind": "page",
+      "method": null,
+      "path": "/",
+      "score": 100,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "pass",
+        },
+        "context": {
+          "status": "pass",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "status": "pass",
+        },
+      },
+      "file": "app/api/checkout/route.ts",
+      "framework": "next",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "bb18fd32686e",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/checkout",
+      "score": 100,
+      "sensitivity": {
+        "level": "high",
+        "reasons": [
+          "money: path matches /api/checkout",
+        ],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "app/api/error/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "evidence": {
+            "file": "app/api/error/route.ts",
+            "line": 1,
+            "snippet": "export async function GET() {",
+          },
+          "message": "throw new Error() — use createError({ why, fix })",
+          "status": "fail",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "app/api/error/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "app/api/error/route.ts",
+      "framework": "next",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "70e08d15062b",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/error",
+      "score": 25,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "app/api/health/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "app/api/health/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "app/api/health/route.ts",
+      "framework": "next",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "e7aac2700a2f",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/health",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "evidence": {
+            "file": "app/api/payments/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "has logger + context but no log.audit() — sensitive route needs audit trail",
+          "status": "fail",
+        },
+        "context": {
+          "evidence": {
+            "file": "app/api/payments/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "evidence": {
+            "file": "app/api/payments/route.ts",
+            "line": 1,
+            "snippet": "import Stripe from 'stripe'",
+          },
+          "message": "empty catch block swallows errors",
+          "status": "fail",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "app/api/payments/route.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "app/api/payments/route.ts",
+      "framework": "next",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "da3635a60c3c",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/payments",
+      "score": 5,
+      "sensitivity": {
+        "level": "high",
+        "reasons": [
+          "money: imports stripe",
+          "money: path matches /api/payments",
+        ],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "app/actions/orders.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "app/actions/orders.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "app/actions/orders.ts",
+      "framework": "next",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "4c3104a25722",
+      "kind": "server-action",
+      "method": "POST",
+      "path": "action:createOrder",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+  ],
+  "score": 49,
+  "version": 1,
+}
+`;
+
+exports[`full scan snapshots > nuxt-basic map snapshot 1`] = `
+{
+  "framework": "nuxt",
+  "generatedAt": "[REDACTED]",
+  "projectName": "nuxt-basic-fixture",
+  "routes": [
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/middleware/auth.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/middleware/auth.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/middleware/auth.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "3b83b97c095f",
+      "kind": "middleware",
+      "method": null,
+      "path": "*",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "page-error-handling": {
+          "evidence": {
+            "file": "pages/index.vue",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "page data fetch without error handling",
+          "status": "fail",
+        },
+      },
+      "file": "pages/index.vue",
+      "framework": "nuxt",
+      "handler": null,
+      "id": "8e327f197322",
+      "kind": "page",
+      "method": null,
+      "path": "/",
+      "score": 80,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/api/broken-error.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "evidence": {
+            "file": "server/api/broken-error.get.ts",
+            "line": 1,
+            "snippet": "export default defineEventHandler(async () => {",
+          },
+          "message": "createError() has why but missing fix",
+          "status": "fail",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/api/broken-error.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/api/broken-error.get.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "7b70dc859cdb",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/broken-error",
+      "score": 25,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "pass",
+        },
+        "context": {
+          "status": "pass",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "status": "pass",
+        },
+      },
+      "file": "server/api/checkout.post.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "882a5c44fa9c",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/checkout",
+      "score": 100,
+      "sensitivity": {
+        "level": "high",
+        "reasons": [
+          "money: path matches /api/checkout",
+        ],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/api/docs/[...slug].get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/api/docs/[...slug].get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/api/docs/[...slug].get.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "d6834acba846",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/docs/:slug*",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "status": "pass",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "status": "pass",
+        },
+      },
+      "file": "server/api/orders/[id].get.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "8be26058acc1",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/orders/:id",
+      "score": 100,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "evidence": {
+            "file": "server/api/payments/stripe.post.ts",
+            "line": 3,
+            "snippet": undefined,
+          },
+          "message": "has logger + context but no log.audit() — sensitive route needs audit trail",
+          "status": "fail",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/api/payments/stripe.post.ts",
+            "line": 3,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "evidence": {
+            "file": "server/api/payments/stripe.post.ts",
+            "line": 1,
+            "snippet": "import Stripe from 'stripe'",
+          },
+          "message": "empty catch block swallows errors",
+          "status": "fail",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/api/payments/stripe.post.ts",
+            "line": 3,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/api/payments/stripe.post.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 3,
+      },
+      "id": "b021c8bbd1fd",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/payments/stripe",
+      "score": 5,
+      "sensitivity": {
+        "level": "high",
+        "reasons": [
+          "money: imports stripe",
+          "money: path matches /api/payments/stripe",
+        ],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/api/plain-error.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "evidence": {
+            "file": "server/api/plain-error.get.ts",
+            "line": 1,
+            "snippet": "export default defineEventHandler(async () => {",
+          },
+          "message": "throw new Error() — use createError({ why, fix })",
+          "status": "fail",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/api/plain-error.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/api/plain-error.get.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "c9325024eea6",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/plain-error",
+      "score": 25,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/routes/health.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/routes/health.get.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/routes/health.get.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "f91b41cdbbba",
+      "kind": "api",
+      "method": "GET",
+      "path": "/health",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "page-error-handling": {
+          "status": "pass",
+        },
+      },
+      "file": "pages/orders/[id].vue",
+      "framework": "nuxt",
+      "handler": null,
+      "id": "5f512212293e",
+      "kind": "page",
+      "method": null,
+      "path": "/orders/:id",
+      "score": 100,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "server/tasks/cleanup.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "server/tasks/cleanup.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "server/tasks/cleanup.ts",
+      "framework": "nuxt",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "87339e3cbf66",
+      "kind": "cron",
+      "method": null,
+      "path": "/tasks/cleanup",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+  ],
+  "score": 53,
+  "version": 1,
+}
+`;
+
+exports[`full scan snapshots > tanstack-basic map snapshot 1`] = `
+{
+  "framework": "tanstack-start",
+  "generatedAt": "[REDACTED]",
+  "projectName": "tanstack-basic-fixture",
+  "routes": [
+    {
+      "checks": {
+        "page-error-handling": {
+          "status": "n/a",
+        },
+      },
+      "file": "src/routes/index.tsx",
+      "framework": "tanstack-start",
+      "handler": null,
+      "id": "62267fb17cf2",
+      "kind": "page",
+      "method": null,
+      "path": "/",
+      "score": 100,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "src/routes/api/admin.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "evidence": {
+            "file": "src/routes/api/admin.ts",
+            "line": 1,
+            "snippet": "import { createFileRoute } from '@tanstack/react-router'",
+          },
+          "message": "empty catch block swallows errors",
+          "status": "fail",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "src/routes/api/admin.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "src/routes/api/admin.ts",
+      "framework": "tanstack-start",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "b0e38a86e1bb",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/admin",
+      "score": 30,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "pass",
+        },
+        "context": {
+          "status": "pass",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "status": "pass",
+        },
+      },
+      "file": "src/routes/api/checkout.ts",
+      "framework": "tanstack-start",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "714cc73bcf15",
+      "kind": "api",
+      "method": "POST",
+      "path": "/api/checkout",
+      "score": 100,
+      "sensitivity": {
+        "level": "high",
+        "reasons": [
+          "money: path matches /api/checkout",
+        ],
+      },
+    },
+    {
+      "checks": {
+        "audit": {
+          "status": "n/a",
+        },
+        "context": {
+          "evidence": {
+            "file": "src/routes/api/hello.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no log.set() context accumulation",
+          "status": "fail",
+        },
+        "error-handling": {
+          "status": "pass",
+        },
+        "structured-errors": {
+          "status": "pass",
+        },
+        "wide-event": {
+          "evidence": {
+            "file": "src/routes/api/hello.ts",
+            "line": 1,
+            "snippet": undefined,
+          },
+          "message": "no useLogger() — handler is a dark event",
+          "status": "fail",
+        },
+      },
+      "file": "src/routes/api/hello.ts",
+      "framework": "tanstack-start",
+      "handler": {
+        "column": 0,
+        "line": 1,
+      },
+      "id": "ecca202ae6c2",
+      "kind": "api",
+      "method": "GET",
+      "path": "/api/hello",
+      "score": 45,
+      "sensitivity": {
+        "level": "none",
+        "reasons": [],
+      },
+    },
+  ],
+  "score": 72,
+  "version": 1,
+}
+`;

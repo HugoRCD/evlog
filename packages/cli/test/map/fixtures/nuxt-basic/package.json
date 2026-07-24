@@ -1,0 +1,9 @@
+{
+  "name": "nuxt-basic-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "evlog": "workspace:*",
+    "nuxt": "^3.16.0"
+  }
+}

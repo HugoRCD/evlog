@@ -39,6 +39,11 @@ npx @evlog/cli doctor --cwd apps/web
 | `evlog doctor` | Monorepo-aware diagnosis: Node, project/workspace, stack, evlog install, `.evlog/logs` |
 | `evlog doctor --cwd <dir>` | Run against another directory |
 | `evlog doctor --debug` | Same, plus a debug wide event (see Debug) |
+| `evlog map` | Static observability score for the current app — Lighthouse for wide events |
+| `evlog map --framework <name>` | Override framework detection (`nuxt`, `nitro`, `next`, `tanstack-start`) |
+| `evlog map --all` | Show every scanned route in the report, not just the worst 15 |
+| `evlog map --min-score <n>` | Exit 1 if the global score is below `n` |
+| `evlog map --no-write` | Skip writing `evlog.map.json` to the project root |
 | `evlog telemetry status` | Show telemetry status and disclosure |
 | `evlog telemetry enable` / `disable` | Change telemetry preference (disable purges buffered data) |
 

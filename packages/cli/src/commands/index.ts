@@ -1,4 +1,5 @@
 import doctor from './doctor'
+import map from './map'
 import telemetry from './telemetry'
 
 /**
@@ -14,5 +15,6 @@ import telemetry from './telemetry'
  */
 export const subCommands = {
   doctor,
+  map,
   telemetry,
 }
