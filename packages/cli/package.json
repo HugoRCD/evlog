@@ -39,6 +39,7 @@
     "cli",
     "wide-events",
     "doctor",
+    "map",
     "citty",
     "structured-logging",
     "telemetry"
@@ -56,7 +57,9 @@
   "dependencies": {
     "@evlog/telemetry": "workspace:*",
     "citty": "^0.2.2",
-    "evlog": "workspace:*"
+    "evlog": "workspace:*",
+    "oxc-parser": "^0.82.3",
+    "tinyglobby": "^0.2.17"
   },
   "devDependencies": {
     "tsdown": "^0.22.8",
