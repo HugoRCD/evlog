@@ -129,6 +129,34 @@ describe('nuxt adapter', () => {
 
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
   })
+
+  it.each(['app/pages', 'pages', 'src/pages'] as const)(
+    'maps a page under %s and strips that root from the path',
+    async (pageDir) => {
+      const root = await project({
+        [`${pageDir}/blog/[...slug].vue`]: '<script setup lang="ts"></script>',
+      })
+
+      const routes = await routesOf('nuxt', root)
+
+      expect(routes.map(route => `${route.kind} ${route.path}`)).toEqual(['page /blog/:slug*'])
+      expect(routes[0]?.file).toBe(`${pageDir}/blog/[...slug].vue`)
+    },
+  )
+
+  it('collects pages from every populated root', async () => {
+    const root = await project({
+      'app/pages/index.vue': '<script setup lang="ts"></script>',
+      'pages/about.vue': '<script setup lang="ts"></script>',
+    })
+
+    const routes = await routesOf('nuxt', root)
+
+    expect(routes.map(route => `${route.path} (${route.file})`).sort()).toEqual([
+      '/ (app/pages/index.vue)',
+      '/about (pages/about.vue)',
+    ])
+  })
 })
 
 describe('nitro adapter', () => {
