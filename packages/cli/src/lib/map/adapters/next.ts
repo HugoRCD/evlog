@@ -156,27 +156,53 @@ function mentionsServerDirective(file: string): boolean {
   }
 }
 
+/**
+ * Every action a `'use server'` module exposes.
+ *
+ * All four export spellings count, because Next treats every export of such a
+ * module as a public endpoint: a missed one is an unscanned POST handler, not a
+ * cosmetic gap.
+ */
 function findServerActionExports(parsed: ParseResult): Array<{ name: string, line: number }> {
   const exports: Array<{ name: string, line: number }> = []
+  const lineOf = (node: Node | undefined): number => (node ? nodeLoc(node, parsed.lines)?.line ?? 1 : 1)
+
   walkAst(parsed.program, (node) => {
-    if (node.type === 'ExportNamedDeclaration') {
-      const decl = node as {
-        declaration?: {
-          type: string
-          id?: { name: string }
-          declarations?: Array<{ id: { type: string, name: string }, init?: { type: string } }>
-        }
+    if (node.type === 'ExportDefaultDeclaration') {
+      const { declaration } = node as { declaration?: Node & { id?: { name: string } } }
+      if (declaration?.type !== 'FunctionDeclaration' && declaration?.type !== 'ArrowFunctionExpression') return
+      exports.push({ name: declaration.id?.name ?? 'default', line: lineOf(node) })
+      return
+    }
+
+    if (node.type !== 'ExportNamedDeclaration') return
+    const decl = node as {
+      source?: { value: string } | null
+      specifiers?: Array<{ exported?: { type: string, name?: string, value?: string } }>
+      declaration?: {
+        type: string
+        id?: { name: string }
+        declarations?: Array<{ id: { type: string, name: string }, init?: { type: string } }>
       }
-      if (decl.declaration?.type === 'FunctionDeclaration' && decl.declaration.id?.name) {
-        const loc = nodeLoc(node, parsed.lines)
-        exports.push({ name: decl.declaration.id.name, line: loc?.line ?? 1 })
+    }
+
+    /* `export { createOrder }` and `export { handler as createOrder }`, but not
+       `export { x } from './elsewhere'` — a re-export is another module's. */
+    if (!decl.declaration && !decl.source) {
+      for (const specifier of decl.specifiers ?? []) {
+        const name = specifier.exported?.name ?? specifier.exported?.value
+        if (name) exports.push({ name, line: lineOf(node) })
       }
-      if (decl.declaration?.type === 'VariableDeclaration') {
-        for (const d of decl.declaration.declarations ?? []) {
-          if (d.id.type === 'Identifier' && d.init && (d.init.type === 'ArrowFunctionExpression' || d.init.type === 'FunctionExpression')) {
-            const loc = nodeLoc(d.init as Node, parsed.lines)
-            exports.push({ name: d.id.name, line: loc?.line ?? 1 })
-          }
+      return
+    }
+
+    if (decl.declaration?.type === 'FunctionDeclaration' && decl.declaration.id?.name) {
+      exports.push({ name: decl.declaration.id.name, line: lineOf(node) })
+    }
+    if (decl.declaration?.type === 'VariableDeclaration') {
+      for (const d of decl.declaration.declarations ?? []) {
+        if (d.id.type === 'Identifier' && d.init && (d.init.type === 'ArrowFunctionExpression' || d.init.type === 'FunctionExpression')) {
+          exports.push({ name: d.id.name, line: lineOf(d.init as Node) })
         }
       }
     }

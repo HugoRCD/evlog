@@ -17,7 +17,7 @@ The official command line for [evlog](https://evlog.dev).
 
 Diagnose your install. Score what your app can tell you when something goes wrong.
 
-> **Early days.** Safe to run on any project — it only reads files, and it is covered by tests — but young. `evlog map` has adapters for four frameworks today, its rules are still being refined, and both will grow. Expect verdicts and scores to move between releases: pin the CLI as a dev dependency when you gate CI on the number.
+> **Early days.** Safe to run on any project — it reads your source and writes a single `evlog.map.json` at the root (`--no-write` to skip), and it is covered by tests — but young. `evlog map` has adapters for four frameworks today, its rules are still being refined, and both will grow. Expect verdicts and scores to move between releases: pin the CLI as a dev dependency when you gate CI on the number.
 
 ## Usage
 
@@ -89,7 +89,8 @@ With `--json`, the payload is the **only** thing written to stdout — everythin
 {
   "schemaVersion": 2,
   "map": { "version": 1, "framework": "nuxt", "score": 76, "routes": [] },
-  "summary": { "instrumented": 19, "partial": 2, "dark": 8, "exempt": 0 }
+  "summary": { "instrumented": 19, "partial": 2, "dark": 8, "exempt": 0 },
+  "mapPath": "evlog.map.json" // null with --no-write
 }
 ```
 

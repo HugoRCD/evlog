@@ -22,6 +22,14 @@ export interface FileFacts {
   catches: readonly CatchFact[]
   /** Network calls (`fetch`, `$fetch`, `useFetch`, `axios.*`, …). */
   network: readonly CallFact[]
+  /**
+   * Network calls with no error affordance around them.
+   *
+   * Guarding is resolved per call rather than per file: an unrelated `try` at
+   * the top of a page used to satisfy the whole rule, so a page could pass with
+   * its actual data fetch left unhandled.
+   */
+  unguardedNetwork: readonly CallFact[]
   /** Where an evlog logger is created, if it is. */
   loggerInit: HandlerLocation | null
   /** Identifiers holding an evlog logger — `const log = useLogger(event)`. */
@@ -46,8 +54,6 @@ export interface FileFacts {
   reexportsEvlog: ReadonlySet<string>
   /** Object keys and member names seen anywhere — cheap PII surface. */
   names: ReadonlySet<string>
-  /** True when a network result is destructured with an `error` binding. */
-  destructuresNetworkError: boolean
   /** `createError({ … })` calls with enough literal detail to compare. */
   inlineErrors: readonly InlineErrorFact[]
   /** Catalog names declared here — `billing` for `defineErrorCatalog('billing', …)`. */
@@ -75,6 +81,8 @@ export interface CallFact {
   /** Member names from the root — `['audit', 'deny']` for `log.audit?.deny()`. */
   chain: readonly string[]
   line: number
+  /** Byte offset of the call, used to place it inside an error guard. */
+  start: number
   /** Keys of the first argument when it is an object literal. */
   props: ReadonlySet<string>
 }
@@ -140,6 +148,17 @@ const NETWORK_RECEIVERS = ['axios', 'http', 'https']
 
 /** Statement shapes inside a `catch` that count as handling the error. */
 const HANDLING_MEMBERS = ['error', 'warn', 'set', 'audit', 'captureException']
+
+/** Calls that put an error affordance around whatever they wrap. */
+const ERROR_GUARD_MEMBERS = ['catch', 'onError', 'catchError']
+
+/** Half-open `[start, end)` byte range of source that guards against a failure. */
+type GuardRange = readonly [number, number]
+
+function nodeRange(node: Node): GuardRange {
+  const { start, end } = node as unknown as { start: number, end: number }
+  return [start, end]
+}
 
 function isEvlogSource(source: string | undefined | null): boolean {
   return source === 'evlog' || (source?.startsWith('evlog/') ?? false)
@@ -237,8 +256,61 @@ function objectKeys(node: Node | undefined): Set<string> {
 type CalleeShape = Pick<CallFact, 'name' | 'member' | 'receiver' | 'root' | 'chain'>
 
 /** Strip the wrapper oxc puts around an optional chain (`a?.b()`). */
+/**
+ * Strip the wrappers that sit between a name and its value.
+ *
+ * `req.context.log as RequestLogger` is the spelling evlog's own TanStack Start
+ * guide uses, and a cast that hides the member chain is enough to make the
+ * handler look uninstrumented.
+ */
 function unwrapChain(node: Node): Node {
-  return node.type === 'ChainExpression' ? (node as { expression: Node }).expression : node
+  let current = node
+  while (true) {
+    switch (current.type) {
+      case 'ChainExpression':
+      case 'ParenthesizedExpression':
+        current = (current as { expression: Node }).expression
+        break
+      case 'TSAsExpression':
+      case 'TSSatisfiesExpression':
+      case 'TSNonNullExpression':
+        current = (current as { expression: Node }).expression
+        break
+      default:
+        return current
+    }
+  }
+}
+
+/**
+ * Where a framework parks the request logger, read as a member chain.
+ *
+ * Not every integration hands the logger back from a factory: evlog's Nitro
+ * plugin puts it on the request context, so the documented TanStack Start and
+ * h3 handlers reach it with `req.context.log` and never call `useLogger()`.
+ * Reading only factories scored those handlers as dark events while they were
+ * calling `log.set()` on every request.
+ */
+const CONTEXT_LOGGER_PATH = ['context', 'log'] as const
+
+/** Whether `chain` contains `context.log` as consecutive members. */
+function hasContextLoggerPath(chain: readonly string[]): boolean {
+  return chain.some(
+    (name, index) => name === CONTEXT_LOGGER_PATH[0] && chain[index + 1] === CONTEXT_LOGGER_PATH[1],
+  )
+}
+
+/** Member names of `node`, root first — `['context', 'log']` for `req.context.log`. */
+function memberPath(node: Node): string[] {
+  const path: string[] = []
+  let current = unwrapChain(node)
+  while (current.type === 'MemberExpression') {
+    const { property, object } = current as { property: Node, object: Node }
+    if (property.type !== 'Identifier') return []
+    path.unshift(property.name)
+    current = unwrapChain(object)
+  }
+  return path
 }
 
 /**
@@ -259,6 +331,18 @@ function patternNames(id: Node): string[] {
     else if (key.type === 'Identifier') names.push(key.name)
   }
   return names
+}
+
+/** Local name `key` is bound to by an object pattern, honouring renames. */
+function destructuredAs(id: Node, key: string): string | null {
+  if (id.type !== 'ObjectPattern') return null
+  for (const property of (id as { properties: Node[] }).properties) {
+    if (property.type !== 'Property') continue
+    const { key: propertyKey, value } = property as { key: Node, value: Node }
+    if (propertyKey.type !== 'Identifier' || propertyKey.name !== key) continue
+    if (value.type === 'Identifier') return value.name
+  }
+  return null
 }
 
 /**
@@ -306,9 +390,40 @@ function isNetworkCall(call: CallFact): boolean {
   return call.receiver !== null && NETWORK_RECEIVERS.includes(call.receiver)
 }
 
-/** Whether a statement inside a `catch` block does something with the error. */
+/**
+ * Whether a statement inside a `catch` block does something with the error.
+ *
+ * Nested bodies count: `catch (e) { if (retryable(e)) log.warn(e); else throw e }`
+ * is a handled error however deep the branch sits, and reading only the direct
+ * children reported that catch as swallowing everything.
+ */
 function statementHandlesError(statement: Node): boolean {
   if (statement.type === 'ThrowStatement' || statement.type === 'ReturnStatement') return true
+
+  switch (statement.type) {
+    case 'BlockStatement':
+      return (statement as { body: Node[] }).body.some(statementHandlesError)
+    case 'IfStatement': {
+      const { consequent, alternate } = statement as { consequent: Node, alternate?: Node | null }
+      return statementHandlesError(consequent) || (!!alternate && statementHandlesError(alternate))
+    }
+    case 'SwitchStatement':
+      return (statement as { cases: Array<{ consequent: Node[] }> }).cases
+        .some(branch => branch.consequent.some(statementHandlesError))
+    case 'TryStatement': {
+      const { block, handler, finalizer } = statement as {
+        block: Node
+        handler?: { body: Node } | null
+        finalizer?: Node | null
+      }
+      return statementHandlesError(block)
+        || (!!handler && statementHandlesError(handler.body))
+        || (!!finalizer && statementHandlesError(finalizer))
+    }
+    default:
+      break
+  }
+
   if (statement.type !== 'ExpressionStatement') return false
 
   let { expression } = (statement as { expression: Node })
@@ -354,9 +469,12 @@ export function buildFileFacts(
   const names = new Set<string>()
   /** Resolved after the pass: needs imports and declarations to be complete. */
   const loggerCandidates: Array<{ binding: string | null, factory: string, line: number }> = []
+  /** Loggers read off the request context — no import to resolve them against. */
+  const contextLoggers: Array<{ binding: string, line: number }> = []
   /** Exported bindings whose value comes from a call — resolved after the pass. */
   const exportedFromFactory: Array<{ names: readonly string[], factory: string }> = []
-  const networkPatterns: Array<{ pattern: Node, init: Node }> = []
+  /** Source spans in which a failure is caught, handled or surfaced. */
+  const guards: GuardRange[] = []
 
   walkAst(parsed.program, (node) => {
     switch (node.type) {
@@ -423,8 +541,23 @@ export function buildFileFacts(
         }
         if (!declarator.init) break
 
-        let { init } = declarator
-        if (init.type === 'AwaitExpression') init = (init as { argument: Node }).argument
+        let init = unwrapChain(declarator.init)
+        if (init.type === 'AwaitExpression') init = unwrapChain((init as { argument: Node }).argument)
+
+        /* `const log = req.context.log` and `const { log } = req.context`: the
+           logger comes off the request, not out of a factory. */
+        if (init.type === 'MemberExpression') {
+          const path = memberPath(init)
+          const line = lines.lineAt((init as unknown as { start: number }).start)
+          if (hasContextLoggerPath(path)) {
+            for (const name of patternNames(declarator.id)) {
+              contextLoggers.push({ binding: name, line })
+            }
+          } else if (path.at(-1) === CONTEXT_LOGGER_PATH[0]) {
+            const binding = destructuredAs(declarator.id, CONTEXT_LOGGER_PATH[1])
+            if (binding) contextLoggers.push({ binding, line })
+          }
+        }
 
         if (init.type === 'CallExpression') {
           const described = describeCallee((init as { callee: Node }).callee)
@@ -435,10 +568,16 @@ export function buildFileFacts(
               line: lines.lineAt((init as unknown as { start: number }).start),
             })
           }
-          if (declarator.id.type === 'ObjectPattern') {
-            networkPatterns.push({ pattern: declarator.id, init })
-          }
         }
+
+        /* `const { data, error } = await useFetch(…)` — the failure is bound
+           rather than caught, which is Nuxt's shape for handling it. */
+        if (destructuredAs(declarator.id, 'error')) guards.push(nodeRange(node))
+        break
+      }
+
+      case 'TryStatement': {
+        guards.push(nodeRange((node as { block: Node }).block))
         break
       }
 
@@ -446,8 +585,12 @@ export function buildFileFacts(
         const described = describeCallee((node as { callee: Node }).callee)
         if (!described) break
         const [firstArgument] = (node as { arguments: Node[] }).arguments
-        const line = lines.lineAt((node as unknown as { start: number }).start)
-        calls.push({ ...described, line, props: objectKeys(firstArgument) })
+        const { start } = (node as unknown as { start: number })
+        const line = lines.lineAt(start)
+        calls.push({ ...described, line, start, props: objectKeys(firstArgument) })
+
+        /* `fetch(…).catch(…)` — the guard spans the call it is chained onto. */
+        if (ERROR_GUARD_MEMBERS.includes(described.member)) guards.push(nodeRange(node))
 
         if (described.member === 'createError') {
           const identity = errorIdentity(firstArgument)
@@ -540,6 +683,14 @@ export function buildFileFacts(
     loggerInit ??= { line: candidate.line, column: 0 }
     if (candidate.binding) loggerBindings.add(candidate.binding)
   }
+  /* Taken at face value: there is no import to check a context read against, and
+     the cost of the two errors is not symmetric — crediting a rare non-evlog
+     `context.log` is harmless, while missing evlog's own documented shape tells
+     a correctly instrumented handler that it is a dark event. */
+  for (const contextLogger of contextLoggers) {
+    loggerInit ??= { line: contextLogger.line, column: 0 }
+    loggerBindings.add(contextLogger.binding)
+  }
   /*
    * evlog's `log` export is deliberately not treated as a request logger: it is
    * the simple logging API (`log.info`, `log.error`) with no `set` or `audit`,
@@ -549,6 +700,11 @@ export function buildFileFacts(
   if (!loggerInit) {
     const bare = calls.find(call => LOGGER_FACTORIES.includes(call.member) && resolvesToEvlog(call.member))
     if (bare) loggerInit = { line: bare.line, column: 0 }
+  }
+  /* `event.context.log.set({ … })` — used straight off the request, never bound. */
+  if (!loggerInit) {
+    const inline = calls.find(call => hasContextLoggerPath(call.chain))
+    if (inline) loggerInit = { line: inline.line, column: 0 }
   }
 
   for (const { names: exportedNames, factory } of exportedFromFactory) {
@@ -569,17 +725,9 @@ export function buildFileFacts(
   }
 
   const network = calls.filter(isNetworkCall)
-  const destructuresNetworkError = networkPatterns.some(({ pattern, init }) => {
-    const described = describeCallee((init as { callee: Node }).callee)
-    if (!described) return false
-    const call: CallFact = { ...described, line: 0, props: new Set() }
-    if (!isNetworkCall(call)) return false
-    return (pattern as { properties: Node[] }).properties.some((property) => {
-      if (property.type !== 'Property') return false
-      const { key } = property as { key: Node }
-      return key.type === 'Identifier' && key.name === 'error'
-    })
-  })
+  const unguardedNetwork = network.filter(
+    call => !guards.some(([start, end]) => call.start >= start && call.start < end),
+  )
 
   return {
     imports,
@@ -588,20 +736,23 @@ export function buildFileFacts(
     throws: throwFacts,
     catches: catchFacts,
     network,
+    unguardedNetwork,
     loggerInit,
     loggerBindings,
     evlogWrappers,
     evlogImports,
     reexportsEvlog,
     names,
-    destructuresNetworkError,
     inlineErrors,
     catalogsDeclared,
     /* Matches anywhere in the chain so `log.audit()` and `log.audit?.deny()`
-       both count as audit calls. */
-    loggerCalls: member => calls.filter(
-      call => call.root !== null && loggerBindings.has(call.root) && call.chain.includes(member),
-    ),
+       both count as audit calls, and reads the logger straight off the request
+       context for handlers that never bind it — `req.context.log.set({ … })`. */
+    loggerCalls: member => calls.filter((call) => {
+      if (!call.chain.includes(member)) return false
+      if (call.root !== null && loggerBindings.has(call.root)) return true
+      return hasContextLoggerPath(call.chain)
+    }),
     callsTo: name => calls.filter(call => call.member === name),
   }
 }

@@ -81,6 +81,72 @@ describe('next adapter', () => {
 
     expect(routes.map(route => route.path)).toEqual(['action:createOrder'])
   })
+
+  /* Next treats every export of a `'use server'` module as a public endpoint, so
+     a spelling the adapter cannot read is an unscanned POST handler. */
+  it.each([
+    ['a function declaration', 'export async function createOrder() {}', 'action:createOrder'],
+    ['an arrow constant', 'export const createOrder = async () => {}', 'action:createOrder'],
+    ['a plain specifier', 'async function createOrder() {}\nexport { createOrder }', 'action:createOrder'],
+    ['a renamed specifier', 'async function run() {}\nexport { run as createOrder }', 'action:createOrder'],
+    ['a default function', 'export default async function createOrder() {}', 'action:createOrder'],
+  ])('collects a server action declared as %s', async (_name, source, expected) => {
+    const root = await project({ 'app/actions/orders.ts': `"use server"\n${source}` })
+
+    const routes = await routesOf('next', root)
+
+    expect(routes.map(route => route.path)).toEqual([expected])
+  })
+
+  it('leaves a re-export alone — the action belongs to the module it came from', async () => {
+    const root = await project({
+      'app/actions/orders.ts': '"use server"\nexport { createOrder } from \'./impl\'',
+    })
+
+    const routes = await routesOf('next', root)
+
+    expect(routes).toEqual([])
+  })
+})
+
+describe('nuxt adapter', () => {
+  it.each(['ts', 'mjs', 'cjs', 'mts'])('reads the method and path off a .%s handler', async (ext) => {
+    const root = await project({
+      [`server/api/orders/checkout.post.${ext}`]: 'export default defineEventHandler(() => ({ ok: true }))',
+    })
+
+    const routes = await routesOf('nuxt', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['POST /api/orders/checkout'])
+  })
+
+  it('gives server/routes handlers no /api prefix', async () => {
+    const root = await project({
+      'server/routes/health.get.ts': 'export default defineEventHandler(() => ({ ok: true }))',
+    })
+
+    const routes = await routesOf('nuxt', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+})
+
+describe('nitro adapter', () => {
+  it('derives the same paths as nuxt, one directory level up', async () => {
+    const root = await project({
+      'api/orders/checkout.post.ts': 'export default defineEventHandler(() => ({ ok: true }))',
+      'routes/health.get.ts': 'export default defineEventHandler(() => ({ ok: true }))',
+      'middleware/auth.ts': 'export default defineEventHandler(() => {})',
+    })
+
+    const routes = await routesOf('nitro', root)
+
+    expect(routes.map(route => `${route.kind} ${route.method ?? '*'} ${route.path}`).sort()).toEqual([
+      'api GET /health',
+      'api POST /api/orders/checkout',
+      'middleware * *',
+    ])
+  })
 })
 
 describe('tanstack-start adapter', () => {

@@ -185,7 +185,12 @@ export default defineEvlogCommand('map', {
     const ctx = cwd ? { ...cli, cwd } : cli
 
     let result: MapResult
+    let threshold: number | undefined
     try {
+      /* Before the scan, not after: an unusable threshold should cost nothing,
+         and validating it afterwards means the command reads the whole project
+         and writes evlog.map.json before admitting it cannot gate on it. */
+      threshold = parseMinScoreArg(args.minScore)
       result = await runMap(ctx, log, {
         framework: parseFrameworkArg(args.framework),
         noWrite: !args.write,
@@ -204,8 +209,6 @@ export default defineEvlogCommand('map', {
       }
       throw error
     }
-
-    const threshold = parseMinScoreArg(args.minScore)
 
     ui.done({
       jsonMode: args.json,

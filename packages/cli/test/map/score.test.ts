@@ -10,6 +10,24 @@ function weightOf(id: 'wide-event' | 'context'): number {
   return rule.weight
 }
 
+/** A complete entry point, so that classification reads the same fields it does in a real scan. */
+function route(overrides: Partial<RouteEntry> = {}): RouteEntry {
+  return {
+    id: 'r',
+    framework: 'nuxt',
+    kind: 'api',
+    method: 'GET',
+    path: '/api/orders',
+    file: 'server/api/orders.get.ts',
+    handler: null,
+    checks: { 'wide-event': { status: 'pass' }, 'context': { status: 'pass' } },
+    suggestions: {},
+    sensitivity: { level: 'none', reasons: [] },
+    score: 100,
+    ...overrides,
+  }
+}
+
 describe('score', () => {
   it('subtracts weights for failed checks', () => {
     const checks: Record<string, CheckResult> = {
@@ -28,24 +46,45 @@ describe('score', () => {
   })
 
   it('computes weighted global score', () => {
-    const routes = [
-      { score: 100, sensitivity: { level: 'none', reasons: [] }, kind: 'api' },
-      { score: 50, sensitivity: { level: 'high', reasons: ['money'] }, kind: 'api' },
-    ] as RouteEntry[]
-    expect(scoreGlobal(routes)).toBe(67)
+    expect(scoreGlobal([
+      route({ score: 100 }),
+      route({ score: 50, sensitivity: { level: 'high', reasons: ['money'] } }),
+    ])).toBe(67)
   })
 
   it('weighs a page as a page even when it is sensitive', () => {
-    const routes = [
-      { score: 100, sensitivity: { level: 'none', reasons: [] }, kind: 'api' },
-      { score: 0, sensitivity: { level: 'high', reasons: ['money'] }, kind: 'page' },
-    ] as RouteEntry[]
     /* 0.5 for the page, not 2 for the sensitivity: (100×1 + 0×0.5) / 1.5. */
-    expect(scoreGlobal(routes)).toBe(67)
+    expect(scoreGlobal([
+      route({ score: 100 }),
+      route({
+        score: 0,
+        kind: 'page',
+        sensitivity: { level: 'high', reasons: ['money'] },
+        checks: { 'page-error-handling': { status: 'fail' } },
+      }),
+    ])).toBe(67)
+  })
+
+  it('leaves exempt entry points out of the average instead of letting their free 100 lift it', () => {
+    const ingest = route({ path: '/_evlog/ingest', file: 'server/routes/_evlog/ingest.post.ts', score: 100 })
+
+    expect(scoreGlobal([route({ score: 40 }), ingest])).toBe(40)
+  })
+
+  it('reads a page with nothing to fetch as exempt rather than as a free 100', () => {
+    /* `page-error-handling` reports `n/a` for a page that fetches nothing, so
+       the page is not an entry point the score has an opinion about. */
+    const staticPage = route({ kind: 'page', score: 100, checks: { 'page-error-handling': { status: 'n/a' } } })
+
+    expect(scoreGlobal([route({ score: 40 }), staticPage])).toBe(40)
   })
 
   it('scores an empty project as perfect rather than dividing by zero', () => {
     expect(scoreGlobal([])).toBe(100)
+  })
+
+  it('scores a project of nothing but exempt entry points as perfect', () => {
+    expect(scoreGlobal([route({ path: '/_evlog/ingest', file: '_evlog/ingest.post.ts', score: 20 })])).toBe(100)
   })
 
   it.each([

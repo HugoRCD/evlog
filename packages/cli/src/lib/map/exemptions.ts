@@ -14,15 +14,18 @@ export interface RouteExemption {
   skip: 'all' | readonly CheckId[]
 }
 
-const INFRA_PATHS = [
-  '/evlog/ingest',
-  '/_evlog/ingest',
-  '/api/evlog/ingest',
-]
-
-const INFRA_FILE_PATTERNS = [
-  'evlog/ingest',
-  '_evlog/ingest',
+/**
+ * evlog's own ingest endpoint, as consecutive path segments.
+ *
+ * Matched segment by segment rather than as a substring: an exemption skips
+ * every rule, so a loose match is the worst kind of bug this tool can have —
+ * it silently drops a real handler out of the score instead of reporting a
+ * gap. `lib/evlog/ingestable.ts` and `/api/evlog/ingestion-report` both contain
+ * `evlog/ingest` and neither is evlog's endpoint.
+ */
+const INFRA_SEGMENTS = [
+  ['evlog', 'ingest'],
+  ['_evlog', 'ingest'],
 ]
 
 const INFRA_EXEMPTION: RouteExemption = {
@@ -31,15 +34,33 @@ const INFRA_EXEMPTION: RouteExemption = {
 }
 
 /**
+ * Segments of a route path or file, lowercased, with the extension and any
+ * method suffix dropped so `_evlog/ingest.post.ts` still reads as `ingest`.
+ */
+function segmentsOf(value: string): string[] {
+  return value
+    .toLowerCase()
+    .split('/')
+    .filter(segment => segment.length > 0)
+    .map(segment => segment.split('.')[0] ?? segment)
+}
+
+/** Whether `segments` contains `pattern` as a consecutive run. */
+function containsRun(segments: readonly string[], pattern: readonly string[]): boolean {
+  return segments.some((_, index) => pattern.every((name, offset) => segments[index + offset] === name))
+}
+
+/**
  * Routes that are evlog plumbing (client ingest, internal handlers) — not app
  * handlers. Observability rules are n/a, not failures.
  */
 export function getRouteExemption(route: Pick<RawRouteEntry, 'path' | 'file'>): RouteExemption | null {
-  const path = route.path.toLowerCase()
-  const file = route.file.toLowerCase()
+  const path = segmentsOf(route.path)
+  const file = segmentsOf(route.file)
 
-  if (INFRA_PATHS.some(pattern => path.includes(pattern))) return INFRA_EXEMPTION
-  if (INFRA_FILE_PATTERNS.some(pattern => file.includes(pattern))) return INFRA_EXEMPTION
+  for (const pattern of INFRA_SEGMENTS) {
+    if (containsRun(path, pattern) || containsRun(file, pattern)) return INFRA_EXEMPTION
+  }
 
   return null
 }

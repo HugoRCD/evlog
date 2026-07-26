@@ -30,14 +30,20 @@ export function scoreRoute(checks: Partial<Record<CheckId, CheckResult>>): numbe
  * that touches money is still a page, and its own rule set is thinner, so
  * letting it weigh double would drag the project score on the strength of one
  * check.
+ *
+ * Exempt entries are left out entirely. Every rule is `n/a` for them, so they
+ * score a free 100, and averaging those in would let a project of static pages
+ * report a high score while its handlers are dark — the report already counts
+ * them apart from real coverage, and the number has to agree with it.
  */
 export function scoreGlobal(routes: RouteEntry[]): number {
-  if (routes.length === 0) return 100
+  const scored = routes.filter(route => classifyRouteObservability(route) !== 'exempt')
+  if (scored.length === 0) return 100
 
   let totalWeight = 0
   let weightedSum = 0
 
-  for (const route of routes) {
+  for (const route of scored) {
     let weight = 1
     if (route.sensitivity.level === 'high') weight = 2
     if (route.kind === 'page') weight = 0.5

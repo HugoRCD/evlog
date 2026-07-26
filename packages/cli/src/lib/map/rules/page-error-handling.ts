@@ -6,10 +6,10 @@ import type { MapRule } from './types'
  * Applies only to pages that actually fetch — a purely presentational page has
  * nothing to fail, so the rule reports itself as not-applicable.
  *
- * The error affordance is read from the AST: a `catch`, a `.catch()`, an
- * `onError` handler, or an `error` binding destructured from the fetch. The
- * previous implementation matched `/error\s*[:=]/` against the whole source,
- * which any variable named `errorMessage` was enough to satisfy.
+ * The error affordance is read from the AST and tied to the request it covers:
+ * a `try` the call sits inside, a `.catch()` chained onto it, or an `error`
+ * binding destructured from it. Checking the file for any of those instead let
+ * an unrelated `try` elsewhere on the page vouch for a fetch nobody guarded.
  */
 export const pageErrorHandlingRule = {
   id: 'page-error-handling',
@@ -44,13 +44,12 @@ export const pageErrorHandlingRule = {
     const { facts } = context
     return {
       onEnd() {
-        const handled = facts.catches.length > 0
-          || facts.callsTo('catch').length > 0
-          || facts.callsTo('onError').length > 0
-          || facts.callsTo('catchError').length > 0
-          || facts.destructuresNetworkError
-        if (handled) return
-        context.report({ message: 'page data fetch without error handling', line: 1 })
+        const [unguarded] = facts.unguardedNetwork
+        if (!unguarded) return
+        context.report({
+          message: `${unguarded.name}() without error handling — the page breaks when it fails`,
+          line: unguarded.line,
+        })
       },
     }
   },
