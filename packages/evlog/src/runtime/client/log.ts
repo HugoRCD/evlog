@@ -1,5 +1,5 @@
 import type { Log, LogLevel, TransportConfig } from '../../types'
-import { cssColors, escapeFormatString, getCssLevelColor, isBrowser, isLevelEnabled } from '../../utils'
+import { cssColors, escapeFormatString, getCssLevelColor, isBrowser, isLevelEnabled, isoNow } from '../../utils'
 
 /**
  * Browser DevTools often hide or bucket `console.debug` under "Verbose" in a way that looks like
@@ -69,7 +69,7 @@ function emitLog(level: LogLevel, event: Record<string, unknown>): void {
   if (!isLevelEnabled(level, clientMinLevel)) return
 
   const formatted = {
-    timestamp: new Date().toISOString(),
+    timestamp: isoNow(),
     level,
     service: clientService,
     ...identityContext,
@@ -97,7 +97,7 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
       console[browserConsoleMethod(level)](`%c[${escapeFormatString(tag)}]%c ${escapeFormatString(message)}`, getCssLevelColor(level), cssColors.reset)
     }
     sendToServer({
-      timestamp: new Date().toISOString(),
+      timestamp: isoNow(),
       level,
       service: clientService,
       ...identityContext,
