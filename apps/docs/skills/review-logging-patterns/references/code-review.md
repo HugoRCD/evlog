@@ -7,8 +7,8 @@ Use this checklist when reviewing code for logging best practices and evlog adop
 On **Nuxt, Nitro, Next.js App Router, and TanStack Start**, start with `@evlog/cli` if the user is open to it — one command finds dark entry points and names the fixes:
 
 ```bash
-npx @evlog/cli map
-npx @evlog/cli map <file>   # suggested shape for one entry point
+npx @evlog/cli map --no-write
+npx @evlog/cli map <file> --no-write   # suggested shape for one entry point
 ```
 
 Map rule ids (requirements that move the score) map to the anti-patterns below:

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { Motion } from 'motion-v'
-import type { TimedEvent } from '~/composables/useTimedSequence'
+import type { TimedEvent, UseTimedSequenceOptions } from '~/composables/useTimedSequence'
 
 type Cell = 'pending' | 'pass' | 'fail' | 'na' | 'disabled'
 
@@ -11,7 +11,7 @@ interface RuleCol {
   initial: Exclude<Cell, 'pending'>
   /** Verdict after fixes (step >= 2), before any disable. */
   fixed?: Exclude<Cell, 'pending'>
-  /** When true, step >= 3 turns this cell into disabled n/a. */
+  /** Step at which this cell becomes disabled n/a. */
   disableAt?: number
 }
 
@@ -22,7 +22,7 @@ interface RuleCol {
 const rules: RuleCol[] = [
   { id: 'log', kind: 'requirement', initial: 'fail', fixed: 'pass' },
   { id: 'ctx', kind: 'requirement', initial: 'fail', fixed: 'pass' },
-  { id: 'audit', kind: 'requirement', initial: 'fail', fixed: 'fail', disableAt: 3 },
+  { id: 'audit', kind: 'requirement', initial: 'fail', fixed: 'fail', disableAt: 4 },
   { id: 'err', kind: 'requirement', initial: 'na' },
   { id: 'catch', kind: 'requirement', initial: 'na' },
   { id: 'fetch', kind: 'requirement', initial: 'na' },
@@ -55,21 +55,22 @@ const events: TimedEvent[] = STEP_AT.map((at, i) => ({
 
 const totalDuration = (STEP_AT.at(-1) ?? 0) + TAIL_HOLD
 
-const { start, toggle, restart, paused, started } = useTimedSequence({
+const sequenceOpts: UseTimedSequenceOptions = {
   events,
   totalDuration,
   loop: true,
+  reducedMotion: false,
   onReset: resetState,
-})
+}
+
+const { start, toggle, restart, paused, started } = useTimedSequence(sequenceOpts)
 
 let observer: IntersectionObserver | undefined
 
 onMounted(() => {
   prefersReducedMotion.value = window.matchMedia('(prefers-reduced-motion: reduce)').matches
-  if (prefersReducedMotion.value) {
-    step.value = 4
-    return
-  }
+  sequenceOpts.reducedMotion = prefersReducedMotion.value
+
   if (!wrapperRef.value) {
     start()
     return
@@ -141,7 +142,7 @@ const failingReqs = computed(() =>
     :in-view-options="{ once: true, amount: 0.2 }"
     class="not-prose my-8"
   >
-    <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
+    <div ref="wrapperRef" class="w-full min-h-[248px] overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-2">
         <UIcon name="i-lucide-list-checks" class="size-3 text-primary shrink-0" />
         <span class="font-mono text-[11px] text-dimmed truncate">evlog map — rules</span>
@@ -221,7 +222,7 @@ const failingReqs = computed(() =>
         >{{ statusLabel }}</span>
         <span
           class="ml-auto tabular-nums transition-opacity duration-500 whitespace-nowrap"
-          :class="step >= 3 ? 'opacity-100 text-amber-400' : 'opacity-0'"
+          :class="step >= 4 ? 'opacity-100 text-amber-400' : 'opacity-0'"
         >
           ○ = disabled (still visible)
         </span>

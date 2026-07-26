@@ -1477,7 +1477,7 @@ Once installed, your AI assistant will:
 
 ### Examples
 
-```
+```text
 Add logging to this endpoint
 Review my logging code
 Raise my evlog map score
