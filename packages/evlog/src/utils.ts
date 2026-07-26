@@ -181,3 +181,26 @@ export function globToRegExp(pattern: string, separator: '/' | '.' = '/'): RegEx
 export function matchesPattern(path: string, pattern: string): boolean {
   return globToRegExp(pattern, '/').test(path)
 }
+
+/** Reused Date for ISO formatting — avoids allocating on second rollover. */
+const _isoDate = new Date()
+let _isoCachedSecond = -1
+let _isoCachedPrefix = ''
+
+/**
+ * Current wall-clock time as an ISO-8601 UTC string (`YYYY-MM-DDTHH:mm:ss.sssZ`).
+ *
+ * Caches the formatted prefix through the second and only appends milliseconds on
+ * each call — same technique as pino / h3's logger, so hot emit paths avoid
+ * re-running `toISOString()` thousands of times per second.
+ */
+export function isoNow(): string {
+  const now = Date.now()
+  const sec = Math.floor(now / 1000)
+  if (sec !== _isoCachedSecond) {
+    _isoCachedSecond = sec
+    _isoDate.setTime(now)
+    _isoCachedPrefix = _isoDate.toISOString().slice(0, 19)
+  }
+  return `${_isoCachedPrefix}.${String(now % 1000).padStart(3, '0')}Z`
+}

@@ -8,7 +8,7 @@ import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } f
 import type { ResolvedPrettyError } from './shared/dev-terminal'
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { EvlogError } from './error'
-import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, matchesPattern } from './utils'
+import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
 
 const nativeStdoutWrite =
   typeof process !== 'undefined' && typeof process.stdout?.write === 'function'
@@ -28,12 +28,6 @@ function writePrettyStdout(text: string): void {
 
 function isPlainObject(val: unknown): val is Record<string, unknown> {
   return val !== null && typeof val === 'object' && !Array.isArray(val)
-}
-
-const _tsDate = new Date()
-function isoNow(): string {
-  _tsDate.setTime(Date.now())
-  return _tsDate.toISOString()
 }
 
 /** Shown after post-emit warnings so users can fix fire-and-forget / ALS continuations. */
