@@ -70,13 +70,24 @@ const FEATURE_MARKERS: Record<EvlogFeature, string> = {
 
 const PAIRABLE_PACKAGES: readonly PairablePackage[] = ['ai', 'better-auth']
 
-/** Source files worth searching for adoption evidence. */
-const SOURCE_GLOBS = ['**/*.{ts,tsx,js,jsx,mts,vue}']
+/**
+ * Source files worth searching for adoption evidence.
+ *
+ * The extension list tracks what the adapters scan — a catalog declared in a
+ * `.mjs` or `.cts` barrel would otherwise be invisible here, and every handler
+ * importing it would be scored as if the project had no catalog at all.
+ */
+const SOURCE_GLOBS = ['**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,vue}']
 const IGNORED = [
   '**/node_modules/**',
+  '**/.git/**',
   '**/dist/**',
+  '**/build/**',
+  '**/.turbo/**',
   '**/.nuxt/**',
   '**/.next/**',
+  '**/.svelte-kit/**',
+  '**/.vercel/**',
   '**/.output/**',
   '**/coverage/**',
   '**/*.d.ts',

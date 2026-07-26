@@ -49,4 +49,26 @@ describe('route display', () => {
     expect(classifyRouteObservability(r)).toBe('dark')
     expect(topIssue(r)).toBe('no useLogger()')
   })
+
+  it('counts a page with nothing to fetch as exempt, not dark', () => {
+    const statik = route({ kind: 'page', checks: { 'page-error-handling': { status: 'n/a' } } })
+    const neverRan = route({ kind: 'page', checks: {} })
+
+    expect(classifyRouteObservability(statik)).toBe('exempt')
+    expect(classifyRouteObservability(neverRan)).toBe('exempt')
+  })
+
+  it('still calls out a page that fetches without handling the failure', () => {
+    const r = route({ kind: 'page', checks: { 'page-error-handling': { status: 'fail', message: 'unhandled fetch' } } })
+    expect(classifyRouteObservability(r)).toBe('dark')
+  })
+
+  it('treats evlog ingest endpoints as exempt whatever their checks say', () => {
+    const r = route({
+      path: '/api/evlog/ingest',
+      file: 'app/api/evlog/ingest/route.ts',
+      checks: { 'wide-event': { status: 'fail' } },
+    })
+    expect(classifyRouteObservability(r)).toBe('exempt')
+  })
 })

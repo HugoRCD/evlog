@@ -45,7 +45,10 @@ export const aiLoggingRule = {
     const { facts } = context
     return {
       onEnd() {
-        const [call] = AI_CALLS.flatMap(name => facts.callsTo(name))
+        /* Source order, not the order of `AI_CALLS`: grouping by name first
+           points the evidence at whichever helper happens to be listed first,
+           which can sit well below the call the reader should look at. */
+        const call = facts.calls.find(fact => AI_CALLS.includes(fact.member))
         context.report({
           message: 'AI SDK call without evlog/ai — tokens, cost and model latency are missing from the event',
           line: call?.line,

@@ -1,3 +1,4 @@
+import type { ParseFn } from './parse'
 import type { ProjectFacts } from './project-facts'
 
 /** Frameworks the `map` command can scan (adapter selection key). */
@@ -96,6 +97,13 @@ export interface ScanContext {
   projectName: string
   hasEvlog: boolean
   verbose: boolean
+  /**
+   * Read-and-parse for this scan, memoized per path.
+   *
+   * Adapters and the scan itself want the same files, so they share one parser
+   * and each file goes through oxc once. Defaults to an uncached read.
+   */
+  parse?: ParseFn
 }
 
 export interface FrameworkAdapter {

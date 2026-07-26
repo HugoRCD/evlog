@@ -63,6 +63,27 @@ export function parseFile(filePath: string): ParseResult | null {
   return parseSource(filePath, source)
 }
 
+/** Reads and parses one path. */
+export type ParseFn = (filePath: string) => ParseResult | null
+
+/**
+ * A {@link parseFile} that touches each path once, for the length of one scan.
+ *
+ * The adapter parses a file to find its handler and the scan parses it again to
+ * derive its facts — and Next emits one entry per exported method, so a
+ * `route.ts` with GET, POST and DELETE went through oxc four times.
+ *
+ * Scoped to a scan rather than the module: a cache that outlives the run would
+ * serve stale ASTs to the next one.
+ */
+export function createParseCache(): ParseFn {
+  const seen = new Map<string, ParseResult | null>()
+  return (filePath) => {
+    if (!seen.has(filePath)) seen.set(filePath, parseFile(filePath))
+    return seen.get(filePath) ?? null
+  }
+}
+
 /**
  * Parse source that is already in memory.
  *
@@ -226,6 +247,16 @@ export function findHttpMethodExports(parsed: ParseResult): Array<{ method: stri
             found.push({ method: d.id.name, line: loc?.line ?? 1 })
           }
         }
+      }
+      /* `export { handler as GET }` — a legitimate way to write a route
+         handler, and the only one where the method name never appears on a
+         declaration. */
+      for (const specifier of decl.specifiers ?? []) {
+        const exported = specifier.exported as { type: string, name?: string, value?: string }
+        const name = exported.type === 'Identifier' ? exported.name : exported.value
+        if (!name || !methods.includes(name)) continue
+        const loc = nodeLoc(specifier.exported, parsed.lines)
+        found.push({ method: name, line: loc?.line ?? 1 })
       }
     }
   })

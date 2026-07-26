@@ -30,6 +30,13 @@ interface Case {
   features?: EvlogFeature[]
   /** Third-party packages present that evlog integrates with. */
   pairable?: PairablePackage[]
+  /**
+   * Everything in `package.json`. Defaults to `pairable`.
+   *
+   * Kept separate so a case can put a package in the project without declaring
+   * it pairable — otherwise no test could tell the two lookups apart.
+   */
+  dependencies?: string[]
   /** Error catalogs the project declares — lets a suggestion name one. */
   catalogs?: string[]
   /**
@@ -97,7 +104,7 @@ function check(rule: MapRule, testCase: Case): CheckResult | undefined {
     verbose: false,
   }
   const project: ProjectFacts = {
-    dependencies: new Set(testCase.pairable ?? []),
+    dependencies: new Set<string>(testCase.dependencies ?? testCase.pairable ?? []),
     features: new Set(testCase.features ?? []),
     pairable: new Set(testCase.pairable ?? []),
     catalogs: testCase.catalogs ?? [],
@@ -197,6 +204,11 @@ const CASES: Record<CheckId, RuleCases> = {
       {
         name: 'a local withAudit is not evlog\'s',
         code: 'function withAudit(o, f) { return f }\nexport default defineEventHandler(() => withAudit({}, () => 1)())',
+        message: /adds nothing/,
+      },
+      {
+        name: 'a useLogger destructured from something else shadows the auto-import',
+        code: 'const { useLogger } = createStub()\nexport default defineEventHandler(() => { const log = useLogger() })',
         message: /adds nothing/,
       },
       {

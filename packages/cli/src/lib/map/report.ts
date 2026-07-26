@@ -3,6 +3,7 @@ import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
 import type { Style, StyleCode } from '../../core/output'
 import { countSuppressed } from './directives'
+import { isInfrastructureRoute } from './exemptions'
 import { REQUIREMENTS, getRule } from './rules/index'
 import type { FixSlot, SuggestContext } from './rules/index'
 import type { ProjectFacts } from './project-facts'
@@ -144,13 +145,6 @@ function displayName(route: RouteEntry): string {
 }
 
 /**
- * The style kit plus a documentation link that reads well either way.
- *
- * `Style.link` falls back to `label (url)` without colors, which would print
- * the same address twice here since the label *is* the address. Plain mode gets
- * the bare URL instead.
- */
-/**
  * Narrowest width the report lays out for, and the widest it spreads to.
  *
  * The floor is a contract: below 80 columns a sentence like "missing audit
@@ -168,6 +162,13 @@ interface ReportStyle extends Style {
   width: number
 }
 
+/**
+ * The style kit plus a documentation link that reads well either way.
+ *
+ * `Style.link` falls back to `label (url)` without colors, which would print
+ * the same address twice here since the label *is* the address. Plain mode gets
+ * the bare URL instead.
+ */
 function createReportStyle(ctx: CliContext): ReportStyle {
   const style = createStyle(ctx)
   return {
@@ -447,7 +448,7 @@ export function formatMapReport(
   const solid = active.filter(route => !hasGaps(route) && countSuppressed(route) === 0)
   if (solid.length > 0) {
     const lead = '✓ Already solid: '
-    const { shown, hidden } = fitItems(solid.map(route => route.path), ' · ', style.width - lead.length - MORE_WIDTH)
+    const { shown, hidden } = fitItems(solid.map(displayName), ' · ', style.width - lead.length - MORE_WIDTH)
     const more = hidden > 0 ? ` +${hidden}` : ''
     lines.push(`${paint('green', '✓')} ${paint('dim', `Already solid: ${shown.join(' · ')}${more}`)}`)
   }
@@ -630,7 +631,8 @@ export function formatMapMatrix(ctx: CliContext, result: ScanResult): string {
       const label = clipStart(labelOf(route), labelWidth - 2)
 
       if (classifyRouteObservability(route) === 'exempt') {
-        lines.push(`${branch} ${pad(paint('dim', label), labelWidth)}${paint('dim', 'exempt — evlog internals')}`)
+        const why = isInfrastructureRoute(route) ? 'evlog internals' : 'nothing to instrument'
+        lines.push(`${branch} ${pad(paint('dim', label), labelWidth)}${paint('dim', `exempt — ${why}`)}`)
         return
       }
 
@@ -741,9 +743,20 @@ function suggestedShape(route: RouteEntry, framework: Framework, project: Projec
   }
 }
 
+/**
+ * A query as the scan knows it.
+ *
+ * Shells complete `./server/api/foo.ts`, the map stores `server/api/foo.ts`;
+ * both the lookup and the suggestions have to strip the prefix, or a typo'd
+ * path is answered with "no entry point matches" and no suggestions at all.
+ */
+function normalizeQuery(query: string): string {
+  return query.replace(/^\.\//, '')
+}
+
 /** Find an entry point by route path or by file path. */
 export function findEntryPoint(result: ScanResult, query: string): RouteEntry | undefined {
-  const needle = query.replace(/^\.\//, '')
+  const needle = normalizeQuery(query)
   return result.map.routes.find(route => route.path === needle)
     ?? result.map.routes.find(route => route.file === needle)
     ?? result.map.routes.find(route => route.file.endsWith(needle))
@@ -904,8 +917,9 @@ export function formatGate(ctx: CliContext, result: ScanResult, threshold: numbe
 /** Shown when `evlog map <file>` matches nothing the scan found. */
 export function formatEntryPointNotFound(ctx: CliContext, result: ScanResult, query: string): string {
   const { paint } = createStyle(ctx)
+  const needle = normalizeQuery(query)
   const nearby = result.map.routes
-    .filter(route => route.file.includes(query) || route.path.includes(query))
+    .filter(route => route.file.includes(needle) || route.path.includes(needle))
     .slice(0, 5)
 
   const lines = [paint('yellow', `No entry point matches ${query}`)]

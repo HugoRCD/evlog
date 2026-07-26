@@ -242,13 +242,6 @@ function unwrapChain(node: Node): Node {
 }
 
 /**
- * Decode a call's callee into names.
- *
- * Walks the whole member chain so `log.audit?.deny()` is still recognised as a
- * call on `log`: matching only the immediate object misses it, and an
- * unrecognised audit call means the report claims an audited route is not.
- */
-/**
  * Bindings a declaration pattern introduces.
  *
  * Only the shapes that appear in evlog's own setup are handled: a plain name and
@@ -268,6 +261,13 @@ function patternNames(id: Node): string[] {
   return names
 }
 
+/**
+ * Decode a call's callee into names.
+ *
+ * Walks the whole member chain so `log.audit?.deny()` is still recognised as a
+ * call on `log`: matching only the immediate object misses it, and an
+ * unrecognised audit call means the report claims an audited route is not.
+ */
 function describeCallee(rawCallee: Node): CalleeShape | null {
   const callee = unwrapChain(rawCallee)
 
@@ -415,8 +415,11 @@ export function buildFileFacts(
 
       case 'VariableDeclarator': {
         const declarator = node as { id: Node, init?: Node }
-        if (declarator.id.type === 'Identifier') {
-          localDeclarations.add(declarator.id.name)
+        /* Destructuring binds names too: without this, `const { useLogger } =
+           createStub()` shadows the auto-import unnoticed and the file gets
+           credited with evlog's logger when it declared its own. */
+        for (const name of patternNames(declarator.id)) {
+          localDeclarations.add(name)
         }
         if (!declarator.init) break
 

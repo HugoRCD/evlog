@@ -2,10 +2,21 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { MapFile } from './types'
 
+/**
+ * Code-point order, not collation.
+ *
+ * `localeCompare` reads the machine's locale, so the same map serializes in a
+ * different route order on a different laptop — which shows up as a phantom
+ * diff in a committed `evlog.map.json` and as a flaky snapshot in CI.
+ */
+function compare(a: string, b: string): number {
+  return a < b ? -1 : a > b ? 1 : 0
+}
+
 function sortedRoutes(map: MapFile): MapFile {
   return {
     ...map,
-    routes: [...map.routes].sort((a, b) => a.path.localeCompare(b.path) || (a.method ?? '').localeCompare(b.method ?? '')),
+    routes: [...map.routes].sort((a, b) => compare(a.path, b.path) || compare(a.method ?? '', b.method ?? '')),
   }
 }
 
@@ -16,6 +27,7 @@ export function writeMapFile(projectRoot: string, map: MapFile): string {
   return outPath
 }
 
+/** The map as it would be written, routes sorted, without touching the disk. */
 export function serializeMapFile(map: MapFile): string {
   return JSON.stringify(sortedRoutes(map), null, 2)
 }

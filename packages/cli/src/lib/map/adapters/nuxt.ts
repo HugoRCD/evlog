@@ -1,5 +1,6 @@
 import { basename } from 'node:path'
 import { globSync } from 'tinyglobby'
+import type { ParseFn } from '../parse'
 import { findHandlerLocation, parseFile } from '../parse'
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { extractMethodFromFilename, relativeFromRoot, segmentsToPath, stripRouteFilename } from '../utils'
@@ -26,13 +27,13 @@ function routeSegmentsFromRel(rel: string, prefix: string): string {
   return segmentsToPath(parts, prefix)
 }
 
-function fileToApiRoute(file: string, root: string): RawRouteEntry[] {
+function fileToApiRoute(file: string, root: string, parse: ParseFn): RawRouteEntry[] {
   const rel = relativeFromRoot(root, file)
   const filename = basename(file)
   const method = extractMethodFromFilename(filename)
   const routePath = routeSegmentsFromRel(rel, rel.startsWith('server/api/') ? '/api' : '')
 
-  const parsed = parseFile(file)
+  const parsed = parse(file)
   const handler = parsed
     ? findHandlerLocation(parsed, ['defineEventHandler', 'eventHandler'])
     : null
@@ -66,9 +67,9 @@ function fileToPageRoute(file: string, root: string): RawRouteEntry {
   }
 }
 
-function fileToMiddlewareRoute(file: string, root: string): RawRouteEntry {
+function fileToMiddlewareRoute(file: string, root: string, parse: ParseFn): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
-  const parsed = parseFile(file)
+  const parsed = parse(file)
   const handler = parsed
     ? findHandlerLocation(parsed, ['defineEventHandler'])
     : null
@@ -83,10 +84,10 @@ function fileToMiddlewareRoute(file: string, root: string): RawRouteEntry {
   }
 }
 
-function fileToCronRoute(file: string, root: string): RawRouteEntry {
+function fileToCronRoute(file: string, root: string, parse: ParseFn): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
   const name = stripRouteFilename(basename(file))
-  const parsed = parseFile(file)
+  const parsed = parse(file)
   const handler = parsed
     ? findHandlerLocation(parsed, ['defineTask', 'defineEventHandler'])
     : null
@@ -121,10 +122,11 @@ export const nuxtAdapter: FrameworkAdapter = {
   async extractRoutes(ctx: ScanContext): Promise<RawRouteEntry[]> {
     const routes: RawRouteEntry[] = []
     const root = ctx.projectRoot
+    const parse = ctx.parse ?? parseFile
 
     for (const pattern of API_GLOBS) {
       for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(...fileToApiRoute(file, root))
+        routes.push(...fileToApiRoute(file, root, parse))
       }
     }
 
@@ -136,13 +138,13 @@ export const nuxtAdapter: FrameworkAdapter = {
 
     for (const pattern of MIDDLEWARE_GLOBS) {
       for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(fileToMiddlewareRoute(file, root))
+        routes.push(fileToMiddlewareRoute(file, root, parse))
       }
     }
 
     for (const pattern of CRON_GLOBS) {
       for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(fileToCronRoute(file, root))
+        routes.push(fileToCronRoute(file, root, parse))
       }
     }
 
@@ -159,6 +161,7 @@ export const nitroAdapter: FrameworkAdapter = {
   async extractRoutes(ctx: ScanContext): Promise<RawRouteEntry[]> {
     const routes: RawRouteEntry[] = []
     const root = ctx.projectRoot
+    const parse = ctx.parse ?? parseFile
 
     const apiGlobs = ['routes/**/*.{ts,js,mts,cts}', 'api/**/*.{ts,js,mts,cts}']
     for (const pattern of apiGlobs) {
@@ -181,7 +184,7 @@ export const nitroAdapter: FrameworkAdapter = {
 
         const segments = stripRouteFilename(segmentStart).split('/')
         const path = segmentsToPath(segments, prefix) || '/'
-        const parsed = parseFile(file)
+        const parsed = parse(file)
         const handler = parsed
           ? findHandlerLocation(parsed, ['defineEventHandler', 'eventHandler'])
           : null
@@ -199,7 +202,7 @@ export const nitroAdapter: FrameworkAdapter = {
 
     for (const file of globSync('middleware/**/*.{ts,js,mts,cts}', { cwd: root, absolute: true })) {
       const rel = relativeFromRoot(root, file)
-      const parsed = parseFile(file)
+      const parsed = parse(file)
       const handler = parsed
         ? findHandlerLocation(parsed, ['defineEventHandler'])
         : null
