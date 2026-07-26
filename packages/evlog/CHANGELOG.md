@@ -1,5 +1,11 @@
 # evlog
 
+## 2.22.4
+
+### Patch Changes
+
+- [#442](https://github.com/HugoRCD/evlog/pull/442) [`8f294d1`](https://github.com/HugoRCD/evlog/commit/8f294d17b65e17a77aa40f2be721168be35b61bb) Thanks [@lichterspiel](https://github.com/lichterspiel)! - fix(next): thread `redact` through `createInstrumentation().register()` — it previously re-initialised the logger without redaction and locked it, silently disabling `redact` configured for the Next.js instrumentation path
+
 ## 2.22.3
 
 ### Patch Changes
