@@ -84,6 +84,7 @@ describe('docs redirects', () => {
   it.each([
     '/start',
     '/learn',
+    '/cli',
     '/integrate',
     '/reference',
     '/examples',

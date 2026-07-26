@@ -42,6 +42,18 @@ const landingItems = [
         icon: 'i-lucide-bot',
         description: 'Use evlog with AI coding agents',
         to: '/reference/agent-skills'
+      },
+      {
+        label: 'Configuration',
+        icon: 'i-lucide-settings',
+        description: 'Every option, env var, and default',
+        to: '/reference/configuration'
+      },
+      {
+        label: 'Best Practices',
+        icon: 'i-lucide-shield-check',
+        description: 'What to log, what never to log',
+        to: '/reference/best-practices'
       }
     ]
   },
@@ -84,6 +96,60 @@ const landingItems = [
         icon: 'i-lucide-filter',
         description: 'Keep all errors, drop healthy noise',
         to: '/learn/sampling'
+      },
+      {
+        label: 'Auto-Redaction',
+        icon: 'i-lucide-eye-off',
+        description: 'Strip secrets before they leave the process',
+        to: '/learn/redaction'
+      },
+      {
+        label: 'Typed Fields',
+        icon: 'i-simple-icons-typescript',
+        description: 'Autocomplete your own log.set fields',
+        to: '/learn/typed-fields'
+      }
+    ]
+  },
+  {
+    label: 'CLI',
+    to: '/cli/overview',
+    children: [
+      {
+        label: 'Overview',
+        icon: 'i-lucide-terminal',
+        description: 'Commands, flags, exit codes',
+        to: '/cli/overview'
+      },
+      {
+        label: 'evlog map',
+        icon: 'i-lucide-radar',
+        description: 'Score every entry point in your app',
+        to: '/cli/map'
+      },
+      {
+        label: 'Rules',
+        icon: 'i-lucide-list-checks',
+        description: 'Every check and how to satisfy it',
+        to: '/cli/rules'
+      },
+      {
+        label: 'Scoring',
+        icon: 'i-lucide-gauge',
+        description: 'Weights, grades, and sensitivity',
+        to: '/cli/scoring'
+      },
+      {
+        label: 'CI',
+        icon: 'i-lucide-git-pull-request',
+        description: 'Gate a pull request on the score',
+        to: '/cli/ci'
+      },
+      {
+        label: 'evlog doctor',
+        icon: 'i-lucide-stethoscope',
+        description: 'Diagnose your evlog install',
+        to: '/cli/doctor'
       }
     ]
   },
@@ -116,6 +182,12 @@ const landingItems = [
         to: '/integrate/frameworks/nitro'
       },
       {
+        label: 'TanStack Start',
+        icon: 'i-custom-tanstack',
+        description: 'Nitro v3 module with async context',
+        to: '/integrate/frameworks/tanstack-start'
+      },
+      {
         label: 'Hono',
         icon: 'i-simple-icons-hono',
         description: 'Web standards middleware',
@@ -128,6 +200,12 @@ const landingItems = [
         to: '/integrate/frameworks/express'
       },
       {
+        label: 'NestJS',
+        icon: 'i-simple-icons-nestjs',
+        description: 'Module with global middleware',
+        to: '/integrate/frameworks/nestjs'
+      },
+      {
         label: 'Cloudflare Workers',
         icon: 'i-simple-icons-cloudflare',
         description: 'Edge runtime support',
@@ -138,6 +216,12 @@ const landingItems = [
         icon: 'i-lucide-code',
         description: 'Scripts, jobs, libraries, anything',
         to: '/integrate/frameworks/standalone'
+      },
+      {
+        label: 'Custom framework',
+        icon: 'i-lucide-puzzle',
+        description: 'Wire up a framework evlog has no module for',
+        to: '/extend/custom-framework'
       },
       {
         label: 'All frameworks',
@@ -206,6 +290,18 @@ const landingItems = [
         to: '/integrate/adapters/self-hosted/nuxthub'
       },
       {
+        label: 'Drain pipeline',
+        icon: 'i-lucide-workflow',
+        description: 'Batching, retries, fan-out to many sinks',
+        to: '/extend/drain-pipeline'
+      },
+      {
+        label: 'Custom drains',
+        icon: 'i-lucide-share-2',
+        description: 'Send events anywhere with the toolkit',
+        to: '/extend/custom-drains'
+      },
+      {
         label: 'All adapters',
         icon: 'i-custom-plug',
         description: 'See every built-in adapter',
@@ -246,6 +342,24 @@ const landingItems = [
         icon: 'i-lucide-sparkles',
         description: 'Auto-add User-Agent, geo, trace context',
         to: '/use-cases/enrichers'
+      },
+      {
+        label: 'Telemetry',
+        icon: 'i-lucide-gauge',
+        description: 'One event per run for your own CLI',
+        to: '/use-cases/telemetry/overview'
+      },
+      {
+        label: 'eve',
+        icon: 'i-custom-eve',
+        description: 'Observability for eve agents',
+        to: '/use-cases/eve'
+      },
+      {
+        label: 'All use cases',
+        icon: 'i-lucide-layers',
+        description: 'See everything evlog is used for',
+        to: '/use-cases/overview'
       }
     ]
   }
