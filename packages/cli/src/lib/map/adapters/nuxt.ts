@@ -36,7 +36,15 @@ const MIDDLEWARE_DIR: Record<'nuxt' | 'nitro', string> = {
   nitro: 'middleware',
 }
 
-const PAGE_GLOBS = ['pages/**/*.vue']
+/**
+ * Where Nuxt keeps file-based pages.
+ *
+ * Nuxt 4 defaults to `app/pages`; older layouts use `pages/` or `src/pages`.
+ * Several can coexist in odd projects — scan every root that actually has
+ * `.vue` files rather than picking one and leaving the others invisible.
+ */
+const PAGE_DIRS = ['app/pages', 'pages', 'src/pages'] as const
+
 const CRON_GLOBS = [`server/tasks/**/*.${HANDLER_EXT}`]
 
 /** What both Nitro-based adapters need to turn a file into an entry point. */
@@ -44,6 +52,17 @@ interface ExtractContext {
   root: string
   parse: ParseFn
   framework: 'nuxt' | 'nitro'
+}
+
+/**
+ * Page directories under `root` that contain at least one `.vue` file.
+ * Falls back to `pages` when nothing is present so globs stay predictable.
+ */
+function resolvePageDirs(root: string): readonly string[] {
+  const found = PAGE_DIRS.filter(
+    dir => globSync(`${dir}/**/*.vue`, { cwd: root }).length > 0,
+  )
+  return found.length > 0 ? found : ['pages']
 }
 
 function fileToApiRoute(file: string, apiRoot: RouteRoot, { root, parse, framework }: ExtractContext): RawRouteEntry {
@@ -65,9 +84,12 @@ function fileToApiRoute(file: string, apiRoot: RouteRoot, { root, parse, framewo
   }
 }
 
-function fileToPageRoute(file: string, root: string): RawRouteEntry {
+function fileToPageRoute(file: string, root: string, pageDir: string): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
-  const segments = rel.slice('pages/'.length).split('/')
+  const prefix = `${pageDir}/`
+  const segments = rel.startsWith(prefix)
+    ? rel.slice(prefix.length).split('/')
+    : rel.split('/')
   const last = segments.length - 1
   segments[last] = stripRouteFilename(segments[last] ?? '')
   const path = segmentsToPath(segments) || '/'
@@ -149,7 +171,7 @@ function extractServerRoutes(ctx: ScanContext, framework: 'nuxt' | 'nitro'): Raw
   return routes
 }
 
-/** Nuxt project: `server/api`, `server/routes`, `server/middleware`, `server/tasks` and `pages`. */
+/** Nuxt project: `server/api`, `server/routes`, `server/middleware`, `server/tasks` and pages. */
 export const nuxtAdapter: FrameworkAdapter = {
   framework: 'nuxt',
   evlogAutoImports: NUXT_EVLOG_AUTO_IMPORTS,
@@ -160,9 +182,9 @@ export const nuxtAdapter: FrameworkAdapter = {
     const root = ctx.projectRoot
     const parse = ctx.parse ?? parseFile
 
-    for (const pattern of PAGE_GLOBS) {
-      for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(fileToPageRoute(file, root))
+    for (const pageDir of resolvePageDirs(root)) {
+      for (const file of globSync(`${pageDir}/**/*.vue`, { cwd: root, absolute: true })) {
+        routes.push(fileToPageRoute(file, root, pageDir))
       }
     }
 
