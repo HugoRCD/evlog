@@ -1,5 +1,12 @@
 # evlog-community-adapter-skeleton
 
+## 8.0.4
+
+### Patch Changes
+
+- Updated dependencies [[`8f294d1`](https://github.com/HugoRCD/evlog/commit/8f294d17b65e17a77aa40f2be721168be35b61bb)]:
+  - evlog@2.22.4
+
 ## 8.0.3
 
 ### Patch Changes
