@@ -24,7 +24,7 @@
   ],
   "tasks": {
     "build": {
-      "dependsOn": ["^build"],
+      "dependsOn": ["^build", "dev:prepare"],
       "outputs": [
         "dist/**",
         ".nuxt/**",
@@ -54,7 +54,7 @@
       ]
     },
     "dev:prepare": {
-      "dependsOn": ["^dev:prepare"],
+      "dependsOn": ["^dev:prepare", "^build"],
       "outputs": ["dist/**", ".nuxt/**", ".output/**"],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"]
     },
