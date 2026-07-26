@@ -58,8 +58,8 @@ npm install evlog
 **Try without installing:**
 
 ```bash
-npx @evlog/cli map
-# or: pnpm dlx @evlog/cli map
+npx @evlog/cli map --no-write
+# or: pnpm dlx @evlog/cli map --no-write
 # agents: npx @evlog/cli map --json --no-write
 ```
 
@@ -67,10 +67,10 @@ What you get:
 
 - A project score and which entry points are still dark
 - **FIX FIRST** — the three most valuable places to fix
-- Per-file inspect: `npx @evlog/cli map <file>` shows the shape the handler could take
+- Per-file inspect: `npx @evlog/cli map <file> --no-write` shows the shape the handler could take
 - Re-run after fixes and watch the score move
 
-If the user is open to it: work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.audit()`, `createError({ why, fix })`), then re-run. Prefer `npx` / `dlx` for a one-shot; only suggest `pnpm add -D @evlog/cli` if they want it pinned for CI — **ask first, never install silently**.
+If the user is open to it: work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.audit()`, `createError({ why, fix })`), then re-run with `--no-write`. Prefer `npx` / `dlx` for a one-shot; only suggest `pnpm add -D @evlog/cli` if they want it pinned for CI — **ask first, never install silently**. Omit `--no-write` only when the user wants `evlog.map.json` written.
 
 If the CLI is unavailable, the framework has no map adapter yet, or the user declines — **continue with the manual checklist** below. The skill does not depend on the CLI.
 
