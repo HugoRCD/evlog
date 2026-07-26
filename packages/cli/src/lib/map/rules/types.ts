@@ -47,7 +47,7 @@ export interface FrameworkCapabilities {
  * Most rules only need `onEnd` because {@link FileFacts} already answers their
  * question; listeners are the escape hatch for anything the facts do not cover.
  */
-export type RuleListeners = Partial<Record<string, (node: Node) => void>> & {
+export type RuleListeners = Partial<Record<Node['type'], (node: Node) => void>> & {
   onEnd?: () => void
 }
 

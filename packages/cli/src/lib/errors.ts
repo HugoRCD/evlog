@@ -83,6 +83,14 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
     tags: ['map'],
   },
+  MAP_INVALID_MIN_SCORE: {
+    status: 400,
+    message: ({ value }: { value: string }) =>
+      `Invalid --min-score "${value}"`,
+    why: 'A gate that cannot be read is a gate that never fails, and CI would go green on a threshold nobody applied',
+    fix: 'Pass a whole number between 0 and 100, e.g. --min-score 80',
+    tags: ['map'],
+  },
 })
 
 declare module 'evlog' {

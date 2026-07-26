@@ -146,10 +146,20 @@ function parseFrameworkArg(value: unknown): Framework | undefined {
   return value
 }
 
+/**
+ * Read `--min-score`, rejecting anything that is not a whole 0-100.
+ *
+ * The whole string has to parse: `parseInt` reads `80oops` as 80 and `abc` as
+ * nothing at all, and a threshold that quietly becomes `undefined` turns the
+ * gate off — CI then reports success for a bar it never checked.
+ */
 function parseMinScoreArg(value: unknown): number | undefined {
   if (typeof value !== 'string' || value.length === 0) return undefined
-  const threshold = Number.parseInt(value, 10)
-  return Number.isNaN(threshold) ? undefined : threshold
+  const threshold = Number(value)
+  if (!Number.isInteger(threshold) || threshold < 0 || threshold > 100) {
+    throw cliErrors.MAP_INVALID_MIN_SCORE({ value })
+  }
+  return threshold
 }
 
 /**

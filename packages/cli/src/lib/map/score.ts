@@ -22,6 +22,15 @@ export function scoreRoute(checks: Partial<Record<CheckId, CheckResult>>): numbe
   return Math.max(0, score)
 }
 
+/**
+ * Weighted average of the per-entry scores.
+ *
+ * The weights say which entry points the number should follow: a sensitive
+ * handler counts double, a page counts half. Page wins when both apply — a page
+ * that touches money is still a page, and its own rule set is thinner, so
+ * letting it weigh double would drag the project score on the strength of one
+ * check.
+ */
 export function scoreGlobal(routes: RouteEntry[]): number {
   if (routes.length === 0) return 100
 
@@ -40,6 +49,7 @@ export function scoreGlobal(routes: RouteEntry[]): number {
   return Math.round(weightedSum / totalWeight)
 }
 
+/** Grade band a score falls into, at 90 / 70 / 50. */
 export function gradeFromScore(score: number): 'excellent' | 'good' | 'needs-work' | 'at-risk' {
   if (score >= 90) return 'excellent'
   if (score >= 70) return 'good'
@@ -47,6 +57,13 @@ export function gradeFromScore(score: number): 'excellent' | 'good' | 'needs-wor
   return 'at-risk'
 }
 
+/**
+ * How much of an entry point the map can actually see.
+ *
+ * `exempt` covers both evlog's own plumbing and entry points with nothing to
+ * instrument; neither belongs in the unobserved tally, because neither is a gap
+ * anyone should close.
+ */
 export function classifyRouteObservability(route: RouteEntry): 'instrumented' | 'partial' | 'dark' | 'exempt' {
   if (isInfrastructureRoute(route)) return 'exempt'
 
@@ -54,7 +71,11 @@ export function classifyRouteObservability(route: RouteEntry): 'instrumented' | 
 
   if (route.kind === 'page') {
     const pageErr = route.checks['page-error-handling']
-    return pageErr?.status === 'pass' ? 'instrumented' : 'dark'
+    if (pageErr?.status === 'pass') return 'instrumented'
+    /* A page that fetches nothing has nothing to log: its rule reports `n/a`,
+       and calling that dark would show a static page as an observability gap. */
+    if (!pageErr || pageErr.status === 'n/a') return 'exempt'
+    return 'dark'
   }
 
   if (wide?.status === 'pass' && context?.status === 'pass') return 'instrumented'
@@ -76,6 +97,7 @@ export function routeCheckChips(route: RouteEntry): string | null {
   return parts.join('  ')
 }
 
+/** The one line to show next to an entry point: its heaviest unmet requirement. */
 export function topIssue(route: RouteEntry): string {
   const chips = routeCheckChips(route)
   const observability = classifyRouteObservability(route)

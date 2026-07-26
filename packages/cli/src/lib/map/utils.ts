@@ -1,4 +1,5 @@
 import { createHash } from 'node:crypto'
+import { isAbsolute, relative, sep } from 'node:path'
 import type { Framework, RawRouteEntry } from './types'
 
 const HTTP_METHODS = ['get', 'post', 'put', 'patch', 'delete', 'head', 'options'] as const
@@ -21,6 +22,7 @@ export function extractMethodFromFilename(filename: string): string | null {
   return null
 }
 
+/** Drop a source file extension, keeping the rest of the name intact. */
 export function stripExtension(filename: string): string {
   return filename.replace(/\.(vue|tsx?|jsx?|mts|cts)$/, '')
 }
@@ -71,10 +73,20 @@ export function segmentsToPath(segments: string[], prefix = ''): string {
   return prefix ? `${prefix}${path === '/' ? '' : path}` : (path || '/')
 }
 
+/**
+ * Path of `file` relative to `root`, always with `/` separators.
+ *
+ * Globs return posix paths while the root comes from the OS, so comparing the
+ * two by prefix drops routes on Windows and eats a character when the root
+ * carries a trailing separator. A file outside the root is returned untouched.
+ */
 export function relativeFromRoot(root: string, file: string): string {
-  return file.startsWith(root) ? file.slice(root.length + 1) : file
+  const rel = relative(root, file)
+  if (rel.length === 0 || rel.startsWith('..') || isAbsolute(rel)) return file
+  return sep === '/' ? rel : rel.split(sep).join('/')
 }
 
+/** One line of `source`, with `radius` lines of context around it, trimmed. */
 export function lineSnippet(source: string, line: number, radius = 0): string {
   const lines = source.split('\n')
   const idx = line - 1
@@ -83,6 +95,7 @@ export function lineSnippet(source: string, line: number, radius = 0): string {
   return lines.slice(start, end).join('\n').trim()
 }
 
+/** Human-readable name of a framework, for report headers. */
 export function frameworkLabel(framework: Framework): string {
   switch (framework) {
     case 'nuxt': return 'Nuxt'

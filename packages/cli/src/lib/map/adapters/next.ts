@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import type { Node } from 'oxc-parser'
 import { globSync } from 'tinyglobby'
 import type { ParseResult } from '../parse'
@@ -12,19 +13,26 @@ import {
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { relativeFromRoot, segmentsToPath } from '../utils'
 
+/**
+ * Where the App Router lives, `app/` or `src/app/`.
+ *
+ * Both page and route files count: an API-only project has no `page.*` at all,
+ * and picking the wrong directory there makes every later glob come back empty.
+ */
 function resolveAppDir(root: string): string {
-  if (globSync('app/**/page.{tsx,jsx,ts,js}', { cwd: root }).length > 0) {
-    return 'app'
-  }
-  if (globSync('src/app/**/page.{tsx,jsx,ts,js}', { cwd: root }).length > 0) {
-    return 'src/app'
+  for (const candidate of ['app', 'src/app']) {
+    if (globSync(`${candidate}/**/{page,route}.{tsx,jsx,ts,js}`, { cwd: root }).length > 0) {
+      return candidate
+    }
   }
   return 'app'
 }
 
 function routeDirFromFile(rel: string, appDir: string): string {
   const inner = rel.slice(`${appDir}/`.length)
-  return inner.replace(/\/route\.(tsx?|jsx?)$/, '')
+  /* The leading separator is optional: `app/route.ts` has none, and leaving the
+     filename in place would turn the root handler into `/route.ts`. */
+  return inner.replace(/(?:^|\/)route\.(?:tsx?|jsx?)$/, '')
 }
 
 /**
@@ -40,13 +48,14 @@ export const nextAdapter: FrameworkAdapter = {
     const routes: RawRouteEntry[] = []
     const root = ctx.projectRoot
     const appDir = resolveAppDir(root)
+    const parse = ctx.parse ?? parseFile
 
     for (const file of globSync(`${appDir}/**/route.{ts,js,tsx,jsx}`, { cwd: root, absolute: true })) {
       const rel = relativeFromRoot(root, file)
       const dir = routeDirFromFile(rel, appDir)
       const apiPath = segmentsToPath(dir.split('/')) || '/'
 
-      const parsed = parseFile(file)
+      const parsed = parse(file)
       if (!parsed) {
         routes.push({
           framework: 'next',
@@ -100,7 +109,7 @@ export const nextAdapter: FrameworkAdapter = {
 
     for (const file of globSync(['middleware.{ts,js}', 'src/middleware.{ts,js}'], { cwd: root, absolute: true })) {
       const rel = relativeFromRoot(root, file)
-      const parsed = parseFile(file)
+      const parsed = parse(file)
       routes.push({
         framework: 'next',
         kind: 'middleware',
@@ -114,7 +123,11 @@ export const nextAdapter: FrameworkAdapter = {
     }
 
     for (const file of globSync([`${appDir}/**/*.{ts,tsx,js,jsx}`, 'src/**/*.{ts,tsx,js,jsx}'], { cwd: root, absolute: true })) {
-      const parsed = parseFile(file)
+      /* This glob covers the whole source tree, and almost none of it declares
+         an action. The directive has to appear literally for Next to treat the
+         module as one, so a substring test rules most files out before oxc. */
+      if (!mentionsServerDirective(file)) continue
+      const parsed = parse(file)
       if (!parsed || !hasDirective(parsed.program, 'use server')) continue
       const rel = relativeFromRoot(root, file)
       const exports = findServerActionExports(parsed)
@@ -132,6 +145,15 @@ export const nextAdapter: FrameworkAdapter = {
 
     return routes
   },
+}
+
+/** Whether a file so much as mentions `use server`, read without parsing. */
+function mentionsServerDirective(file: string): boolean {
+  try {
+    return readFileSync(file, 'utf8').includes('use server')
+  } catch {
+    return false
+  }
 }
 
 function findServerActionExports(parsed: ParseResult): Array<{ name: string, line: number }> {

@@ -3,6 +3,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
+    "@tanstack/react-router": "^1.0.0",
     "@tanstack/react-start": "^1.0.0",
     "evlog": "workspace:*"
   }

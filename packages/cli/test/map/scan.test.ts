@@ -1,10 +1,10 @@
 import { join } from 'node:path'
-import { describe, expect, it } from 'vitest'
+import { beforeAll, describe, expect, it } from 'vitest'
 import { getAdapter } from '../../src/lib/map/adapters/index'
 import { detectFramework } from '../../src/lib/map/detect'
 import { scan } from '../../src/lib/map/scan'
-import type { ScanContext } from '../../src/lib/map/types'
-import { extractMethodFromFilename, segmentsToPath } from '../../src/lib/map/utils'
+import type { ScanContext, ScanResult } from '../../src/lib/map/types'
+import { extractMethodFromFilename, relativeFromRoot, segmentsToPath } from '../../src/lib/map/utils'
 import { mapForSnapshot } from '../../src/lib/map/write'
 import { resolveProject } from '../../src/lib/project'
 
@@ -33,6 +33,20 @@ describe('utils', () => {
     expect(segmentsToPath(['orders', '[id]'], '/api')).toBe('/api/orders/:id')
     expect(segmentsToPath(['docs', '[...slug]'], '/api')).toBe('/api/docs/:slug*')
     expect(segmentsToPath(['(group)', 'about'])).toBe('/about')
+  })
+
+  it('relativises a file against the project root', () => {
+    expect(relativeFromRoot('/app', '/app/server/api/foo.ts')).toBe('server/api/foo.ts')
+  })
+
+  it('survives a root with a trailing separator', () => {
+    /* A prefix comparison eats the first character here and yields `erver/…`,
+       which no longer resolves to a file when the scan reads it back. */
+    expect(relativeFromRoot('/app/', '/app/server/api/foo.ts')).toBe('server/api/foo.ts')
+  })
+
+  it('leaves a file outside the root untouched', () => {
+    expect(relativeFromRoot('/app', '/elsewhere/foo.ts')).toBe('/elsewhere/foo.ts')
   })
 })
 
@@ -134,16 +148,20 @@ describe('full scan snapshots', () => {
 })
 
 describe('checks', () => {
-  it('flags empty catch blocks', async () => {
-    const root = join(FIXTURES, 'nuxt-basic')
-    const result = await scan(await ctx(root, 'nuxt'))
+  /* One scan for the suite: every case below reads the same fixture, and
+     re-parsing it four times only makes the suite slower. */
+  let result: ScanResult
+
+  beforeAll(async () => {
+    result = await scan(await ctx(join(FIXTURES, 'nuxt-basic'), 'nuxt'))
+  })
+
+  it('flags empty catch blocks', () => {
     const stripe = result.map.routes.find(r => r.path === '/api/payments/stripe')
     expect(stripe?.checks['error-handling']?.status).toBe('fail')
   })
 
-  it('passes instrumented checkout route', async () => {
-    const root = join(FIXTURES, 'nuxt-basic')
-    const result = await scan(await ctx(root, 'nuxt'))
+  it('passes instrumented checkout route', () => {
     const checkout = result.map.routes.find(r => r.path === '/api/checkout')
     expect(checkout?.checks['wide-event']?.status).toBe('pass')
     expect(checkout?.checks['context']?.status).toBe('pass')
@@ -151,16 +169,12 @@ describe('checks', () => {
     expect(checkout?.score).toBe(100)
   })
 
-  it('flags createError missing fix', async () => {
-    const root = join(FIXTURES, 'nuxt-basic')
-    const result = await scan(await ctx(root, 'nuxt'))
+  it('flags createError missing fix', () => {
     const broken = result.map.routes.find(r => r.path === '/api/broken-error')
     expect(broken?.checks['structured-errors']?.status).toBe('fail')
   })
 
-  it('flags plain throw new Error', async () => {
-    const root = join(FIXTURES, 'nuxt-basic')
-    const result = await scan(await ctx(root, 'nuxt'))
+  it('flags plain throw new Error', () => {
     const plain = result.map.routes.find(r => r.path === '/api/plain-error')
     expect(plain?.checks['structured-errors']?.status).toBe('fail')
   })

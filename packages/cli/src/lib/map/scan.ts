@@ -2,7 +2,7 @@ import { join } from 'node:path'
 import { getAdapter } from './adapters/index'
 import { countSuppressed } from './directives'
 import { buildFileFacts } from './facts'
-import { parseFile } from './parse'
+import { createParseCache, parseFile } from './parse'
 import { collectProjectFacts, readPackageJson } from './project-facts'
 import type { ProjectFacts } from './project-facts'
 import { getRule, runRules } from './rules/index'
@@ -36,7 +36,7 @@ interface AnalyseInput {
  */
 function analyseRoute(input: AnalyseInput): { route: RouteEntry, warnings: string[] } {
   const { ctx, raw, project, capabilities } = input
-  const parsed = parseFile(join(ctx.projectRoot, raw.file))
+  const parsed = (ctx.parse ?? parseFile)(join(ctx.projectRoot, raw.file))
   const facts = parsed
     ? buildFileFacts(parsed, {
       evlogAutoImports: capabilities.evlogAutoImports,
@@ -74,7 +74,10 @@ function analyseRoute(input: AnalyseInput): { route: RouteEntry, warnings: strin
 }
 
 /** Extract entry points for `ctx.framework`, run the rules, and score them. */
-export async function scan(ctx: ScanContext): Promise<ScanResult> {
+export async function scan(input: ScanContext): Promise<ScanResult> {
+  /* One parser for the whole run: the adapter and the analysis below read the
+     same files, and Next emits one entry per exported method. */
+  const ctx: ScanContext = { ...input, parse: input.parse ?? createParseCache() }
   const adapter = getAdapter(ctx.framework)
   const capabilities: FrameworkCapabilities = {
     requestLogger: adapter.requestLogger,

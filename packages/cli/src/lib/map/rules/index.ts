@@ -156,12 +156,19 @@ export function runRuleSet(rules: readonly MapRule[], run: RuleRun): RuleResults
   const bucket = (rule: MapRule): Partial<Record<CheckId, CheckResult>> =>
     rule.category === 'requirement' ? results.checks : results.suggestions
   const relevant = rules.filter(rule => isRelevant(rule, target, ctx.framework))
+  /* Depends only on the route's path and file, so it holds even for a file we
+     cannot read — an exempt health check stays exempt when it fails to parse. */
+  const exemption = getRouteExemption(target)
 
   if (!parsed || !facts) {
     /* A file that will not parse is a real failure, but only of requirements —
        we have no basis to suggest anything about code we could not read. */
     for (const rule of relevant) {
       if (rule.category !== 'requirement') continue
+      if (exemption && isSkipped(exemption, rule.id)) {
+        results.checks[rule.id] = { status: 'n/a', message: exemption.reason }
+        continue
+      }
       results.checks[rule.id] = {
         status: 'fail',
         message: 'file failed to parse',
@@ -171,7 +178,6 @@ export function runRuleSet(rules: readonly MapRule[], run: RuleRun): RuleResults
     return results
   }
 
-  const exemption = getRouteExemption(target)
   /* Validated against the whole registry rather than `rules`, so exercising one
      rule in isolation never turns a valid id into a warning. */
   const suppressions = collectSuppressions(parsed.comments, parsed.lines)

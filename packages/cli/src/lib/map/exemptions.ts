@@ -1,6 +1,8 @@
 import type { CheckId, RawRouteEntry, RouteEntry } from './types'
 
+/** Why an entry point is not held to some of the rules, and to which ones. */
 export interface RouteExemption {
+  /** Shown in the report in place of the check's verdict. */
   reason: string
   /**
    * Rules that do not apply to this route.
@@ -47,10 +49,12 @@ export function isSkipped(exemption: RouteExemption, id: CheckId): boolean {
   return exemption.skip === 'all' || exemption.skip.includes(id)
 }
 
+/** Whether this entry point is evlog's own plumbing rather than app code. */
 export function isInfrastructureRoute(route: Pick<RawRouteEntry, 'path' | 'file'>): boolean {
   return getRouteExemption(route) !== null
 }
 
+/** The `infra` tag for the report, or an empty string for app entry points. */
 export function infrastructureLabel(route: RouteEntry): string {
   return getRouteExemption(route) ? 'infra' : ''
 }

@@ -8,17 +8,27 @@ const MONEY_TERMS = ['checkout', 'payment', 'billing', 'invoice', 'refund', 'sub
 const AUTH_TERMS = ['auth', 'oauth', 'login', 'logout', 'signin', 'signup', 'register', 'password', 'token', 'session', 'mfa', 'otp']
 
 /**
- * Match a term as a whole word in a route path, allowing a plural.
+ * Whole-word matcher per term, allowing a plural.
  *
  * Anchoring matters more than it looks: the previous patterns were plain
  * substrings, so `/api/authors` was classified as authentication and `/api/blog`
  * escaped only by luck. A route wrongly marked sensitive is handed a 25-point
  * audit requirement it has no reason to satisfy, and counts double in the global
  * score — the fastest way to make the whole number untrustworthy.
+ *
+ * Compiled once at load: the term lists are constants, so rebuilding twenty
+ * expressions for every entry point buys nothing.
  */
-function matchTerm(path: string, terms: readonly string[]): string | null {
-  for (const term of terms) {
-    if (new RegExp(`(?:^|[^a-z0-9])${term}s?(?:[^a-z0-9]|$)`, 'i').test(path)) return term
+function compileTerms(terms: readonly string[]): ReadonlyArray<readonly [string, RegExp]> {
+  return terms.map(term => [term, new RegExp(`(?:^|[^a-z0-9])${term}s?(?:[^a-z0-9]|$)`, 'i')] as const)
+}
+
+const MONEY_PATTERNS = compileTerms(MONEY_TERMS)
+const AUTH_PATTERNS = compileTerms(AUTH_TERMS)
+
+function matchTerm(path: string, patterns: ReadonlyArray<readonly [string, RegExp]>): string | null {
+  for (const [term, pattern] of patterns) {
+    if (pattern.test(path)) return term
   }
   return null
 }
@@ -49,13 +59,13 @@ export function classifySensitivity(route: RawRouteEntry, facts: FileFacts): Sen
   for (const pkg of MONEY_IMPORTS) {
     if (importsPackage(facts, pkg)) reasons.push(`money: imports ${pkg}`)
   }
-  const moneyTerm = matchTerm(path, MONEY_TERMS)
+  const moneyTerm = matchTerm(path, MONEY_PATTERNS)
   if (moneyTerm) reasons.push(`money: path says "${moneyTerm}"`)
 
   for (const pkg of AUTH_IMPORTS) {
     if (importsPackage(facts, pkg)) reasons.push(`auth: imports ${pkg}`)
   }
-  const authTerm = matchTerm(path, AUTH_TERMS)
+  const authTerm = matchTerm(path, AUTH_PATTERNS)
   if (authTerm) reasons.push(`auth: path says "${authTerm}"`)
 
   const touchesPii = [...facts.names].some(name => PII_FIELDS.test(name))
@@ -73,13 +83,14 @@ export function classifySensitivity(route: RawRouteEntry, facts: FileFacts): Sen
   return { level: 'none', reasons: [] }
 }
 
+/** One-character marker for the report's route lines, empty when not sensitive. */
 export function sensitivityBadge(sensitivity: Sensitivity): string {
-  if (sensitivity.reasons.some(reason => reason.startsWith('money:'))) return '$'
-  if (sensitivity.reasons.some(reason => reason.startsWith('auth:'))) return 'A'
-  if (sensitivity.level === 'medium') return 'o'
-  return ''
+  return BADGES[sensitivityLabel(sensitivity)] ?? ''
 }
 
+const BADGES: Record<string, string> = { money: '$', auth: 'A', pii: 'o' }
+
+/** What makes this entry point sensitive — `money`, `auth`, `pii`, or nothing. */
 export function sensitivityLabel(sensitivity: Sensitivity): string {
   if (sensitivity.reasons.some(reason => reason.startsWith('money:'))) return 'money'
   if (sensitivity.reasons.some(reason => reason.startsWith('auth:'))) return 'auth'

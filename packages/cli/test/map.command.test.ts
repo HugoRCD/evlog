@@ -236,6 +236,22 @@ describe('formatMapReport', () => {
     expect(byFile).toBe(byPath)
   })
 
+  it('accepts the ./ prefix a shell completes', async () => {
+    const { ctx, result } = await nuxt()
+    const bare = formatMapReport(ctx, result, { entry: 'server/api/payments/stripe.post.ts' })
+    const dotted = formatMapReport(ctx, result, { entry: './server/api/payments/stripe.post.ts' })
+
+    expect(dotted).toBe(bare)
+  })
+
+  it('still suggests near matches for a ./ prefixed typo', async () => {
+    const { ctx, result } = await nuxt()
+    const out = formatMapReport(ctx, result, { entry: './server/api/payment' })
+
+    expect(out).toContain('Did you mean')
+    expect(out).toContain('/api/payments/stripe')
+  })
+
   it('suggests near matches when the entry point is unknown', async () => {
     const { ctx, result } = await nuxt()
     const out = formatMapReport(ctx, result, { entry: 'payments' })
@@ -286,12 +302,7 @@ describe('map command', () => {
     }) as typeof process.stdout.write)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    await map.run!({
-      args: { json: true, noHeader: true, cwd, debug: false, write: false },
-      rawArgs: [],
-      cmd: map,
-      data: {},
-    })
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write'] })
 
     const raw = JSON.parse(out.join('').trim()) as {
       schemaVersion: number
@@ -314,14 +325,19 @@ describe('map command', () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    await map.run!({
-      args: { json: true, noHeader: true, cwd, debug: false, write: false, minScore: '999' },
-      rawArgs: [],
-      cmd: map,
-      data: {},
-    })
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write', '--min-score', '100'] })
 
     expect(process.exitCode).toBe(1)
+  })
+
+  it.each(['abc', '80oops', '-1', '101', '80.5'])('rejects --min-score %s instead of skipping the gate', async (value) => {
+    const cwd = join(FIXTURES, 'nuxt-basic')
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    await expect(
+      runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write', '--min-score', value] }),
+    ).rejects.toThrow(`Invalid --min-score "${value}"`)
   })
 
   it('leaves the exit code untouched without --min-score', async () => {
@@ -329,12 +345,7 @@ describe('map command', () => {
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    await map.run!({
-      args: { json: true, noHeader: true, cwd, debug: false, write: false },
-      rawArgs: [],
-      cmd: map,
-      data: {},
-    })
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write'] })
 
     expect(process.exitCode).toBeUndefined()
   })

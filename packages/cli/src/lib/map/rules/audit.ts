@@ -2,7 +2,7 @@ import { HANDLER_KINDS } from './types'
 import type { MapRule, RuleTarget } from './types'
 
 /** Route segments that name nothing: prefixes, indexes, and dynamic params. */
-function isNamedSegment(segment: string): boolean {
+function isAnonymousSegment(segment: string): boolean {
   if (segment.length === 0) return true
   if (segment === 'api' || segment === 'index') return true
   return segment.startsWith('[') || segment.startsWith(':') || segment.startsWith('*')
@@ -25,7 +25,7 @@ const METHOD_VERBS: Record<string, string> = {
  * like filler. `/api/auth/login` now suggests `auth.login`.
  */
 export function auditAction(target: Pick<RuleTarget, 'path' | 'method'>): string {
-  const named = target.path.split('/').filter(segment => !isNamedSegment(segment))
+  const named = target.path.split('/').filter(segment => !isAnonymousSegment(segment))
   if (named.length === 0) return 'resource.action'
   if (named.length === 1) {
     const verb = METHOD_VERBS[target.method?.toUpperCase() ?? ''] ?? 'action'
