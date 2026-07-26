@@ -2,6 +2,30 @@
 
 Use this checklist when reviewing code for logging best practices and evlog adoption.
 
+## Prefer `evlog map` when you can
+
+On **Nuxt, Nitro, Next.js App Router, and TanStack Start**, start with `@evlog/cli` if the user is open to it — one command finds dark entry points and names the fixes:
+
+```bash
+npx @evlog/cli map
+npx @evlog/cli map <file>   # suggested shape for one entry point
+```
+
+Map rule ids (requirements that move the score) map to the anti-patterns below:
+
+| Map rule id | What it expects | Related anti-pattern |
+|-------------|-----------------|----------------------|
+| `wide-event` | `useLogger()` / request logger | No logging in handlers |
+| `context` | `log.set(...)` | Flat / missing request context |
+| `structured-errors` | `createError({ why, fix })` | `throw new Error('...')` |
+| `error-handling` | log or rethrow in `catch` | `console.error(e); throw e` |
+| `audit` | `log.audit(...)` on sensitive routes | Missing audit on auth/billing |
+| `page-error-handling` | fetch error handling on pages | Unhandled page fetches |
+
+Full rule reference: https://www.evlog.dev/cli/rules
+
+Map tells you the **shape** is present — not that the context is useful at runtime. Keep the scans below for frameworks without adapters, for quality of context, drains, redaction, and AI SDK usage. If the user skips the CLI, use this checklist alone.
+
 ## Quick Scan
 
 Run through these checks first to identify improvement opportunities:

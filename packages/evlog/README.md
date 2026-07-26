@@ -1425,10 +1425,11 @@ try {
 
 ## CLI
 
-[`@evlog/cli`](https://npmjs.com/package/@evlog/cli) scores what your app can tell you when something goes wrong. It reads your project on disk — no traffic, no instrumentation — finds every entry point, and names the ones to fix first.
+[`@evlog/cli`](https://npmjs.com/package/@evlog/cli) is a **separate package** — still early — that scores what your app can tell you when something goes wrong. It reads your project on disk — no traffic, no instrumentation — finds every entry point, and names the ones to fix first. Worth trying once you have anything wired; hand the report to an agent if you like.
 
 ```bash
 npx @evlog/cli map
+# or: pnpm dlx @evlog/cli map
 ```
 
 ```
@@ -1453,7 +1454,7 @@ Same code in, same verdict out, with the file and line for every finding — whi
 
 > **Early days:** the CLI is tested and safe to run on any project, but it is young — four framework adapters today, rules still being refined. Expect verdicts and scores to move between releases; pin it as a dev dependency when you gate CI on the number.
 
-Docs: [CLI](https://www.evlog.dev/cli/overview) · [`evlog map`](https://www.evlog.dev/cli/map) · [Rules](https://www.evlog.dev/cli/rules) · [Scoring](https://www.evlog.dev/cli/scoring)
+Docs: [CLI](https://www.evlog.dev/cli/overview) · [`evlog map`](https://www.evlog.dev/cli/map) · [Rules](https://www.evlog.dev/cli/rules) · [Scoring](https://www.evlog.dev/cli/scoring) · [CI](https://www.evlog.dev/cli/ci)
 
 ## Agent Skills
 
@@ -1472,12 +1473,14 @@ Once installed, your AI assistant will:
 - Help refactor scattered `console.log` calls into structured events
 - Guide you to use `createError()` for self-documenting errors
 - Ensure proper use of `useLogger(event)` in Nuxt/Nitro routes
+- Optionally run [`evlog map`](https://www.evlog.dev/cli/map) (`npx @evlog/cli map`) to score dark entry points — separate early CLI package, worth trying
 
 ### Examples
 
 ```
 Add logging to this endpoint
 Review my logging code
+Raise my evlog map score
 Help me set up logging for this service
 ```
 
