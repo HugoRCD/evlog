@@ -20,6 +20,23 @@ describe('exemptions', () => {
     expect(isInfrastructureRoute({ path: '/api/checkout', file: 'app/api/checkout/route.ts' })).toBe(false)
   })
 
+  it.each([
+    ['/_evlog/ingest', 'server/routes/_evlog/ingest.post.ts'],
+    ['/evlog/ingest', 'server/api/evlog/ingest.post.ts'],
+  ])('exempts the ingest endpoint spelled %s', (path, file) => {
+    expect(isInfrastructureRoute({ path, file })).toBe(true)
+  })
+
+  /* An exemption waives every rule, so a loose match is the worst bug this tool
+     can have: the handler leaves the score without ever being reported. */
+  it.each([
+    ['a file whose name merely starts with the pattern', '/api/ingestable', 'lib/evlog/ingestable.ts'],
+    ['a longer route under the same directory', '/api/evlog/ingestion-report', 'app/api/evlog/ingestion-report/route.ts'],
+    ['a directory whose name merely ends with evlog', '/api/legacy-evlog/ingest-report', 'routes/api/legacy-evlog/ingest-report.ts'],
+  ])('does not exempt %s', (_name, path, file) => {
+    expect(isInfrastructureRoute({ path, file })).toBe(false)
+  })
+
   it('classifies exempt routes separately from dark', () => {
     const route = {
       id: 'x',

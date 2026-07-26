@@ -183,6 +183,19 @@ const CASES: Record<CheckId, RuleCases> = {
         barrels: { observability: ['*'] },
         code: 'import { useLogger } from \'~/lib/observability\'\nexport async function POST() { const log = useLogger() }',
       },
+      {
+        name: 'the logger read off the request context — evlog\'s own TanStack Start shape',
+        framework: 'tanstack-start',
+        code: 'import type { RequestLogger } from \'evlog\'\nexport const Route = { server: { handlers: { POST: async () => { const req = useRequest()\nconst log = req.context.log as RequestLogger\nlog.set({ a: 1 }) } } } }',
+      },
+      {
+        name: 'the same logger destructured off the context',
+        code: 'export default defineEventHandler((event) => { const { log } = event.context\nlog.set({ a: 1 }) })',
+      },
+      {
+        name: 'the same logger used without ever being bound',
+        code: 'export default defineEventHandler((event) => { event.context.log.set({ a: 1 }) })',
+      },
     ],
     invalid: [
       {
@@ -254,6 +267,14 @@ const CASES: Record<CheckId, RuleCases> = {
       {
         name: 'renamed logger binding',
         code: 'export default defineEventHandler((event) => { const wide = useLogger(event); wide.set({ a: 1 }) })',
+      },
+      {
+        name: 'set on a logger taken off the request context',
+        code: 'export default defineEventHandler((event) => { const log = event.context.log\nlog.set({ a: 1 }) })',
+      },
+      {
+        name: 'set on a context logger destructured under another name',
+        code: 'export default defineEventHandler((event) => { const { log: wide } = event.context\nwide.set({ a: 1 }) })',
       },
     ],
     invalid: [
@@ -357,6 +378,14 @@ const CASES: Record<CheckId, RuleCases> = {
         name: 'catch that falls back with a return',
         code: 'export default defineEventHandler(() => { try { go() } catch { return { ok: false } } })',
       },
+      {
+        name: 'catch that branches before it logs',
+        code: 'export default defineEventHandler((event) => { const log = useLogger(event); try { go() } catch (e) { if (retryable(e)) { log.error(e) } else { throw e } } })',
+      },
+      {
+        name: 'catch that switches on the failure',
+        code: 'export default defineEventHandler(() => { try { go() } catch (e) { switch (e.code) { case \'x\': throw e } } })',
+      },
     ],
     invalid: [
       {
@@ -401,6 +430,18 @@ const CASES: Record<CheckId, RuleCases> = {
         name: 'bare useFetch',
         kind: 'page',
         code: 'const { data } = await useFetch(\'/api/x\')',
+        message: /without error handling/,
+      },
+      {
+        name: 'a try elsewhere on the page does not cover the fetch',
+        kind: 'page',
+        code: 'try { JSON.parse(raw) } catch { }\nconst { data } = await useFetch(\'/api/x\')',
+        message: /useFetch\(\) without error handling/,
+      },
+      {
+        name: 'guarding one fetch says nothing about the next one',
+        kind: 'page',
+        code: 'const a = await $fetch(\'/api/a\').catch(() => null)\nconst b = await $fetch(\'/api/b\')',
         message: /without error handling/,
       },
     ],
@@ -497,7 +538,14 @@ const CASES: Record<CheckId, RuleCases> = {
       {
         name: 'model call already wrapped with evlog/ai',
         pairable: ['ai'],
+        features: ['ai'],
         code: 'import { createAIMiddleware } from \'evlog/ai\'\nexport default defineEventHandler(() => generateText({}))',
+      },
+      {
+        name: 'the middleware is installed once elsewhere, on the model this handler reuses',
+        pairable: ['ai'],
+        features: ['ai'],
+        code: 'import { model } from \'~/lib/ai\'\nexport default defineEventHandler(() => generateText({ model }))',
       },
     ],
     invalid: [

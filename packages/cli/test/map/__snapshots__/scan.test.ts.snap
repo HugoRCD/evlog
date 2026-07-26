@@ -360,7 +360,7 @@ exports[`full scan snapshots > next-app-router map snapshot 1`] = `
       "suggestions": {},
     },
   ],
-  "score": 54,
+  "score": 52,
   "version": 1,
 }
 `;
@@ -423,10 +423,10 @@ exports[`full scan snapshots > nuxt-basic map snapshot 1`] = `
         "page-error-handling": {
           "evidence": {
             "file": "pages/index.vue",
-            "line": 1,
+            "line": 2,
             "snippet": undefined,
           },
-          "message": "page data fetch without error handling",
+          "message": "useFetch() without error handling — the page breaks when it fails",
           "status": "fail",
         },
       },
@@ -1007,7 +1007,7 @@ exports[`full scan snapshots > tanstack-basic map snapshot 1`] = `
       "framework": "tanstack-start",
       "handler": {
         "column": 0,
-        "line": 7,
+        "line": 9,
       },
       "id": "714cc73bcf15",
       "kind": "api",
@@ -1070,7 +1070,7 @@ exports[`full scan snapshots > tanstack-basic map snapshot 1`] = `
       "suggestions": {},
     },
   ],
-  "score": 72,
+  "score": 69,
   "version": 1,
 }
 `;

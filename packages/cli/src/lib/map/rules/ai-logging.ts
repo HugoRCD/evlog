@@ -25,7 +25,10 @@ export const aiLoggingRule = {
     kinds: HANDLER_KINDS,
     when: ({ project, facts }) => {
       if (!project.pairable.has('ai')) return false
-      if (facts.evlogImports.has('evlog/ai')) return false
+      /* Project-wide, like `auth-identity`: the middleware is installed once on
+         a shared model, and reading only this file would keep nagging every
+         handler that calls that model. */
+      if (project.features.has('ai')) return false
       return AI_CALLS.some(name => facts.callsTo(name).length > 0)
     },
   },

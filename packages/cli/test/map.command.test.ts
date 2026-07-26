@@ -1,3 +1,4 @@
+import { existsSync } from 'node:fs'
 import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -332,12 +333,24 @@ describe('map command', () => {
 
   it.each(['abc', '80oops', '-1', '101', '80.5'])('rejects --min-score %s instead of skipping the gate', async (value) => {
     const cwd = join(FIXTURES, 'nuxt-basic')
+    const stdout = vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write', '--min-score', value] })
+
+    expect(process.exitCode).toBe(1)
+    expect(stdout.mock.calls.map(([chunk]) => String(chunk)).join('')).toContain('MAP_INVALID_MIN_SCORE')
+  })
+
+  it('rejects --min-score before it scans anything, so a bad gate costs nothing', async () => {
+    const cwd = await copyFixture('nuxt-basic')
     vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
     vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
 
-    await expect(
-      runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write', '--min-score', value] }),
-    ).rejects.toThrow(`Invalid --min-score "${value}"`)
+    /* `--write` is on: reaching the writer at all would leave the file behind. */
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--min-score', 'abc'] })
+
+    expect(existsSync(join(cwd, 'evlog.map.json'))).toBe(false)
   })
 
   it('leaves the exit code untouched without --min-score', async () => {

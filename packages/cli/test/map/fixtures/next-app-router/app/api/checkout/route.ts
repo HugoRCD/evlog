@@ -1,4 +1,4 @@
-import { useLogger } from 'evlog'
+import { useLogger } from 'evlog/next'
 
 export async function POST() {
   const log = useLogger()

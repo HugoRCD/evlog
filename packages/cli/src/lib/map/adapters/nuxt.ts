@@ -5,49 +5,64 @@ import { findHandlerLocation, parseFile } from '../parse'
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { extractMethodFromFilename, relativeFromRoot, segmentsToPath, stripRouteFilename } from '../utils'
 
-const API_GLOBS = [
-  'server/api/**/*.{ts,js,mts,cts}',
-  'server/routes/**/*.{ts,js,mts,cts}',
-]
+/**
+ * Extensions Nitro serves a handler from.
+ *
+ * `.mjs` and `.cjs` are in the list because Nitro runs them exactly like a
+ * `.ts` handler: a route written in either was invisible to the whole scan.
+ */
+const HANDLER_EXT = '{ts,js,mts,cts,mjs,cjs}'
 
-const PAGE_GLOBS = ['pages/**/*.vue']
-const MIDDLEWARE_GLOBS = ['server/middleware/**/*.{ts,js,mts,cts}']
-const CRON_GLOBS = ['server/tasks/**/*.{ts,js,mts,cts}']
-
-function routeSegmentsFromRel(rel: string, prefix: string): string {
-  let rest = rel
-  if (rest.startsWith('server/api/')) {
-    rest = rest.slice('server/api/'.length)
-  } else if (rest.startsWith('server/routes/')) {
-    rest = rest.slice('server/routes/'.length)
-  }
-  const parts = rest.split('/')
-  const last = parts.length - 1
-  parts[last] = stripRouteFilename(parts[last] ?? '')
-  return segmentsToPath(parts, prefix)
+/** A directory of file-based handlers, and the URL prefix its routes get. */
+interface RouteRoot {
+  dir: string
+  prefix: string
 }
 
-function fileToApiRoute(file: string, root: string, parse: ParseFn): RawRouteEntry[] {
+/**
+ * Where each framework keeps its handlers.
+ *
+ * Nuxt and raw Nitro differ by these paths and nothing else, so they share the
+ * extraction below rather than each carrying a copy of it — the copies had
+ * already started to drift.
+ */
+const API_ROOTS: Record<'nuxt' | 'nitro', readonly RouteRoot[]> = {
+  nuxt: [{ dir: 'server/api', prefix: '/api' }, { dir: 'server/routes', prefix: '' }],
+  nitro: [{ dir: 'api', prefix: '/api' }, { dir: 'routes', prefix: '' }],
+}
+
+const MIDDLEWARE_DIR: Record<'nuxt' | 'nitro', string> = {
+  nuxt: 'server/middleware',
+  nitro: 'middleware',
+}
+
+const PAGE_GLOBS = ['pages/**/*.vue']
+const CRON_GLOBS = [`server/tasks/**/*.${HANDLER_EXT}`]
+
+/** What both Nitro-based adapters need to turn a file into an entry point. */
+interface ExtractContext {
+  root: string
+  parse: ParseFn
+  framework: 'nuxt' | 'nitro'
+}
+
+function fileToApiRoute(file: string, apiRoot: RouteRoot, { root, parse, framework }: ExtractContext): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
-  const filename = basename(file)
-  const method = extractMethodFromFilename(filename)
-  const routePath = routeSegmentsFromRel(rel, rel.startsWith('server/api/') ? '/api' : '')
+  const method = extractMethodFromFilename(basename(file))
+
+  const parts = rel.slice(`${apiRoot.dir}/`.length).split('/')
+  parts[parts.length - 1] = stripRouteFilename(parts.at(-1) ?? '')
 
   const parsed = parse(file)
-  const handler = parsed
-    ? findHandlerLocation(parsed, ['defineEventHandler', 'eventHandler'])
-    : null
 
-  return [
-    {
-      framework: 'nuxt',
-      kind: 'api',
-      method,
-      path: routePath || '/',
-      file: rel,
-      handler,
-    }
-  ]
+  return {
+    framework,
+    kind: 'api',
+    method,
+    path: segmentsToPath(parts, apiRoot.prefix) || '/',
+    file: rel,
+    handler: parsed ? findHandlerLocation(parsed, ['defineEventHandler', 'eventHandler']) : null,
+  }
 }
 
 function fileToPageRoute(file: string, root: string): RawRouteEntry {
@@ -67,7 +82,7 @@ function fileToPageRoute(file: string, root: string): RawRouteEntry {
   }
 }
 
-function fileToMiddlewareRoute(file: string, root: string, parse: ParseFn): RawRouteEntry {
+function fileToMiddlewareRoute(file: string, { root, parse, framework }: ExtractContext): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
   const parsed = parse(file)
   const handler = parsed
@@ -75,7 +90,7 @@ function fileToMiddlewareRoute(file: string, root: string, parse: ParseFn): RawR
     : null
 
   return {
-    framework: 'nuxt',
+    framework,
     kind: 'middleware',
     method: null,
     path: '*',
@@ -84,6 +99,7 @@ function fileToMiddlewareRoute(file: string, root: string, parse: ParseFn): RawR
   }
 }
 
+/** A Nitro scheduled task — no request, but the same wide-event expectations. */
 function fileToCronRoute(file: string, root: string, parse: ParseFn): RawRouteEntry {
   const rel = relativeFromRoot(root, file)
   const name = stripRouteFilename(basename(file))
@@ -114,31 +130,39 @@ const NUXT_EVLOG_AUTO_IMPORTS = [
   'createEvlogError',
 ] as const
 
+/** Handlers and middleware, in whichever directories this framework serves them from. */
+function extractServerRoutes(ctx: ScanContext, framework: 'nuxt' | 'nitro'): RawRouteEntry[] {
+  const routes: RawRouteEntry[] = []
+  const root = ctx.projectRoot
+  const extract: ExtractContext = { root, parse: ctx.parse ?? parseFile, framework }
+
+  for (const apiRoot of API_ROOTS[framework]) {
+    for (const file of globSync(`${apiRoot.dir}/**/*.${HANDLER_EXT}`, { cwd: root, absolute: true })) {
+      routes.push(fileToApiRoute(file, apiRoot, extract))
+    }
+  }
+
+  for (const file of globSync(`${MIDDLEWARE_DIR[framework]}/**/*.${HANDLER_EXT}`, { cwd: root, absolute: true })) {
+    routes.push(fileToMiddlewareRoute(file, extract))
+  }
+
+  return routes
+}
+
+/** Nuxt project: `server/api`, `server/routes`, `server/middleware`, `server/tasks` and `pages`. */
 export const nuxtAdapter: FrameworkAdapter = {
   framework: 'nuxt',
   evlogAutoImports: NUXT_EVLOG_AUTO_IMPORTS,
   requestLogger: 'ambient',
   // eslint-disable-next-line require-await -- satisfies the async FrameworkAdapter contract
   async extractRoutes(ctx: ScanContext): Promise<RawRouteEntry[]> {
-    const routes: RawRouteEntry[] = []
+    const routes = extractServerRoutes(ctx, 'nuxt')
     const root = ctx.projectRoot
     const parse = ctx.parse ?? parseFile
-
-    for (const pattern of API_GLOBS) {
-      for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(...fileToApiRoute(file, root, parse))
-      }
-    }
 
     for (const pattern of PAGE_GLOBS) {
       for (const file of globSync(pattern, { cwd: root, absolute: true })) {
         routes.push(fileToPageRoute(file, root))
-      }
-    }
-
-    for (const pattern of MIDDLEWARE_GLOBS) {
-      for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        routes.push(fileToMiddlewareRoute(file, root, parse))
       }
     }
 
@@ -152,74 +176,18 @@ export const nuxtAdapter: FrameworkAdapter = {
   },
 }
 
-/** Raw Nitro project (no Nuxt). */
+/** Raw Nitro project (no Nuxt): the same handlers, one directory level up. */
 export const nitroAdapter: FrameworkAdapter = {
   framework: 'nitro',
   evlogAutoImports: NUXT_EVLOG_AUTO_IMPORTS,
   requestLogger: 'ambient',
   // eslint-disable-next-line require-await -- satisfies the async FrameworkAdapter contract
   async extractRoutes(ctx: ScanContext): Promise<RawRouteEntry[]> {
-    const routes: RawRouteEntry[] = []
-    const root = ctx.projectRoot
-    const parse = ctx.parse ?? parseFile
-
-    const apiGlobs = ['routes/**/*.{ts,js,mts,cts}', 'api/**/*.{ts,js,mts,cts}']
-    for (const pattern of apiGlobs) {
-      for (const file of globSync(pattern, { cwd: root, absolute: true })) {
-        const rel = relativeFromRoot(root, file)
-        const filename = basename(file)
-        const method = extractMethodFromFilename(filename)
-
-        let prefix = ''
-        let segmentStart = ''
-        if (rel.startsWith('routes/')) {
-          segmentStart = rel.slice('routes/'.length)
-          prefix = ''
-        } else if (rel.startsWith('api/')) {
-          segmentStart = rel.slice('api/'.length)
-          prefix = '/api'
-        } else {
-          continue
-        }
-
-        const segments = stripRouteFilename(segmentStart).split('/')
-        const path = segmentsToPath(segments, prefix) || '/'
-        const parsed = parse(file)
-        const handler = parsed
-          ? findHandlerLocation(parsed, ['defineEventHandler', 'eventHandler'])
-          : null
-
-        routes.push({
-          framework: 'nitro',
-          kind: 'api',
-          method,
-          path,
-          file: rel,
-          handler,
-        })
-      }
-    }
-
-    for (const file of globSync('middleware/**/*.{ts,js,mts,cts}', { cwd: root, absolute: true })) {
-      const rel = relativeFromRoot(root, file)
-      const parsed = parse(file)
-      const handler = parsed
-        ? findHandlerLocation(parsed, ['defineEventHandler'])
-        : null
-      routes.push({
-        framework: 'nitro',
-        kind: 'middleware',
-        method: null,
-        path: '*',
-        file: rel,
-        handler,
-      })
-    }
-
-    return routes
+    return extractServerRoutes(ctx, 'nitro')
   },
 }
 
+/** The adapter for whichever of the two Nitro-based frameworks was detected. */
 export function getNuxtOrNitroAdapter(framework: 'nuxt' | 'nitro'): FrameworkAdapter {
   return framework === 'nitro' ? nitroAdapter : nuxtAdapter
 }

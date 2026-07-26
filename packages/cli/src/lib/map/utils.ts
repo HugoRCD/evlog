@@ -10,9 +10,18 @@ export function routeId(entry: Pick<RawRouteEntry, 'framework' | 'kind' | 'path'
   return createHash('sha256').update(key).digest('hex').slice(0, 12)
 }
 
+/**
+ * Extension of a module, in every spelling the route globs pick up.
+ *
+ * `.mjs` and `.cjs` are in here because Nitro serves them as handlers just the
+ * same: leaving them out kept the extension in the derived path and dropped the
+ * method off `checkout.post.mjs`.
+ */
+const MODULE_EXTENSION = /\.(?:[mc]?[jt]s)$/
+
 /** Extract an HTTP method from a filename like `checkout.post.ts` (Nuxt/Nitro convention). */
 export function extractMethodFromFilename(filename: string): string | null {
-  const base = filename.replace(/\.(ts|js|mts|cts)$/, '')
+  const base = filename.replace(MODULE_EXTENSION, '')
   const dot = base.lastIndexOf('.')
   if (dot === -1) return null
   const suffix = base.slice(dot + 1).toLowerCase()
@@ -24,7 +33,7 @@ export function extractMethodFromFilename(filename: string): string | null {
 
 /** Drop a source file extension, keeping the rest of the name intact. */
 export function stripExtension(filename: string): string {
-  return filename.replace(/\.(vue|tsx?|jsx?|mts|cts)$/, '')
+  return filename.replace(/\.(?:vue|[mc]?[jt]sx?)$/, '')
 }
 
 /** Remove HTTP method suffix and file extension from a route filename. */
