@@ -34,6 +34,7 @@ export const redirects: Record<string, RouteRedirect> = {
   // New section roots (no content index page — 404 without an explicit redirect)
   '/start': r('/start/introduction'),
   '/learn': r('/learn/overview'),
+  '/cli': r('/cli/overview'),
   '/integrate': r('/integrate/overview'),
   '/reference': r('/reference/configuration'),
   '/examples': r('/integrate/frameworks/overview'),

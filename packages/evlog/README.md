@@ -1423,6 +1423,38 @@ try {
 | **Vinxi** | Nitro v2 module setup |
 | **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
 
+## CLI
+
+[`@evlog/cli`](https://npmjs.com/package/@evlog/cli) scores what your app can tell you when something goes wrong. It reads your project on disk — no traffic, no instrumentation — finds every entry point, and names the ones to fix first.
+
+```bash
+npx @evlog/cli map
+```
+
+```
+▀▀█ █▀▀   score /100              your-app · Nuxt
+  █ █▀█   ▰▰▰▰▰▰▰▰▰▰▰▰▰▰▰▱▱▱▱▱    29 entry points scanned
+  ▀ ▀▀▀   good                    ▂▂▂▃▃▃▃▃▄▆▆▆▆▆███████████████
+
+FIX FIRST
+1. ANY    /api/auth/:all* A — touches auth and logs nothing
+   server/api/auth/[...all].ts:1 · evlog.dev/learn/wide-events
+```
+
+| Command | What it does |
+|---------|-------------|
+| `evlog map` | Score every entry point and list the three worth fixing first |
+| `evlog map <route-or-file>` | Explain one entry point in full, with the shape it could take |
+| `evlog map --all` | Every entry point as a check matrix |
+| `evlog map --min-score <n>` | Exit 1 below the threshold — a CI gate |
+| `evlog doctor` | Diagnose the install: Node, workspace, evlog version, local logs |
+
+Same code in, same verdict out, with the file and line for every finding — which also makes it something you can hand to an agent: run it, fix the list, run it again.
+
+> **Early days:** the CLI is tested and safe to run on any project, but it is young — four framework adapters today, rules still being refined. Expect verdicts and scores to move between releases; pin it as a dev dependency when you gate CI on the number.
+
+Docs: [CLI](https://www.evlog.dev/cli/overview) · [`evlog map`](https://www.evlog.dev/cli/map) · [Rules](https://www.evlog.dev/cli/rules) · [Scoring](https://www.evlog.dev/cli/scoring)
+
 ## Agent Skills
 
 evlog provides [Agent Skills](https://www.evlog.dev/reference/agent-skills) to help AI coding assistants understand and implement proper logging patterns in your codebase.

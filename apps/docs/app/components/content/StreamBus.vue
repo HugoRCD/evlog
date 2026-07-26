@@ -105,7 +105,7 @@ onMounted(() => {
     onBus.value = true
     state.value = { sync: 'delivered', iter: 'delivered', ring: 'delivered' }
     ringFill.value = RING_MAX
-    totalEmitted.value = EMITS
+    totalEmitted.value = EMIT_COUNT
     return
   }
   if (!wrapperRef.value) {

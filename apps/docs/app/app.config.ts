@@ -52,6 +52,13 @@ export default defineAppConfig({
       },
     },
     prose: {
+      pre: {
+        slots: {
+          // Scroll long lines instead of wrapping them: CLI output and check
+          // matrices are column-aligned, and a soft wrap destroys the alignment.
+          base: 'whitespace-pre wrap-normal',
+        },
+      },
       codeIcon: {
         'nuxt': 'i-vscode-icons-file-type-nuxt',
         'nuxt / nitro': 'i-vscode-icons-file-type-nuxt',
