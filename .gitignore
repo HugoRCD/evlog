@@ -28,6 +28,9 @@ logs
 # Benchmarks
 bench/results.json
 
+# evlog map reports
+evlog.map.json
+
 # Test artefacts (coverage report, Stryker mutation report, Stryker scratch)
 coverage/
 reports/

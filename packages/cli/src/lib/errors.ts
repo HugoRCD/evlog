@@ -54,6 +54,35 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Re-run with --debug and share the wide event',
     tags: ['cli'],
   },
+  MAP_NO_PACKAGE_JSON: {
+    status: 404,
+    message: 'No package.json found',
+    why: 'map needs a package root to detect the framework and scan routes',
+    fix: 'Run from your app directory or pass --cwd',
+    tags: ['map', 'project'],
+  },
+  MAP_WORKSPACE_ROOT: {
+    status: 400,
+    message: 'Monorepo root detected with no supported framework',
+    why: 'map scans one app at a time and cannot infer a framework from a bare workspace root',
+    fix: 'Run from an app directory (e.g. apps/web) or pass --cwd',
+    tags: ['map', 'project'],
+  },
+  MAP_FRAMEWORK_NOT_DETECTED: {
+    status: 400,
+    message: 'Could not detect a supported framework (nuxt, nitro, next, tanstack-start)',
+    why: 'No matching dependency or config file was found in this project',
+    fix: 'Use --framework <name> to override detection',
+    tags: ['map', 'project'],
+  },
+  MAP_INVALID_FRAMEWORK: {
+    status: 400,
+    message: ({ value }: { value: string }) =>
+      `Unknown --framework "${value}"`,
+    why: 'map only ships adapters for nuxt, nitro, next, and tanstack-start',
+    fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
+    tags: ['map'],
+  },
 })
 
 declare module 'evlog' {
