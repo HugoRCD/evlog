@@ -1,0 +1,148 @@
+import { join } from 'node:path'
+import { getAdapter } from './adapters/index'
+import { countSuppressed } from './directives'
+import { buildFileFacts } from './facts'
+import { parseFile } from './parse'
+import { collectProjectFacts, readPackageJson } from './project-facts'
+import type { ProjectFacts } from './project-facts'
+import { getRule, runRules } from './rules/index'
+import type { FrameworkCapabilities } from './rules/index'
+import { classifySensitivity } from './sensitivity'
+import { classifyRouteObservability, gradeFromScore, scoreGlobal, scoreRoute } from './score'
+import type {
+  CheckId,
+  CheckResult,
+  MapFile,
+  ProjectSuggestion,
+  RawRouteEntry,
+  RouteEntry,
+  ScanContext,
+  ScanResult,
+} from './types'
+import { routeId } from './utils'
+
+interface AnalyseInput {
+  ctx: ScanContext
+  raw: RawRouteEntry
+  project: ProjectFacts
+  capabilities: FrameworkCapabilities
+}
+
+/**
+ * Analyse one entry point: read it once, derive the facts, classify
+ * sensitivity from those facts, then run the rules against them.
+ *
+ * Sensitivity has to come before the rules because `audit` is gated on it.
+ */
+function analyseRoute(input: AnalyseInput): { route: RouteEntry, warnings: string[] } {
+  const { ctx, raw, project, capabilities } = input
+  const parsed = parseFile(join(ctx.projectRoot, raw.file))
+  const facts = parsed
+    ? buildFileFacts(parsed, {
+      evlogAutoImports: capabilities.evlogAutoImports,
+      evlogBarrels: project.evlogBarrels,
+    })
+    : null
+
+  if (parsed && parsed.errors.length > 0 && ctx.verbose) {
+    console.warn(`Parse warnings in ${raw.file}: ${parsed.errors.join(', ')}`)
+  }
+
+  const sensitivity = facts
+    ? classifySensitivity(raw, facts)
+    : { level: 'none' as const, reasons: [] }
+  const { checks, suggestions, warnings } = runRules({
+    ctx,
+    target: { ...raw, sensitivity },
+    parsed,
+    facts,
+    project,
+    capabilities,
+  })
+
+  return {
+    route: {
+      ...raw,
+      id: routeId(raw),
+      checks,
+      suggestions,
+      sensitivity,
+      score: scoreRoute(checks),
+    },
+    warnings,
+  }
+}
+
+/** Extract entry points for `ctx.framework`, run the rules, and score them. */
+export async function scan(ctx: ScanContext): Promise<ScanResult> {
+  const adapter = getAdapter(ctx.framework)
+  const capabilities: FrameworkCapabilities = {
+    requestLogger: adapter.requestLogger,
+    evlogAutoImports: adapter.evlogAutoImports ?? [],
+  }
+
+  const project = collectProjectFacts(ctx, {
+    packageJson: readPackageJson(ctx.projectRoot),
+    evlogAutoImports: capabilities.evlogAutoImports,
+  })
+
+  const rawRoutes = await adapter.extractRoutes(ctx)
+  const analysed = rawRoutes.map(raw => analyseRoute({ ctx, raw, project, capabilities }))
+  const routes = analysed.map(entry => entry.route)
+  const warnings = analysed.flatMap(entry => entry.warnings)
+  const suggestions = hoistProjectSuggestions(routes)
+
+  const globalScore = scoreGlobal(routes)
+
+  const tally = { instrumented: 0, partial: 0, dark: 0, exempt: 0, suppressedChecks: 0 }
+  for (const route of routes) {
+    tally[classifyRouteObservability(route)]++
+    tally.suppressedChecks += countSuppressed(route)
+  }
+
+  const map: MapFile = {
+    version: 1,
+    generatedAt: new Date().toISOString(),
+    framework: ctx.framework,
+    projectName: ctx.projectName,
+    score: globalScore,
+    routes,
+  }
+
+  return {
+    map,
+    grade: gradeFromScore(globalScore),
+    summary: tally,
+    project,
+    suggestions,
+    warnings,
+  }
+}
+
+/**
+ * Move project-scoped suggestions off the routes and into one list.
+ *
+ * Installing `evlog/better-auth` is a single edit, so leaving a copy on every
+ * entry point where auth is in play would make the report claim there are five
+ * things to do. The first entry point that raised it keeps the evidence, which
+ * is where the reader should look first.
+ */
+function hoistProjectSuggestions(routes: RouteEntry[]): ProjectSuggestion[] {
+  const hoisted = new Map<CheckId, ProjectSuggestion>()
+
+  for (const route of routes) {
+    for (const [id, result] of Object.entries(route.suggestions) as [CheckId, CheckResult][]) {
+      const rule = getRule(id)
+      if (rule?.category !== 'opportunity' || rule.scope !== 'project') continue
+      delete route.suggestions[id]
+      if (hoisted.has(id) || result.status !== 'fail') continue
+      hoisted.set(id, {
+        id,
+        message: result.message ?? rule.question,
+        evidence: result.evidence,
+      })
+    }
+  }
+
+  return [...hoisted.values()]
+}

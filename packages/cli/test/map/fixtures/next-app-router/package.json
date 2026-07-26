@@ -1,0 +1,9 @@
+{
+  "name": "next-app-router-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "evlog": "workspace:*",
+    "next": "^15.0.0"
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "name": "tanstack-basic-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@tanstack/react-start": "^1.0.0",
+    "evlog": "workspace:*"
+  }
+}

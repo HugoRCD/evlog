@@ -21,11 +21,13 @@ const codes = {
   green: '\x1B[32m',
   yellow: '\x1B[33m',
   blue: '\x1B[34m',
+  magenta: '\x1B[35m',
   cyan: '\x1B[36m',
   white: '\x1B[37m',
 } as const
 
-type StyleCode = keyof typeof codes
+/** A style name accepted by {@link Style.paint}. */
+export type StyleCode = keyof typeof codes
 
 /**
  * Minimal ANSI kit bound to a {@link CliContext} — hand-rolled like

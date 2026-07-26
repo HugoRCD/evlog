@@ -28,4 +28,12 @@ export default createConfig(
       'import/first': 'off',
     },
   },
+  {
+    // `evlog map` test fixtures are throwaway sample apps scanned by the
+    // analysis engine (like `examples/*`, which carry no lint script at
+    // all) — intentionally imperfect (empty catch blocks, plain
+    // `throw new Error()`, framework-mandated `GET`/`POST`/`Route` names)
+    // to exercise specific checks. Not maintained to repo lint standards.
+    ignores: ['packages/cli/test/map/fixtures/**'],
+  },
 )

@@ -15,7 +15,9 @@
 
 The official command line for [evlog](https://evlog.dev).
 
-Diagnose your install. Inspect wide events. Audit and map what your app emits.
+Diagnose your install. Score what your app can tell you when something goes wrong.
+
+> **Early days.** Safe to run on any project — it only reads files, and it is covered by tests — but young. `evlog map` has adapters for four frameworks today, its rules are still being refined, and both will grow. Expect verdicts and scores to move between releases: pin the CLI as a dev dependency when you gate CI on the number.
 
 ## Usage
 
@@ -39,8 +41,27 @@ npx @evlog/cli doctor --cwd apps/web
 | `evlog doctor` | Monorepo-aware diagnosis: Node, project/workspace, stack, evlog install, `.evlog/logs` |
 | `evlog doctor --cwd <dir>` | Run against another directory |
 | `evlog doctor --debug` | Same, plus a debug wide event (see Debug) |
+| `evlog map` | Static observability score for the current app — Lighthouse for wide events |
+| `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
+| `evlog map --all` | Every entry point as a check matrix, grouped by directory |
+| `evlog map --framework <name>` | Override framework detection (`nuxt`, `nitro`, `next`, `tanstack-start`) |
+| `evlog map --min-score <n>` | Exit 1 if the global score is below `n` |
+| `evlog map --no-write` | Skip writing `evlog.map.json` to the project root |
+| `evlog map --verbose` | Show per-file parse warnings |
+| `evlog map --cwd <dir>` | Scan another app in the workspace |
 | `evlog telemetry status` | Show telemetry status and disclosure |
 | `evlog telemetry enable` / `disable` | Change telemetry preference (disable purges buffered data) |
+
+### Disabling a check
+
+A verdict you disagree with costs one comment, not your CI gate:
+
+```ts
+// evlog-map-disable-next-line wide-event, context -- liveness probe, deliberately silent
+export default defineEventHandler(() => ({ ok: true }))
+```
+
+Also `evlog-map-disable-line` for a trailing comment, and `evlog-map-disable` on its own for the whole file. Name no rule id and it covers all of them. The check becomes `n/a` with your reason attached, so it costs no score — and the report counts how many checks the project disabled, so a green score never hides an app that logs nothing. Full syntax: [Rules](https://evlog.dev/cli/rules#disabling-a-check).
 
 ## Exit codes
 
@@ -55,14 +76,24 @@ npx @evlog/cli doctor --cwd apps/web
 With `--json`, the payload is the **only** thing written to stdout — everything human goes to stderr. The shape is a contract:
 
 ```jsonc
+// evlog doctor --json
 {
-  "schemaVersion": 1,
+  "schemaVersion": 2,
   "checks": [{ "id": "node", "status": "ok", "message": "Node v22.1.0" }],
   "summary": { "ok": 4, "warn": 0, "fail": 0 }
 }
 ```
 
-Breaking this shape requires a `schemaVersion` bump.
+```jsonc
+// evlog map --json
+{
+  "schemaVersion": 2,
+  "map": { "version": 1, "framework": "nuxt", "score": 76, "routes": [] },
+  "summary": { "instrumented": 19, "partial": 2, "dark": 8, "exempt": 0 }
+}
+```
+
+Breaking either shape requires a `schemaVersion` bump. In `routes[]`, `checks` holds the requirements that move the score and `suggestions` holds the opportunities that never do — separate keys so a suggestion can't be mistaken for a failure.
 
 ## Telemetry
 
@@ -107,4 +138,8 @@ src/
 
 ## Docs
 
-Full guide: [evlog.dev](https://evlog.dev)
+- [CLI overview](https://evlog.dev/cli/overview) — commands, global flags, exit codes
+- [`evlog map`](https://evlog.dev/cli/map) — what it scans and how to read the report
+- [Rules](https://evlog.dev/cli/rules) — every check, what satisfies it, how to fix it
+- [Scoring](https://evlog.dev/cli/scoring) — weights, grades, sensitivity
+- [CI](https://evlog.dev/cli/ci) — gate a pull request on the score
