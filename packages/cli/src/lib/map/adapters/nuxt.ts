@@ -54,15 +54,24 @@ interface ExtractContext {
   framework: 'nuxt' | 'nitro'
 }
 
+/** One page root and the `.vue` files already discovered under it. */
+interface PageRoot {
+  dir: string
+  files: readonly string[]
+}
+
 /**
  * Page directories under `root` that contain at least one `.vue` file.
- * Falls back to `pages` when nothing is present so globs stay predictable.
+ * Returns the matched files with each directory so extractors do not glob twice.
+ * Falls back to an empty `pages` root when nothing is present.
  */
-function resolvePageDirs(root: string): readonly string[] {
-  const found = PAGE_DIRS.filter(
-    dir => globSync(`${dir}/**/*.vue`, { cwd: root }).length > 0,
-  )
-  return found.length > 0 ? found : ['pages']
+function resolvePageRoots(root: string): readonly PageRoot[] {
+  const found: PageRoot[] = []
+  for (const dir of PAGE_DIRS) {
+    const files = globSync(`${dir}/**/*.vue`, { cwd: root, absolute: true })
+    if (files.length > 0) found.push({ dir, files })
+  }
+  return found.length > 0 ? found : [{ dir: 'pages', files: [] }]
 }
 
 function fileToApiRoute(file: string, apiRoot: RouteRoot, { root, parse, framework }: ExtractContext): RawRouteEntry {
@@ -182,9 +191,9 @@ export const nuxtAdapter: FrameworkAdapter = {
     const root = ctx.projectRoot
     const parse = ctx.parse ?? parseFile
 
-    for (const pageDir of resolvePageDirs(root)) {
-      for (const file of globSync(`${pageDir}/**/*.vue`, { cwd: root, absolute: true })) {
-        routes.push(fileToPageRoute(file, root, pageDir))
+    for (const { dir, files } of resolvePageRoots(root)) {
+      for (const file of files) {
+        routes.push(fileToPageRoute(file, root, dir))
       }
     }
 
