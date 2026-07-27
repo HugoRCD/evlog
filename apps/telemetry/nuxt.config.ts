@@ -14,6 +14,9 @@ export default defineNuxtConfig({
   evlog: {
     env: { service: 'evlog-telemetry' },
     include: ['/api/**'],
+    // The live-refresh probe fires every 3s per open tab and carries no
+    // information worth keeping — logging it would drown the events that matter.
+    exclude: ['/api/telemetry/cursor'],
   },
 
   // Exposes the dashboard's stats/runs data to AI assistants over MCP — see

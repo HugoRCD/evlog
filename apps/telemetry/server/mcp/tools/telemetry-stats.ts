@@ -17,6 +17,9 @@ export default defineMcpTool({
     { range: '30d', tool: 'evlog-cli', environment: 'production' },
   ],
   handler: ({ range, tool, environment }) => {
-    return getStatsForFilter({ range, tool, environment })
+    // Same cursor-invalidated cache the dashboard uses — an agent sweeping
+    // several ranges in a row (or several agents at once) then costs one
+    // aggregation per filter instead of one per call.
+    return getCachedStatsForFilter({ range, tool, environment })
   },
 })
