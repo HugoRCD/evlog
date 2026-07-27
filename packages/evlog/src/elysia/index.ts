@@ -138,7 +138,6 @@ export function evlog(options: EvlogElysiaOptions = {}) {
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
       const err = error instanceof Error ? error : new Error(String(error))
-      state.logger.error(err)
       await state.finish({ error: err })
       activeLoggers.delete(state.logger)
       clearAsyncLocalStorage(storage)
