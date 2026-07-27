@@ -43,3 +43,18 @@ describe('parseAllowedCustomKeys', () => {
     })
   })
 })
+
+describe('the evlog-cli allowlist against the CLI itself', () => {
+  it('accepts every field evlog init can set', async () => {
+    /* The two lists are maintained by hand on either side of an HTTP boundary,
+       and a name missing here is dropped by the ingest without a word — the
+       option simply never appears in the numbers. Reading the CLI's own list is
+       what turns that silence into a failing test. */
+    const { initTelemetryFieldNames } = await import('../../../packages/cli/src/lib/init/telemetry')
+    const allowed = new Set(DEFAULT_ALLOWED_CUSTOM_KEYS['evlog-cli'])
+
+    for (const name of initTelemetryFieldNames()) {
+      expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
+    }
+  })
+})
