@@ -194,3 +194,45 @@ export function addImport(source: string, program: Program, statement: string): 
 }
 
 export type { ArrayNode, ObjectNode }
+
+/**
+ * The `createEvlog({ … })` options object, when the file calls it at all.
+ *
+ * Next.js keeps its evlog configuration in a factory call rather than an
+ * exported config object, so the generic {@link findConfigObject} does not
+ * reach it.
+ */
+export function findCreateEvlogCall(program: Program): ObjectNode | null {
+  let found: ObjectNode | null = null
+
+  const visit = (node: Node): void => {
+    if (found || !node || typeof node !== 'object') return
+
+    if (node.type === 'CallExpression') {
+      const call = node as unknown as { callee: Node, arguments: Node[] }
+      const callee = call.callee as unknown as { type: string, name?: string }
+      if (callee.type === 'Identifier' && callee.name === 'createEvlog') {
+        const [argument] = call.arguments
+        if (argument?.type === 'ObjectExpression') {
+          found = argument as ObjectNode
+          return
+        }
+      }
+    }
+
+    for (const value of Object.values(node as unknown as Record<string, unknown>)) {
+      if (Array.isArray(value)) value.forEach(entry => visit(entry as Node))
+      else if (value && typeof value === 'object' && 'type' in value) visit(value as Node)
+    }
+  }
+
+  visit(program as unknown as Node)
+  return found
+}
+
+/** Offset just past the last import statement — where a preamble belongs. */
+export function importsEnd(source: string, program: Program): number {
+  const imports = (program.body as Node[]).filter(node => node.type === 'ImportDeclaration')
+  const last = imports.at(-1)
+  return last ? offsets(last).end : 0
+}

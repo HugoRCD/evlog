@@ -355,3 +355,85 @@ describe('drain wiring', () => {
     expect(config.contents).toContain('error: 100')
   })
 })
+
+describe('an evlog factory that is already there (Next.js)', () => {
+  it('splices the destinations into an existing createEvlog call', async () => {
+    /* Reporting "already exists" and wiring nothing meant the command asked
+       which destinations you wanted and then ignored the answer. */
+    const root = await project({
+      'package.json': '{"name":"web"}',
+      'lib/evlog.ts': `import { createEvlog } from 'evlog/next'\n\n// ours\nexport const { withEvlog } = createEvlog({\n  service: 'web',\n})\n`,
+    })
+
+    const plan = planWiring({
+      root,
+      framework: 'next',
+      service: 'web',
+      ...wiring({ prodDrains: ['axiom'], extras: ['sampling'], sampling: 'balanced' }),
+      nitroMajor: 3,
+    })
+    const lib = plan.actions.find(action => action.relative === join('lib', 'evlog.ts'))!
+
+    expect(lib.kind).toBe('patch')
+    expect(lib.contents).toContain('// ours')
+    expect(lib.contents).toContain('drain: async ctx =>')
+    expect(lib.contents).toContain('rates: { info: 25')
+    /* Imports before the statements that call them. */
+    expect(lib.contents.indexOf(`from 'evlog/axiom'`)).toBeLessThan(lib.contents.indexOf('const drains ='))
+  })
+
+  it('hands back a snippet when the file is a re-export barrel', async () => {
+    const root = await project({
+      'package.json': '{"name":"web"}',
+      'lib/evlog.ts': `export { useLogger, withEvlog } from 'evlog'\n`,
+    })
+
+    const plan = planWiring({
+      root,
+      framework: 'next',
+      service: 'web',
+      ...wiring({ prodDrains: ['axiom'] }),
+      nitroMajor: 3,
+    })
+
+    expect(plan.actions.some(action => action.relative === join('lib', 'evlog.ts'))).toBe(false)
+    expect(plan.manual.some(step => step.snippet.includes('createAxiomDrain'))).toBe(true)
+  })
+
+  it('refuses to replace options the author already set', async () => {
+    const root = await project({
+      'package.json': '{"name":"web"}',
+      'lib/evlog.ts': `import { createEvlog } from 'evlog/next'\n\nexport const { withEvlog } = createEvlog({\n  service: 'web',\n  drain: myDrain,\n})\n`,
+    })
+
+    const plan = planWiring({
+      root,
+      framework: 'next',
+      service: 'web',
+      ...wiring({ prodDrains: ['axiom'] }),
+      nitroMajor: 3,
+    })
+
+    expect(plan.actions.some(action => action.relative === join('lib', 'evlog.ts'))).toBe(false)
+    expect(plan.manual.some(step => step.reason.includes('already sets drain'))).toBe(true)
+  })
+
+  it('wires enrichers and sampling for Next, which supports both', async () => {
+    /* createEvlog takes `enrich` and `sampling`; gating them to the Nitro-based
+       frameworks excluded Next from two features it fully supports. */
+    const root = await project({ 'package.json': '{"name":"web"}' })
+
+    const plan = planWiring({
+      root,
+      framework: 'next',
+      service: 'web',
+      ...wiring({ extras: ['enrichers', 'sampling'], enrichers: ['user-agent'], sampling: 'high-traffic' }),
+      nitroMajor: 3,
+    })
+    const lib = plan.actions.find(action => action.relative === join('lib', 'evlog.ts'))!
+
+    expect(lib.contents).toContain('createUserAgentEnricher()')
+    expect(lib.contents).toContain('enrich: async (ctx) =>')
+    expect(lib.contents).toContain('rates: { info: 5')
+  })
+})
