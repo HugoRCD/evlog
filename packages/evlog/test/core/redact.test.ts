@@ -347,6 +347,68 @@ describe('redactEvent - edge cases', () => {
     expect(redacted).not.toHaveProperty('handler')
   })
 
+  it('treats native objects as opaque during path redaction', () => {
+    const cause = new DOMException('Upstream request timed out', 'TimeoutError')
+    const redacted = redactEvent(
+      {
+        error: {
+          code: 'UPSTREAM_TIMEOUT',
+          cause,
+        },
+      },
+      { paths: ['*code'] },
+    )
+
+    expect(redacted).toMatchObject({
+      error: {
+        code: '[REDACTED]',
+        cause: expect.any(DOMException),
+      },
+    })
+    expect(cause.name).toBe('TimeoutError')
+  })
+
+  it('treats native objects as opaque during pattern redaction', () => {
+    const cause = new DOMException('Contact alice@example.com', 'NetworkError')
+    const redacted = redactEvent(
+      {
+        message: 'Contact alice@example.com',
+        error: { cause },
+      },
+      { patterns: [/[\w.+-]+@[\w-]+\.[\w.]+/g] },
+    )
+
+    expect(redacted.message).toBe('Contact [REDACTED]')
+    expect(redacted).toMatchObject({
+      error: {
+        cause: expect.objectContaining({
+          message: 'Contact alice@example.com',
+        }),
+      },
+    })
+  })
+
+  it('treats native objects as opaque during built-in masking', () => {
+    const cause = new DOMException('Contact alice@example.com', 'NetworkError')
+    const config = defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config')
+    const redacted = redactEvent(
+      {
+        message: 'Contact alice@example.com',
+        error: { cause },
+      },
+      config,
+    )
+
+    expect(redacted.message).toBe('Contact a***@***.com')
+    expect(redacted).toMatchObject({
+      error: {
+        cause: expect.objectContaining({
+          message: 'Contact alice@example.com',
+        }),
+      },
+    })
+  })
+
   it('handles empty config gracefully', () => {
     let event: Record<string, unknown> = { user: { email: 'alice@example.com' } }
     event = redactEvent(event, {})
@@ -523,4 +585,3 @@ describe('normalizeRedactConfig', () => {
     expect(config?.paths).toEqual(['user.ssn'])
   })
 })
-

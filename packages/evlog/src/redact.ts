@@ -119,7 +119,8 @@ export function redactPathsInTree(
   }
 
   if (typeof obj === 'object') {
-    const record = obj as Record<string, unknown>
+    if (!isPlainRecord(obj)) return
+    const record = obj
     for (const key in record) {
       const fullPath = prefix ? `${prefix}.${key}` : key
       if (matchesRedactPath(fullPath, key, matchers)) {
@@ -362,7 +363,8 @@ function redactPatterns(obj: unknown, patterns: RegExp[], replacement: string): 
   }
 
   if (typeof obj === 'object') {
-    const record = obj as Record<string, unknown>
+    if (!isPlainRecord(obj)) return
+    const record = obj
     for (const key in record) {
       const val = record[key]
       if (typeof val === 'string') {
@@ -397,7 +399,8 @@ function applyMaskersToTree(obj: unknown, maskers: Masker[]): void {
   }
 
   if (typeof obj === 'object') {
-    const record = obj as Record<string, unknown>
+    if (!isPlainRecord(obj)) return
+    const record = obj
     for (const key in record) {
       const val = record[key]
       if (typeof val === 'string') {
