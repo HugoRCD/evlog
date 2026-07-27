@@ -1,6 +1,8 @@
 import { existsSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Framework } from '../map/types'
+import { findDestination } from './catalog'
+import type { DrainId, ExtraId } from './catalog'
 import {
   addImport,
   appendProperty,
@@ -49,8 +51,10 @@ export interface WiringInput {
   root: string
   framework: Framework
   service: string
-  /** Write a local `.evlog/logs` sink alongside the wiring. */
-  sink: boolean
+  /** Where wide events are sent. `none` writes no drain at all. */
+  drain: DrainId
+  /** Opt-in additions layered onto the drain and the config. */
+  extras: ExtraId[]
   /** Nitro major, when the framework is Nitro (`tanstack-start` is always v3). */
   nitroMajor: 2 | 3
 }
@@ -70,11 +74,12 @@ function configCandidates(base: string): string[] {
 
 /* ── nuxt ───────────────────────────────────────────────────────────────── */
 
-function nuxtConfigTemplate(service: string): string {
+function nuxtConfigTemplate(input: WiringInput): string {
+  const sampling = samplingProperty(input)
   return `export default defineNuxtConfig({
   modules: ['evlog/nuxt'],
   evlog: {
-    env: { service: '${service}' },
+    env: { service: '${input.service}' },${sampling ? `\n    ${sampling},` : ''}
   },
 })
 `
@@ -86,8 +91,8 @@ function planNuxt(input: WiringInput): WiringPlan {
 
   if (!configPath) {
     const path = join(input.root, 'nuxt.config.ts')
-    plan.actions.push({ path, relative: 'nuxt.config.ts', kind: 'create', contents: nuxtConfigTemplate(input.service) })
-    return withNitroSink(plan, input)
+    plan.actions.push({ path, relative: 'nuxt.config.ts', kind: 'create', contents: nuxtConfigTemplate(input) })
+    return withNitroPlugins(plan, input)
   }
 
   const relativePath = relative(input.root, configPath)
@@ -101,7 +106,7 @@ function planNuxt(input: WiringInput): WiringPlan {
       snippet: `modules: ['evlog/nuxt'],\nevlog: {\n  env: { service: '${input.service}' },\n},`,
       reason: config ? 'the config does not export a plain object literal' : 'the config could not be parsed',
     })
-    return withNitroSink(plan, input)
+    return withNitroPlugins(plan, input)
   }
 
   const splices: Splice[] = []
@@ -121,8 +126,24 @@ function planNuxt(input: WiringInput): WiringPlan {
     splices.push(appendProperty(config.source, object, `modules: ['evlog/nuxt']`))
   }
 
-  if (hasProperty(object, 'evlog')) plan.already.push(`${relativePath} already has an evlog block`)
-  else splices.push(appendProperty(config.source, object, `evlog: {\n    env: { service: '${input.service}' },\n  }`))
+  if (hasProperty(object, 'evlog')) {
+    plan.already.push(`${relativePath} already has an evlog block`)
+    if (samplingProperty(input)) {
+      plan.manual.push({
+        title: 'Add sampling to the evlog block',
+        file: relativePath,
+        snippet: `${samplingProperty(input)},`,
+        reason: 'the block already exists — merging into options you wrote is not something init guesses at',
+      })
+    }
+  } else {
+    const sampling = samplingProperty(input)
+    splices.push(appendProperty(
+      config.source,
+      object,
+      `evlog: {\n    env: { service: '${input.service}' },${sampling ? `\n    ${sampling},` : ''}\n  }`,
+    ))
+  }
 
   if (splices.length > 0) {
     plan.actions.push({
@@ -133,7 +154,7 @@ function planNuxt(input: WiringInput): WiringPlan {
     })
   }
 
-  return withNitroSink(plan, input)
+  return withNitroPlugins(plan, input)
 }
 
 /* ── nitro / tanstack start ─────────────────────────────────────────────── */
@@ -143,6 +164,7 @@ function nitroModuleSpecifier(major: 2 | 3): string {
 }
 
 function nitroConfigTemplate(input: WiringInput): string {
+  const sampling = samplingProperty(input)
   const asyncContext = input.framework === 'tanstack-start'
     ? '  experimental: {\n    asyncContext: true,\n  },\n'
     : ''
@@ -154,7 +176,7 @@ import evlog from 'evlog/nitro/v3'
 export default defineConfig({
 ${asyncContext}  modules: [
     evlog({
-      env: { service: '${input.service}' },
+      env: { service: '${input.service}' },${sampling ? `\n      ${sampling},` : ''}
     }),
   ],
 })
@@ -167,7 +189,7 @@ import evlog from 'evlog/nitro'
 export default defineNitroConfig({
   modules: [
     evlog({
-      env: { service: '${input.service}' },
+      env: { service: '${input.service}' },${sampling ? `\n      ${sampling},` : ''}
     }),
   ],
 })
@@ -182,13 +204,14 @@ function planNitro(input: WiringInput): WiringPlan {
   if (!configPath) {
     const path = join(input.root, 'nitro.config.ts')
     plan.actions.push({ path, relative: 'nitro.config.ts', kind: 'create', contents: nitroConfigTemplate(input) })
-    return withTanstackNotes(withNitroSink(plan, input), input)
+    return withTanstackNotes(withNitroPlugins(plan, input), input)
   }
 
   const relativePath = relative(input.root, configPath)
   const config = readConfig(configPath)
   const object = config ? findConfigObject(config.program) : null
-  const moduleCall = `evlog({\n      env: { service: '${input.service}' },\n    })`
+  const sampling = samplingProperty(input)
+  const moduleCall = `evlog({\n      env: { service: '${input.service}' },${sampling ? `\n      ${sampling},` : ''}\n    })`
 
   if (!config || !object) {
     plan.manual.push({
@@ -197,7 +220,7 @@ function planNitro(input: WiringInput): WiringPlan {
       snippet: `import evlog from '${specifier}'\n\n// inside the config:\nmodules: [\n  ${moduleCall},\n],`,
       reason: config ? 'the config does not export a plain object literal' : 'the config could not be parsed',
     })
-    return withTanstackNotes(withNitroSink(plan, input), input)
+    return withTanstackNotes(withNitroPlugins(plan, input), input)
   }
 
   const splices: Splice[] = []
@@ -249,7 +272,7 @@ function planNitro(input: WiringInput): WiringPlan {
     })
   }
 
-  return withTanstackNotes(withNitroSink(plan, input), input)
+  return withTanstackNotes(withNitroPlugins(plan, input), input)
 }
 
 /**
@@ -261,6 +284,27 @@ function planNitro(input: WiringInput): WiringPlan {
  */
 function withTanstackNotes(plan: WiringPlan, input: WiringInput): WiringPlan {
   if (input.framework !== 'tanstack-start') return plan
+
+  if (input.extras.includes('vite')) {
+    /* `vite.config.ts` already holds the TanStack and Nitro plugins in an array
+       whose shape varies per template, and the plugin has to sit alongside them
+       in the right order. Cheaper to read four lines than to guess. */
+    const viteConfig = firstExisting(input.root, configCandidates('vite.config'))
+    plan.manual.push({
+      title: 'Add the evlog Vite plugin',
+      file: viteConfig ? relative(input.root, viteConfig) : 'vite.config.ts',
+      snippet: `import evlog from 'evlog/vite'
+
+export default defineConfig({
+  plugins: [
+    evlog(),
+    // …your existing plugins
+  ],
+})`,
+      reason: 'strips log.debug() from production builds and injects source locations',
+    })
+  }
+
   const rootRoute = firstExisting(input.root, ['src/routes/__root.tsx', 'app/routes/__root.tsx'])
   plan.manual.push({
     title: 'Return structured errors from the root route',
@@ -278,37 +322,108 @@ export const Route = createRootRoute({
   return plan
 }
 
-function nitroSinkTemplate(): string {
-  return `import { createFsDrain } from 'evlog/fs'
+/**
+ * The Nitro drain plugin for the chosen destination.
+ *
+ * A development-only drain is gated on `import.meta.dev`; a hosted one is not.
+ * The filesystem adapter writes files on whatever box serves the request, so
+ * leaving it on in production is a decision, and `init` does not make it for
+ * you. Everything else is production traffic by definition.
+ */
+function nitroDrainTemplate(input: WiringInput): string | null {
+  const destination = findDestination(input.drain)
+  if (!destination?.specifier || !destination.factory) return null
+
+  const batched = input.extras.includes('pipeline')
+  const imports = [`import { ${destination.factory.replace('()', '')} } from '${destination.specifier}'`]
+  if (batched) {
+    imports.unshift(`import type { DrainContext } from 'evlog'`)
+    imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
+  }
+
+  const setup = batched
+    ? `const pipeline = createDrainPipeline<DrainContext>({
+  batch: { size: 50, intervalMs: 5000 },
+  retry: { maxAttempts: 3 },
+})
+const drain = pipeline(${destination.factory})`
+    : `const drain = ${destination.factory}`
+
+  const guard = destination.productionSafe
+    ? ''
+    : '  // Local files are a development convenience — never a production sink.\n  if (!import.meta.dev) return\n'
+
+  const envNote = destination.env.length > 0
+    ? `\n * Reads ${destination.env.map(variable => variable.name).join(' and ')} from the environment.`
+    : ''
+
+  return `${imports.join('\n')}
 
 /**
- * Local wide-event sink — writes NDJSON to .evlog/logs during development.
- * Swap createFsDrain() for a hosted adapter (Axiom, OTLP, …) in production.
+ * Wide events land in ${destination.label}.${envNote}
  */
+${setup}
+
 export default defineNitroPlugin((nitroApp) => {
-  if (!import.meta.dev) return
-  nitroApp.hooks.hook('evlog:drain', createFsDrain())
+${guard}  nitroApp.hooks.hook('evlog:drain', drain)
 })
 `
 }
 
-/**
- * Add the local sink plugin for Nitro-based apps.
- *
- * Guarded by `import.meta.dev` rather than shipped as-is: a drain that writes
- * files is a development convenience, and turning one on in production without
- * being asked is not `init`'s call to make.
- */
-function withNitroSink(plan: WiringPlan, input: WiringInput): WiringPlan {
-  if (!input.sink) return plan
-  const relativePath = join('server', 'plugins', 'evlog-drain.ts')
-  const path = join(input.root, relativePath)
-  if (existsSync(path)) {
-    plan.already.push(`${relativePath} already exists`)
-    return plan
+function nitroEnricherTemplate(): string {
+  return `import {
+  createGeoEnricher,
+  createRequestSizeEnricher,
+  createTraceContextEnricher,
+  createUserAgentEnricher,
+} from 'evlog/enrichers'
+
+const enrichers = [
+  createUserAgentEnricher(),
+  createGeoEnricher(),
+  createRequestSizeEnricher(),
+  createTraceContextEnricher(),
+]
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:enrich', async (ctx) => {
+    for (const enrich of enrichers) await enrich(ctx)
+  })
+})
+`
+}
+
+/** Add the Nitro-side plugins: the drain, and the enrichers when asked for. */
+function withNitroPlugins(plan: WiringPlan, input: WiringInput): WiringPlan {
+  const files: { relative: string, contents: string | null }[] = [
+    { relative: join('server', 'plugins', 'evlog-drain.ts'), contents: nitroDrainTemplate(input) },
+    {
+      relative: join('server', 'plugins', 'evlog-enrich.ts'),
+      contents: input.extras.includes('enrichers') ? nitroEnricherTemplate() : null,
+    },
+  ]
+
+  for (const file of files) {
+    if (file.contents === null) continue
+    const path = join(input.root, file.relative)
+    if (existsSync(path)) {
+      plan.already.push(`${file.relative} already exists`)
+      continue
+    }
+    plan.actions.push({ path, relative: file.relative, kind: 'create', contents: file.contents })
   }
-  plan.actions.push({ path, relative: relativePath, kind: 'create', contents: nitroSinkTemplate() })
+
   return plan
+}
+
+/** The `sampling` block for a module config, when the extra was selected. */
+function samplingProperty(input: WiringInput): string | null {
+  if (!input.extras.includes('sampling')) return null
+  /* Errors are never sampled out. A sampling config that drops errors is one
+     that hides the only events anybody reads at 3am. */
+  return `sampling: {
+      rates: { info: 25, warn: 100, error: 100, debug: 5 },
+    }`
 }
 
 /* ── next ───────────────────────────────────────────────────────────────── */
@@ -323,17 +438,39 @@ export const { register, onRequestError } = defineNodeInstrumentation({
 `
 }
 
-function nextLibTemplate(service: string, sink: boolean): string {
-  const imports = sink
-    ? `import { createEvlog } from 'evlog/next'\nimport { createFsDrain } from 'evlog/fs'\n`
-    : `import { createEvlog } from 'evlog/next'\n`
-  const drain = sink
-    ? `\n  // Local NDJSON sink under .evlog/logs — swap for a hosted adapter in production.\n  drain: process.env.NODE_ENV === 'production' ? undefined : createFsDrain(),\n`
-    : '\n'
+function nextLibTemplate(input: WiringInput): string {
+  const destination = findDestination(input.drain)
+  const wired = destination?.specifier && destination.factory ? destination : null
 
-  return `${imports}
+  const imports = [`import { createEvlog } from 'evlog/next'`]
+  if (wired) imports.push(`import { ${wired.factory!.replace('()', '')} } from '${wired.specifier}'`)
+
+  const batched = wired && input.extras.includes('pipeline')
+  if (batched) {
+    imports.splice(1, 0, `import type { DrainContext } from 'evlog'`)
+    imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
+  }
+
+  const pipeline = batched
+    ? `\nconst pipeline = createDrainPipeline<DrainContext>({\n  batch: { size: 50, intervalMs: 5000 },\n  retry: { maxAttempts: 3 },\n})\n`
+    : ''
+
+  const expression = wired
+    ? (batched ? `pipeline(${wired.factory})` : wired.factory!)
+    : null
+
+  /* The filesystem drain writes files on whatever box serves the request, so
+     it is scoped to development here the same way the Nitro plugin scopes it. */
+  const drain = expression === null
+    ? '\n'
+    : wired!.productionSafe
+      ? `\n  drain: ${expression},\n`
+      : `\n  // Local NDJSON under .evlog/logs — development only.\n  drain: process.env.NODE_ENV === 'production' ? undefined : ${expression},\n`
+
+  return `${imports.join('\n')}
+${pipeline}
 export const { withEvlog, useLogger, log, createError } = createEvlog({
-  service: '${service}',${drain}})
+  service: '${input.service}',${drain}})
 `
 }
 
@@ -367,7 +504,7 @@ function planNext(input: WiringInput): WiringPlan {
       path,
       relative: relative(input.root, path),
       kind: 'create',
-      contents: nextLibTemplate(input.service, input.sink),
+      contents: nextLibTemplate(input),
     })
   }
 

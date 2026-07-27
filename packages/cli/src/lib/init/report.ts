@@ -1,6 +1,8 @@
 import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
+import { findDestination, findExtra } from './catalog'
+import { frameworkDocs } from './run'
 import type { InitResult } from './run'
 
 function docLink(ctx: CliContext, path: string): string {
@@ -8,25 +10,35 @@ function docLink(ctx: CliContext, path: string): string {
   return ctx.color ? style.link(`${DOCS_URL}${path}`, `evlog.dev${path}`) : `evlog.dev${path}`
 }
 
-const FRAMEWORK_DOCS: Record<string, string> = {
-  nuxt: '/integrate/frameworks/nuxt',
-  nitro: '/integrate/frameworks/nitro',
-  next: '/integrate/frameworks/nextjs',
-  'tanstack-start': '/integrate/frameworks/tanstack-start',
-}
-
 /**
- * What `init` did, in the order it did it.
+ * What `init` did, for a run that asked nothing.
  *
- * Every outcome gets a line, including the ones where nothing happened: a setup
- * command that prints only its writes leaves the reader unable to tell "already
- * wired" from "did not look".
+ * The interactive flow narrates itself through clack, so this renders only when
+ * prompts were skipped — which is the mode an agent or a CI job runs in, and the
+ * one whose output somebody will read in a log days later. Every outcome gets a
+ * line, including the ones where nothing happened: a setup command that prints
+ * only its writes leaves the reader unable to tell "already wired" from "did
+ * not look".
  */
 export function formatInitReport(ctx: CliContext, result: InitResult): string {
   const { paint } = createStyle(ctx)
+  const { answers } = result
   const lines: string[] = []
 
-  lines.push(`${paint('dim', 'Detected')} ${paint('bold', result.framework)} ${paint('dim', `· service ${result.service}`)}`)
+  if (result.cancelled) {
+    return paint('yellow', 'Cancelled — nothing was written.')
+  }
+
+  const destination = findDestination(answers.drain)
+  const summary = [
+    paint('bold', answers.framework),
+    paint('dim', `service ${answers.service}`),
+    paint('dim', `→ ${destination?.label ?? answers.drain}`),
+  ]
+  lines.push(summary.join(paint('dim', ' · ')))
+  if (answers.extras.length > 0) {
+    lines.push(paint('dim', `extras: ${answers.extras.map(id => findExtra(id)?.label ?? id).join(', ')}`))
+  }
   lines.push('')
 
   const { install } = result
@@ -50,7 +62,21 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
   }
 
   for (const note of result.already) {
-    lines.push(`${paint('dim', `· ${note}`)}`)
+    lines.push(paint('dim', `· ${note}`))
+  }
+
+  for (const id of result.dropped) {
+    /* Silently dropping an extra would leave the author believing they wired
+       something they did not. */
+    lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply to ${answers.framework} — skipped`)}`)
+  }
+
+  if (destination && destination.env.length > 0) {
+    lines.push('')
+    lines.push(paint('dim', `${destination.label.toUpperCase()} NEEDS`))
+    for (const variable of destination.env) {
+      lines.push(`${paint('cyan', variable.name)} ${paint('dim', `— ${variable.hint}`)}`)
+    }
   }
 
   if (result.manual.length > 0) {
@@ -74,7 +100,7 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
   } else {
     lines.push(`${paint('dim', 'next:')} ${paint('bold', 'evlog doctor')} ${paint('dim', 'to verify ·')} ${paint('bold', 'evlog map')} ${paint('dim', 'to score what is still dark')}`)
   }
-  lines.push(`${paint('dim', 'setup guide →')} ${docLink(ctx, FRAMEWORK_DOCS[result.framework] ?? '/start/installation')}`)
+  lines.push(`${paint('dim', 'setup guide →')} ${docLink(ctx, frameworkDocs(answers.framework))}`)
 
   return lines.join('\n')
 }

@@ -1,4 +1,4 @@
-import type { ArgsDef, CommandDef, CommandContext, CommandMeta } from 'citty'
+import type { ArgsDef, CommandDef, CommandContext, CommandMeta, ParsedArgs } from 'citty'
 import { defineCommand } from 'citty'
 import { createContext } from '../core/context'
 import type { CliContext } from '../core/context'
@@ -39,6 +39,14 @@ export type EvlogRunContext<T extends ArgsDef = ArgsDef> = CommandContext<T> & {
 
 export type EvlogCommandDef<T extends ArgsDef = ArgsDef> = Omit<CommandDef<T>, 'run' | 'args'> & {
   args?: T
+  /**
+   * Suppress the branded header for this run.
+   *
+   * For commands that draw their own frame — `init` opens a clack session with
+   * its own intro, and stacking the ASCII header on top of it reads as two
+   * programs starting. Global flags (`--no-header`, `--json`) still win.
+   */
+  skipHeader?: (ctx: CliContext, args: ParsedArgs<T & typeof COMMON_ARGS>) => boolean
   run?: (ctx: EvlogRunContext<T & typeof COMMON_ARGS>) => ReturnType<NonNullable<CommandDef<T>['run']>>
 }
 
@@ -96,7 +104,7 @@ export function defineEvlogCommand<T extends ArgsDef = ArgsDef>(
     async run(ctx: CommandContext<T & typeof COMMON_ARGS>) {
       const flags = runArgs(ctx.args)
       const cli = createContext()
-      if (wantsHeader(cli, flags)) {
+      if (wantsHeader(cli, flags) && !def.skipHeader?.(cli, ctx.args)) {
         writeHuman(formatCommandHeader(cli, { command }))
       }
       const ui = createUi({ json: flags.json })
