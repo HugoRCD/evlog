@@ -9,6 +9,7 @@
  * non-interactive feature across them and reports what broke.
  *
  *   node scripts/cli-sandbox.mjs            # (re)create the apps, print a cheat sheet
+ *   node scripts/cli-sandbox.mjs --reset    # undo whatever you ran, keep the apps
  *   node scripts/cli-sandbox.mjs --smoke    # create, then run the whole feature matrix
  *   node scripts/cli-sandbox.mjs --keep     # reuse whatever is already there
  */
@@ -161,6 +162,27 @@ function createApp(app) {
 
 function git(cwd, ...args) {
   return execFileSync('git', ['-C', cwd, ...args], { encoding: 'utf8', stdio: ['ignore', 'pipe', 'ignore'] })
+}
+
+/**
+ * Roll an app back to how it was created, without rebuilding it.
+ *
+ * The initial commit is the pristine state and it includes the `evlog` symlink,
+ * so a checkout plus a clean restores everything the commands wrote — and puts
+ * the link back rather than leaving the app unable to resolve evlog. Falls back
+ * to a full rebuild if the app is not there or its git repo is gone.
+ */
+function resetApp(app) {
+  const dir = join(SANDBOX, app.name)
+  if (!existsSync(join(dir, '.git'))) return createApp(app)
+
+  try {
+    git(dir, 'checkout', '--', '.')
+    git(dir, 'clean', '-fdq')
+    return dir
+  } catch {
+    return createApp(app)
+  }
 }
 
 /** Run the CLI against an app. Never interactive: no TTY, and `CI` is set. */
@@ -447,7 +469,12 @@ function cheatSheet(apps) {
     `  ${cyan('pnpm cli doctor --cwd .sandbox/nitro')}`,
     `  ${cyan('pnpm cli doctor --cwd .sandbox/nitro --debug')}`,
     '',
-    dim(`Reset any time: ${'pnpm cli:sandbox'} · everything under .sandbox/ is disposable and gitignored.`),
+    dim('Undo whatever you ran:'),
+    `  ${cyan('pnpm cli:sandbox --reset')}        ${dim('rolls the apps back, keeps them')}`,
+    `  ${cyan('pnpm cli:sandbox --reset nuxt')}   ${dim('just that one')}`,
+    `  ${cyan('pnpm cli:sandbox')}                ${dim('rebuilds from scratch')}`,
+    '',
+    dim('Everything under .sandbox/ is disposable and gitignored.'),
     '',
   ]
   process.stderr.write(`${lines.join('\n')}\n`)
@@ -467,6 +494,9 @@ mkdirSync(SANDBOX, { recursive: true })
 
 if (args.includes('--smoke')) {
   smoke(apps)
+} else if (args.includes('--reset')) {
+  for (const app of apps) resetApp(app)
+  process.stderr.write(`${green('✓')} ${dim(`reset ${apps.map(app => app.name).join(', ')}`)}\n`)
 } else {
   if (!args.includes('--keep')) for (const app of apps) createApp(app)
   cheatSheet(apps)
