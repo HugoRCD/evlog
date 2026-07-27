@@ -4,19 +4,31 @@ import {
   autocompleteMultiselect,
   cancel,
   confirm,
+  groupMultiselect,
   intro,
   isCancel,
   log as clackLog,
+  multiselect,
   note,
   outro,
   select,
+  tasks,
   text,
 } from '@clack/prompts'
 import type { CliContext } from '../../core/context'
 import { DOCS_URL, createStyle } from '../../core/output'
 import type { Framework } from '../map/types'
-import { availableExtras, DESTINATIONS, findDestination } from './catalog'
-import type { DrainId, ExtraId } from './catalog'
+import {
+  availableExtras,
+  DEFAULT_ENRICHERS,
+  DEV_DESTINATIONS,
+  ENRICHERS,
+  findDestination,
+  offerEvidence,
+  PROD_DESTINATIONS,
+  SAMPLING_PRESETS,
+} from './catalog'
+import type { DrainId, EnricherId, ExtraGroup, ExtraId, OfferContext, SamplingProfile } from './catalog'
 import type { FileAction, ManualStep } from './frameworks'
 import type { PackageManager } from './pm'
 import { installCommand } from './pm'
@@ -25,8 +37,13 @@ import { installCommand } from './pm'
 export interface InitAnswers {
   framework: Framework
   service: string
-  drain: DrainId
+  /** Local sink: `fs` or `none`. */
+  devDrain: DrainId
+  /** Production destinations — more than one fans the same event out to each. */
+  prodDrains: DrainId[]
   extras: ExtraId[]
+  enrichers: EnricherId[]
+  sampling: SamplingProfile
   /** Run the package manager for a missing `evlog`. */
   install: boolean
 }
@@ -68,6 +85,8 @@ export interface PromptContext {
   /** Whether `--install` is still on — `--no-install` is an answer, not a prompt. */
   installRequested: boolean
   packageManager: PackageManager
+  /** Builds the offer list once the destinations are known. */
+  offers: (prodDrains: DrainId[], framework: Framework) => OfferContext
 }
 
 export function openInteractive(ctx: CliContext, projectLabel: string): void {
@@ -77,7 +96,7 @@ export function openInteractive(ctx: CliContext, projectLabel: string): void {
 
 /**
  * Ask everything, in the order a person thinks about it: what am I, what am I
- * called, where do the events go, what else do I want.
+ * called, where do events go here, where do they go in production, what else.
  */
 export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
   const framework = input.uncertain
@@ -108,41 +127,99 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     },
   }))
 
-  const drain = required(await autocomplete<DrainId>({
-    message: 'Where should wide events go?',
-    placeholder: 'Type to search — local files, Axiom, OTLP, Sentry…',
-    options: DESTINATIONS.map(destination => ({
+  /* Two questions rather than one list: nobody sends local development traffic
+     to Axiom, and nobody reads production logs off the box's filesystem. Asking
+     "where do events go" once forces one answer onto two different problems. */
+  const devDrain = required(await select<DrainId>({
+    message: 'In development, where should events go?',
+    options: DEV_DESTINATIONS.map(destination => ({
       value: destination.id,
       label: destination.label,
       hint: destination.hint,
     })),
-    initialValue: 'fs',
+    initialValue: 'fs' as DrainId,
   }))
 
-  const offered = availableExtras(framework, drain)
-  const extras = offered.length === 0
-    ? []
-    : required(await autocompleteMultiselect<ExtraId>({
-      message: 'Anything else? (space to select, enter to confirm)',
-      placeholder: 'Type to filter — nothing is selected by default',
-      options: offered.map(extra => ({
+  const prodDrains = required(await autocompleteMultiselect<DrainId>({
+    message: 'And in production?',
+    placeholder: 'Type to search — leave empty to decide later',
+    options: PROD_DESTINATIONS.map(destination => ({
+      value: destination.id,
+      label: destination.label,
+      hint: destination.hint,
+    })),
+    initialValues: [],
+    required: false,
+  }))
+
+  const offered = availableExtras(input.offers(prodDrains, framework))
+  const context = input.offers(prodDrains, framework)
+
+  let extras: ExtraId[] = []
+  if (offered.length > 0) {
+    /* Grouped rather than flat: eight options under one heading is a list to
+       get through, the same eight under four headings is a set of decisions. */
+    const groups: Record<string, { value: ExtraId, label: string, hint?: string }[]> = {}
+    for (const extra of offered) {
+      const evidence = offerEvidence(extra, context)
+      const { group } = extra
+      groups[group] ??= []
+      groups[group]!.push({
         value: extra.id,
-        label: extra.label,
+        /* The evidence goes in the label, not the hint: a grouped multiselect
+           only renders the hint of the focused row, and "3 repeated errors
+           found" is the whole reason the row is there. */
+        label: evidence ? `${extra.label} · ${evidence}` : extra.label,
         hint: extra.hint,
-      })),
+      })
+    }
+
+    extras = required(await groupMultiselect<ExtraId>({
+      message: 'Anything else?',
+      options: groups,
       initialValues: [],
       required: false,
+      selectableGroups: false,
     }))
+  }
 
-  /* Not a question of its own: the plan lists `run pnpm add evlog` and asks
-     once for everything. Two confirmations for one decision is how a flow
-     starts feeling like paperwork — and asking after `--no-install` was passed
-     is asking someone to repeat themselves. */
+  const enrichers = extras.includes('enrichers')
+    ? required(await multiselect<EnricherId>({
+      message: 'Which enrichers?',
+      options: ENRICHERS.map(enricher => ({
+        value: enricher.id,
+        label: enricher.label,
+        hint: enricher.hint,
+      })),
+      initialValues: [...DEFAULT_ENRICHERS],
+      required: false,
+    }))
+    : []
+
+  const sampling = extras.includes('sampling')
+    ? required(await select<SamplingProfile>({
+      message: 'How much traffic should reach the drain?',
+      options: SAMPLING_PRESETS.map(preset => ({
+        value: preset.id,
+        label: preset.label,
+        hint: preset.hint,
+      })),
+      initialValue: 'balanced' as SamplingProfile,
+    }))
+    : 'all'
+
+  /* Installing is not a question of its own: the plan lists `pnpm add evlog`
+     and asks once for everything. Two confirmations for one decision is how a
+     flow starts feeling like paperwork — and asking after `--no-install` was
+     passed is asking someone to repeat themselves. */
   return {
     framework,
     service: service || input.defaultService,
-    drain,
-    extras,
+    devDrain,
+    prodDrains,
+    extras: extras.filter(id => id !== 'enrichers' || enrichers.length > 0),
+    enrichers,
+    sampling,
     install: !input.evlogInstalled && input.installRequested,
   }
 }
@@ -178,17 +255,20 @@ export async function confirmPlan(
   return required(await confirm({ message: 'Apply?', initialValue: true }))
 }
 
-/** Environment variables the chosen destination reads, printed once at the end. */
-export function noteEnvironment(drain: DrainId): void {
-  const destination = findDestination(drain)
-  if (!destination || destination.env.length === 0) return
+/** Environment variables the chosen destinations read, printed once at the end. */
+export function noteEnvironment(prodDrains: DrainId[]): void {
+  const variables = prodDrains
+    .map(id => findDestination(id))
+    .flatMap(destination => destination?.env.map(variable => ({ ...variable, label: destination.label })) ?? [])
+  if (variables.length === 0) return
 
   /* Deliberately not prompted for. A setup command that asks for an API token
      is a setup command that writes a secret into a file it chose, and the
      answer scrolls into the terminal history either way. */
+  const width = Math.max(...variables.map(variable => variable.name.length))
   note(
-    destination.env.map(variable => `${variable.name}    ${variable.hint}`).join('\n'),
-    `Set these before ${destination.label} receives anything`,
+    variables.map(variable => `${variable.name.padEnd(width)}  ${variable.hint}`).join('\n'),
+    'Set these before anything is received',
   )
 }
 
@@ -198,15 +278,45 @@ export function noteManual(steps: ManualStep[]): void {
   }
 }
 
+/**
+ * Run the verification step in the same session.
+ *
+ * The real question after a setup is "did it work", and answering it with
+ * "now run this other command" is leaving the job half done.
+ */
+export async function runVerification(verify: () => Promise<string>): Promise<void> {
+  await tasks([
+    {
+      title: 'Verifying the install',
+      task: async () => await verify(),
+    },
+  ])
+}
+
 export function closeInteractive(ctx: CliContext, framework: Framework, docsPath: string): void {
   const { paint } = createStyle(ctx)
-  clackLog.message(`${paint('dim', 'verify')}  evlog doctor`)
-  clackLog.message(`${paint('dim', 'score ')}  evlog map`)
+  clackLog.message(`${paint('dim', 'score')}  evlog map`)
   outro(`${FRAMEWORK_LABELS[framework]} wired · ${DOCS_URL}${docsPath}`)
 }
 
 export function closeCancelled(): void {
   cancel('Cancelled — nothing was written.')
+}
+
+/** Ask which workspace packages to set up. */
+export async function askWorkspaceTargets(
+  candidates: { name: string, dir: string, framework: Framework }[],
+): Promise<string[]> {
+  return required(await multiselect<string>({
+    message: 'Which apps should be set up?',
+    options: candidates.map(candidate => ({
+      value: candidate.dir,
+      label: candidate.name,
+      hint: FRAMEWORK_LABELS[candidate.framework],
+    })),
+    initialValues: candidates.map(candidate => candidate.dir),
+    required: true,
+  }))
 }
 
 /**

@@ -1,7 +1,7 @@
 import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
-import { findDestination, findExtra } from './catalog'
+import { findDestination, findEnricher, findExtra, findSamplingPreset } from './catalog'
 import { frameworkDocs } from './run'
 import type { InitResult } from './run'
 
@@ -29,15 +29,27 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
     return paint('yellow', 'Cancelled — nothing was written.')
   }
 
-  const destination = findDestination(answers.drain)
-  const summary = [
+  const dev = findDestination(answers.devDrain)?.label ?? answers.devDrain
+  const prod = answers.prodDrains.map(id => findDestination(id)?.label ?? id)
+  lines.push([
     paint('bold', answers.framework),
     paint('dim', `service ${answers.service}`),
-    paint('dim', `→ ${destination?.label ?? answers.drain}`),
-  ]
-  lines.push(summary.join(paint('dim', ' · ')))
+    paint('dim', `dev → ${dev}`),
+    paint('dim', `prod → ${prod.length > 0 ? prod.join(' + ') : 'not set'}`),
+  ].join(paint('dim', ' · ')))
+
   if (answers.extras.length > 0) {
-    lines.push(paint('dim', `extras: ${answers.extras.map(id => findExtra(id)?.label ?? id).join(', ')}`))
+    const labels = answers.extras.map((id) => {
+      if (id === 'enrichers') {
+        const names = answers.enrichers.map(enricher => findEnricher(enricher)?.label ?? enricher)
+        return `enrichers (${names.join(', ')})`
+      }
+      if (id === 'sampling') {
+        return `sampling (${findSamplingPreset(answers.sampling)?.label ?? answers.sampling})`
+      }
+      return findExtra(id)?.label ?? id
+    })
+    lines.push(paint('dim', `extras: ${labels.join(' · ')}`))
   }
   lines.push('')
 
@@ -68,14 +80,24 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
   for (const id of result.dropped) {
     /* Silently dropping an extra would leave the author believing they wired
        something they did not. */
-    lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply to ${answers.framework} — skipped`)}`)
+    lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply here — skipped`)}`)
   }
 
-  if (destination && destination.env.length > 0) {
+  if (result.verified) {
+    const { ok, warn, fail } = result.verified
+    const glyph = fail > 0 ? paint('red', '✗') : warn > 0 ? paint('yellow', '⚠') : paint('green', '✓')
+    lines.push(`${glyph} ${paint('dim', `doctor: ${ok} ok · ${warn} warn · ${fail} fail`)}`)
+  }
+
+  const envVariables = answers.prodDrains
+    .map(id => findDestination(id))
+    .flatMap(destination => destination?.env ?? [])
+  if (envVariables.length > 0) {
     lines.push('')
-    lines.push(paint('dim', `${destination.label.toUpperCase()} NEEDS`))
-    for (const variable of destination.env) {
-      lines.push(`${paint('cyan', variable.name)} ${paint('dim', `— ${variable.hint}`)}`)
+    lines.push(paint('dim', 'SET BEFORE ANYTHING IS RECEIVED'))
+    const width = Math.max(...envVariables.map(variable => variable.name.length))
+    for (const variable of envVariables) {
+      lines.push(`${paint('cyan', variable.name.padEnd(width))} ${paint('dim', `— ${variable.hint}`)}`)
     }
   }
 
@@ -98,9 +120,15 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
   if (result.dryRun) {
     lines.push(paint('dim', 'dry run — nothing was written. Drop --dry-run to apply.'))
   } else {
-    lines.push(`${paint('dim', 'next:')} ${paint('bold', 'evlog doctor')} ${paint('dim', 'to verify ·')} ${paint('bold', 'evlog map')} ${paint('dim', 'to score what is still dark')}`)
+    lines.push(`${paint('dim', 'next:')} ${paint('bold', 'evlog map')} ${paint('dim', 'to score what is still dark')}`)
   }
   lines.push(`${paint('dim', 'setup guide →')} ${docLink(ctx, frameworkDocs(answers.framework))}`)
 
   return lines.join('\n')
+}
+
+/** Header for a workspace run, above each app's own report. */
+export function formatWorkspaceHeading(ctx: CliContext, label: string): string {
+  const { paint } = createStyle(ctx)
+  return `\n${paint(['bold', 'cyan'], `── ${label} `)}${paint('dim', '─'.repeat(Math.max(0, 40 - label.length)))}`
 }

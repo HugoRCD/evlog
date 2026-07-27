@@ -265,6 +265,63 @@ check('init is idempotent', (dir) => {
   expect(second.already.length > 0, 'the second run reported nothing as already wired')
 })
 
+check('init splits dev and production destinations', (dir) => {
+  rmSync(join(dir, 'lib/evlog.ts'), { force: true })
+
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--prod-drain', 'axiom,sentry']))
+  expect(payload.prodDrains.join() === 'axiom,sentry', `prodDrains were ${payload.prodDrains}`)
+
+  const wired = payload.written.map(file => join(dir, file.file))
+    .filter(path => !path.endsWith('.env.example'))
+    .map(path => readFileSync(path, 'utf8')).join('\n')
+  expect(wired.includes('createFsDrain'), 'the development sink was not wired')
+  expect(wired.includes('createAxiomDrain') && wired.includes('createSentryDrain'), 'both production drains were not wired')
+  expect(/import\.meta\.dev|NODE_ENV/.test(wired), 'the two were not branched on the environment')
+})
+
+check('init writes .env.example, never .env', (dir) => {
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--prod-drain', 'axiom']))
+  const files = payload.written.map(file => file.file)
+
+  expect(files.includes('.env.example'), 'no .env.example was written')
+  expect(!files.includes('.env'), 'a real .env was touched')
+
+  const example = readFileSync(join(dir, '.env.example'), 'utf8')
+  expect(example.includes('AXIOM_API_KEY='), 'the adapter keys are missing')
+  expect(!/AXIOM_API_KEY=\S/.test(example), 'a value was filled in — init must never write secrets')
+})
+
+check('init seeds an error catalog from repeated errors', (dir) => {
+  /* Two handlers throwing the same inline error is the evidence that justifies
+     a catalog; the generated file should contain the project's own error. */
+  const handler = `export default defineEventHandler(async (event) => {
+  const log = useLogger(event)
+  log.set({ step: 'start' })
+  throw createError({ status: 402, message: 'Card declined', why: 'The issuer refused' })
+})
+`
+  write(dir, 'sandbox-a.post.ts', handler)
+  write(dir, 'sandbox-b.post.ts', handler)
+
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--extras', 'error-catalog']))
+  expect(payload.insight?.repeatedErrors > 0, 'the scan found no repeated error')
+
+  const catalog = payload.written.find(file => file.file.endsWith('errors.ts'))
+  if (!catalog) {
+    expect(payload.already.some(entry => entry.includes('errors.ts')), 'no catalog written and none reported')
+    return
+  }
+  const contents = readFileSync(join(dir, catalog.file), 'utf8')
+  expect(contents.includes('CARD_DECLINED'), 'the key was not derived from the error')
+  expect(contents.includes('The issuer refused'), 'the existing why was replaced')
+})
+
+check('init verifies with doctor before it finishes', (dir) => {
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install']))
+  expect(payload.verified !== null, 'no verification ran')
+  expect(payload.verified.fail === 0, `doctor reported ${payload.verified.fail} failures after setup`)
+})
+
 check('init --drain axiom --extras pipeline', (dir) => {
   /* Set the precondition the check is about: a project with no evlog factory
      yet. The Next fixture ships one, and `init` rightly refuses to touch it —
@@ -272,9 +329,10 @@ check('init --drain axiom --extras pipeline', (dir) => {
      That gap has its own check below. */
   rmSync(join(dir, 'lib/evlog.ts'), { force: true })
 
-  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--drain', 'axiom', '--extras', 'pipeline']))
-  expect(payload.drain === 'axiom', `drain was ${payload.drain}`)
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--drain', 'none', '--prod-drain', 'axiom', '--extras', 'pipeline']))
+  expect(payload.prodDrains[0] === 'axiom', `prodDrains were ${payload.prodDrains}`)
   const wired = payload.written.map(file => join(dir, file.file))
+    .filter(path => !path.endsWith('.env.example'))
     .map(path => readFileSync(path, 'utf8')).join('\n')
   expect(wired.includes('createAxiomDrain'), 'the Axiom drain was not wired')
   expect(wired.includes('createDrainPipeline'), 'batching was not wired')
@@ -290,8 +348,8 @@ check('init leaves an existing drain host alone', (dir) => {
   write(dir, 'lib/evlog.ts', '// pre-existing\n')
   write(dir, 'server/plugins/evlog-drain.ts', '// pre-existing\n')
 
-  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--drain', 'axiom']))
-  const hosts = payload.written.filter(file => /evlog-drain|lib\/evlog/.test(file.file))
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--prod-drain', 'axiom']))
+  const hosts = payload.written.filter(file => /evlog-drain\.ts$|lib\/evlog\.ts$/.test(file.file))
 
   expect(hosts.length === 0, `overwrote ${hosts.map(f => f.file).join(', ')}`)
   expect(payload.already.length > 0, 'the skipped file was not reported')
@@ -301,6 +359,16 @@ check('init leaves an existing drain host alone', (dir) => {
 check('init --drain none writes no drain', (dir) => {
   const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--drain', 'none']))
   expect(!payload.written.some(file => file.file.includes('evlog-drain')), 'a drain plugin was written')
+})
+
+check('init offers nothing it cannot back up', (dir) => {
+  /* Batching is meaningless with no production destination, and the AI and auth
+     integrations are meaningless without their packages. Asking for them anyway
+     drops them rather than wiring something inert. */
+  const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--extras', 'pipeline,ai,better-auth']))
+
+  expect(payload.extras.length === 0, `wired ${payload.extras.join(', ')} with nothing to back them`)
+  expect(payload.dropped.length === 3, `dropped ${payload.dropped.join(', ')}`)
 })
 
 check('init rejects an unknown drain', (dir) => {

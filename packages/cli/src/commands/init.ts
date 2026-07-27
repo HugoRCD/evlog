@@ -1,12 +1,22 @@
 import { EvlogError } from 'evlog'
 import { EXIT_FAIL } from '../core/output'
 import { defineEvlogCommand } from '../lib/command'
+import type { CliDebug } from '../lib/debug'
+import type { CliUi } from '../lib/ui'
 import { cliErrors } from '../lib/errors'
-import { formatInitReport } from '../lib/init/report'
-import { canPrompt } from '../lib/init/prompts'
-import { parseDrainArg, parseExtrasArg } from '../lib/init/resolve'
+import { askWorkspaceTargets, canPrompt, closeCancelled, InitCancelled } from '../lib/init/prompts'
+import { formatInitReport, formatWorkspaceHeading } from '../lib/init/report'
+import {
+  parseDrainArg,
+  parseEnrichersArg,
+  parseExtrasArg,
+  parseProdDrainsArg,
+  parseSamplingArg,
+} from '../lib/init/resolve'
 import { runInit } from '../lib/init/run'
-import type { InitResult } from '../lib/init/run'
+import type { InitOptions, InitResult } from '../lib/init/run'
+import { findWorkspaceApps, isWorkspaceRoot } from '../lib/init/workspace'
+import { resolveProject } from '../lib/project'
 import type { Framework } from '../lib/map/types'
 
 const FRAMEWORKS: readonly Framework[] = ['nuxt', 'nitro', 'next', 'tanstack-start']
@@ -28,24 +38,28 @@ function parseServiceArg(value: unknown): string | undefined {
  * `evlog init` — wire evlog into the project it is run in.
  *
  * Interactive by default and fully driveable by flags, because both callers are
- * real: a person picking a destination from a list, and an agent that must
- * never be left waiting on a keystroke. `--json`, `--yes`, a non-TTY stdin, or
- * `CI` all select the second path.
+ * real: a person picking destinations from a list, and an agent that must never
+ * be left waiting on a keystroke. `--json`, `--yes`, a non-TTY stdin, or `CI`
+ * all select the second path.
  *
  * The other commands score and diagnose; this one writes application code, so
  * it is deliberately conservative: it appends to configs, never rewrites them,
  * skips any file that already exists, and shows the plan before applying it.
  */
 export default defineEvlogCommand('init', {
-  meta: { name: 'init', description: 'Wire evlog into this project — install, config, drain' },
+  meta: { name: 'init', description: 'Wire evlog into this project — install, config, drains' },
   /* The clack session draws its own intro; two banners read as two programs. */
   skipHeader: (ctx, args) => args.json !== true && args.yes !== true && canPrompt(ctx),
   args: {
     cwd: { type: 'string', description: 'Project directory (default: current)' },
     framework: { type: 'string', description: 'Override framework detection (nuxt, nitro, next, tanstack-start)' },
     service: { type: 'string', description: 'Service name on every wide event (default: package name)' },
-    drain: { type: 'string', description: 'Where events go: fs, axiom, otlp, posthog, sentry, better-stack, datadog, hyperdx, none' },
-    extras: { type: 'string', description: 'Comma-separated: enrichers, pipeline, sampling, vite' },
+    drain: { type: 'string', description: 'Development sink: fs (default) or none' },
+    prodDrain: { type: 'string', description: 'Production destinations, comma-separated: axiom, otlp, posthog, sentry, better-stack, datadog, hyperdx' },
+    extras: { type: 'string', description: 'Comma-separated: enrichers, pipeline, sampling, vite, error-catalog, audit-catalog, ai, better-auth' },
+    enrichers: { type: 'string', description: 'Comma-separated: user-agent, geo, request-size, trace-context (default: all)' },
+    sampling: { type: 'string', description: 'Sampling preset: all, balanced (default), high-traffic' },
+    apps: { type: 'string', description: 'Workspace packages to set up, comma-separated (monorepo root only)' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip every question and take the defaults' },
     dryRun: { type: 'boolean', description: 'Show what would change without writing anything' },
     // citty negations: declared positive so `--no-install` works.
@@ -55,50 +69,93 @@ export default defineEvlogCommand('init', {
     const cwd = typeof args.cwd === 'string' && args.cwd.length > 0 ? args.cwd : undefined
     const ctx = cwd ? { ...cli, cwd } : cli
 
-    let result: InitResult
+    let options: InitOptions
     try {
-      result = await runInit(ctx, log, {
+      options = {
         framework: parseFrameworkArg(args.framework),
         service: parseServiceArg(args.service),
-        drain: parseDrainArg(args.drain),
+        devDrain: parseDrainArg(args.drain),
+        prodDrains: parseProdDrainsArg(args.prodDrain),
         extras: parseExtrasArg(args.extras),
+        enrichers: parseEnrichersArg(args.enrichers),
+        sampling: parseSamplingArg(args.sampling),
         dryRun: args.dryRun,
         install: args.install,
         yes: args.yes,
         /* JSON output and a prompt cannot share a terminal: the payload is the
            contract, and half a TUI on stderr in front of it helps nobody. */
         nonInteractive: args.json === true,
-      })
+      }
     } catch (error) {
-      if (error instanceof EvlogError) {
-        log.finding({ code: error.code ?? 'cli.COMMAND_FAILED', why: error.why, fix: error.fix, link: error.link }, { status: 'fail' })
+      return fail(error, { args, log, ui })
+    }
+
+    /* A monorepo root has no entry points of its own, so `init` there means
+       "set up the apps", not "wire this package". */
+    const project = await resolveProject(ctx.cwd)
+    const targets = isWorkspaceRoot(project) ? findWorkspaceApps(project) : []
+
+    if (targets.length > 0) {
+      const requested = typeof args.apps === 'string' && args.apps.length > 0
+        ? args.apps.split(',').map(entry => entry.trim()).filter(Boolean)
+        : null
+
+      let selected = requested
+        ? targets.filter(app => requested.includes(app.label) || requested.includes(app.name))
+        : targets
+
+      /* Without `--apps`, a terminal gets to choose. Setting up every package in
+         a monorepo because the command was run from the root is the kind of
+         helpfulness that produces a revert. */
+      if (!requested && args.json !== true && args.yes !== true && canPrompt(ctx)) {
+        try {
+          const chosen = await askWorkspaceTargets(targets)
+          selected = targets.filter(app => chosen.includes(app.dir))
+        } catch (error) {
+          if (error instanceof InitCancelled) {
+            closeCancelled()
+            return
+          }
+          throw error
+        }
+      }
+
+      if (selected.length === 0) {
         ui.done({
           jsonMode: args.json,
-          json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
-          human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
+          json: { error: { code: 'cli.INIT_NO_APPS', message: 'No matching workspace app' } },
+          human: `No workspace app matched --apps. Found: ${targets.map(app => app.label).join(', ')}`,
         })
         ui.exit(EXIT_FAIL)
         return
       }
-      throw error
+
+      const results: InitResult[] = []
+      for (const app of selected) {
+        if (!args.json) ui.human(formatWorkspaceHeading(ctx, app.label))
+        const result = await runInit({ ...ctx, cwd: app.dir }, log, { ...options, framework: app.framework })
+        results.push(result)
+        if (!args.json && !result.interactive) ui.human(formatInitReport(ctx, result))
+      }
+
+      ui.done({
+        jsonMode: args.json,
+        json: { workspace: true, apps: selected.map((app, index) => ({ app: app.label, ...toJson(results[index]!) })) },
+      })
+      if (results.some(result => result.install.status === 'failed')) ui.exit(EXIT_FAIL)
+      return
+    }
+
+    let result: InitResult
+    try {
+      result = await runInit(ctx, log, options)
+    } catch (error) {
+      return fail(error, { args, log, ui })
     }
 
     ui.done({
       jsonMode: args.json,
-      json: {
-        framework: result.answers.framework,
-        service: result.answers.service,
-        drain: result.answers.drain,
-        extras: result.answers.extras,
-        packageManager: result.packageManager,
-        install: result.install,
-        written: result.written.map(action => ({ file: action.relative, kind: action.kind })),
-        already: result.already,
-        manual: result.manual.map(step => ({ title: step.title, file: step.file, reason: step.reason })),
-        dropped: result.dropped,
-        dryRun: result.dryRun,
-        cancelled: result.cancelled,
-      },
+      json: toJson(result),
       /* The interactive flow already narrated itself; printing the report after
          it would repeat the whole run under the outro. */
       human: result.interactive ? undefined : formatInitReport(ctx, result),
@@ -109,3 +166,43 @@ export default defineEvlogCommand('init', {
     }
   },
 })
+
+function toJson(result: InitResult): Record<string, unknown> {
+  return {
+    framework: result.answers.framework,
+    service: result.answers.service,
+    devDrain: result.answers.devDrain,
+    prodDrains: result.answers.prodDrains,
+    extras: result.answers.extras,
+    enrichers: result.answers.enrichers,
+    sampling: result.answers.sampling,
+    packageManager: result.packageManager,
+    install: result.install,
+    written: result.written.map(action => ({ file: action.relative, kind: action.kind })),
+    already: result.already,
+    manual: result.manual.map(step => ({ title: step.title, file: step.file, reason: step.reason })),
+    dropped: result.dropped,
+    insight: result.insight,
+    verified: result.verified,
+    dryRun: result.dryRun,
+    cancelled: result.cancelled,
+  }
+}
+
+/** Render a catalog error and exit 1; rethrow anything unexpected. */
+function fail(
+  error: unknown,
+  io: { args: { json?: boolean }, log: CliDebug, ui: CliUi },
+): void {
+  if (!(error instanceof EvlogError)) throw error
+  io.log.finding(
+    { code: error.code ?? 'cli.COMMAND_FAILED', why: error.why, fix: error.fix, link: error.link },
+    { status: 'fail' },
+  )
+  io.ui.done({
+    jsonMode: io.args.json,
+    json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
+    human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
+  })
+  io.ui.exit(EXIT_FAIL)
+}
