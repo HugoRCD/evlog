@@ -284,7 +284,6 @@ export const EXTRAS: readonly Extra[] = [
     label: 'Request enrichers',
     hint: 'User agent, geo, size, trace context — you pick which',
     docs: '/use-cases/enrichers',
-    frameworks: ['nuxt', 'nitro', 'tanstack-start'],
   },
   {
     id: 'pipeline',
@@ -300,7 +299,6 @@ export const EXTRAS: readonly Extra[] = [
     label: 'Sampling',
     hint: 'Keep every error, a fraction of the healthy traffic',
     docs: '/learn/sampling',
-    frameworks: ['nuxt', 'nitro', 'tanstack-start'],
   },
   {
     id: 'error-catalog',

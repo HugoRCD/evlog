@@ -12,7 +12,9 @@ import {
   applySplices,
   arrayMentions,
   findConfigObject,
+  findCreateEvlogCall,
   getProperty,
+  importsEnd,
   hasImportFrom,
   hasProperty,
   readConfig,
@@ -557,43 +559,154 @@ export const { register, onRequestError } = defineNodeInstrumentation({
 `
 }
 
-function nextLibTemplate(input: WiringInput): string {
+/**
+ * The pieces of a Next.js `lib/evlog.ts`, separately.
+ *
+ * Split apart because the file is written from scratch in the common case and
+ * spliced into an existing one otherwise — and both need the same imports, the
+ * same preamble and the same option keys.
+ */
+interface NextFactoryParts {
+  imports: string[]
+  /** Statements that go above `createEvlog`. */
+  preamble: string
+  /** Option keys, each already indented and comma-terminated. */
+  options: string[]
+}
+
+function nextFactoryParts(input: WiringInput): NextFactoryParts {
   const dev = input.devDrain === 'none' ? null : findDestination(input.devDrain) ?? null
   const prod = input.prodDrains.map(id => findDestination(id)).filter(Boolean) as NonNullable<ReturnType<typeof findDestination>>[]
   const batched = input.extras.includes('pipeline') && prod.length > 0
 
-  const imports = [`import { createEvlog } from 'evlog/next'`]
+  const imports: string[] = []
   if (batched) imports.push(`import type { DrainContext } from 'evlog'`)
   for (const destination of [...(dev ? [dev] : []), ...prod]) {
     imports.push(`import { ${destination.factory!.replace('()', '')} } from '${destination.specifier}'`)
   }
   if (batched) imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
 
-  const pipeline = batched
-    ? `\nconst pipeline = createDrainPipeline<DrainContext>({\n  batch: { size: 50, intervalMs: 5000 },\n  retry: { maxAttempts: 3 },\n})\n`
-    : ''
+  const enrichers = input.extras.includes('enrichers')
+    ? input.enrichers.map(id => findEnricher(id)).filter(Boolean)
+    : []
+  if (enrichers.length > 0) {
+    const names = enrichers.map(enricher => enricher!.factory.replace('()', '')).sort()
+    imports.push(`import {\n${names.map(name => `  ${name},`).join('\n')}\n} from 'evlog/enrichers'`)
+  }
+
+  const blocks: string[] = []
+  if (batched) {
+    blocks.push(`const pipeline = createDrainPipeline<DrainContext>({\n  batch: { size: 50, intervalMs: 5000 },\n  retry: { maxAttempts: 3 },\n})`)
+  }
 
   const wrap = (factory: string) => batched ? `pipeline(${factory})` : factory
+  const options: string[] = []
 
   /* Next has no `import.meta.dev`, so the split is on NODE_ENV — same intent:
      the file sink never runs where it would write to a production box. */
-  let drainBlock = ''
-  let drainField = '\n'
   if (dev && prod.length > 0) {
-    drainBlock = `\nconst drains = process.env.NODE_ENV === 'production'\n  ? [${prod.map(d => wrap(d.factory!)).join(', ')}]\n  : [${dev.factory}]\n`
-    drainField = `\n  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),\n`
+    blocks.push(`const drains = process.env.NODE_ENV === 'production'\n  ? [${prod.map(d => wrap(d.factory!)).join(', ')}]\n  : [${dev.factory}]`)
+    options.push('  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),')
   } else if (prod.length > 0) {
-    drainBlock = `\nconst drains = [${prod.map(d => wrap(d.factory!)).join(', ')}]\n`
-    drainField = `\n  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),\n`
+    blocks.push(`const drains = [${prod.map(d => wrap(d.factory!)).join(', ')}]`)
+    options.push('  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),')
   } else if (dev) {
-    drainField = `\n  // Local NDJSON under .evlog/logs — development only.\n  drain: process.env.NODE_ENV === 'production' ? undefined : ${dev.factory},\n`
+    options.push('  // Local NDJSON under .evlog/logs — development only.')
+    options.push(`  drain: process.env.NODE_ENV === 'production' ? undefined : ${dev.factory},`)
   }
 
-  return `${imports.join('\n')}
-${pipeline}${drainBlock}
+  if (enrichers.length > 0) {
+    blocks.push(`const enrichers = [\n${enrichers.map(enricher => `  ${enricher!.factory},`).join('\n')}\n]`)
+    options.push('  enrich: async (ctx) => {\n    for (const enrich of enrichers) await enrich(ctx)\n  },')
+  }
+
+  const preset = input.extras.includes('sampling') ? findSamplingPreset(input.sampling) : undefined
+  if (preset?.rates) {
+    const { info, warn, debug } = preset.rates
+    options.push(`  sampling: {\n    rates: { info: ${info}, warn: ${warn}, error: 100, debug: ${debug} },\n  },`)
+  }
+
+  return { imports, preamble: blocks.length > 0 ? `\n${blocks.join('\n\n')}\n` : '', options }
+}
+
+function nextLibTemplate(input: WiringInput): string {
+  const { imports, preamble, options } = nextFactoryParts(input)
+  const all = [`import { createEvlog } from 'evlog/next'`, ...imports]
+
+  return `${all.join('\n')}
+${preamble}
 export const { withEvlog, useLogger, log, createError } = createEvlog({
-  service: '${input.service}',${drainField}})
+  service: '${input.service}',
+${options.join('\n')}${options.length > 0 ? '\n' : ''}})
 `
+}
+
+/**
+ * Splice the chosen options into a `lib/evlog.ts` that is already there.
+ *
+ * Without this, picking Axiom on a project that already has the file left the
+ * run reporting "already exists" and wiring the destination nowhere — the
+ * command asked a question and then ignored the answer. Patching only works
+ * when the file actually calls `createEvlog({ … })`; a re-export barrel or a
+ * computed config gets the snippet to paste instead.
+ */
+function patchNextLib(plan: WiringPlan, input: WiringInput, path: string, relativePath: string): void {
+  const { imports, preamble, options } = nextFactoryParts(input)
+  if (options.length === 0) {
+    plan.already.push(`${relativePath} already exists`)
+    return
+  }
+
+  const config = readConfig(path)
+  const call = config ? findCreateEvlogCall(config.program) : null
+
+  if (!config || !call) {
+    plan.manual.push({
+      title: 'Wire the destinations into your evlog factory',
+      file: relativePath,
+      snippet: `${imports.join('\n')}\n${preamble}\ncreateEvlog({\n${options.join('\n')}\n})`,
+      reason: `${relativePath} exists but does not call createEvlog({ … }) here — splicing into it would be guesswork`,
+    })
+    return
+  }
+
+  const present = ['drain', 'enrich', 'sampling'].filter(key => hasProperty(call, key))
+  if (present.length > 0) {
+    plan.manual.push({
+      title: 'Reconcile your evlog factory options',
+      file: relativePath,
+      snippet: options.join('\n'),
+      reason: `${relativePath} already sets ${present.join(', ')} — replacing what you wrote is not init's call`,
+    })
+    return
+  }
+
+  const splices: Splice[] = [appendProperty(config.source, call, options.map(line => line.trim()).join('\n  ').replace(/,$/, ''))]
+
+  /* Imports and the statements that use them go in as one splice at one
+     offset. As two, they share the same insertion point and the order between
+     them is whatever the sort happens to do — which put `const drains = …`
+     above the import of the factory it calls. */
+  const missing = imports.filter((statement) => {
+    const specifier = statement.match(/from '([^']+)'/)?.[1]
+    return specifier && !hasImportFrom(config.program, specifier)
+  })
+
+  const head = [
+    missing.length > 0 ? `\n${missing.join('\n')}` : '',
+    preamble.trim().length > 0 ? `\n\n${preamble.trim()}` : '',
+  ].join('')
+
+  if (head.length > 0) {
+    splices.push({ at: importsEnd(config.source, config.program), text: head })
+  }
+
+  plan.actions.push({
+    path,
+    relative: relativePath,
+    kind: 'patch',
+    contents: applySplices(config.source, splices),
+  })
 }
 
 /* ── catalogs, seeded from the scan ─────────────────────────────────────── */
@@ -792,7 +905,7 @@ function planNext(input: WiringInput): WiringPlan {
 
   const lib = firstExisting(base, ['lib/evlog.ts', 'lib/evlog.tsx', 'app/lib/evlog.ts'])
   if (lib) {
-    plan.already.push(`${relative(input.root, lib)} already exists`)
+    patchNextLib(plan, input, lib, relative(input.root, lib))
   } else {
     const path = join(base, 'lib', 'evlog.ts')
     plan.actions.push({

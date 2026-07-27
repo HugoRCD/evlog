@@ -361,21 +361,21 @@ check('init --drain axiom --extras pipeline', (dir) => {
   expect(!wired.includes('import.meta.dev'), 'a hosted drain was gated to development')
 })
 
-check('init leaves an existing drain host alone', (dir) => {
-  /* Pins today's behaviour, which is safe but incomplete: when the file that
-     would host the drain already exists, `init` reports it and moves on — so
-     asking for Axiom against an already-wired app wires nothing. Never
-     overwriting is the right instinct; staying silent about the consequence is
-     the part still to fix. */
+check('init never overwrites, never silently drops a destination', (dir) => {
+  /* The two halves of the same promise: a file somebody wrote is left exactly
+     as it was, and a destination that was asked for still lands somewhere —
+     patched in, written beside it, or handed back as a snippet to paste. */
   write(dir, 'lib/evlog.ts', '// pre-existing\n')
   write(dir, 'server/plugins/evlog-drain.ts', '// pre-existing\n')
 
   const payload = json(cli(dir, ['init', '--json', '--yes', '--no-install', '--prod-drain', 'axiom']))
-  const hosts = payload.written.filter(file => /evlog-drain\.ts$|lib\/evlog\.ts$/.test(file.file))
 
-  expect(hosts.length === 0, `overwrote ${hosts.map(f => f.file).join(', ')}`)
-  expect(payload.already.length > 0, 'the skipped file was not reported')
-  expect(readFileSync(join(dir, 'lib/evlog.ts'), 'utf8') === '// pre-existing\n', 'the file was modified')
+  expect(readFileSync(join(dir, 'lib/evlog.ts'), 'utf8') === '// pre-existing\n', 'lib/evlog.ts was modified')
+  expect(readFileSync(join(dir, 'server/plugins/evlog-drain.ts'), 'utf8') === '// pre-existing\n', 'the drain plugin was modified')
+
+  const landed = payload.written.some(file => /evlog-drain-|lib\/evlog/.test(file.file))
+    || payload.manual.some(step => /destination|factory/i.test(step.title))
+  expect(landed, 'Axiom was asked for and went nowhere')
 })
 
 check('init --drain none writes no drain', (dir) => {
