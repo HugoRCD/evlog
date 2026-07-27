@@ -83,6 +83,27 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
     tags: ['map'],
   },
+  INIT_INVALID_DRAIN: {
+    status: 400,
+    /* The known ids come from the catalog rather than being spelled out here:
+       a fixed list in an error message is a list that goes stale the first time
+       an adapter is added. */
+    message: ({ value, known }: { value: string, known: string }) =>
+      `Unknown --drain "${value}" — pass one of: ${known}`,
+    why: 'A destination that is not in the catalog cannot be wired, and defaulting instead would send events somewhere the author did not ask for',
+    fix: 'Run evlog init without --drain to pick from the list interactively',
+    link: 'https://evlog.dev/integrate/adapters/overview',
+    tags: ['init'],
+  },
+  INIT_INVALID_EXTRA: {
+    status: 400,
+    message: ({ value, known }: { value: string, known: string }) =>
+      `Unknown --extras entry "${value}" — pass a comma-separated list of: ${known}`,
+    why: 'Extras are a fixed set, so a typo would silently do nothing',
+    fix: 'Run evlog init without --extras to pick from the list interactively',
+    link: 'https://evlog.dev/cli/init',
+    tags: ['init'],
+  },
   MAP_BASELINE_NOT_FOUND: {
     status: 404,
     message: ({ source }: { source: string }) =>

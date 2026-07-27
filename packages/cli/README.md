@@ -24,7 +24,7 @@ Score what your app can tell you when something goes wrong. Diagnose your instal
 Try without installing:
 
 ```bash
-npx @evlog/cli init          # wire evlog into this app
+npx @evlog/cli init          # interactive setup — pick a destination, review the plan
 npx @evlog/cli map           # score what is still dark
 npx @evlog/cli map --json --no-write
 ```
@@ -41,10 +41,13 @@ pnpm evlog doctor
 
 | Command | What it does |
 | --- | --- |
-| `evlog init` | Wire evlog into this app: install, register the framework integration, write a local sink |
+| `evlog init` | Interactive setup: install, register the framework integration, wire a drain |
+| `evlog init --yes` | Non-interactive — defaults for everything (also implied by `--json`, no TTY, or `CI`) |
+| `evlog init --drain <id>` | `fs`, `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx`, `none` |
+| `evlog init --extras <a,b>` | `enrichers`, `pipeline`, `sampling`, `vite` |
 | `evlog init --dry-run` | Print the plan without touching a file |
 | `evlog init --service <name>` | Service name on every wide event (default: package name, unscoped) |
-| `evlog init --no-install` / `--no-sink` | Skip the package manager / skip the `.evlog/logs` drain |
+| `evlog init --no-install` | Print the install command instead of running it |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |
