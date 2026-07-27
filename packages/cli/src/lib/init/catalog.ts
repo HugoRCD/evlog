@@ -209,55 +209,64 @@ export function findEnricher(id: string): Enricher | undefined {
 
 /* ── sampling ───────────────────────────────────────────────────────────── */
 
-export type SamplingProfile = 'all' | 'balanced' | 'high-traffic' | 'minimal' | 'errors-only'
+export type SamplingProfile = 'all' | 'low' | 'medium' | 'high' | 'very-high'
 
 export interface SamplingPreset {
   id: SamplingProfile
   label: string
   hint: string
-  /** `null` means "emit everything" — no sampling block is written. */
-  rates: { info: number, warn: number, debug: number } | null
+  /**
+   * Rates to write, or `null` for "keep everything" — no block at all.
+   *
+   * `debug` is deliberately absent from every one of them. An unspecified level
+   * is kept at 100%, and debug events only exist because somebody turned them
+   * on to chase something: a 5% sample of the logs you switched on to
+   * investigate a problem is a 5% chance of seeing the line you needed.
+   * Production builds strip `log.debug()` anyway, so there is rarely volume
+   * there to sample.
+   */
+  rates: { info: number, warn: number } | null
 }
 
 /**
- * Presets ordered by how much they keep, loudest first.
+ * Named by the traffic the app takes, not by the ratio.
  *
- * The labels state the ratio because that is the decision — "Balanced" tells
- * you nothing about what you are about to lose, where "1 in 4 info events"
- * does. Errors are absent from every preset and are always kept at 100%: a
- * sampling config that drops errors hides the only events anybody reads at
- * three in the morning.
+ * Errors are never in the table: they stay at 100% in every tier, which the
+ * generated config states explicitly so the invariant is visible where somebody
+ * would otherwise wonder. Info is what moves — it is the bulk of the volume and
+ * the bulk of the bill — and warnings only give way at the top, where halving
+ * them still leaves the shape.
  */
 export const SAMPLING_PRESETS: readonly SamplingPreset[] = [
   {
     id: 'all',
     label: 'Everything',
-    hint: 'No sampling at all — the right answer until volume or cost says otherwise',
+    hint: 'No sampling — the right answer until volume or cost says otherwise',
     rates: null,
   },
   {
-    id: 'balanced',
-    label: '1 in 4 info events',
-    hint: 'Keeps 25% of info and 5% of debug — a usable sample of healthy traffic',
-    rates: { info: 25, warn: 100, debug: 5 },
+    id: 'low',
+    label: 'Low traffic',
+    hint: 'Half the info events, every warning — a small app that has started to repeat itself',
+    rates: { info: 50, warn: 100 },
   },
   {
-    id: 'high-traffic',
-    label: '1 in 20 info events',
-    hint: 'Keeps 5% of info and 1% of debug — when info is most of the bill',
-    rates: { info: 5, warn: 100, debug: 1 },
+    id: 'medium',
+    label: 'Medium traffic',
+    hint: '1 info event in 4, every warning — steady traffic with a bill worth watching',
+    rates: { info: 25, warn: 100 },
   },
   {
-    id: 'minimal',
-    label: '1 in 100 info events',
-    hint: 'Keeps 1% of info and no debug — for very high volume, trends only',
-    rates: { info: 1, warn: 100, debug: 0 },
+    id: 'high',
+    label: 'High traffic',
+    hint: '1 info event in 10, every warning — info is most of what you are paying for',
+    rates: { info: 10, warn: 100 },
   },
   {
-    id: 'errors-only',
-    label: 'Only what went wrong',
-    hint: 'Drops info and debug entirely, keeps every warning and error',
-    rates: { info: 0, warn: 100, debug: 0 },
+    id: 'very-high',
+    label: 'Very high traffic',
+    hint: '1 info event in 100 and half the warnings — trends rather than individual requests',
+    rates: { info: 1, warn: 50 },
   },
 ]
 

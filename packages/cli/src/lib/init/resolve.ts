@@ -129,7 +129,7 @@ export function resolveAnswers(input: ResolveInput): InitAnswers {
     prodDrains,
     extras,
     enrichers: extras.includes('enrichers') ? input.enrichers ?? [...DEFAULT_ENRICHERS] : [],
-    sampling: extras.includes('sampling') ? input.sampling ?? 'balanced' : 'all',
+    sampling: extras.includes('sampling') ? input.sampling ?? 'medium' : 'all',
     install: input.evlogInstalled ? false : input.install,
   }
 }
