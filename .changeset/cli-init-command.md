@@ -11,3 +11,5 @@ Development and production destinations are asked for separately, because nobody
 Config files are patched at the exact AST offsets so comments and formatting survive; existing files are never overwritten, and a drain file that already wires the same destinations is left alone rather than duplicated. Secrets are never prompted for — the adapter's variables are appended to `.env.example`, never `.env`. The run finishes by executing `evlog doctor`, so it answers "did it work" instead of pointing at another command
 
 Every prompt has a flag, so an agent reproduces exactly what a human just did: `--yes`, `--json`, a non-TTY, or `CI` selects the non-interactive path, and an unknown `--drain` or `--extras` value stops the run rather than silently defaulting. Run from a workspace root, it sets up the apps rather than the root package
+
+`init` records which options were picked on its telemetry event — framework, destinations, extras, sampling preset, and counts — so the flow can lead with what people use. Every value is an id from the CLI's own catalog behind an allowlist; the service name and anything read out of the user's source are never sent

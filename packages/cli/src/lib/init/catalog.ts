@@ -209,7 +209,7 @@ export function findEnricher(id: string): Enricher | undefined {
 
 /* ── sampling ───────────────────────────────────────────────────────────── */
 
-export type SamplingProfile = 'all' | 'balanced' | 'high-traffic'
+export type SamplingProfile = 'all' | 'balanced' | 'high-traffic' | 'minimal' | 'errors-only'
 
 export interface SamplingPreset {
   id: SamplingProfile
@@ -220,29 +220,44 @@ export interface SamplingPreset {
 }
 
 /**
- * Errors are absent from every preset on purpose.
+ * Presets ordered by how much they keep, loudest first.
  *
- * `error: 100` is written in all cases and is not a choice: a sampling config
- * that drops errors hides the only events anybody reads at three in the morning.
+ * The labels state the ratio because that is the decision — "Balanced" tells
+ * you nothing about what you are about to lose, where "1 in 4 info events"
+ * does. Errors are absent from every preset and are always kept at 100%: a
+ * sampling config that drops errors hides the only events anybody reads at
+ * three in the morning.
  */
 export const SAMPLING_PRESETS: readonly SamplingPreset[] = [
   {
     id: 'all',
-    label: 'Keep everything',
-    hint: 'No sampling — the right answer until volume says otherwise',
+    label: 'Everything',
+    hint: 'No sampling at all — the right answer until volume or cost says otherwise',
     rates: null,
   },
   {
     id: 'balanced',
-    label: 'Balanced',
-    hint: '25% of info, 5% of debug, every warning and error',
+    label: '1 in 4 info events',
+    hint: 'Keeps 25% of info and 5% of debug — a usable sample of healthy traffic',
     rates: { info: 25, warn: 100, debug: 5 },
   },
   {
     id: 'high-traffic',
-    label: 'High traffic',
-    hint: '5% of info, 1% of debug — when info is the bulk of the bill',
+    label: '1 in 20 info events',
+    hint: 'Keeps 5% of info and 1% of debug — when info is most of the bill',
     rates: { info: 5, warn: 100, debug: 1 },
+  },
+  {
+    id: 'minimal',
+    label: '1 in 100 info events',
+    hint: 'Keeps 1% of info and no debug — for very high volume, trends only',
+    rates: { info: 1, warn: 100, debug: 0 },
+  },
+  {
+    id: 'errors-only',
+    label: 'Only what went wrong',
+    hint: 'Drops info and debug entirely, keeps every warning and error',
+    rates: { info: 0, warn: 100, debug: 0 },
   },
 ]
 

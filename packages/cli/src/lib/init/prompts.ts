@@ -198,7 +198,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
 
   const sampling = extras.includes('sampling')
     ? required(await select<SamplingProfile>({
-      message: 'How much traffic should reach the drain?',
+      message: 'How much healthy traffic should reach the drain?',
       options: SAMPLING_PRESETS.map(preset => ({
         value: preset.id,
         label: preset.label,

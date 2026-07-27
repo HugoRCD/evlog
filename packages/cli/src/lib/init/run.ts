@@ -29,6 +29,7 @@ import {
 } from './prompts'
 import type { InitAnswers } from './prompts'
 import { droppedExtras, resolveAnswers } from './resolve'
+import { recordInitAnswers } from './telemetry'
 
 export interface InstallOutcome {
   status: 'already' | 'installed' | 'skipped' | 'failed'
@@ -208,7 +209,7 @@ export async function runInit(
     } catch (error) {
       if (error instanceof InitCancelled) {
         closeCancelled()
-        return cancelledResult({ project, answers: resolveAnswers(base), packageManager, command, dryRun })
+        return cancelled(cancelledResult({ project, answers: resolveAnswers(base), packageManager, command, dryRun }))
       }
       throw error
     }
@@ -249,13 +250,13 @@ export async function runInit(
     } catch (error) {
       if (error instanceof InitCancelled) {
         closeCancelled()
-        return cancelledResult({ project, answers, packageManager, command, dryRun })
+        return cancelled(cancelledResult({ project, answers, packageManager, command, dryRun }))
       }
       throw error
     }
     if (!confirmed) {
       closeCancelled()
-      return cancelledResult({ project, answers, packageManager, command, dryRun })
+      return cancelled(cancelledResult({ project, answers, packageManager, command, dryRun }))
     }
   }
 
@@ -309,7 +310,7 @@ export async function runInit(
 
   log.set({ steps: ['done'] })
 
-  return {
+  const result: InitResult = {
     project,
     answers,
     packageManager,
@@ -330,6 +331,9 @@ export async function runInit(
     interactive,
     cancelled: false,
   }
+
+  recordInitAnswers(result)
+  return result
 }
 
 /** The result of a run the user walked away from: answers kept, nothing done. */
@@ -357,6 +361,12 @@ function cancelledResult(input: {
     interactive: true,
     cancelled: true,
   }
+}
+
+/** A cancelled run still reports its answers: what people back out of matters. */
+function cancelled(result: InitResult): InitResult {
+  recordInitAnswers(result)
+  return result
 }
 
 export function frameworkDocs(framework: Framework): string {
