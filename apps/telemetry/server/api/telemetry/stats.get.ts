@@ -6,5 +6,5 @@ export default defineEventHandler(async (event): Promise<StatsResponse> => {
   const filter = parseRunsFilter(getQuery(event))
   log.set({ query: filter })
 
-  return getStatsForFilter(filter)
+  return getCachedStatsForFilter(filter)
 })
