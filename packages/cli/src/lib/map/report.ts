@@ -2,6 +2,8 @@ import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
 import type { Style, StyleCode } from '../../core/output'
+import type { BaselineComparison } from './baseline'
+import { hasRegressed } from './baseline'
 import { countSuppressed } from './directives'
 import { isInfrastructureRoute } from './exemptions'
 import { REQUIREMENTS, getRule } from './rules/index'
@@ -10,6 +12,7 @@ import type { ProjectFacts } from './project-facts'
 import { classifyRouteObservability, scoreGlobal } from './score'
 import type { CheckId, CheckResult, Framework, RouteEntry, ScanResult } from './types'
 import { frameworkLabel } from './utils'
+import { MAP_FILE_NAME } from './write'
 
 /* ── measuring text that contains ANSI ─────────────────────────────────── */
 
@@ -911,6 +914,73 @@ export function formatGate(ctx: CliContext, result: ScanResult, threshold: numbe
   if (!passed) {
     lines.push(`${paint('dim', 'fix what is listed under FIX FIRST to pass ·')} ${style.doc('/cli/ci')}`)
   }
+  return lines.join('\n')
+}
+
+/**
+ * The `--baseline` verdict — what changed since the committed map.
+ *
+ * Reads as a diff rather than a score, because that is the question the gate
+ * answers: `--min-score` asks "is this app good enough", `--baseline` asks "did
+ * this pull request make it worse". The two are printed the same way on purpose;
+ * both end up in the same CI log next to the same red cross.
+ */
+export function formatBaseline(ctx: CliContext, comparison: BaselineComparison): string {
+  const style = createReportStyle(ctx)
+  const { paint } = style
+  const { regressions, fixed, added, removed, delta } = comparison
+  const passed = !hasRegressed(comparison)
+  const badge = paint(['bold', passed ? 'green' : 'red'], ' BASELINE ')
+
+  const move = delta === 0
+    ? paint('dim', `score ${comparison.score}, unchanged`)
+    : paint(delta > 0 ? 'green' : 'red', `score ${comparison.baselineScore} → ${comparison.score} (${delta > 0 ? '+' : ''}${delta})`)
+
+  const lines = ['', `${badge} ${move} ${paint('dim', `vs ${comparison.source.label}`)}`]
+
+  if (regressions.length > 0) {
+    lines.push('')
+    lines.push(paint('dim', 'REGRESSED'))
+    for (const item of regressions) {
+      const label = item.method ? `${item.method} ${item.path}` : item.path
+      const cause = item.to === 'suppressed'
+        ? paint('yellow', `${ruleExpects(item.check)} disabled by a comment`)
+        : paint('red', `${ruleExpects(item.check)} no longer passes`)
+      lines.push(`${paint('red', '✗')} ${paint('bold', label)} ${paint('dim', '—')} ${cause}`)
+      lines.push(`   ${paint('dim', `${item.file} ·`)} ${style.doc(ruleDocs(item.check))}`)
+    }
+  }
+
+  const darkAdded = added.filter(route => route.dark)
+  if (darkAdded.length > 0) {
+    /* Listed, not gated: on an app that is not green yet, failing every pull
+       request that adds an endpoint would make the gate something teams turn
+       off. `--min-score` is the bar for new work. */
+    lines.push('')
+    lines.push(paint('dim', 'NEW AND DARK'))
+    const lead = '⚠ '
+    const names = darkAdded.map(route => route.method ? `${route.method} ${route.path}` : route.path)
+    const { shown, hidden } = fitItems(names, ' · ', style.width - lead.length - MORE_WIDTH)
+    const more = hidden > 0 ? ` +${hidden}` : ''
+    lines.push(`${paint('yellow', '⚠')} ${paint('dim', `${shown.join(' · ')}${more} — added with no instrumentation`)}`)
+  }
+
+  if (fixed.length > 0 || removed.length > 0) {
+    const parts: string[] = []
+    if (fixed.length > 0) parts.push(`${fixed.length} check${fixed.length > 1 ? 's' : ''} fixed`)
+    if (removed.length > 0) parts.push(`${removed.length} entry point${removed.length > 1 ? 's' : ''} gone`)
+    lines.push(`${paint('green', '✓')} ${paint('dim', parts.join(' · '))}`)
+  }
+
+  lines.push('')
+  if (passed) {
+    lines.push(`${paint('green', 'no regression')} ${paint('dim', '— exit code 0')}`)
+  } else {
+    const counted = `${regressions.length} regression${regressions.length === 1 ? '' : 's'}${delta < 0 ? ` and a ${-delta} point drop` : ''}`
+    lines.push(`${paint('red', counted)} ${paint('dim', '— exit code 1 ·')} ${style.doc('/cli/ci')}`)
+    lines.push(paint('dim', `${MAP_FILE_NAME} was not rewritten — fix the regression, or re-run without --baseline to accept it`))
+  }
+
   return lines.join('\n')
 }
 

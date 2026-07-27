@@ -7,9 +7,12 @@ import { createNoopCliDebug } from '../lib/debug'
 import { cliErrors } from '../lib/errors'
 import { resolveEvlog, resolveProject } from '../lib/project'
 import type { ProjectInfo } from '../lib/project'
+import { compareToBaseline, hasRegressed, loadBaseline } from '../lib/map/baseline'
+import type { BaselineComparison } from '../lib/map/baseline'
 import { detectFramework } from '../lib/map/detect'
 import {
   findEntryPoint,
+  formatBaseline,
   formatEntryPointNotFound,
   formatGate,
   formatMapInspect,
@@ -35,6 +38,8 @@ export interface MapResult {
   scan: ScanResult
   /** Path `evlog.map.json` was written to, or `null` with `--no-write`. */
   mapPath: string | null
+  /** Diff against the committed map, when `--baseline` was passed. */
+  baseline: BaselineComparison | null
 }
 
 /**
@@ -44,7 +49,7 @@ export interface MapResult {
 export async function runMap(
   ctx: CliContext,
   log: CliDebug = createNoopCliDebug(),
-  options: { framework?: Framework, noWrite?: boolean, verbose?: boolean } = {},
+  options: { framework?: Framework, noWrite?: boolean, verbose?: boolean, baseline?: string | true } = {},
 ): Promise<MapResult> {
   const project = await log.step(
     'resolveProject',
@@ -75,14 +80,34 @@ export async function runMap(
     verbose: options.verbose ?? false,
   }
 
+  /* Read before the scan writes: `writeMapFile` overwrites `evlog.map.json` in
+     place, so loading the baseline afterwards would compare this run against
+     itself and never report a regression. */
+  const baselineMap = options.baseline
+    ? await log.step(
+      'loadBaseline',
+      () => loadBaseline(project.packageDir, typeof options.baseline === 'string' ? options.baseline : undefined),
+      r => ({ baselineSource: r.source.label, baselineScore: r.map.score }),
+    )
+    : null
+
   const scanResult = await log.step(
     'scan',
     () => scan(scanCtx),
     r => ({ routes: r.map.routes.length, score: r.map.score, grade: r.grade }),
   )
 
+  const baseline = baselineMap
+    ? compareToBaseline(baselineMap.map, scanResult.map, baselineMap.source)
+    : null
+
+  /* A run that just reported a regression must not overwrite the file it
+     compared against: doing so moves the ratchet down to the worse state, and
+     the same command run a second time reports no regression and exits 0. */
+  const wouldClobberBaseline = baseline !== null && hasRegressed(baseline)
+
   let mapPath: string | null = null
-  if (!options.noWrite) {
+  if (!options.noWrite && !wouldClobberBaseline) {
     mapPath = await log.step('writeMapFile', () => writeMapFile(project.packageDir, scanResult.map))
   }
 
@@ -94,6 +119,7 @@ export async function runMap(
     frameworkWarnings: warnings,
     scan: scanResult,
     mapPath,
+    baseline,
   }
 }
 
@@ -131,6 +157,10 @@ export function formatMapReport(
     sections.push(formatMapReportView(ctx, result.scan, { mapPath: result.mapPath }))
   }
 
+  if (result.baseline) {
+    sections.push(formatBaseline(ctx, result.baseline))
+  }
+
   if (options.minScore !== undefined) {
     sections.push(formatGate(ctx, result.scan, options.minScore))
   }
@@ -163,6 +193,20 @@ function parseMinScoreArg(value: unknown): number | undefined {
 }
 
 /**
+ * Read `--baseline`, which is a flag and an option at once.
+ *
+ * Bare (`--baseline`) means "the committed map, wherever it is"; with a value it
+ * is a path or a `git:<ref>`. citty hands a bare string flag back as `true` or
+ * as an empty string depending on how it was written, and both spellings mean
+ * the same thing to a user.
+ */
+function parseBaselineArg(value: unknown): string | true | undefined {
+  if (value === true) return true
+  if (typeof value !== 'string') return undefined
+  return value.length > 0 ? value : true
+}
+
+/**
  * `evlog map` — static observability map: Lighthouse for wide events.
  * Logic lives in {@link runMap}; this file owns the citty surface.
  */
@@ -174,6 +218,10 @@ export default defineEvlogCommand('map', {
     framework: { type: 'string', description: 'Override framework detection (nuxt, nitro, next, tanstack-start)' },
     all: { type: 'boolean', description: 'Every entry point, as a check matrix' },
     minScore: { type: 'string', description: 'Exit 1 if the global score is below this threshold' },
+    baseline: {
+      type: 'string',
+      description: 'Compare against the committed evlog.map.json and exit 1 on regression (path, or git:<ref>)',
+    },
     // `default: true` + citty's `--no-write` negation — declaring this as `noWrite`
     // directly would not work: citty's parser treats any `--no-x` flag as negating
     // `x`, not as setting `noX` (see `wantsHeader`'s `--no-header` argv fallback).
@@ -195,6 +243,7 @@ export default defineEvlogCommand('map', {
         framework: parseFrameworkArg(args.framework),
         noWrite: !args.write,
         verbose: args.verbose,
+        baseline: parseBaselineArg(args.baseline),
       })
     } catch (error) {
       if (error instanceof EvlogError) {
@@ -212,7 +261,12 @@ export default defineEvlogCommand('map', {
 
     ui.done({
       jsonMode: args.json,
-      json: { map: result.scan.map, summary: result.scan.summary, mapPath: result.mapPath },
+      json: {
+        map: result.scan.map,
+        summary: result.scan.summary,
+        mapPath: result.mapPath,
+        ...(result.baseline ? { baseline: result.baseline } : {}),
+      },
       human: formatMapReport(ctx, result, {
         all: args.all,
         entry: typeof args.entry === 'string' && args.entry.length > 0 ? args.entry : undefined,
@@ -221,6 +275,11 @@ export default defineEvlogCommand('map', {
     })
 
     if (threshold !== undefined && result.scan.map.score < threshold) {
+      ui.exit(EXIT_FAIL)
+      return
+    }
+
+    if (result.baseline && hasRegressed(result.baseline)) {
       ui.exit(EXIT_FAIL)
     }
   },

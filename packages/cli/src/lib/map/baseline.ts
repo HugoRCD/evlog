@@ -1,0 +1,207 @@
+import { execFileSync } from 'node:child_process'
+import { readFileSync } from 'node:fs'
+import { isAbsolute, resolve } from 'node:path'
+import { cliErrors } from '../errors'
+import type { CheckId, MapFile, RouteEntry } from './types'
+import { MAP_FILE_NAME } from './write'
+
+/**
+ * Where a baseline map was read from.
+ *
+ * The label is what the report prints, so it stays the spelling the user typed
+ * (`git:HEAD`, `../base.json`) rather than an absolute path they never wrote.
+ */
+export interface BaselineSource {
+  kind: 'file' | 'git'
+  label: string
+}
+
+/** A requirement that used to pass on this entry point and no longer does. */
+export interface CheckRegression {
+  routeId: string
+  path: string
+  method: string | null
+  file: string
+  check: CheckId
+  /**
+   * `fail` is the check breaking; `suppressed` is an `evlog-map-disable`
+   * comment being added over a check that was passing. Both cost the same
+   * coverage, so both gate — the distinction is only there to be printed,
+   * because the fix for one is code and for the other is a conversation.
+   */
+  to: 'fail' | 'suppressed'
+}
+
+/** An entry point that exists now and did not exist in the baseline. */
+export interface AddedRoute {
+  path: string
+  method: string | null
+  file: string
+  /** No requirement passes on it — the case a baseline gate is meant to surface. */
+  dark: boolean
+}
+
+/** Result of scoring the current scan against a committed map. */
+export interface BaselineComparison {
+  source: BaselineSource
+  baselineScore: number
+  score: number
+  /** `score - baselineScore`, so negative means the project got worse. */
+  delta: number
+  /** Requirements that went from pass to fail or suppressed. These gate. */
+  regressions: CheckRegression[]
+  /** Requirements that went from fail to pass — the report's good news. */
+  fixed: CheckRegression[]
+  added: AddedRoute[]
+  /** Ids present in the baseline and gone from the scan (deleted routes). */
+  removed: { path: string, method: string | null }[]
+}
+
+function readGitBaseline(cwd: string, ref: string): string | null {
+  try {
+    const prefix = execFileSync('git', ['-C', cwd, 'rev-parse', '--show-prefix'], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).trim()
+    return execFileSync('git', ['-C', cwd, 'show', `${ref}:${prefix}${MAP_FILE_NAME}`], {
+      encoding: 'utf8',
+      stdio: ['ignore', 'pipe', 'ignore'],
+      maxBuffer: 64 * 1024 * 1024,
+    })
+  } catch {
+    return null
+  }
+}
+
+function parseMapFile(raw: string, label: string): MapFile {
+  let parsed: unknown
+  try {
+    parsed = JSON.parse(raw)
+  } catch {
+    throw cliErrors.MAP_BASELINE_INVALID({ source: label, reason: 'not valid JSON' })
+  }
+  const map = parsed as Partial<MapFile>
+  if (map?.version !== 1 || !Array.isArray(map.routes) || typeof map.score !== 'number') {
+    throw cliErrors.MAP_BASELINE_INVALID({ source: label, reason: 'not an evlog.map.json (version 1)' })
+  }
+  return map as MapFile
+}
+
+/**
+ * Read the map to compare against.
+ *
+ * Deliberately local-only. A baseline is a file the project commits, so on CI
+ * the checkout has already put it on disk and the comparison needs no network,
+ * no token, and no repository access — the gate works the same on a private
+ * repo as on a public one.
+ *
+ * @param spec - `git:<ref>` to read the committed copy through git, otherwise a
+ * path to a map file. Defaults to `evlog.map.json` in the project, falling back
+ * to `git:HEAD` when the working copy has already been overwritten by a
+ * previous run.
+ */
+export function loadBaseline(projectRoot: string, spec?: string): { map: MapFile, source: BaselineSource } {
+  if (spec?.startsWith('git:')) {
+    const ref = spec.slice(4) || 'HEAD'
+    const raw = readGitBaseline(projectRoot, ref)
+    if (raw === null) throw cliErrors.MAP_BASELINE_NOT_FOUND({ source: spec })
+    return { map: parseMapFile(raw, spec), source: { kind: 'git', label: spec } }
+  }
+
+  if (spec) {
+    const path = isAbsolute(spec) ? spec : resolve(projectRoot, spec)
+    let raw: string
+    try {
+      raw = readFileSync(path, 'utf8')
+    } catch {
+      throw cliErrors.MAP_BASELINE_NOT_FOUND({ source: spec })
+    }
+    return { map: parseMapFile(raw, spec), source: { kind: 'file', label: spec } }
+  }
+
+  try {
+    const raw = readFileSync(resolve(projectRoot, MAP_FILE_NAME), 'utf8')
+    return { map: parseMapFile(raw, MAP_FILE_NAME), source: { kind: 'file', label: MAP_FILE_NAME } }
+  } catch {
+    /* The checked-in map is the normal baseline, but `map --baseline` run twice
+       in a row would compare the second scan against the first one's output.
+       Falling back to git means the answer stays "what did main say" instead of
+       silently becoming "what did I say a minute ago". */
+    const raw = readGitBaseline(projectRoot, 'HEAD')
+    if (raw === null) throw cliErrors.MAP_BASELINE_NOT_FOUND({ source: MAP_FILE_NAME })
+    return { map: parseMapFile(raw, 'git:HEAD'), source: { kind: 'git', label: 'git:HEAD' } }
+  }
+}
+
+function checkIds(route: RouteEntry): CheckId[] {
+  return Object.keys(route.checks) as CheckId[]
+}
+
+function isDark(route: RouteEntry): boolean {
+  const results = Object.values(route.checks)
+  return results.length > 0 && results.every(check => check.status !== 'pass')
+}
+
+/**
+ * Compare a fresh scan against a baseline map, per entry point and per check.
+ *
+ * The unit is the requirement, not the score: a refactor that instruments one
+ * route and breaks another can leave the number untouched, and a gate that only
+ * watches the total would call that a no-op. Only pass → fail and
+ * pass → suppressed transitions count as regressions; a route that disappeared
+ * was deleted, and a new dark route is reported but does not gate — that bar is
+ * `--min-score`'s job, and ratcheting it here would fail every pull request
+ * that adds an endpoint to an app that is not green yet.
+ */
+export function compareToBaseline(baseline: MapFile, current: MapFile, source: BaselineSource): BaselineComparison {
+  const currentById = new Map(current.routes.map(route => [route.id, route]))
+  const baselineById = new Map(baseline.routes.map(route => [route.id, route]))
+
+  const regressions: CheckRegression[] = []
+  const fixed: CheckRegression[] = []
+  const removed: { path: string, method: string | null }[] = []
+
+  for (const before of baseline.routes) {
+    const after = currentById.get(before.id)
+    if (!after) {
+      removed.push({ path: before.path, method: before.method })
+      continue
+    }
+
+    for (const id of checkIds(before)) {
+      const was = before.checks[id]
+      const now = after.checks[id]
+      if (!was || !now) continue
+
+      const entry = { routeId: after.id, path: after.path, method: after.method, file: after.file, check: id }
+
+      if (was.status === 'pass' && now.status === 'fail') {
+        regressions.push({ ...entry, to: 'fail' })
+      } else if (was.status === 'pass' && now.status === 'n/a' && now.suppressed) {
+        regressions.push({ ...entry, to: 'suppressed' })
+      } else if (was.status === 'fail' && now.status === 'pass') {
+        fixed.push({ ...entry, to: 'fail' })
+      }
+    }
+  }
+
+  const added: AddedRoute[] = current.routes
+    .filter(route => !baselineById.has(route.id))
+    .map(route => ({ path: route.path, method: route.method, file: route.file, dark: isDark(route) }))
+
+  return {
+    source,
+    baselineScore: baseline.score,
+    score: current.score,
+    delta: current.score - baseline.score,
+    regressions,
+    fixed,
+    added,
+    removed,
+  }
+}
+
+/** Whether the comparison should fail the command (exit 1). */
+export function hasRegressed(comparison: BaselineComparison): boolean {
+  return comparison.regressions.length > 0 || comparison.delta < 0
+}

@@ -24,7 +24,8 @@ Score what your app can tell you when something goes wrong. Diagnose your instal
 Try without installing:
 
 ```bash
-npx @evlog/cli map
+npx @evlog/cli init          # wire evlog into this app
+npx @evlog/cli map           # score what is still dark
 npx @evlog/cli map --json --no-write
 ```
 
@@ -40,11 +41,16 @@ pnpm evlog doctor
 
 | Command | What it does |
 | --- | --- |
+| `evlog init` | Wire evlog into this app: install, register the framework integration, write a local sink |
+| `evlog init --dry-run` | Print the plan without touching a file |
+| `evlog init --service <name>` | Service name on every wide event (default: package name, unscoped) |
+| `evlog init --no-install` / `--no-sink` | Skip the package manager / skip the `.evlog/logs` drain |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |
 | `evlog map --framework <name>` | Override framework detection (`nuxt`, `nitro`, `next`, `tanstack-start`) |
 | `evlog map --min-score <n>` | Exit 1 if the global score is below `n` |
+| `evlog map --baseline [ref]` | Exit 1 on a regression against the committed `evlog.map.json` (path, or `git:<ref>`) |
 | `evlog map --no-write` | Skip writing `evlog.map.json` to the project root |
 | `evlog map --verbose` | Show per-file parse warnings |
 | `evlog map --cwd <dir>` | Scan another app in the workspace |
@@ -95,6 +101,8 @@ With `--json`, the payload is the **only** thing written to stdout — everythin
   "mapPath": "evlog.map.json" // null with --no-write
 }
 ```
+
+With `--baseline`, the payload gains a `baseline` key holding the comparison (`regressions`, `fixed`, `added`, `removed`, `delta`).
 
 Breaking either shape requires a `schemaVersion` bump. In `routes[]`, `checks` holds the requirements that move the score and `suggestions` holds the opportunities that never do — separate keys so a suggestion can't be mistaken for a failure.
 

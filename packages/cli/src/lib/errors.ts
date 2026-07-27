@@ -83,6 +83,24 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
     tags: ['map'],
   },
+  MAP_BASELINE_NOT_FOUND: {
+    status: 404,
+    message: ({ source }: { source: string }) =>
+      `No baseline map at ${source}`,
+    why: 'A baseline gate compares against a committed evlog.map.json, and none was readable',
+    fix: 'Run evlog map once and commit evlog.map.json, or pass --baseline <path>',
+    link: 'https://evlog.dev/cli/ci',
+    tags: ['map', 'baseline'],
+  },
+  MAP_BASELINE_INVALID: {
+    status: 400,
+    message: ({ source, reason }: { source: string, reason: string }) =>
+      `Baseline ${source} is unusable — ${reason}`,
+    why: 'The baseline has to be an evlog.map.json written by this CLI to be comparable',
+    fix: 'Regenerate it with evlog map, or point --baseline at the right file',
+    link: 'https://evlog.dev/cli/ci',
+    tags: ['map', 'baseline'],
+  },
   MAP_INVALID_MIN_SCORE: {
     status: 400,
     message: ({ value }: { value: string }) =>
