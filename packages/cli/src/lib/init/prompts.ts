@@ -204,7 +204,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
         label: preset.label,
         hint: preset.hint,
       })),
-      initialValue: 'balanced' as SamplingProfile,
+      initialValue: 'medium' as SamplingProfile,
     }))
     : 'all'
 

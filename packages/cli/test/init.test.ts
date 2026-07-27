@@ -349,10 +349,13 @@ describe('drain wiring', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ extras: ['sampling'], sampling: 'balanced' }), nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ extras: ['sampling'], sampling: 'medium' }), nitroMajor: 3 })
     const config = plan.actions.find(action => action.relative === 'nuxt.config.ts')!
 
     expect(config.contents).toContain('error: 100')
+    /* Debug is never named: an unspecified level is kept in full, which is what
+       you want from logs somebody switched on to investigate something. */
+    expect(config.contents).not.toContain('debug:')
   })
 })
 
@@ -369,7 +372,7 @@ describe('an evlog factory that is already there (Next.js)', () => {
       root,
       framework: 'next',
       service: 'web',
-      ...wiring({ prodDrains: ['axiom'], extras: ['sampling'], sampling: 'balanced' }),
+      ...wiring({ prodDrains: ['axiom'], extras: ['sampling'], sampling: 'medium' }),
       nitroMajor: 3,
     })
     const lib = plan.actions.find(action => action.relative === join('lib', 'evlog.ts'))!
@@ -427,13 +430,57 @@ describe('an evlog factory that is already there (Next.js)', () => {
       root,
       framework: 'next',
       service: 'web',
-      ...wiring({ extras: ['enrichers', 'sampling'], enrichers: ['user-agent'], sampling: 'high-traffic' }),
+      ...wiring({ extras: ['enrichers', 'sampling'], enrichers: ['user-agent'], sampling: 'very-high' }),
       nitroMajor: 3,
     })
     const lib = plan.actions.find(action => action.relative === join('lib', 'evlog.ts'))!
 
     expect(lib.contents).toContain('createUserAgentEnricher()')
     expect(lib.contents).toContain('enrich: async (ctx) =>')
-    expect(lib.contents).toContain('rates: { info: 5')
+    expect(lib.contents).toContain('rates: { info: 1')
+  })
+})
+
+describe('sampling tiers', () => {
+  it('never names debug, whatever the tier', async () => {
+    /* An unspecified level is kept at 100%. Debug events exist because somebody
+       turned them on to chase something, so a 5% sample of them is a 5% chance
+       of seeing the line you switched them on for. */
+    const root = await project({
+      'package.json': '{"name":"shop"}',
+      'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
+    })
+
+    for (const tier of ['low', 'medium', 'high', 'very-high'] as const) {
+      const plan = planWiring({
+        root,
+        framework: 'nuxt',
+        service: 'shop',
+        ...wiring({ extras: ['sampling'], sampling: tier }),
+        nitroMajor: 3,
+      })
+      const config = plan.actions.find(action => action.relative === 'nuxt.config.ts')!
+
+      expect(config.contents, tier).toContain('error: 100')
+      expect(config.contents, tier).not.toContain('debug:')
+    }
+  })
+
+  it('writes no sampling block for the everything tier', async () => {
+    const root = await project({
+      'package.json': '{"name":"shop"}',
+      'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
+    })
+
+    const plan = planWiring({
+      root,
+      framework: 'nuxt',
+      service: 'shop',
+      ...wiring({ extras: ['sampling'], sampling: 'all' }),
+      nitroMajor: 3,
+    })
+    const config = plan.actions.find(action => action.relative === 'nuxt.config.ts')!
+
+    expect(config.contents).not.toContain('sampling:')
   })
 })

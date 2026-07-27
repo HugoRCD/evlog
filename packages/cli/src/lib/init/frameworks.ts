@@ -539,11 +539,13 @@ function samplingProperty(input: WiringInput): string | null {
   if (!input.extras.includes('sampling')) return null
   const preset = findSamplingPreset(input.sampling)
   if (!preset?.rates) return null
-  const { info, warn, debug } = preset.rates
+  const { info, warn } = preset.rates
   /* `error: 100` is not part of the preset and not a choice: a sampling config
-     that drops errors hides the only events anybody reads at 3am. */
+     that drops errors hides the only events anybody reads at 3am. `debug` is
+     left out — an unspecified level is kept in full, which is what you want
+     from logs somebody switched on to investigate something. */
   return `sampling: {
-      rates: { info: ${info}, warn: ${warn}, error: 100, debug: ${debug} },
+      rates: { info: ${info}, warn: ${warn}, error: 100 },
     }`
 }
 
@@ -622,8 +624,8 @@ function nextFactoryParts(input: WiringInput): NextFactoryParts {
 
   const preset = input.extras.includes('sampling') ? findSamplingPreset(input.sampling) : undefined
   if (preset?.rates) {
-    const { info, warn, debug } = preset.rates
-    options.push(`  sampling: {\n    rates: { info: ${info}, warn: ${warn}, error: 100, debug: ${debug} },\n  },`)
+    const { info, warn } = preset.rates
+    options.push(`  sampling: {\n    rates: { info: ${info}, warn: ${warn}, error: 100 },\n  },`)
   }
 
   return { imports, preamble: blocks.length > 0 ? `\n${blocks.join('\n\n')}\n` : '', options }

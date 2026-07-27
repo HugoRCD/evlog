@@ -88,8 +88,8 @@ describe('resolveAnswers', () => {
     expect(answers.enrichers).toEqual(['user-agent', 'geo', 'request-size', 'trace-context'])
   })
 
-  it('defaults sampling to balanced only when the extra is selected', () => {
-    expect(resolveAnswers({ ...base, extras: ['sampling'] }).sampling).toBe('balanced')
+  it('defaults sampling to the medium tier only when the extra is selected', () => {
+    expect(resolveAnswers({ ...base, extras: ['sampling'] }).sampling).toBe('medium')
     expect(resolveAnswers(base).sampling).toBe('all')
   })
 

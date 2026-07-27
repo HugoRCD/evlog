@@ -58,7 +58,7 @@ export default defineEvlogCommand('init', {
     prodDrain: { type: 'string', description: 'Production destinations, comma-separated: axiom, otlp, posthog, sentry, better-stack, datadog, hyperdx' },
     extras: { type: 'string', description: 'Comma-separated: enrichers, pipeline, sampling, vite, error-catalog, audit-catalog, ai, better-auth' },
     enrichers: { type: 'string', description: 'Comma-separated: user-agent, geo, request-size, trace-context (default: all)' },
-    sampling: { type: 'string', description: 'Sampling preset: all, balanced (default), high-traffic' },
+    sampling: { type: 'string', description: 'Traffic tier: all, low, medium (default), high, very-high' },
     apps: { type: 'string', description: 'Workspace packages to set up, comma-separated (monorepo root only)' },
     yes: { type: 'boolean', alias: 'y', description: 'Skip every question and take the defaults' },
     dryRun: { type: 'boolean', description: 'Show what would change without writing anything' },
