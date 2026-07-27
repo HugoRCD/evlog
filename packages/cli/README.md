@@ -113,7 +113,9 @@ Breaking either shape requires a `schemaVersion` bump. In `routes[]`, `checks` h
 
 ## Telemetry
 
-The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Delivered to evlog's own dashboard (`apps/telemetry` in this repo); override with `EVLOG_TELEMETRY_ENDPOINT` to point at your own instance. Opt out anytime:
+The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents.
+
+`evlog init` also records **which options you picked** — the framework, the destinations, the extras, the sampling preset, and counts (files written, manual steps left). Every value is an id from the CLI's own catalog, enforced by an allowlist, so a free-text answer can never be sent: your service name, your package name and anything read out of your source stay on your machine. Delivered to evlog's own dashboard (`apps/telemetry` in this repo); override with `EVLOG_TELEMETRY_ENDPOINT` to point at your own instance. Opt out anytime:
 
 ```bash
 evlog telemetry disable   # or DO_NOT_TRACK=1 / EVLOG_TELEMETRY=0

@@ -44,10 +44,52 @@ const cyan = text => paint('36', text)
  */
 const APPS = [
   { name: 'nuxt', fixture: 'nuxt-basic' },
-  { name: 'next', fixture: 'next-app-router' },
+  { name: 'next', fixture: 'next-app-router', augment: augmentNextApp },
   { name: 'tanstack', fixture: 'tanstack-basic' },
   { name: 'nitro', generate: generateNitroApp },
 ]
+
+/**
+ * The same structured error, written out twice.
+ *
+ * Every app gets this so `init` has something to seed an error catalog from:
+ * one inline error is a local decision, the same one in two files is the
+ * evidence the offer is gated on. Added here rather than in the `map` fixtures,
+ * which exist to pin scan behaviour and should not grow features for a
+ * different command's benefit.
+ */
+function addRepeatedError(dir) {
+  const body = `import { createError } from 'evlog'
+
+export function assertCard(ok: boolean) {
+  if (ok) return
+  throw createError({
+    status: 402,
+    message: 'Card declined',
+    why: 'The issuer refused the charge',
+  })
+}
+`
+  write(dir, 'sandbox/billing-checkout.ts', body)
+  write(dir, 'sandbox/billing-renewal.ts', body)
+}
+
+/**
+ * Give the Next app a real evlog factory.
+ *
+ * The fixture ships a re-export barrel, which is a legitimate shape but the one
+ * `init` cannot splice into — so every sandbox run ended at "paste this
+ * snippet" and the patch path went untested by hand. A factory call is also
+ * what the framework guide tells people to write.
+ */
+function augmentNextApp(dir) {
+  write(dir, 'lib/evlog.ts', `import { createEvlog } from 'evlog/next'
+
+export const { withEvlog, useLogger, log, createError } = createEvlog({
+  service: 'next-sandbox',
+})
+`)
+}
 
 function generateNitroApp(dir) {
   write(dir, 'package.json', `${JSON.stringify({
@@ -149,6 +191,8 @@ function createApp(app) {
 
   if (app.fixture) cpSync(join(FIXTURES, app.fixture), dir, { recursive: true })
   else app.generate(dir)
+  app.augment?.(dir)
+  addRepeatedError(dir)
 
   mkdirSync(join(dir, 'node_modules'), { recursive: true })
   symlinkSync(EVLOG, join(dir, 'node_modules/evlog'), 'dir')

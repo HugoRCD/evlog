@@ -720,7 +720,11 @@ function patchNextLib(plan: WiringPlan, input: WiringInput, path: string, relati
  * replace rather than a design exercise.
  */
 function errorCatalogTemplate(input: WiringInput): string {
-  const prefix = input.service.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'app'
+  /* Keep the dashes in the wire prefix — `shop-api.CARD_DECLINED` reads, where
+     stripping them gives `shopapi`. The variable gets the camelCase spelling
+     because that is what an identifier has to be. */
+  const prefix = input.service.replace(/[^a-z0-9-]/gi, '-').replace(/-+/g, '-').replace(/^-|-$/g, '').toLowerCase() || 'app'
+  const identifier = `${prefix.replace(/-(.)/g, (_, char) => char.toUpperCase())}Errors`
   const entries = input.repeatedErrors.map((seed) => {
     const files = seed.files.slice(0, 3).join(', ')
     const status = seed.status ? `\n    status: ${seed.status},` : ''
@@ -741,15 +745,15 @@ function errorCatalogTemplate(input: WiringInput): string {
  * Seeded by \`evlog init\` from errors this project already repeats across
  * files. Fill in \`why\` and \`fix\` — they are what turn a stack trace into
  * something a reader, or an agent, can act on — then replace the inline
- * \`createError\` calls with \`${prefix}Errors.<KEY>()\`.
+ * \`createError\` calls with \`${identifier}.<KEY>()\`.
  */
-export const ${prefix}Errors = defineErrorCatalog('${prefix}', {
+export const ${identifier} = defineErrorCatalog('${prefix}', {
 ${entries.join('\n')}
 })
 
 declare module 'evlog' {
   interface RegisteredErrorCatalogs {
-    ${prefix}: typeof ${prefix}Errors
+    '${prefix}': typeof ${identifier}
   }
 }
 `
