@@ -2,6 +2,9 @@ import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
 import type { MapFile } from './types'
 
+/** Name of the map file at the project root — written here, read by `--baseline`. */
+export const MAP_FILE_NAME = 'evlog.map.json'
+
 /**
  * Code-point order, not collation.
  *
@@ -22,7 +25,7 @@ function sortedRoutes(map: MapFile): MapFile {
 
 /** Write `evlog.map.json` to `projectRoot` (routes sorted for a stable diff). Returns the path written. */
 export function writeMapFile(projectRoot: string, map: MapFile): string {
-  const outPath = join(projectRoot, 'evlog.map.json')
+  const outPath = join(projectRoot, MAP_FILE_NAME)
   writeFileSync(outPath, `${JSON.stringify(sortedRoutes(map), null, 2)}\n`, 'utf8')
   return outPath
 }
