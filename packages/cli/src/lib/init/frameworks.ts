@@ -1,8 +1,10 @@
-import { existsSync } from 'node:fs'
+import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
 import type { Framework } from '../map/types'
-import { findDestination } from './catalog'
-import type { DrainId, ExtraId } from './catalog'
+import { findDestination, findEnricher, findSamplingPreset } from './catalog'
+import type { DrainId, EnricherId, ExtraId, SamplingProfile } from './catalog'
+import { auditActionName } from './insight'
+import type { AuditGap, RepeatedErrorSeed } from './insight'
 import {
   addImport,
   appendProperty,
@@ -51,12 +53,52 @@ export interface WiringInput {
   root: string
   framework: Framework
   service: string
-  /** Where wide events are sent. `none` writes no drain at all. */
-  drain: DrainId
+  /** Local sink: `fs` or `none`. */
+  devDrain: DrainId
+  /** Where production events go. Empty means nothing leaves the process. */
+  prodDrains: DrainId[]
   /** Opt-in additions layered onto the drain and the config. */
   extras: ExtraId[]
+  /** Which enrichers to wire, when the `enrichers` extra was selected. */
+  enrichers: EnricherId[]
+  /** Sampling preset, when the `sampling` extra was selected. */
+  sampling: SamplingProfile
   /** Nitro major, when the framework is Nitro (`tanstack-start` is always v3). */
   nitroMajor: 2 | 3
+  /** Seeds from the scan, when the catalog extras were selected. */
+  repeatedErrors: readonly RepeatedErrorSeed[]
+  auditGaps: readonly AuditGap[]
+}
+
+/** Every destination this run wires, dev and prod alike. */
+function allDrains(input: WiringInput): DrainId[] {
+  return [...new Set([input.devDrain, ...input.prodDrains])].filter(id => id !== 'none')
+}
+
+/**
+ * Whether a file already calls every drain factory this run would wire.
+ *
+ * Textual on purpose: the question is "would writing this add anything", and a
+ * file that mentions `createAxiomDrain` sends events to Axiom however it is
+ * spelled around the call.
+ */
+function wiresEveryDrain(path: string, input: WiringInput): boolean {
+  let source: string
+  try {
+    source = readFileSync(path, 'utf8')
+  } catch {
+    return false
+  }
+
+  return allDrains(input).every((id) => {
+    const factory = findDestination(id)?.factory
+    return factory ? source.includes(factory.replace('()', '')) : true
+  })
+}
+
+function describeDrains(input: WiringInput): string {
+  const labels = allDrains(input).map(id => findDestination(id)?.label ?? id)
+  return labels.length > 0 ? labels.join(' and ') : 'the console'
 }
 
 function firstExisting(root: string, names: string[]): string | null {
@@ -128,12 +170,28 @@ function planNuxt(input: WiringInput): WiringPlan {
 
   if (hasProperty(object, 'evlog')) {
     plan.already.push(`${relativePath} already has an evlog block`)
-    if (samplingProperty(input)) {
+    /* An existing block is not a reason to hand back a snippet: adding a key
+       that is not there is the same offset splice as adding one to the root,
+       and only a key that already exists is genuinely ambiguous. */
+    const sampling = samplingProperty(input)
+    const block = getProperty(object, 'evlog')
+    if (sampling && block?.type === 'ObjectExpression') {
+      if (hasProperty(block as ObjectNode, 'sampling')) {
+        plan.manual.push({
+          title: 'Reconcile the sampling rates',
+          file: relativePath,
+          snippet: `${sampling},`,
+          reason: 'the evlog block already sets sampling — replacing rates you chose is not init\'s call',
+        })
+      } else {
+        splices.push(appendProperty(config.source, block as ObjectNode, sampling))
+      }
+    } else if (sampling) {
       plan.manual.push({
         title: 'Add sampling to the evlog block',
         file: relativePath,
-        snippet: `${samplingProperty(input)},`,
-        reason: 'the block already exists — merging into options you wrote is not something init guesses at',
+        snippet: `${sampling},`,
+        reason: 'the evlog block is not a plain object literal',
       })
     }
   } else {
@@ -331,58 +389,94 @@ export const Route = createRootRoute({
  * you. Everything else is production traffic by definition.
  */
 function nitroDrainTemplate(input: WiringInput): string | null {
-  const destination = findDestination(input.drain)
-  if (!destination?.specifier || !destination.factory) return null
+  const dev = input.devDrain === 'none' ? null : findDestination(input.devDrain) ?? null
+  const prod = input.prodDrains.map(id => findDestination(id)).filter(Boolean) as NonNullable<ReturnType<typeof findDestination>>[]
+  if (!dev && prod.length === 0) return null
 
-  const batched = input.extras.includes('pipeline')
-  const imports = [`import { ${destination.factory.replace('()', '')} } from '${destination.specifier}'`]
-  if (batched) {
-    imports.unshift(`import type { DrainContext } from 'evlog'`)
-    imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
+  const batched = input.extras.includes('pipeline') && prod.length > 0
+  const imports: string[] = []
+  if (batched) imports.push(`import type { DrainContext } from 'evlog'`)
+  for (const destination of [...(dev ? [dev] : []), ...prod]) {
+    imports.push(`import { ${destination.factory!.replace('()', '')} } from '${destination.specifier}'`)
   }
+  if (batched) imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
 
-  const setup = batched
-    ? `const pipeline = createDrainPipeline<DrainContext>({
+  const body: string[] = []
+  if (batched) {
+    body.push(`const pipeline = createDrainPipeline<DrainContext>({
   batch: { size: 50, intervalMs: 5000 },
   retry: { maxAttempts: 3 },
 })
-const drain = pipeline(${destination.factory})`
-    : `const drain = ${destination.factory}`
+`)
+  }
 
-  const guard = destination.productionSafe
-    ? ''
-    : '  // Local files are a development convenience — never a production sink.\n  if (!import.meta.dev) return\n'
+  /* Batching wraps the network sends only. Buffering a local file write adds
+     latency to the one loop where you want the event on screen immediately. */
+  const wrap = (factory: string) => batched ? `pipeline(${factory})` : factory
+  const prodList = prod.map(destination => wrap(destination.factory!)).join(', ')
 
-  const envNote = destination.env.length > 0
-    ? `\n * Reads ${destination.env.map(variable => variable.name).join(' and ')} from the environment.`
-    : ''
-
-  return `${imports.join('\n')}
-
-/**
- * Wide events land in ${destination.label}.${envNote}
- */
-${setup}
+  /* One plugin, branched on the environment, rather than a file per
+     destination: the reader gets the whole delivery story in one place, and
+     "which drain runs where" stops being something to reconstruct. */
+  if (dev && prod.length > 0) {
+    body.push(`/**
+ * Development writes to ${dev.label}; production sends to ${prod.map(d => d.label).join(' and ')}.
+${envComment(prod)} */
+const drains = import.meta.dev
+  ? [${dev.factory}]
+  : [${prodList}]
 
 export default defineNitroPlugin((nitroApp) => {
-${guard}  nitroApp.hooks.hook('evlog:drain', drain)
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.all(drains.map(drain => drain(ctx)))
+  })
 })
-`
+`)
+  } else if (prod.length > 0) {
+    body.push(`/**
+ * Wide events land in ${prod.map(d => d.label).join(' and ')}.
+${envComment(prod)} */
+const drains = [${prodList}]
+
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', async (ctx) => {
+    await Promise.all(drains.map(drain => drain(ctx)))
+  })
+})
+`)
+  } else {
+    body.push(`/**
+ * Local wide-event sink — NDJSON under .evlog/logs.
+ */
+const drain = ${dev!.factory}
+
+export default defineNitroPlugin((nitroApp) => {
+  // Local files are a development convenience — never a production sink.
+  if (!import.meta.dev) return
+  nitroApp.hooks.hook('evlog:drain', drain)
+})
+`)
+  }
+
+  return `${imports.join('\n')}\n\n${body.join('\n')}`
 }
 
-function nitroEnricherTemplate(): string {
+function envComment(destinations: { env: { name: string }[] }[]): string {
+  const names = [...new Set(destinations.flatMap(d => d.env.map(v => v.name)))]
+  return names.length > 0 ? ` * Reads ${names.join(', ')} from the environment.\n` : ''
+}
+
+function nitroEnricherTemplate(input: WiringInput): string {
+  const chosen = input.enrichers.map(id => findEnricher(id)).filter(Boolean)
+  const factories = chosen.map(enricher => enricher!.factory)
+  const names = [...factories].map(factory => factory.replace('()', '')).sort()
+
   return `import {
-  createGeoEnricher,
-  createRequestSizeEnricher,
-  createTraceContextEnricher,
-  createUserAgentEnricher,
+${names.map(name => `  ${name},`).join('\n')}
 } from 'evlog/enrichers'
 
 const enrichers = [
-  createUserAgentEnricher(),
-  createGeoEnricher(),
-  createRequestSizeEnricher(),
-  createTraceContextEnricher(),
+${factories.map(factory => `  ${factory},`).join('\n')}
 ]
 
 export default defineNitroPlugin((nitroApp) => {
@@ -393,24 +487,46 @@ export default defineNitroPlugin((nitroApp) => {
 `
 }
 
-/** Add the Nitro-side plugins: the drain, and the enrichers when asked for. */
+/**
+ * Add the Nitro-side plugins.
+ *
+ * A drain file that already exists is never rewritten — but saying only "it
+ * already exists" would leave someone who just picked Axiom with no Axiom
+ * anywhere and no idea why. The destination is written beside it under a name
+ * of its own, and the existing file is left exactly as it was.
+ */
 function withNitroPlugins(plan: WiringPlan, input: WiringInput): WiringPlan {
-  const files: { relative: string, contents: string | null }[] = [
-    { relative: join('server', 'plugins', 'evlog-drain.ts'), contents: nitroDrainTemplate(input) },
-    {
-      relative: join('server', 'plugins', 'evlog-enrich.ts'),
-      contents: input.extras.includes('enrichers') ? nitroEnricherTemplate() : null,
-    },
-  ]
+  const drain = nitroDrainTemplate(input)
+  if (drain) {
+    const preferred = join('server', 'plugins', 'evlog-drain.ts')
+    const path = join(input.root, preferred)
 
-  for (const file of files) {
-    if (file.contents === null) continue
-    const path = join(input.root, file.relative)
-    if (existsSync(path)) {
-      plan.already.push(`${file.relative} already exists`)
-      continue
+    if (!existsSync(path)) {
+      plan.actions.push({ path, relative: preferred, kind: 'create', contents: drain })
+    } else if (wiresEveryDrain(path, input)) {
+      /* Including the file this command wrote last time: without this check,
+         running init twice appends a second plugin that drains the same events
+         to the same place, and idempotence is the property that makes the
+         command safe to re-run at all. */
+      plan.already.push(`${preferred} already wires ${describeDrains(input)}`)
+    } else {
+      const suffix = allDrains(input).join('-') || 'extra'
+      const alternate = join('server', 'plugins', `evlog-drain-${suffix}.ts`)
+      const alternatePath = join(input.root, alternate)
+      if (existsSync(alternatePath)) {
+        plan.already.push(`${alternate} already exists`)
+      } else {
+        plan.actions.push({ path: alternatePath, relative: alternate, kind: 'create', contents: drain })
+        plan.already.push(`${preferred} left as it is — the new drain went to ${alternate}`)
+      }
     }
-    plan.actions.push({ path, relative: file.relative, kind: 'create', contents: file.contents })
+  }
+
+  if (input.extras.includes('enrichers') && input.enrichers.length > 0) {
+    const relativePath = join('server', 'plugins', 'evlog-enrich.ts')
+    const path = join(input.root, relativePath)
+    if (existsSync(path)) plan.already.push(`${relativePath} already exists`)
+    else plan.actions.push({ path, relative: relativePath, kind: 'create', contents: nitroEnricherTemplate(input) })
   }
 
   return plan
@@ -419,10 +535,13 @@ function withNitroPlugins(plan: WiringPlan, input: WiringInput): WiringPlan {
 /** The `sampling` block for a module config, when the extra was selected. */
 function samplingProperty(input: WiringInput): string | null {
   if (!input.extras.includes('sampling')) return null
-  /* Errors are never sampled out. A sampling config that drops errors is one
-     that hides the only events anybody reads at 3am. */
+  const preset = findSamplingPreset(input.sampling)
+  if (!preset?.rates) return null
+  const { info, warn, debug } = preset.rates
+  /* `error: 100` is not part of the preset and not a choice: a sampling config
+     that drops errors hides the only events anybody reads at 3am. */
   return `sampling: {
-      rates: { info: 25, warn: 100, error: 100, debug: 5 },
+      rates: { info: ${info}, warn: ${warn}, error: 100, debug: ${debug} },
     }`
 }
 
@@ -439,39 +558,215 @@ export const { register, onRequestError } = defineNodeInstrumentation({
 }
 
 function nextLibTemplate(input: WiringInput): string {
-  const destination = findDestination(input.drain)
-  const wired = destination?.specifier && destination.factory ? destination : null
+  const dev = input.devDrain === 'none' ? null : findDestination(input.devDrain) ?? null
+  const prod = input.prodDrains.map(id => findDestination(id)).filter(Boolean) as NonNullable<ReturnType<typeof findDestination>>[]
+  const batched = input.extras.includes('pipeline') && prod.length > 0
 
   const imports = [`import { createEvlog } from 'evlog/next'`]
-  if (wired) imports.push(`import { ${wired.factory!.replace('()', '')} } from '${wired.specifier}'`)
-
-  const batched = wired && input.extras.includes('pipeline')
-  if (batched) {
-    imports.splice(1, 0, `import type { DrainContext } from 'evlog'`)
-    imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
+  if (batched) imports.push(`import type { DrainContext } from 'evlog'`)
+  for (const destination of [...(dev ? [dev] : []), ...prod]) {
+    imports.push(`import { ${destination.factory!.replace('()', '')} } from '${destination.specifier}'`)
   }
+  if (batched) imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
 
   const pipeline = batched
     ? `\nconst pipeline = createDrainPipeline<DrainContext>({\n  batch: { size: 50, intervalMs: 5000 },\n  retry: { maxAttempts: 3 },\n})\n`
     : ''
 
-  const expression = wired
-    ? (batched ? `pipeline(${wired.factory})` : wired.factory!)
-    : null
+  const wrap = (factory: string) => batched ? `pipeline(${factory})` : factory
 
-  /* The filesystem drain writes files on whatever box serves the request, so
-     it is scoped to development here the same way the Nitro plugin scopes it. */
-  const drain = expression === null
-    ? '\n'
-    : wired!.productionSafe
-      ? `\n  drain: ${expression},\n`
-      : `\n  // Local NDJSON under .evlog/logs — development only.\n  drain: process.env.NODE_ENV === 'production' ? undefined : ${expression},\n`
+  /* Next has no `import.meta.dev`, so the split is on NODE_ENV — same intent:
+     the file sink never runs where it would write to a production box. */
+  let drainBlock = ''
+  let drainField = '\n'
+  if (dev && prod.length > 0) {
+    drainBlock = `\nconst drains = process.env.NODE_ENV === 'production'\n  ? [${prod.map(d => wrap(d.factory!)).join(', ')}]\n  : [${dev.factory}]\n`
+    drainField = `\n  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),\n`
+  } else if (prod.length > 0) {
+    drainBlock = `\nconst drains = [${prod.map(d => wrap(d.factory!)).join(', ')}]\n`
+    drainField = `\n  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),\n`
+  } else if (dev) {
+    drainField = `\n  // Local NDJSON under .evlog/logs — development only.\n  drain: process.env.NODE_ENV === 'production' ? undefined : ${dev.factory},\n`
+  }
 
   return `${imports.join('\n')}
-${pipeline}
+${pipeline}${drainBlock}
 export const { withEvlog, useLogger, log, createError } = createEvlog({
-  service: '${input.service}',${drain}})
+  service: '${input.service}',${drainField}})
 `
+}
+
+/* ── catalogs, seeded from the scan ─────────────────────────────────────── */
+
+/**
+ * An error catalog built from the project's own repeated errors.
+ *
+ * This is the difference between scaffolding and a suggestion: the entries are
+ * the `createError` calls already written in more than one file, so the file
+ * lands with the team's real errors in it and the migration is a find and
+ * replace rather than a design exercise.
+ */
+function errorCatalogTemplate(input: WiringInput): string {
+  const prefix = input.service.replace(/[^a-z0-9]/gi, '').toLowerCase() || 'app'
+  const entries = input.repeatedErrors.map((seed) => {
+    const files = seed.files.slice(0, 3).join(', ')
+    const status = seed.status ? `\n    status: ${seed.status},` : ''
+    const why = seed.why ? quote(seed.why) : `'TODO: what went wrong, in the reader\\'s terms'`
+    return `  /** Currently written inline in ${files}${seed.files.length > 3 ? ', …' : ''} */
+  ${seed.key}: {${status}
+    message: ${quote(seed.message)},
+    why: ${why},
+    fix: 'TODO: what they should do about it',
+  },`
+  })
+
+  return `import { defineErrorCatalog } from 'evlog'
+
+/**
+ * Typed errors for ${input.service}.
+ *
+ * Seeded by \`evlog init\` from errors this project already repeats across
+ * files. Fill in \`why\` and \`fix\` — they are what turn a stack trace into
+ * something a reader, or an agent, can act on — then replace the inline
+ * \`createError\` calls with \`${prefix}Errors.<KEY>()\`.
+ */
+export const ${prefix}Errors = defineErrorCatalog('${prefix}', {
+${entries.join('\n')}
+})
+
+declare module 'evlog' {
+  interface RegisteredErrorCatalogs {
+    ${prefix}: typeof ${prefix}Errors
+  }
+}
+`
+}
+
+/**
+ * Audit actions for the sensitive routes the scan found without a trail.
+ *
+ * Same principle as the error catalog: the actions are named after the routes
+ * that need them, so the file is a to-do list with the types already written
+ * rather than an empty example.
+ */
+function auditCatalogTemplate(input: WiringInput): string {
+  const seen = new Set<string>()
+  const entries = input.auditGaps.map((gap) => {
+    let name = auditActionName(gap)
+    while (seen.has(name)) name = `${name}2`
+    seen.add(name)
+
+    const constant = name.replace(/[^a-z0-9]+/gi, '_').toUpperCase()
+    const target = gap.path.split('/').filter(Boolean).at(-1)?.replace(/[^a-z0-9]/gi, '') || 'resource'
+    const why = gap.reasons.length > 0 ? ` — flagged for ${gap.reasons.join(', ')}` : ''
+
+    return `/** ${gap.method ?? 'ANY'} ${gap.path}${why} */
+export const ${constant} = defineAuditAction('${name}', {
+  target: '${target}',
+  description: 'TODO: what this records, in one line',
+})`
+  })
+
+  return `import { defineAuditAction } from 'evlog'
+
+/**
+ * Audit actions for ${input.service}.
+ *
+ * Seeded by \`evlog init\` from the entry points \`evlog map\` flagged as
+ * sensitive with no audit trail. Call them from the handlers listed above each
+ * one:
+ *
+ *   log.audit(${entries.length > 0 ? [...seen][0]!.replace(/[^a-z0-9]+/gi, '_').toUpperCase() : 'ACTION'}({ actor: { type: 'user', id: user.id }, outcome: 'success' }))
+ */
+${entries.join('\n\n')}
+`
+}
+
+/**
+ * A single-quoted string literal.
+ *
+ * Generated files land in someone's repository and go through their linter;
+ * `JSON.stringify` would emit double quotes and fail the check on the majority
+ * of TypeScript projects, which style on single.
+ */
+function quote(value: string): string {
+  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
+}
+
+/** Where a catalog file goes, per framework convention. */
+function catalogDir(input: WiringInput): string {
+  if (input.framework === 'next') {
+    const useSrc = existsSync(join(input.root, 'src', 'app')) || existsSync(join(input.root, 'src', 'pages'))
+    return useSrc ? join('src', 'lib') : 'lib'
+  }
+  if (input.framework === 'tanstack-start') return join('src', 'lib')
+  return join('server', 'utils')
+}
+
+function withCatalogs(plan: WiringPlan, input: WiringInput): WiringPlan {
+  const dir = catalogDir(input)
+
+  if (input.extras.includes('error-catalog') && input.repeatedErrors.length > 0) {
+    addFile(plan, input, join(dir, 'errors.ts'), errorCatalogTemplate(input))
+  }
+  if (input.extras.includes('audit-catalog') && input.auditGaps.length > 0) {
+    addFile(plan, input, join(dir, 'audit.ts'), auditCatalogTemplate(input))
+  }
+
+  return plan
+}
+
+/** Queue a file, or report it as already present. Never overwrites. */
+function addFile(plan: WiringPlan, input: WiringInput, relativePath: string, contents: string): void {
+  const path = join(input.root, relativePath)
+  if (existsSync(path)) {
+    plan.already.push(`${relativePath} already exists`)
+    return
+  }
+  plan.actions.push({ path, relative: relativePath, kind: 'create', contents })
+}
+
+/* ── environment ────────────────────────────────────────────────────────── */
+
+/**
+ * Append the chosen adapters' variables to `.env.example`.
+ *
+ * `.env.example` and never `.env`: the example file is documentation and is
+ * committed, the real one holds secrets and is not something a setup command
+ * should be editing. Keys already present are left alone.
+ */
+function withEnvExample(plan: WiringPlan, input: WiringInput): WiringPlan {
+  const variables = input.prodDrains
+    .map(id => findDestination(id))
+    .flatMap(destination => destination?.env ?? [])
+  if (variables.length === 0) return plan
+
+  const path = join(input.root, '.env.example')
+  const existing = existsSync(path) ? readFileSync(path, 'utf8') : ''
+  const missing = variables.filter(variable => !new RegExp(`^\\s*${variable.name}\\s*=`, 'm').test(existing))
+
+  if (missing.length === 0) {
+    plan.already.push('.env.example already lists the adapter keys')
+    return plan
+  }
+
+  const width = Math.max(...missing.map(variable => variable.name.length))
+  const block = [
+    '# evlog — wide event delivery',
+    ...missing.map(variable => `${`${variable.name}=`.padEnd(width + 2)}# ${variable.hint}`),
+    '',
+  ].join('\n')
+  const contents = existing.length > 0
+    ? `${existing.replace(/\n*$/, '\n')}\n${block}`
+    : block
+
+  plan.actions.push({
+    path,
+    relative: '.env.example',
+    kind: existing.length > 0 ? 'patch' : 'create',
+    contents,
+  })
+  return plan
 }
 
 function planNext(input: WiringInput): WiringPlan {
@@ -526,6 +821,14 @@ export const GET = withEvlog(async () => {
 
 /** Build the file plan for a framework. Pure: reads the project, writes nothing. */
 export function planWiring(input: WiringInput): WiringPlan {
+  const plan = frameworkPlan(input)
+  /* Catalogs and the env example are framework-shaped only in where they land,
+     so they are applied once here rather than repeated in each planner — which
+     is how the Next planner ended up being the only one that wrote them. */
+  return withEnvExample(withCatalogs(plan, input), input)
+}
+
+function frameworkPlan(input: WiringInput): WiringPlan {
   switch (input.framework) {
     case 'nuxt': return planNuxt(input)
     case 'nitro':

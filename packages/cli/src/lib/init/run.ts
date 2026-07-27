@@ -1,5 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
+import { runDoctor } from '../../commands/doctor'
 import type { CliContext } from '../../core/context'
 import type { CliDebug } from '../debug'
 import { createNoopCliDebug } from '../debug'
@@ -7,9 +8,11 @@ import { detectFramework } from '../map/detect'
 import type { Framework } from '../map/types'
 import { resolveEvlog, resolveProject } from '../project'
 import type { PackageJson, ProjectInfo } from '../project'
-import type { DrainId, ExtraId } from './catalog'
+import type { DrainId, EnricherId, ExtraId, OfferContext, SamplingProfile } from './catalog'
 import { planWiring } from './frameworks'
 import type { FileAction, ManualStep } from './frameworks'
+import { readProject } from './insight'
+import type { ProjectInsight } from './insight'
 import { detectPackageManager, installCommand, runInstall } from './pm'
 import type { PackageManager } from './pm'
 import {
@@ -22,6 +25,7 @@ import {
   noteEnvironment,
   noteManual,
   openInteractive,
+  runVerification,
 } from './prompts'
 import type { InitAnswers } from './prompts'
 import { droppedExtras, resolveAnswers } from './resolve'
@@ -43,8 +47,12 @@ export interface InitResult {
   written: FileAction[]
   already: string[]
   manual: ManualStep[]
-  /** Extras asked for that this framework or drain cannot use. */
+  /** Extras asked for that this project cannot use. */
   dropped: ExtraId[]
+  /** What the scan found — why the offers were what they were. */
+  insight: InsightSummary | null
+  /** `evlog doctor` after the writes, when it ran. */
+  verified: VerifySummary | null
   dryRun: boolean
   /** True when the run asked questions — the report stays quiet if so. */
   interactive: boolean
@@ -52,11 +60,26 @@ export interface InitResult {
   cancelled: boolean
 }
 
+export interface InsightSummary {
+  repeatedErrors: number
+  auditGaps: number
+  pairable: string[]
+}
+
+export interface VerifySummary {
+  ok: number
+  warn: number
+  fail: number
+}
+
 export interface InitOptions {
   framework?: Framework
   service?: string
-  drain?: DrainId
+  devDrain?: DrainId
+  prodDrains?: DrainId[]
   extras?: ExtraId[]
+  enrichers?: EnricherId[]
+  sampling?: SamplingProfile
   /** Plan everything, write nothing. */
   dryRun?: boolean
   /** Run the package manager when evlog is missing. Default: true. */
@@ -95,7 +118,7 @@ function detectNitroMajor(pkg: PackageJson | null, framework: Framework): 2 | 3 
 }
 
 /**
- * Wire evlog into the project: ask, plan, confirm, write.
+ * Wire evlog into the project: read it, ask, plan, confirm, write, verify.
  *
  * Interactive when there is somebody to answer and nothing says otherwise;
  * flags and defaults fill in everything when there is not, so an agent gets the
@@ -130,25 +153,43 @@ export async function runInit(
     r => ({ hasEvlog: !!r.install }),
   )
 
+  /* The same analysis `map` runs, so an offer can carry its evidence. Two
+     analyses that disagreed about what counts as an audit gap would have `init`
+     offering to fix something `map` does not report. */
+  const insight = await log.step(
+    'readProject',
+    () => readProject(project.packageDir, detection.framework, project.packageName ?? 'app'),
+    r => ({ repeatedErrors: r?.repeatedErrors.length ?? 0, auditGaps: r?.auditGaps.length ?? 0 }),
+  )
+
   const packageManager = detectPackageManager([project.packageDir, project.root])
   const command = installCommand(packageManager)
   const dryRun = options.dryRun === true
   const evlogInstalled = !!resolved.install
-
   const interactive = !options.nonInteractive && !options.yes && canPrompt(ctx)
+
+  const offers = (prodDrains: DrainId[], framework: Framework): OfferContext => ({
+    framework,
+    prodDrains,
+    facts: insight?.facts ?? null,
+    auditGaps: insight?.auditGaps.length ?? 0,
+  })
 
   const base = {
     framework: detection.framework,
     defaultService: defaultService(project),
     evlogInstalled,
     install: options.install !== false,
-    drain: options.drain,
+    devDrain: options.devDrain,
+    prodDrains: options.prodDrains,
     extras: options.extras,
+    enrichers: options.enrichers,
+    sampling: options.sampling,
     service: options.service,
+    offers,
   }
 
   let answers: InitAnswers
-  let confirmed = true
 
   if (interactive) {
     openInteractive(ctx, project.packageName ?? project.packageDir)
@@ -162,6 +203,7 @@ export async function runInit(
         evlogInstalled,
         installRequested: base.install,
         packageManager,
+        offers,
       })
     } catch (error) {
       if (error instanceof InitCancelled) {
@@ -174,7 +216,11 @@ export async function runInit(
     answers = resolveAnswers(base)
   }
 
-  log.set({ drain: answers.drain, extras: answers.extras.join(',') || 'none' })
+  log.set({
+    devDrain: answers.devDrain,
+    prodDrains: answers.prodDrains.join(',') || 'none',
+    extras: answers.extras.join(',') || 'none',
+  })
 
   const plan = await log.step(
     'planWiring',
@@ -182,9 +228,14 @@ export async function runInit(
       root: project.packageDir,
       framework: answers.framework,
       service: answers.service,
-      drain: answers.drain,
+      devDrain: answers.devDrain,
+      prodDrains: answers.prodDrains,
       extras: answers.extras,
+      enrichers: answers.enrichers,
+      sampling: answers.sampling,
       nitroMajor: detectNitroMajor(project.packageJson, answers.framework),
+      repeatedErrors: insight?.repeatedErrors ?? [],
+      auditGaps: insight?.auditGaps ?? [],
     }),
     r => ({ writes: r.actions.length, manual: r.manual.length }),
   )
@@ -192,6 +243,7 @@ export async function runInit(
   const installing = !evlogInstalled && answers.install && !dryRun
 
   if (interactive && !dryRun) {
+    let confirmed: boolean
     try {
       confirmed = await confirmPlan(plan.actions, plan.already, installing, packageManager)
     } catch (error) {
@@ -231,8 +283,26 @@ export async function runInit(
     })
   }
 
+  /* The real question after a setup is "did it work", and answering it with
+     "now run this other command" is leaving the job half done. */
+  let verified: VerifySummary | null = null
+  if (!dryRun) {
+    const verify = async (): Promise<VerifySummary> => {
+      const doctor = await runDoctor({ ...ctx, cwd: project.packageDir })
+      return doctor.summary
+    }
+    if (interactive) {
+      await runVerification(async () => {
+        verified = await verify()
+        return `${verified.ok} ok · ${verified.warn} warn · ${verified.fail} fail`
+      })
+    } else {
+      verified = await log.step('verify', verify)
+    }
+  }
+
   if (interactive) {
-    noteEnvironment(answers.drain)
+    noteEnvironment(answers.prodDrains)
     noteManual(plan.manual)
     closeInteractive(ctx, answers.framework, frameworkDocs(answers.framework))
   }
@@ -248,6 +318,14 @@ export async function runInit(
     already: plan.already,
     manual: plan.manual,
     dropped: droppedExtras(base),
+    insight: insight
+      ? {
+        repeatedErrors: insight.repeatedErrors.length,
+        auditGaps: insight.auditGaps.length,
+        pairable: [...insight.facts.pairable],
+      }
+      : null,
+    verified,
     dryRun,
     interactive,
     cancelled: false,
@@ -271,6 +349,8 @@ function cancelledResult(input: {
     already: [],
     manual: [],
     dropped: [],
+    insight: null,
+    verified: null,
     dryRun: input.dryRun,
     /* Only an interactive run can be cancelled — there is nothing to answer
        when nobody was asked. */

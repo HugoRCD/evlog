@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { createContext } from '../src/core/context'
 import { availableExtras, DESTINATIONS, EXTRAS, findDestination } from '../src/lib/init/catalog'
+import type { DrainId } from '../src/lib/init/catalog'
 import { canPrompt } from '../src/lib/init/prompts'
 import { droppedExtras, parseDrainArg, parseExtrasArg, resolveAnswers } from '../src/lib/init/resolve'
 
@@ -38,19 +39,32 @@ describe('parseExtrasArg', () => {
 })
 
 describe('resolveAnswers', () => {
+  /* No scan ran, so evidence-gated offers are unavailable — which is exactly
+     what a caller passing flags against an unreadable project gets. */
+  const offers = (prodDrains: DrainId[], framework: 'nuxt' | 'nitro' | 'next' | 'tanstack-start') => ({
+    framework,
+    prodDrains,
+    facts: null,
+    auditGaps: 0,
+  })
+
   const base = {
     framework: 'nuxt' as const,
     defaultService: 'shop',
     evlogInstalled: false,
     install: true,
+    offers,
   }
 
-  it('defaults to the local sink and no extras', () => {
+  it('defaults to the local sink, nothing in production, no extras', () => {
     expect(resolveAnswers(base)).toEqual({
       framework: 'nuxt',
       service: 'shop',
-      drain: 'fs',
+      devDrain: 'fs',
+      prodDrains: [],
       extras: [],
+      enrichers: [],
+      sampling: 'all',
       install: true,
     })
   })
@@ -68,11 +82,23 @@ describe('resolveAnswers', () => {
     expect(droppedExtras(input)).toEqual(['vite'])
   })
 
-  it('hides batching behind a drain that actually sends somewhere', () => {
-    const input = { ...base, drain: 'fs' as const, extras: ['pipeline' as const] }
+  it('turns every enricher on when the extra is selected without a list', () => {
+    const answers = resolveAnswers({ ...base, extras: ['enrichers'] })
 
-    expect(resolveAnswers(input).extras).toEqual([])
-    expect(availableExtras('nuxt', 'axiom').map(extra => extra.id)).toContain('pipeline')
+    expect(answers.enrichers).toEqual(['user-agent', 'geo', 'request-size', 'trace-context'])
+  })
+
+  it('defaults sampling to balanced only when the extra is selected', () => {
+    expect(resolveAnswers({ ...base, extras: ['sampling'] }).sampling).toBe('balanced')
+    expect(resolveAnswers(base).sampling).toBe('all')
+  })
+
+  it('hides batching until something actually leaves the process', () => {
+    const local = { ...base, extras: ['pipeline' as const] }
+    expect(resolveAnswers(local).extras).toEqual([])
+
+    const hosted = { ...base, prodDrains: ['axiom' as const], extras: ['pipeline' as const] }
+    expect(resolveAnswers(hosted).extras).toEqual(['pipeline'])
   })
 })
 
@@ -89,9 +115,20 @@ describe('the catalog', () => {
   })
 
   it('keeps every extra reachable from at least one framework', () => {
+    /* Full evidence: every gate satisfied, so anything still missing is an
+       extra no project could ever be offered. */
+    const facts = {
+      dependencies: new Set(['ai', 'better-auth']),
+      features: new Set<never>(),
+      pairable: new Set(['ai', 'better-auth'] as const),
+      catalogs: [],
+      evlogBarrels: new Map(),
+      repeatedErrors: new Map([['status=402', { label: '402', files: ['a.ts', 'b.ts'] }]]),
+    }
+
     for (const extra of EXTRAS) {
-      const reachable = (['nuxt', 'nitro', 'next', 'tanstack-start'] as const)
-        .some(framework => availableExtras(framework, 'axiom').includes(extra))
+      const reachable = (['nuxt', 'nitro', 'next', 'tanstack-start'] as const).some(framework =>
+        availableExtras({ framework, prodDrains: ['axiom'], facts: facts as never, auditGaps: 2 }).includes(extra))
       expect(reachable, `${extra.id} is offered nowhere`).toBe(true)
     }
   })

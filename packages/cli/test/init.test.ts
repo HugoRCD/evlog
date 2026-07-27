@@ -26,6 +26,21 @@ function fakeContext(cwd: string): CliContext {
   return createContext({ cwd, env: {}, nodeVersion: 'v22.0.0', tty: false, color: false, columns: 80 })
 }
 
+
+/** Wiring defaults, so each case states only what it is about. */
+function wiring(overrides: Partial<Parameters<typeof planWiring>[0]> = {}) {
+  return {
+    devDrain: 'fs' as const,
+    prodDrains: [] as never[],
+    extras: [] as never[],
+    enrichers: [] as never[],
+    sampling: 'all' as const,
+    repeatedErrors: [],
+    auditGaps: [],
+    ...overrides,
+  }
+}
+
 afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
@@ -37,7 +52,7 @@ describe('planWiring — nuxt', () => {
       'nuxt.config.ts': `export default defineNuxtConfig({\n  // keep me\n  modules: ['@nuxt/ui'],\n  devtools: { enabled: true },\n})\n`,
     })
 
-    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.actions).toHaveLength(1)
     expect(plan.actions[0]!.contents).toBe(
@@ -51,7 +66,7 @@ describe('planWiring — nuxt', () => {
       'nuxt.config.ts': `export default defineNuxtConfig({\n  devtools: { enabled: true },\n})\n`,
     })
 
-    const { contents } = (planWiring({ root, framework: 'nuxt', service: 'shop', drain: 'none', extras: [], nitroMajor: 3 }).actions[0]!)
+    const { contents } = (planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ devDrain: 'none' }), nitroMajor: 3 }).actions[0]!)
 
     expect(contents).toContain(`modules: ['evlog/nuxt'],`)
     expect(contents).toContain(`env: { service: 'shop' },`)
@@ -63,7 +78,7 @@ describe('planWiring — nuxt', () => {
       'nuxt.config.ts': `export default defineNuxtConfig({\n  modules: ['evlog/nuxt'],\n  evlog: { env: { service: 'shop' } },\n})\n`,
     })
 
-    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.actions).toHaveLength(0)
     expect(plan.already).toHaveLength(2)
@@ -75,7 +90,7 @@ describe('planWiring — nuxt', () => {
       'nuxt.config.ts': `const mods = ['@nuxt/ui']\nexport default defineNuxtConfig({\n  modules: mods,\n})\n`,
     })
 
-    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.manual[0]).toMatchObject({ file: 'nuxt.config.ts', snippet: `'evlog/nuxt'` })
     /* The half it can still do lands: the `evlog` block is independent of how
@@ -93,7 +108,7 @@ describe('planWiring — nitro', () => {
       'nitro.config.ts': `import { defineConfig } from 'nitro'\n\nexport default defineConfig({\n  compatibilityDate: '2025-01-01',\n})\n`,
     })
 
-    const { contents } = (planWiring({ root, framework: 'nitro', service: 'api', drain: 'none', extras: [], nitroMajor: 3 }).actions[0]!)
+    const { contents } = (planWiring({ root, framework: 'nitro', service: 'api', ...wiring({ devDrain: 'none' }), nitroMajor: 3 }).actions[0]!)
 
     expect(contents).toContain(`import evlog from 'evlog/nitro/v3'`)
     expect(contents).toContain(`env: { service: 'api' },`)
@@ -102,7 +117,7 @@ describe('planWiring — nitro', () => {
   it('uses the v2 subpath and factory when the project is on nitropack', async () => {
     const root = await project({ 'package.json': '{"name":"api"}' })
 
-    const { contents } = (planWiring({ root, framework: 'nitro', service: 'api', drain: 'none', extras: [], nitroMajor: 2 }).actions[0]!)
+    const { contents } = (planWiring({ root, framework: 'nitro', service: 'api', ...wiring({ devDrain: 'none' }), nitroMajor: 2 }).actions[0]!)
 
     expect(contents).toContain(`import evlog from 'evlog/nitro'`)
     expect(contents).toContain('defineNitroConfig')
@@ -114,7 +129,7 @@ describe('planWiring — nitro', () => {
       'nitro.config.ts': `import { defineConfig } from 'nitro'\n\nexport default defineConfig({\n  experimental: {},\n})\n`,
     })
 
-    const plan = planWiring({ root, framework: 'tanstack-start', service: 'start-app', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'tanstack-start', service: 'start-app', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.actions[0]!.contents).toContain('asyncContext: true')
     expect(plan.manual[0]!.snippet).toContain('evlogErrorHandler')
@@ -128,7 +143,7 @@ describe('planWiring — next', () => {
       'src/app/page.tsx': 'export default function Page() { return null }',
     })
 
-    const files = planWiring({ root, framework: 'next', service: 'web', drain: 'fs', extras: [], nitroMajor: 3 }).actions.map(a => a.relative)
+    const files = planWiring({ root, framework: 'next', service: 'web', ...wiring({}), nitroMajor: 3 }).actions.map(a => a.relative)
 
     expect(files).toEqual([join('src', 'instrumentation.ts'), join('src', 'lib', 'evlog.ts')])
   })
@@ -139,7 +154,7 @@ describe('planWiring — next', () => {
       'instrumentation.ts': 'export function register() {}',
     })
 
-    const plan = planWiring({ root, framework: 'next', service: 'web', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'next', service: 'web', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.actions.map(a => a.relative)).toEqual([join('lib', 'evlog.ts')])
     expect(plan.already).toContain('instrumentation.ts already exists')
@@ -196,7 +211,7 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    await runInit(fakeContext(cwd), undefined, { install: false, drain: 'none', yes: true })
+    await runInit(fakeContext(cwd), undefined, { install: false, devDrain: 'none', yes: true })
 
     expect(existsSync(join(cwd, 'server/plugins/evlog-drain.ts'))).toBe(false)
   })
@@ -233,11 +248,54 @@ describe('drain wiring', () => {
   it('leaves a hosted drain running in production', async () => {
     const root = await project({ 'package.json': '{"name":"api"}' })
 
-    const plan = planWiring({ root, framework: 'nitro', service: 'api', drain: 'axiom', extras: [], nitroMajor: 3 })
+    const plan = planWiring({
+      root,
+      framework: 'nitro',
+      service: 'api',
+      ...wiring({ devDrain: 'none', prodDrains: ['axiom'] }),
+      nitroMajor: 3,
+    })
     const drain = plan.actions.find(action => action.relative.endsWith('evlog-drain.ts'))!
 
     expect(drain.contents).toContain(`import { createAxiomDrain } from 'evlog/axiom'`)
+    /* Nothing gates it: a hosted destination is the one you picked to receive
+       production traffic. */
     expect(drain.contents).not.toContain('import.meta.dev')
+  })
+
+  it('branches on the environment when dev and production differ', async () => {
+    const root = await project({ 'package.json': '{"name":"api"}' })
+
+    const plan = planWiring({
+      root,
+      framework: 'nitro',
+      service: 'api',
+      ...wiring({ devDrain: 'fs', prodDrains: ['axiom', 'sentry'] }),
+      nitroMajor: 3,
+    })
+    const drain = plan.actions.find(action => action.relative.endsWith('evlog-drain.ts'))!
+
+    expect(drain.contents).toContain('import.meta.dev')
+    expect(drain.contents).toContain('createFsDrain()')
+    expect(drain.contents).toContain('createAxiomDrain(), createSentryDrain()')
+  })
+
+  it('batches the network sends and never the local file write', async () => {
+    /* Buffering a local write adds latency to the one loop where you want the
+       event on screen immediately. */
+    const root = await project({ 'package.json': '{"name":"api"}' })
+
+    const plan = planWiring({
+      root,
+      framework: 'nitro',
+      service: 'api',
+      ...wiring({ devDrain: 'fs', prodDrains: ['axiom'], extras: ['pipeline'] }),
+      nitroMajor: 3,
+    })
+    const drain = plan.actions.find(action => action.relative.endsWith('evlog-drain.ts'))!
+
+    expect(drain.contents).toContain('[createFsDrain()]')
+    expect(drain.contents).toContain('[pipeline(createAxiomDrain())]')
   })
 
   it('scopes the filesystem drain to development', async () => {
@@ -245,7 +303,7 @@ describe('drain wiring', () => {
        and init does not make it for you. */
     const root = await project({ 'package.json': '{"name":"api"}' })
 
-    const plan = planWiring({ root, framework: 'nitro', service: 'api', drain: 'fs', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nitro', service: 'api', ...wiring({}), nitroMajor: 3 })
     const drain = plan.actions.find(action => action.relative.endsWith('evlog-drain.ts'))!
 
     expect(drain.contents).toContain('if (!import.meta.dev) return')
@@ -254,7 +312,7 @@ describe('drain wiring', () => {
   it('writes no drain plugin at all for the console-only choice', async () => {
     const root = await project({ 'package.json': '{"name":"api"}' })
 
-    const plan = planWiring({ root, framework: 'nitro', service: 'api', drain: 'none', extras: [], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nitro', service: 'api', ...wiring({ devDrain: 'none' }), nitroMajor: 3 })
 
     expect(plan.actions.some(action => action.relative.includes('evlog-drain'))).toBe(false)
   })
@@ -262,7 +320,7 @@ describe('drain wiring', () => {
   it('wraps the drain in a pipeline when batching was asked for', async () => {
     const root = await project({ 'package.json': '{"name":"api"}' })
 
-    const plan = planWiring({ root, framework: 'nitro', service: 'api', drain: 'axiom', extras: ['pipeline'], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nitro', service: 'api', ...wiring({ prodDrains: ['axiom'], extras: ['pipeline'] }), nitroMajor: 3 })
     const drain = plan.actions.find(action => action.relative.endsWith('evlog-drain.ts'))!
 
     expect(drain.contents).toContain('createDrainPipeline<DrainContext>')
@@ -272,11 +330,17 @@ describe('drain wiring', () => {
   it('puts the Next.js drain in the factory rather than a plugin', async () => {
     const root = await project({ 'package.json': '{"name":"web"}' })
 
-    const plan = planWiring({ root, framework: 'next', service: 'web', drain: 'sentry', extras: [], nitroMajor: 3 })
+    const plan = planWiring({
+      root,
+      framework: 'next',
+      service: 'web',
+      ...wiring({ devDrain: 'none', prodDrains: ['sentry'] }),
+      nitroMajor: 3,
+    })
     const lib = plan.actions.find(action => action.relative.endsWith('evlog.ts'))!
 
     expect(lib.contents).toContain(`import { createSentryDrain } from 'evlog/sentry'`)
-    expect(lib.contents).toContain('drain: createSentryDrain(),')
+    expect(lib.contents).toContain('const drains = [createSentryDrain()]')
   })
 
   it('keeps errors at full rate when sampling is enabled', async () => {
@@ -285,7 +349,7 @@ describe('drain wiring', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', drain: 'fs', extras: ['sampling'], nitroMajor: 3 })
+    const plan = planWiring({ root, framework: 'nuxt', service: 'shop', ...wiring({ extras: ['sampling'], sampling: 'balanced' }), nitroMajor: 3 })
     const config = plan.actions.find(action => action.relative === 'nuxt.config.ts')!
 
     expect(config.contents).toContain('error: 100')
