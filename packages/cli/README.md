@@ -13,34 +13,33 @@
 
 **Digging through logs is not observability. It's hope.**
 
-The official command line for [evlog](https://evlog.dev).
+The official command line for [evlog](https://evlog.dev) — a **separate package** from the logger itself.
 
-Diagnose your install. Score what your app can tell you when something goes wrong.
+Score what your app can tell you when something goes wrong. Diagnose your install when nothing shows up.
 
 > **Early days.** Safe to run on any project — it reads your source and writes a single `evlog.map.json` at the root (`--no-write` to skip), and it is covered by tests — but young. `evlog map` has adapters for four frameworks today, its rules are still being refined, and both will grow. Expect verdicts and scores to move between releases: pin the CLI as a dev dependency when you gate CI on the number.
 
 ## Usage
 
+Try without installing:
+
 ```bash
-pnpm add -D @evlog/cli
-pnpm evlog doctor
+npx @evlog/cli map
+npx @evlog/cli map --json --no-write
 ```
 
-Or without installing:
+Or pin it for repeatable scores / CI:
 
 ```bash
-npx @evlog/cli doctor
-npx @evlog/cli doctor --json
-npx @evlog/cli doctor --cwd apps/web
+pnpm add -D @evlog/cli
+pnpm evlog map
+pnpm evlog doctor
 ```
 
 ## Commands
 
 | Command | What it does |
 | --- | --- |
-| `evlog doctor` | Monorepo-aware diagnosis: Node, project/workspace, stack, evlog install, `.evlog/logs` |
-| `evlog doctor --cwd <dir>` | Run against another directory |
-| `evlog doctor --debug` | Same, plus a debug wide event (see Debug) |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |
@@ -49,6 +48,9 @@ npx @evlog/cli doctor --cwd apps/web
 | `evlog map --no-write` | Skip writing `evlog.map.json` to the project root |
 | `evlog map --verbose` | Show per-file parse warnings |
 | `evlog map --cwd <dir>` | Scan another app in the workspace |
+| `evlog doctor` | Monorepo-aware diagnosis: Node, project/workspace, stack, evlog install, `.evlog/logs` |
+| `evlog doctor --cwd <dir>` | Run against another directory |
+| `evlog doctor --debug` | Same, plus a debug wide event (see Debug) |
 | `evlog telemetry status` | Show telemetry status and disclosure |
 | `evlog telemetry enable` / `disable` | Change telemetry preference (disable purges buffered data) |
 

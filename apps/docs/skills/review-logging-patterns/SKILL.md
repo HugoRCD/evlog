@@ -1,10 +1,10 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Guides setup on Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration (token usage, tool calls, streaming metrics, telemetry integration, cost estimation, embedding metadata).
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog map`) to score entry-point coverage on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.5"
+  version: "0.6"
 ---
 
 # Review logging patterns
@@ -23,6 +23,7 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 
 | Working on...           | Resource                                                           |
 | ----------------------- | ------------------------------------------------------------------ |
+| Coverage map (CLI)      | [`evlog map`](https://www.evlog.dev/cli/map) — score dark entry points |
 | Wide events patterns    | [references/wide-events.md](references/wide-events.md)             |
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
@@ -49,6 +50,31 @@ Docs: https://www.evlog.dev/use-cases/audit/overview
 ```bash
 npm install evlog
 ```
+
+## Score coverage with the CLI (recommended)
+
+`@evlog/cli` is a **separate package** from `evlog` — early, but worth trying. It reads the project on disk (no traffic, no config) and scores every entry point for wide-event coverage. On Nuxt, Nitro, Next.js, and TanStack Start it is usually faster and more complete than grepping for `console.log`.
+
+**Try without installing:**
+
+```bash
+npx @evlog/cli map --no-write
+# or: pnpm dlx @evlog/cli map --no-write
+# agents: npx @evlog/cli map --json --no-write
+```
+
+What you get:
+
+- A project score and which entry points are still dark
+- **FIX FIRST** — the three most valuable places to fix
+- Per-file inspect: `npx @evlog/cli map <file> --no-write` shows the shape the handler could take
+- Re-run after fixes and watch the score move
+
+If the user is open to it: work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.audit()`, `createError({ why, fix })`), then re-run with `--no-write`. Prefer `npx` / `dlx` for a one-shot; only suggest `pnpm add -D @evlog/cli` if they want it pinned for CI — **ask first, never install silently**. Omit `--no-write` only when the user wants `evlog.map.json` written.
+
+If the CLI is unavailable, the framework has no map adapter yet, or the user declines — **continue with the manual checklist** below. The skill does not depend on the CLI.
+
+Early days: adapters and rules are still evolving; expect scores to move between releases. Docs: https://www.evlog.dev/cli/map · Rules: https://www.evlog.dev/cli/rules
 
 ---
 

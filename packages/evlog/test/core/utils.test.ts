@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { colors, formatDuration, getLevelColor, isBrowser, isClient, isDev, isLevelEnabled, isServer, matchesPattern } from '../../src/utils'
+import { colors, formatDuration, getLevelColor, isBrowser, isClient, isDev, isLevelEnabled, isServer, isoNow, matchesPattern } from '../../src/utils'
 import { shouldLog } from '../../src/shared/routes'
 
 describe('formatDuration', () => {
@@ -18,6 +18,48 @@ describe('formatDuration', () => {
   it('rounds milliseconds', () => {
     expect(formatDuration(42.7)).toBe('43ms')
     expect(formatDuration(42.3)).toBe('42ms')
+  })
+})
+
+describe('isoNow', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('matches Date.toISOString() for a fixed wall-clock time', () => {
+    const now = Date.parse('2024-01-15T12:00:00.123Z')
+    vi.spyOn(Date, 'now').mockReturnValue(now)
+    expect(isoNow()).toBe('2024-01-15T12:00:00.123Z')
+    expect(isoNow()).toBe(new Date(now).toISOString())
+  })
+
+  it('formats correctly across a second boundary', () => {
+    const before = Date.parse('2024-01-15T12:00:00.999Z')
+    const after = Date.parse('2024-01-15T12:00:01.000Z')
+    const now = vi.spyOn(Date, 'now')
+
+    now.mockReturnValue(before)
+    expect(isoNow()).toBe('2024-01-15T12:00:00.999Z')
+
+    now.mockReturnValue(after)
+    expect(isoNow()).toBe('2024-01-15T12:00:01.000Z')
+  })
+
+  it('updates milliseconds within the same second', () => {
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValue(Date.parse('2024-01-15T12:00:00.001Z'))
+    expect(isoNow()).toBe('2024-01-15T12:00:00.001Z')
+
+    now.mockReturnValue(Date.parse('2024-01-15T12:00:00.042Z'))
+    expect(isoNow()).toBe('2024-01-15T12:00:00.042Z')
+
+    now.mockReturnValue(Date.parse('2024-01-15T12:00:00.999Z'))
+    expect(isoNow()).toBe('2024-01-15T12:00:00.999Z')
+  })
+
+  it('zero-pads single-digit milliseconds', () => {
+    vi.spyOn(Date, 'now').mockReturnValue(Date.parse('2024-01-15T12:00:00.005Z'))
+    expect(isoNow()).toBe('2024-01-15T12:00:00.005Z')
   })
 })
 
