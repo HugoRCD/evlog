@@ -928,13 +928,15 @@ export function formatGate(ctx: CliContext, result: ScanResult, threshold: numbe
 export function formatBaseline(ctx: CliContext, comparison: BaselineComparison): string {
   const style = createReportStyle(ctx)
   const { paint } = style
-  const { regressions, fixed, added, removed, delta } = comparison
+  const { regressions, fixed, added, removed, delta, totalDelta } = comparison
   const passed = !hasRegressed(comparison)
   const badge = paint(['bold', passed ? 'green' : 'red'], ' BASELINE ')
 
-  const move = delta === 0
+  /* The headline shows the two global scores, so it has to show the arithmetic
+     between them — `delta` measures something narrower and would not add up. */
+  const move = totalDelta === 0
     ? paint('dim', `score ${comparison.score}, unchanged`)
-    : paint(delta > 0 ? 'green' : 'red', `score ${comparison.baselineScore} → ${comparison.score} (${delta > 0 ? '+' : ''}${delta})`)
+    : paint(totalDelta > 0 ? 'green' : 'red', `score ${comparison.baselineScore} → ${comparison.score} (${totalDelta > 0 ? '+' : ''}${totalDelta})`)
 
   const lines = ['', `${badge} ${move} ${paint('dim', `vs ${comparison.source.label}`)}`]
 
@@ -976,7 +978,9 @@ export function formatBaseline(ctx: CliContext, comparison: BaselineComparison):
   if (passed) {
     lines.push(`${paint('green', 'no regression')} ${paint('dim', '— exit code 0')}`)
   } else {
-    const counted = `${regressions.length} regression${regressions.length === 1 ? '' : 's'}${delta < 0 ? ` and a ${-delta} point drop` : ''}`
+    /* `delta`, not `totalDelta`: this sentence explains the exit code, and what
+       gates is the movement on the entry points that already existed. */
+    const counted = `${regressions.length} regression${regressions.length === 1 ? '' : 's'}${delta < 0 ? ` and a ${-delta} point drop on existing entry points` : ''}`
     lines.push(`${paint('red', counted)} ${paint('dim', '— exit code 1 ·')} ${style.doc('/cli/ci')}`)
     lines.push(paint('dim', `${MAP_FILE_NAME} was not rewritten — fix the regression, or re-run without --baseline to accept it`))
   }

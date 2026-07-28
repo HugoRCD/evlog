@@ -15,7 +15,7 @@
  */
 
 import { execFileSync, spawnSync } from 'node:child_process'
-import { cpSync, existsSync, mkdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
+import { cpSync, existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, symlinkSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import process from 'node:process'
 import { fileURLToPath } from 'node:url'
@@ -157,23 +157,20 @@ function ensureCliBuilt() {
 function newestSourceTime(dir) {
   let newest = 0
   const walk = (current) => {
-    for (const entry of readdirSafe(current)) {
-      const path = join(current, entry)
-      const stat = statSync(path)
-      if (stat.isDirectory()) walk(path)
-      else newest = Math.max(newest, stat.mtimeMs)
+    let entries
+    try {
+      entries = readdirSync(current, { withFileTypes: true })
+    } catch {
+      return
+    }
+    for (const entry of entries) {
+      const path = join(current, entry.name)
+      if (entry.isDirectory()) walk(path)
+      else newest = Math.max(newest, statSync(path).mtimeMs)
     }
   }
   walk(dir)
   return newest
-}
-
-function readdirSafe(dir) {
-  try {
-    return execFileSync('ls', ['-A', dir], { encoding: 'utf8' }).split('\n').filter(Boolean)
-  } catch {
-    return []
-  }
 }
 
 /**

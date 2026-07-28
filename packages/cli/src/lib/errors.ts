@@ -83,6 +83,42 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
     tags: ['map'],
   },
+  INIT_INVALID_FRAMEWORK: {
+    status: 400,
+    message: ({ value }: { value: string }) =>
+      `Unknown --framework "${value}"`,
+    why: 'init only knows how to wire nuxt, nitro, next, and tanstack-start',
+    fix: 'Pass one of: nuxt, nitro, next, tanstack-start — or omit it and let detection decide',
+    link: 'https://evlog.dev/cli/init',
+    tags: ['init'],
+  },
+  INIT_INVALID_ENRICHER: {
+    status: 400,
+    message: ({ value, known }: { value: string, known: string }) =>
+      `Unknown --enrichers entry "${value}" — pass a comma-separated list of: ${known}`,
+    why: 'Enrichers are a fixed set, so a typo would silently wire one fewer',
+    fix: 'Run evlog init without --enrichers to pick from the list interactively',
+    link: 'https://evlog.dev/use-cases/enrichers',
+    tags: ['init'],
+  },
+  INIT_INVALID_SAMPLING: {
+    status: 400,
+    message: ({ value, known }: { value: string, known: string }) =>
+      `Unknown --sampling "${value}" — pass one of: ${known}`,
+    why: 'Sampling is a fixed set of traffic tiers, not a rate',
+    fix: 'Run evlog init without --sampling to pick a tier interactively',
+    link: 'https://evlog.dev/cli/init',
+    tags: ['init'],
+  },
+  INIT_NO_APPS: {
+    status: 400,
+    message: ({ value, known }: { value: string, known: string }) =>
+      `No workspace app matches "${value}" — this workspace has: ${known}`,
+    why: 'Setting up nothing is never what --apps was meant to express',
+    fix: 'Name the packages by their directory (apps/web) or their package.json name',
+    link: 'https://evlog.dev/cli/init',
+    tags: ['init', 'workspace'],
+  },
   INIT_INVALID_DRAIN: {
     status: 400,
     /* The known ids come from the catalog rather than being spelled out here:

@@ -43,10 +43,11 @@ export function parseProdDrainsArg(value: unknown): DrainId[] | undefined {
 
   const parsed: DrainId[] = []
   for (const id of splitList(value)) {
-    const destination = findDestination(id)
-    if (!destination || !destination.productionSafe || destination.id === 'none') {
-      throw cliErrors.INIT_INVALID_DRAIN({ value: id, known: PROD_IDS })
-    }
+    /* Membership in PROD_DESTINATIONS is the rule, not a re-derivation of it:
+       the filesystem sink is excluded there for a reason, and restating the
+       condition here is how the two drift. */
+    const destination = PROD_DESTINATIONS.find(candidate => candidate.id === id)
+    if (!destination) throw cliErrors.INIT_INVALID_DRAIN({ value: id, known: PROD_IDS })
     if (!parsed.includes(destination.id)) parsed.push(destination.id)
   }
   return parsed
@@ -73,7 +74,7 @@ export function parseEnrichersArg(value: unknown): EnricherId[] | undefined {
   const parsed: EnricherId[] = []
   for (const id of splitList(value)) {
     const enricher = findEnricher(id)
-    if (!enricher) throw cliErrors.INIT_INVALID_EXTRA({ value: id, known: ENRICHER_IDS })
+    if (!enricher) throw cliErrors.INIT_INVALID_ENRICHER({ value: id, known: ENRICHER_IDS })
     if (!parsed.includes(enricher.id)) parsed.push(enricher.id)
   }
   return parsed
@@ -82,7 +83,7 @@ export function parseEnrichersArg(value: unknown): EnricherId[] | undefined {
 export function parseSamplingArg(value: unknown): SamplingProfile | undefined {
   if (typeof value !== 'string' || value.length === 0) return undefined
   const preset = findSamplingPreset(value)
-  if (!preset) throw cliErrors.INIT_INVALID_EXTRA({ value, known: SAMPLING_IDS })
+  if (!preset) throw cliErrors.INIT_INVALID_SAMPLING({ value, known: SAMPLING_IDS })
   return preset.id
 }
 
@@ -117,10 +118,7 @@ export interface ResolveInput {
 export function resolveAnswers(input: ResolveInput): InitAnswers {
   const devDrain = input.devDrain ?? 'fs'
   const prodDrains = input.prodDrains ?? []
-  const requested = input.extras ?? []
-
-  const applicable = new Set(availableExtras(input.offers(prodDrains, input.framework)).map(extra => extra.id))
-  const extras = requested.filter(id => applicable.has(id))
+  const extras = (input.extras ?? []).filter(id => applicableExtras(input).has(id))
 
   return {
     framework: input.framework,
@@ -134,9 +132,21 @@ export function resolveAnswers(input: ResolveInput): InitAnswers {
   }
 }
 
+/**
+ * The extras this project can actually use.
+ *
+ * One helper for both {@link resolveAnswers} and {@link droppedExtras}: they
+ * are two views of the same decision, and computing it twice is how the kept
+ * set and the dropped set start disagreeing.
+ */
+function applicableExtras(input: ResolveInput): Set<ExtraId> {
+  return new Set(
+    availableExtras(input.offers(input.prodDrains ?? [], input.framework)).map(extra => extra.id),
+  )
+}
+
 /** Extras asked for that this project cannot use — reported, not applied. */
 export function droppedExtras(input: ResolveInput): ExtraId[] {
-  const prodDrains = input.prodDrains ?? []
-  const applicable = new Set(availableExtras(input.offers(prodDrains, input.framework)).map(extra => extra.id))
+  const applicable = applicableExtras(input)
   return (input.extras ?? []).filter(id => !applicable.has(id))
 }

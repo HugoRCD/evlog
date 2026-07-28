@@ -130,7 +130,13 @@ function parseSignature(signature: string): Record<string, string> {
   return fields
 }
 
-/** `Card declined` → `CARD_DECLINED`, clipped to something readable. */
+/**
+ * `Card declined` → `CARD_DECLINED`, clipped to something readable.
+ *
+ * The result is emitted as a bare object key, so it has to be a valid
+ * identifier: `3DS required` would otherwise yield `3DS_REQUIRED` and the
+ * generated catalog would not parse.
+ */
 function catalogKey(source: string): string {
   const key = source
     .replace(/[^a-z0-9]+/gi, '_')
@@ -140,7 +146,8 @@ function catalogKey(source: string): string {
     .filter(Boolean)
     .slice(0, 4)
     .join('_')
-  return key.length > 0 ? key : 'UNNAMED_ERROR'
+  if (key.length === 0) return 'UNNAMED_ERROR'
+  return /^[0-9]/.test(key) ? `E_${key}` : key
 }
 
 function uniqueKey(key: string, used: Set<string>): string {
@@ -150,7 +157,7 @@ function uniqueKey(key: string, used: Set<string>): string {
   return `${key}_${suffix}`
 }
 
-/** `/api/payments/refund` + POST → `payment.refund`, an audit action name. */
+/** `/api/payments/refund` + POST → `payments.refund.created`, an audit action name. */
 export function auditActionName(gap: AuditGap): string {
   const segments = gap.path
     .split('/')

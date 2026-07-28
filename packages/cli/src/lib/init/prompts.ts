@@ -1,4 +1,3 @@
-import process from 'node:process'
 import {
   autocomplete,
   autocompleteMultiselect,
@@ -152,8 +151,8 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     required: false,
   }))
 
-  const offered = availableExtras(input.offers(prodDrains, framework))
   const context = input.offers(prodDrains, framework)
+  const offered = availableExtras(context)
 
   let extras: ExtraId[] = []
   if (offered.length > 0) {
@@ -231,12 +230,12 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
  * about to land. A setup command that writes first and reports after is one the
  * user has to undo with git rather than with an answer.
  */
-export async function confirmPlan(
+export function showPlan(
   actions: FileAction[],
   already: string[],
   installing: boolean,
   packageManager: PackageManager,
-): Promise<boolean> {
+): boolean {
   const lines: string[] = []
 
   if (installing) lines.push(`run  ${installCommand(packageManager)}`)
@@ -251,6 +250,16 @@ export async function confirmPlan(
   }
 
   note(lines.join('\n'), 'Plan')
+  return true
+}
+
+export async function confirmPlan(
+  actions: FileAction[],
+  already: string[],
+  installing: boolean,
+  packageManager: PackageManager,
+): Promise<boolean> {
+  if (!showPlan(actions, already, installing, packageManager)) return false
 
   return required(await confirm({ message: 'Apply?', initialValue: true }))
 }
@@ -293,8 +302,19 @@ export async function runVerification(verify: () => Promise<string>): Promise<vo
   ])
 }
 
-export function closeInteractive(ctx: CliContext, framework: Framework, docsPath: string): void {
+export function closeInteractive(
+  ctx: CliContext,
+  framework: Framework,
+  docsPath: string,
+  dryRun = false,
+): void {
   const { paint } = createStyle(ctx)
+  if (dryRun) {
+    /* "Nitro wired" after a run that wrote nothing is the command claiming
+       credit for work it did not do. */
+    outro(`${paint('yellow', 'Dry run')} — nothing was written. Drop --dry-run to apply.`)
+    return
+  }
   clackLog.message(`${paint('dim', 'score')}  evlog map`)
   outro(`${FRAMEWORK_LABELS[framework]} wired · ${DOCS_URL}${docsPath}`)
 }
@@ -327,7 +347,10 @@ export async function askWorkspaceTargets(
  * this command must never end up waiting on a keystroke that is not coming.
  */
 export function canPrompt(ctx: CliContext): boolean {
-  if (!process.stdin.isTTY || !process.stdout.isTTY) return false
+  /* Both halves matter and they are not the same question: without a terminal
+     on stdin there is nobody to answer, and without one on stdout there is
+     nowhere to draw. */
+  if (!ctx.stdinTty || !ctx.tty) return false
   if (ctx.env.CI !== undefined && ctx.env.CI !== 'false' && ctx.env.CI !== '0') return false
   return true
 }

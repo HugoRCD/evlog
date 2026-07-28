@@ -2,6 +2,7 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { cliErrors } from '../errors'
+import { classifyRouteObservability, scoreGlobal } from './score'
 import type { CheckId, MapFile, RouteEntry } from './types'
 import { MAP_FILE_NAME } from './write'
 
@@ -32,6 +33,15 @@ export interface CheckRegression {
   to: 'fail' | 'suppressed'
 }
 
+/** A requirement that was failing in the baseline and now passes. */
+export interface CheckFix {
+  routeId: string
+  path: string
+  method: string | null
+  file: string
+  check: CheckId
+}
+
 /** An entry point that exists now and did not exist in the baseline. */
 export interface AddedRoute {
   path: string
@@ -46,12 +56,21 @@ export interface BaselineComparison {
   source: BaselineSource
   baselineScore: number
   score: number
-  /** `score - baselineScore`, so negative means the project got worse. */
+  /**
+   * Score movement across the entry points that existed in the baseline.
+   *
+   * Deliberately not `current.score - baseline.score`: the global score is a
+   * weighted average over every route, so adding a dark endpoint drags it down
+   * on its own. Gating on that would fail exactly the pull requests this
+   * comparison promises not to fail.
+   */
   delta: number
+  /** `current.score - baseline.score`, for the report. Never gates. */
+  totalDelta: number
   /** Requirements that went from pass to fail or suppressed. These gate. */
   regressions: CheckRegression[]
   /** Requirements that went from fail to pass — the report's good news. */
-  fixed: CheckRegression[]
+  fixed: CheckFix[]
   added: AddedRoute[]
   /** Ids present in the baseline and gone from the scan (deleted routes). */
   removed: { path: string, method: string | null }[]
@@ -137,11 +156,6 @@ function checkIds(route: RouteEntry): CheckId[] {
   return Object.keys(route.checks) as CheckId[]
 }
 
-function isDark(route: RouteEntry): boolean {
-  const results = Object.values(route.checks)
-  return results.length > 0 && results.every(check => check.status !== 'pass')
-}
-
 /**
  * Compare a fresh scan against a baseline map, per entry point and per check.
  *
@@ -158,7 +172,7 @@ export function compareToBaseline(baseline: MapFile, current: MapFile, source: B
   const baselineById = new Map(baseline.routes.map(route => [route.id, route]))
 
   const regressions: CheckRegression[] = []
-  const fixed: CheckRegression[] = []
+  const fixed: CheckFix[] = []
   const removed: { path: string, method: string | null }[] = []
 
   for (const before of baseline.routes) {
@@ -180,20 +194,31 @@ export function compareToBaseline(baseline: MapFile, current: MapFile, source: B
       } else if (was.status === 'pass' && now.status === 'n/a' && now.suppressed) {
         regressions.push({ ...entry, to: 'suppressed' })
       } else if (was.status === 'fail' && now.status === 'pass') {
-        fixed.push({ ...entry, to: 'fail' })
+        fixed.push(entry)
       }
     }
   }
 
   const added: AddedRoute[] = current.routes
     .filter(route => !baselineById.has(route.id))
-    .map(route => ({ path: route.path, method: route.method, file: route.file, dark: isDark(route) }))
+    .map(route => ({
+      path: route.path,
+      method: route.method,
+      file: route.file,
+      /* The scan's own classifier, so an exempt route is exempt here too rather
+         than being reported as needing instrumentation it was excused from. */
+      dark: classifyRouteObservability(route) === 'dark',
+    }))
+
+  const carried = current.routes.filter(route => baselineById.has(route.id))
+  const carriedBefore = baseline.routes.filter(route => currentById.has(route.id))
 
   return {
     source,
     baselineScore: baseline.score,
     score: current.score,
-    delta: current.score - baseline.score,
+    delta: scoreGlobal(carried) - scoreGlobal(carriedBefore),
+    totalDelta: current.score - baseline.score,
     regressions,
     fixed,
     added,

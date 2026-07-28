@@ -98,6 +98,16 @@ function wiresEveryDrain(path: string, input: WiringInput): boolean {
   })
 }
 
+/** The same destination chosen for dev and production is one import, not two. */
+function dedupeDestinations<T extends { id: DrainId }>(destinations: T[]): T[] {
+  const seen = new Set<DrainId>()
+  return destinations.filter((destination) => {
+    if (seen.has(destination.id)) return false
+    seen.add(destination.id)
+    return true
+  })
+}
+
 function describeDrains(input: WiringInput): string {
   const labels = allDrains(input).map(id => findDestination(id)?.label ?? id)
   return labels.length > 0 ? labels.join(' and ') : 'the console'
@@ -398,7 +408,10 @@ function nitroDrainTemplate(input: WiringInput): string | null {
   const batched = input.extras.includes('pipeline') && prod.length > 0
   const imports: string[] = []
   if (batched) imports.push(`import type { DrainContext } from 'evlog'`)
-  for (const destination of [...(dev ? [dev] : []), ...prod]) {
+  /* Deduped by id: nothing stops the same destination being the local sink and
+     a production one, and importing its factory twice is a file that does not
+     compile. */
+  for (const destination of dedupeDestinations([...(dev ? [dev] : []), ...prod])) {
     imports.push(`import { ${destination.factory!.replace('()', '')} } from '${destination.specifier}'`)
   }
   if (batched) imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
@@ -583,7 +596,10 @@ function nextFactoryParts(input: WiringInput): NextFactoryParts {
 
   const imports: string[] = []
   if (batched) imports.push(`import type { DrainContext } from 'evlog'`)
-  for (const destination of [...(dev ? [dev] : []), ...prod]) {
+  /* Deduped by id: nothing stops the same destination being the local sink and
+     a production one, and importing its factory twice is a file that does not
+     compile. */
+  for (const destination of dedupeDestinations([...(dev ? [dev] : []), ...prod])) {
     imports.push(`import { ${destination.factory!.replace('()', '')} } from '${destination.specifier}'`)
   }
   if (batched) imports.push(`import { createDrainPipeline } from 'evlog/pipeline'`)
@@ -732,7 +748,7 @@ function errorCatalogTemplate(input: WiringInput): string {
     const status = seed.status ? `\n    status: ${seed.status},` : ''
     const why = seed.why ? quote(seed.why) : `'TODO: what went wrong, in the reader\\'s terms'`
     return `  /** Currently written inline in ${files}${seed.files.length > 3 ? ', …' : ''} */
-  ${seed.key}: {${status}
+  ${objectKey(seed.key)}: {${status}
     message: ${quote(seed.message)},
     why: ${why},
     fix: 'TODO: what they should do about it',
@@ -809,7 +825,24 @@ ${entries.join('\n\n')}
  * of TypeScript projects, which style on single.
  */
 function quote(value: string): string {
-  return `'${value.replace(/\\/g, '\\\\').replace(/'/g, '\\\'')}'`
+  /* Newlines are escaped rather than dropped: a message spanning two lines is
+     unusual but legal, and emitting it raw ends the string literal mid-file. */
+  return `'${value
+    .replace(/\\/g, '\\\\')
+    .replace(/'/g, '\\\'')
+    .replace(/\n/g, '\\n')
+    .replace(/\r/g, '\\r')}'`
+}
+
+/**
+ * A catalog key that is safe to emit as a bare object key.
+ *
+ * `insight.ts` already shapes the keys it derives, but the seed type cannot
+ * promise it — and an entry like `3DS_REQUIRED` would leave the generated file
+ * unparseable, which is a worse failure than an ugly name.
+ */
+function objectKey(key: string): string {
+  return /^[A-Z_$][\w$]*$/i.test(key) ? key : quote(key)
 }
 
 /** Where a catalog file goes, per framework convention. */

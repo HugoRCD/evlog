@@ -21,6 +21,7 @@ import {
   closeCancelled,
   closeInteractive,
   confirmPlan,
+  showPlan,
   InitCancelled,
   noteEnvironment,
   noteManual,
@@ -61,12 +62,14 @@ export interface InitResult {
   cancelled: boolean
 }
 
+/** What the scan found, summarised for the report and the telemetry event. */
 export interface InsightSummary {
   repeatedErrors: number
   auditGaps: number
   pairable: string[]
 }
 
+/** The `evlog doctor` tally taken straight after the writes. */
 export interface VerifySummary {
   ok: number
   warn: number
@@ -243,6 +246,13 @@ export async function runInit(
 
   const installing = !evlogInstalled && answers.install && !dryRun
 
+  if (interactive && dryRun) {
+    /* `--dry-run` promises the plan. The confirm step is the only thing that
+       renders it, and interactive runs suppress the written report — so
+       without this the terminal shows the questions and then nothing. */
+    showPlan(plan.actions, plan.already, false, packageManager)
+  }
+
   if (interactive && !dryRun) {
     let confirmed: boolean
     try {
@@ -305,7 +315,7 @@ export async function runInit(
   if (interactive) {
     noteEnvironment(answers.prodDrains)
     noteManual(plan.manual)
-    closeInteractive(ctx, answers.framework, frameworkDocs(answers.framework))
+    closeInteractive(ctx, answers.framework, frameworkDocs(answers.framework), dryRun)
   }
 
   log.set({ steps: ['done'] })
@@ -369,6 +379,7 @@ function cancelled(result: InitResult): InitResult {
   return result
 }
 
+/** Documentation path for a framework's setup guide. */
 export function frameworkDocs(framework: Framework): string {
   switch (framework) {
     case 'nuxt': return '/integrate/frameworks/nuxt'
