@@ -50,7 +50,7 @@ const frameworkRows = [
           <h2 class="section-title">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title blur-xs animate-pulse pointer-events-none">
+          <div aria-hidden="true" class="title-glow section-title">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>
