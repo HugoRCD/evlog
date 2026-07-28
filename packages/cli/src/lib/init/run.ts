@@ -94,12 +94,7 @@ export interface InitOptions {
   nonInteractive?: boolean
 }
 
-/**
- * Service name for the wide events this project will emit.
- *
- * Falls back to the package name without its scope: `@acme/checkout` is
- * `checkout` in a log line, and the scope is noise once every event carries it.
- */
+/** The package name without its scope: `@acme/checkout` → `checkout`. */
 function defaultService(project: ProjectInfo): string {
   const name = project.packageName
   if (!name) return 'app'
@@ -107,13 +102,7 @@ function defaultService(project: ProjectInfo): string {
   return unscoped.replace(/[^a-z0-9-_]/gi, '-') || 'app'
 }
 
-/**
- * Which Nitro the project is on.
- *
- * The module lives at a different subpath per major (`evlog/nitro` vs
- * `evlog/nitro/v3`) and the config factory differs too, so guessing wrong
- * produces an import that does not resolve.
- */
+/** The module subpath and config factory differ per major. */
 function detectNitroMajor(pkg: PackageJson | null, framework: Framework): 2 | 3 {
   if (framework === 'tanstack-start') return 3
   const deps = { ...pkg?.dependencies, ...pkg?.devDependencies }
@@ -124,15 +113,9 @@ function detectNitroMajor(pkg: PackageJson | null, framework: Framework): 2 | 3 
 /**
  * Wire evlog into the project: read it, ask, plan, confirm, write, verify.
  *
- * Interactive when there is somebody to answer and nothing says otherwise;
- * flags and defaults fill in everything when there is not, so an agent gets the
- * same run without ever waiting on a keystroke. Both paths produce the same
- * {@link InitAnswers} and share every step after it.
- *
- * Nothing here overwrites a file that already exists — an existing
- * `instrumentation.ts` is reported as already present rather than replaced,
- * because the cost of being wrong about someone's setup file is much higher
- * than the cost of them pasting four lines.
+ * Interactive when there is somebody to answer; flags and defaults fill in
+ * everything when there is not. Both paths produce the same {@link InitAnswers}.
+ * Nothing here overwrites a file that already exists.
  */
 export async function runInit(
   ctx: CliContext,
@@ -157,9 +140,7 @@ export async function runInit(
     r => ({ hasEvlog: !!r.install }),
   )
 
-  /* The same analysis `map` runs, so an offer can carry its evidence. Two
-     analyses that disagreed about what counts as an audit gap would have `init`
-     offering to fix something `map` does not report. */
+  // The same analysis `map` runs, so an offer can carry its evidence.
   const insight = await log.step(
     'readProject',
     () => readProject(project.packageDir, detection.framework, project.packageName ?? 'app'),
@@ -294,8 +275,6 @@ export async function runInit(
     })
   }
 
-  /* The real question after a setup is "did it work", and answering it with
-     "now run this other command" is leaving the job half done. */
   let verified: VerifySummary | null = null
   if (!dryRun) {
     const verify = async (): Promise<VerifySummary> => {

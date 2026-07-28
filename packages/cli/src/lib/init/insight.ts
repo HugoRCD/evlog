@@ -4,14 +4,7 @@ import { createParseCache } from '../map/parse'
 import { scan } from '../map/scan'
 import type { Framework, RouteEntry, ScanContext } from '../map/types'
 
-/**
- * What `init` learned by reading the project, before it offers anything.
- *
- * The whole point of running the same analysis `map` runs: an offer backed by
- * "3 repeated errors found in your code" is a different proposition from a menu
- * item, and the seeds below turn the offer into generated code rather than a
- * blank file.
- */
+/** What `init` learned by reading the project, before it offers anything. */
 export interface ProjectInsight {
   facts: ProjectFacts
   /** Sensitive entry points whose audit check failed — the audit catalog seeds. */
@@ -42,11 +35,10 @@ export interface RepeatedErrorSeed {
 /**
  * Run the `map` analysis for `init`'s benefit.
  *
- * Deliberately the same code path rather than a lighter approximation: two
- * analyses that disagree about what counts as an audit gap would have `init`
- * offering to fix something `map` does not report, which is worse than not
- * offering at all. Returns `null` when the scan cannot run — a project too
- * broken to parse should still be able to install evlog.
+ * The same code path rather than an approximation: two analyses that disagree
+ * would have `init` offering to fix something `map` does not report. Returns
+ * `null` when the scan cannot run — a project too broken to parse should still
+ * be able to install evlog.
  */
 export async function readProject(projectRoot: string, framework: Framework, projectName: string): Promise<ProjectInsight | null> {
   const context: ScanContext = {
@@ -81,8 +73,7 @@ function toAuditGap(route: RouteEntry): AuditGap {
     path: route.path,
     method: route.method,
     file: route.file,
-    /* `money: path says "checkout"` → `money`. The classifier's prose is for the
-       map report; here only the category matters. */
+    // `money: path says "checkout"` → `money`.
     reasons: [...new Set(route.sensitivity.reasons.map(reason => reason.split(':')[0]!.trim()))],
   }
 }
@@ -91,8 +82,7 @@ function toAuditGap(route: RouteEntry): AuditGap {
  * Turn the scan's repeated-error signatures into catalog entries.
  *
  * The signature is `status=402|message=Card declined`, built from the literal
- * fields of the `createError` calls themselves — so the generated catalog is
- * the project's own errors, not a template with the names filled in.
+ * fields of the calls themselves — so the catalog holds the project's own errors.
  */
 function toErrorSeeds(facts: ProjectFacts): RepeatedErrorSeed[] {
   const seeds: RepeatedErrorSeed[] = []
@@ -105,13 +95,11 @@ function toErrorSeeds(facts: ProjectFacts): RepeatedErrorSeed[] {
     used.add(key)
 
     const status = Number(fields.status ?? fields.statusCode)
+    // Carry over the prose the code already has rather than a TODO.
     seeds.push({
       key,
       status: Number.isInteger(status) ? status : undefined,
       message,
-      /* Carry over the prose the code already has. Replacing a `why` somebody
-         wrote with a TODO would make the generated file worse than the inline
-         error it replaces. */
       why: fields.why,
       files: repeated.files,
     })
@@ -130,13 +118,7 @@ function parseSignature(signature: string): Record<string, string> {
   return fields
 }
 
-/**
- * `Card declined` → `CARD_DECLINED`, clipped to something readable.
- *
- * The result is emitted as a bare object key, so it has to be a valid
- * identifier: `3DS required` would otherwise yield `3DS_REQUIRED` and the
- * generated catalog would not parse.
- */
+/** `Card declined` → `CARD_DECLINED`, shaped to be a valid identifier. */
 function catalogKey(source: string): string {
   const key = source
     .replace(/[^a-z0-9]+/gi, '_')

@@ -4,10 +4,8 @@ import type { Framework } from '../map/types'
 /**
  * Everything `init` can offer, as data.
  *
- * One catalog drives both surfaces: the prompts render from it, and
- * `--drain` / `--extras` validate against it. Splitting them is how an
- * interactive flow and its flags drift until an agent cannot reproduce what a
- * human just did.
+ * One catalog drives both surfaces — the prompts render from it and the flags
+ * validate against it — so the two cannot drift.
  */
 
 export type DrainId =
@@ -33,12 +31,7 @@ export interface Destination {
   /** Environment variables the adapter reads. Never prompted for — see the env note. */
   env: { name: string, hint: string }[]
   docs: string
-  /**
-   * Whether the drain is safe to leave on in production.
-   *
-   * The filesystem drain is not: it writes files on whatever box serves the
-   * request. It is the default for development and never offered for production.
-   */
+  /** The filesystem drain is not: it writes files on whatever box serves the request. */
   productionSafe: boolean
 }
 
@@ -154,13 +147,7 @@ export function findDestination(id: string): Destination | undefined {
 /** Destinations offered for local development — the file sink, or nothing. */
 export const DEV_DESTINATIONS = DESTINATIONS.filter(d => d.id === 'fs' || d.id === 'none')
 
-/**
- * Destinations offered for production.
- *
- * The filesystem drain is deliberately absent: it writes files on the box
- * serving the request, which is a local convenience and not a place anybody
- * reads production logs from.
- */
+/** Production destinations. The filesystem sink is deliberately absent. */
 export const PROD_DESTINATIONS = DESTINATIONS.filter(d => d.productionSafe && d.factory !== null)
 
 /* ── enrichers ──────────────────────────────────────────────────────────── */
@@ -216,14 +203,10 @@ export interface SamplingPreset {
   label: string
   hint: string
   /**
-   * Rates to write, or `null` for "keep everything" — no block at all.
+   * Rates to write, or `null` for "keep everything".
    *
-   * `debug` is deliberately absent from every one of them. An unspecified level
-   * is kept at 100%, and debug events only exist because somebody turned them
-   * on to chase something: a 5% sample of the logs you switched on to
-   * investigate a problem is a 5% chance of seeing the line you needed.
-   * Production builds strip `log.debug()` anyway, so there is rarely volume
-   * there to sample.
+   * `debug` is absent on purpose: an unspecified level is kept at 100%, and
+   * debug events only exist because somebody turned them on to chase something.
    */
   rates: { info: number, warn: number } | null
 }
@@ -231,11 +214,8 @@ export interface SamplingPreset {
 /**
  * Named by the traffic the app takes, not by the ratio.
  *
- * Errors are never in the table: they stay at 100% in every tier, which the
- * generated config states explicitly so the invariant is visible where somebody
- * would otherwise wonder. Info is what moves — it is the bulk of the volume and
- * the bulk of the bill — and warnings only give way at the top, where halving
- * them still leaves the shape.
+ * Errors stay at 100% in every tier. Info is what moves across the ladder;
+ * warnings only give way at the top.
  */
 export const SAMPLING_PRESETS: readonly SamplingPreset[] = [
   {
@@ -380,11 +360,8 @@ export interface OfferContext {
 /**
  * The extras worth showing for this project.
  *
- * Offers are filtered against what the project actually is: a flow that shows
- * four relevant options beats one that shows eight generic ones, and gating on
- * evidence is what makes the list read as "it looked at my code" rather than as
- * a menu. Integrations appear only when their package is installed, and the
- * catalogs only when the scan found something to seed them with.
+ * Gated on evidence: integrations need their package installed, catalogs need
+ * the scan to have found something to seed them with.
  */
 export function availableExtras(context: OfferContext): Extra[] {
   return EXTRAS.filter((extra) => {
@@ -392,12 +369,10 @@ export function availableExtras(context: OfferContext): Extra[] {
     if (extra.requiresProdDrain && context.prodDrains.length === 0) return false
 
     switch (extra.id) {
-      /* Integrations are pure pairing: without the package there is nothing to
-         integrate with, and offering it anyway would be advertising. */
       case 'ai': return context.facts?.pairable.has('ai') ?? false
       case 'better-auth': return context.facts?.pairable.has('better-auth') ?? false
       /* One inline error is a local decision; the same one in three handlers is
-         a catalog entry nobody has written yet. No repeats, no offer. */
+         a catalog entry nobody has written yet. */
       case 'error-catalog': return (context.facts?.repeatedErrors.size ?? 0) > 0
       case 'audit-catalog': return context.auditGaps > 0
       default: return true
@@ -405,13 +380,7 @@ export function availableExtras(context: OfferContext): Extra[] {
   })
 }
 
-/**
- * A count to put next to an offer, so the reason it is there is visible.
- *
- * "Error catalog (3 duplicated errors found)" is a different proposition from
- * "Error catalog": the first says the tool read the project, the second asks
- * the reader to take it on faith.
- */
+/** A count to put next to an offer, so the reason it is there is visible. */
 export function offerEvidence(extra: Extra, context: OfferContext): string | null {
   switch (extra.id) {
     case 'error-catalog': {

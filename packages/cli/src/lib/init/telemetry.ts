@@ -3,13 +3,10 @@ import { DESTINATIONS, ENRICHERS, EXTRAS, SAMPLING_PRESETS } from './catalog'
 import type { InitResult } from './run'
 
 /**
- * Which choices `init` recorded on the run's telemetry event.
+ * Which choices `init` records, to learn which options people actually pick.
  *
- * The point is to learn which options people actually pick, so the flow can put
- * the useful ones first and stop offering the ones nobody wants. Only values
- * from this CLI's own catalog are sent: every field below is an id we defined,
- * a count, or a boolean. The service name, the package name, file paths and
- * anything read out of the user's source stay where they are.
+ * Only ids from this CLI's own catalog, counts and booleans. The service name,
+ * package names, paths and anything read out of the user's source never leave.
  */
 const PREFIX = 'init'
 
@@ -32,9 +29,8 @@ export function memberField(group: 'Prod' | 'Extra' | 'Enricher', id: string): s
 /**
  * Record the answers on the active telemetry run.
  *
- * Multi-selects become one boolean per chosen option rather than a joined
- * string: "how many runs picked Axiom" is then a count rather than a substring
- * match, and only the chosen ones are sent, so the event stays small.
+ * Multi-selects become one boolean per chosen option, so "how many runs picked
+ * Axiom" is a count rather than a substring match.
  */
 export function recordInitAnswers(result: InitResult): void {
   const { answers } = result
@@ -59,19 +55,16 @@ export function recordInitAnswers(result: InitResult): void {
     if (result.verified) fields.initDoctorFail = result.verified.fail
   }
 
-  /* Whether an offer had anything behind it, without saying what. The gap
-     between "the error catalog was offered" and "it was taken" is the signal
-     that says whether the offer is worth keeping. */
+  /* The gap between "offered" and "taken" is what says whether an offer earns
+     its place. Whether the scan found something, never what it found. */
   if (result.insight) {
     fields.initHadRepeatedErrors = result.insight.repeatedErrors > 0
     fields.initHadAuditGaps = result.insight.auditGaps > 0
   }
 
-  /* The ambient setter is typed for numbers and booleans because a string is
-     only accepted when its key is allowlisted — which ours are, on the
-     `withTelemetry` wrapper, and `sanitizeCustom` drops anything else. The cast
-     buys the string fields; it cannot smuggle an unlisted value past the
-     runtime check. */
+  /* Typed for numbers and booleans because strings need an allowlisted key —
+     ours are, on the wrapper. The cast cannot get an unlisted value past
+     `sanitizeCustom`. */
   telemetry.set(fields as Record<string, boolean | number>)
 }
 

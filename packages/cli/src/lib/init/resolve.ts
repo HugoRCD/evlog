@@ -25,9 +25,8 @@ const SAMPLING_IDS = SAMPLING_PRESETS.map(preset => preset.id).join(', ')
 /**
  * Read a destination id, rejecting one the catalog does not know.
  *
- * A misspelled destination has to stop the command. Falling back to the default
- * would wire the local file drain into an app whose author asked for Axiom, and
- * they would find out when production told them nothing.
+ * Falling back to the default would wire local files into an app whose author
+ * asked for Axiom, and they would find out when production told them nothing.
  */
 export function parseDrainArg(value: unknown): DrainId | undefined {
   if (typeof value !== 'string' || value.length === 0) return undefined
@@ -43,9 +42,7 @@ export function parseProdDrainsArg(value: unknown): DrainId[] | undefined {
 
   const parsed: DrainId[] = []
   for (const id of splitList(value)) {
-    /* Membership in PROD_DESTINATIONS is the rule, not a re-derivation of it:
-       the filesystem sink is excluded there for a reason, and restating the
-       condition here is how the two drift. */
+    // Membership in PROD_DESTINATIONS is the rule, not a re-derivation of it.
     const destination = PROD_DESTINATIONS.find(candidate => candidate.id === id)
     if (!destination) throw cliErrors.INIT_INVALID_DRAIN({ value: id, known: PROD_IDS })
     if (!parsed.includes(destination.id)) parsed.push(destination.id)
@@ -110,10 +107,8 @@ export interface ResolveInput {
 /**
  * The answers a non-interactive run uses: flags first, then defaults.
  *
- * Same shape the prompts produce, so everything downstream — the plan, the
- * writes, the report — has one code path. `--drain fs` and picking "Local
- * files" in the picker are the same run, and an extra is filtered out here for
- * exactly the reasons it would not have been offered there.
+ * Same shape the prompts produce, so `--drain fs` and picking "Local files" in
+ * the picker are the same run downstream.
  */
 export function resolveAnswers(input: ResolveInput): InitAnswers {
   const devDrain = input.devDrain ?? 'fs'
@@ -132,13 +127,7 @@ export function resolveAnswers(input: ResolveInput): InitAnswers {
   }
 }
 
-/**
- * The extras this project can actually use.
- *
- * One helper for both {@link resolveAnswers} and {@link droppedExtras}: they
- * are two views of the same decision, and computing it twice is how the kept
- * set and the dropped set start disagreeing.
- */
+/** Shared by {@link resolveAnswers} and {@link droppedExtras} — two views of one decision. */
 function applicableExtras(input: ResolveInput): Set<ExtraId> {
   return new Set(
     availableExtras(input.offers(input.prodDrains ?? [], input.framework)).map(extra => extra.id),

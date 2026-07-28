@@ -15,13 +15,7 @@ export interface WorkspaceApp {
   framework: Framework
 }
 
-/**
- * Whether this looks like a workspace root rather than an app.
- *
- * Running `init` from the root of a monorepo is a common mistake and a common
- * intent at the same time: either way, wiring the root package — which serves
- * no traffic — is never what was meant.
- */
+/** Whether this looks like a workspace root rather than an app. */
 export function isWorkspaceRoot(project: ProjectInfo): boolean {
   return project.kind !== 'single' && project.packageDir === project.root
 }
@@ -29,10 +23,8 @@ export function isWorkspaceRoot(project: ProjectInfo): boolean {
 /**
  * Find the apps in a workspace that `init` knows how to wire.
  *
- * Reads the workspace globs rather than walking the tree: a monorepo's
- * `node_modules` dwarfs its source, and the globs are the definition of what
- * counts as a package anyway. Packages with no detectable framework are left
- * out — a shared `utils` package has no entry points to instrument.
+ * Packages with no detectable framework are left out — a shared `utils`
+ * package has no entry points to instrument.
  */
 export function findWorkspaceApps(project: ProjectInfo): WorkspaceApp[] {
   const patterns = workspaceGlobs(project)
@@ -74,8 +66,7 @@ export function findWorkspaceApps(project: ProjectInfo): WorkspaceApp[] {
         framework,
       })
     } catch {
-      /* No framework: a library, a config package, the docs site. Nothing to
-         instrument, so nothing to offer. */
+      // No framework, nothing to instrument.
     }
   }
 
@@ -101,10 +92,8 @@ function workspaceGlobs(project: ProjectInfo): string[] {
 /**
  * Read the `packages:` list out of `pnpm-workspace.yaml`.
  *
- * A three-line reader rather than a YAML dependency: the file's shape is fixed
- * by pnpm and this is the only key anybody needs from it. Negated globs are
- * dropped — tinyglobby takes them as patterns, not exclusions, so keeping them
- * would search for a directory literally named `!docs`.
+ * Negated globs are dropped: tinyglobby takes them as patterns rather than
+ * exclusions, so keeping them would search for a directory named `!docs`.
  */
 export function parsePnpmPackages(yaml: string): string[] {
   const patterns: string[] = []

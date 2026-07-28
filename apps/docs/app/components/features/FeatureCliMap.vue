@@ -68,14 +68,7 @@ function snapToEnd() {
 
 const COUNT_UP_MS = 900
 
-/**
- * Count to the score on the frame clock rather than a 24ms interval.
- *
- * A timer that fires at ~41Hz lands between frames, so some frames render the
- * same number twice and others skip one — visible as stutter next to the bars
- * animating beside it. Driving it from `requestAnimationFrame` means one update
- * per frame, and the browser pauses it with the rest of the tab.
- */
+/** On the frame clock: a 24ms interval lands between frames and stutters. */
 function countUp() {
   const startedAt = performance.now()
   const step = (now: number) => {
@@ -192,12 +185,7 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="p-5 sm:p-6 flex-1 space-y-5">
-            <!--
-              The score column matches the coverage labels below — same width,
-              same gap — so the skyline starts on the same vertical as the
-              coverage tracks. Left to its intrinsic width it lined up with
-              nothing, and moved with the font.
-            -->
+            <!-- Same width and gap as the coverage labels, so both start on one vertical. -->
             <div class="flex items-end gap-3">
               <div class="w-32 shrink-0">
                 <p class="font-mono text-[10px] uppercase tracking-wide text-dimmed">
@@ -211,14 +199,7 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="flex-1 flex h-14 items-end gap-px" aria-hidden="true">
-                <!--
-                  Scaled, not resized. Animating `height` on 29 siblings inside
-                  a flex row re-runs layout for the whole row on every frame of
-                  every bar; `transform` is composited and touches neither
-                  layout nor paint. `transition-transform` rather than
-                  `transition-all` for the same reason — the browser stops
-                  watching properties nobody is animating.
-                -->
+                <!-- Scaled, not resized: `height` on 29 flex siblings re-runs layout every frame. -->
                 <div
                   v-for="(value, i) in skyline"
                   :key="i"

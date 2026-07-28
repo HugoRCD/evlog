@@ -5,11 +5,9 @@ import { parseSource } from '../map/parse'
 /**
  * Offset-based edits to an existing config file.
  *
- * `init` patches files people wrote, so the rule is: locate the exact node with
- * oxc, splice text at its offsets, and leave every other byte alone. Nothing
- * here reprints the AST — a config that comes back reformatted, with its
- * comments dropped and its quotes flipped, is a worse outcome than a step the
- * user finishes by hand.
+ * Locate the node with oxc, splice text at its offsets, leave every other byte
+ * alone. Nothing here reprints the AST — a config that comes back reformatted
+ * is a worse outcome than a step the user finishes by hand.
  */
 export interface ConfigFile {
   path: string
@@ -46,13 +44,7 @@ function propertyName(prop: Node): string | null {
   return null
 }
 
-/**
- * The object literal a config file exports.
- *
- * Accepts the wrapped forms (`defineNuxtConfig({…})`, `defineConfig({…})`) and
- * the bare one, because all three are valid and which one a project uses is not
- * something `init` should have an opinion about.
- */
+/** The exported object literal, wrapped (`defineNuxtConfig({…})`) or bare. */
 export function findConfigObject(program: Program): ObjectNode | null {
   for (const statement of program.body as Node[]) {
     if (statement.type !== 'ExportDefaultDeclaration') continue
@@ -88,13 +80,7 @@ export function hasImportFrom(program: Program, specifier: string): boolean {
   })
 }
 
-/**
- * Whether an array already contains an element whose text mentions `needle`.
- *
- * Textual on purpose: `'evlog/nuxt'`, `evlog({…})` and a spread of a variable
- * holding either are all "already wired", and the only thing they have in
- * common is the name.
- */
+/** Textual on purpose: `'evlog/nuxt'` and `evlog({…})` are both "already wired". */
 export function arrayMentions(source: string, array: ArrayNode, needle: string): boolean {
   return array.elements.some((element) => {
     if (!element) return false
@@ -127,9 +113,8 @@ export interface Splice {
 /**
  * Where a new sibling goes after `lastEnd`, and whether a comma is owed.
  *
- * The subtlety is the trailing comma: inserting at the end of the last element
- * puts the new text *before* an existing `,`, which produces `}, ,`. The
- * insertion point has to move past it.
+ * Inserting at the end of the last element puts the new text *before* an
+ * existing `,`, which produces `}, ,` — the point has to move past it.
  */
 function afterLast(source: string, lastEnd: number, containerEnd: number): { at: number, needsComma: boolean } {
   const between = source.slice(lastEnd, containerEnd - 1)
@@ -154,8 +139,7 @@ export function appendToArray(source: string, array: ArrayNode, entry: string): 
 
   if (!last) {
     const inner = source.slice(start + 1, end - 1)
-    /* An array written on one line stays on one line: `modules: []` becoming
-       three lines is a diff the reviewer has to read for no reason. */
+    // An array written on one line stays on one line.
     if (!inner.includes('\n')) return { at: end - 1, text: entry }
     const indent = indentAt(source, start) + indentUnit(source)
     return { at: end - 1, text: `${indent}${entry},\n${indentAt(source, start)}` }
@@ -198,13 +182,7 @@ export function addImport(source: string, program: Program, statement: string): 
 
 export type { ArrayNode, ObjectNode }
 
-/**
- * The `createEvlog({ … })` options object, when the file calls it at all.
- *
- * Next.js keeps its evlog configuration in a factory call rather than an
- * exported config object, so the generic {@link findConfigObject} does not
- * reach it.
- */
+/** The `createEvlog({ … })` options object — {@link findConfigObject} does not reach it. */
 export function findCreateEvlogCall(program: Program): ObjectNode | null {
   let found: ObjectNode | null = null
 

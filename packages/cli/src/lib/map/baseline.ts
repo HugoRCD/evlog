@@ -6,12 +6,7 @@ import { classifyRouteObservability, scoreGlobal } from './score'
 import type { CheckId, MapFile, RouteEntry } from './types'
 import { MAP_FILE_NAME } from './write'
 
-/**
- * Where a baseline map was read from.
- *
- * The label is what the report prints, so it stays the spelling the user typed
- * (`git:HEAD`, `../base.json`) rather than an absolute path they never wrote.
- */
+/** Where a baseline map was read from — the label keeps the spelling the user typed. */
 export interface BaselineSource {
   kind: 'file' | 'git'
   label: string
@@ -24,12 +19,7 @@ export interface CheckRegression {
   method: string | null
   file: string
   check: CheckId
-  /**
-   * `fail` is the check breaking; `suppressed` is an `evlog-map-disable`
-   * comment being added over a check that was passing. Both cost the same
-   * coverage, so both gate — the distinction is only there to be printed,
-   * because the fix for one is code and for the other is a conversation.
-   */
+  /** Both gate; the distinction is printed because the fix differs. */
   to: 'fail' | 'suppressed'
 }
 
@@ -59,10 +49,9 @@ export interface BaselineComparison {
   /**
    * Score movement across the entry points that existed in the baseline.
    *
-   * Deliberately not `current.score - baseline.score`: the global score is a
-   * weighted average over every route, so adding a dark endpoint drags it down
-   * on its own. Gating on that would fail exactly the pull requests this
-   * comparison promises not to fail.
+   * Not `current.score - baseline.score`: that is a weighted average over every
+   * route, so a new dark endpoint drags it down and would fail the pull
+   * requests this comparison promises not to fail.
    */
   delta: number
   /** `current.score - baseline.score`, for the report. Never gates. */
@@ -107,17 +96,11 @@ function parseMapFile(raw: string, label: string): MapFile {
 }
 
 /**
- * Read the map to compare against.
- *
- * Deliberately local-only. A baseline is a file the project commits, so on CI
- * the checkout has already put it on disk and the comparison needs no network,
- * no token, and no repository access — the gate works the same on a private
- * repo as on a public one.
+ * Read the map to compare against. Local-only: no network, no token, no
+ * repository access, so a private repo gates like a public one.
  *
  * @param spec - `git:<ref>` to read the committed copy through git, otherwise a
- * path to a map file. Defaults to `evlog.map.json` in the project, falling back
- * to `git:HEAD` when the working copy has already been overwritten by a
- * previous run.
+ * path. Defaults to `evlog.map.json`, falling back to `git:HEAD`.
  */
 export function loadBaseline(projectRoot: string, spec?: string): { map: MapFile, source: BaselineSource } {
   if (spec?.startsWith('git:')) {
@@ -142,10 +125,8 @@ export function loadBaseline(projectRoot: string, spec?: string): { map: MapFile
     const raw = readFileSync(resolve(projectRoot, MAP_FILE_NAME), 'utf8')
     return { map: parseMapFile(raw, MAP_FILE_NAME), source: { kind: 'file', label: MAP_FILE_NAME } }
   } catch {
-    /* The checked-in map is the normal baseline, but `map --baseline` run twice
-       in a row would compare the second scan against the first one's output.
-       Falling back to git means the answer stays "what did main say" instead of
-       silently becoming "what did I say a minute ago". */
+    /* Run twice in a row, the second scan would otherwise compare against the
+       first one's output. */
     const raw = readGitBaseline(projectRoot, 'HEAD')
     if (raw === null) throw cliErrors.MAP_BASELINE_NOT_FOUND({ source: MAP_FILE_NAME })
     return { map: parseMapFile(raw, 'git:HEAD'), source: { kind: 'git', label: 'git:HEAD' } }
@@ -157,15 +138,12 @@ function checkIds(route: RouteEntry): CheckId[] {
 }
 
 /**
- * Compare a fresh scan against a baseline map, per entry point and per check.
+ * Compare a fresh scan against a baseline, per entry point and per check.
  *
  * The unit is the requirement, not the score: a refactor that instruments one
- * route and breaks another can leave the number untouched, and a gate that only
- * watches the total would call that a no-op. Only pass → fail and
- * pass → suppressed transitions count as regressions; a route that disappeared
- * was deleted, and a new dark route is reported but does not gate — that bar is
- * `--min-score`'s job, and ratcheting it here would fail every pull request
- * that adds an endpoint to an app that is not green yet.
+ * route and breaks another leaves the number untouched. A deleted route is not
+ * a regression, and a new dark one is reported but does not gate — that bar is
+ * `--min-score`'s job.
  */
 export function compareToBaseline(baseline: MapFile, current: MapFile, source: BaselineSource): BaselineComparison {
   const currentById = new Map(current.routes.map(route => [route.id, route]))
@@ -205,8 +183,7 @@ export function compareToBaseline(baseline: MapFile, current: MapFile, source: B
       path: route.path,
       method: route.method,
       file: route.file,
-      /* The scan's own classifier, so an exempt route is exempt here too rather
-         than being reported as needing instrumentation it was excused from. */
+      // The scan's own classifier, so an exempt route stays exempt here.
       dark: classifyRouteObservability(route) === 'dark',
     }))
 

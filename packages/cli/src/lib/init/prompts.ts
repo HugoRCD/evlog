@@ -55,13 +55,7 @@ export class InitCancelled extends Error {
   }
 }
 
-/**
- * Unwrap a clack answer, turning a cancel into a throw.
- *
- * Every prompt has to handle Ctrl-C, and doing it at each call site is how one
- * gets forgotten and the run continues with `Symbol(clack:cancel)` as the
- * service name.
- */
+/** Unwrap a clack answer, turning a cancel into a throw. */
 function required<T>(value: T | symbol): T {
   if (isCancel(value)) throw new InitCancelled()
   return value as T
@@ -126,9 +120,8 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     },
   }))
 
-  /* Two questions rather than one list: nobody sends local development traffic
-     to Axiom, and nobody reads production logs off the box's filesystem. Asking
-     "where do events go" once forces one answer onto two different problems. */
+  /* Two questions: nobody sends local traffic to Axiom, and nobody reads
+     production logs off the box's filesystem. */
   const devDrain = required(await select<DrainId>({
     message: 'In development, where should events go?',
     options: DEV_DESTINATIONS.map(destination => ({
@@ -156,8 +149,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
 
   let extras: ExtraId[] = []
   if (offered.length > 0) {
-    /* Grouped rather than flat: eight options under one heading is a list to
-       get through, the same eight under four headings is a set of decisions. */
+    // Grouped: eight options under one heading is a list, under four it is a decision.
     const groups: Record<string, { value: ExtraId, label: string, hint?: string }[]> = {}
     for (const extra of offered) {
       const evidence = offerEvidence(extra, context)
@@ -165,9 +157,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
       groups[group] ??= []
       groups[group]!.push({
         value: extra.id,
-        /* The evidence goes in the label, not the hint: a grouped multiselect
-           only renders the hint of the focused row, and "3 repeated errors
-           found" is the whole reason the row is there. */
+        // In the label, not the hint: only the focused row renders its hint.
         label: evidence ? `${extra.label} · ${evidence}` : extra.label,
         hint: extra.hint,
       })
@@ -207,10 +197,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     }))
     : 'all'
 
-  /* Installing is not a question of its own: the plan lists `pnpm add evlog`
-     and asks once for everything. Two confirmations for one decision is how a
-     flow starts feeling like paperwork — and asking after `--no-install` was
-     passed is asking someone to repeat themselves. */
+  // Not a question of its own: the plan lists the install and asks once.
   return {
     framework,
     service: service || input.defaultService,
@@ -223,13 +210,7 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
   }
 }
 
-/**
- * Show the exact file list and ask before writing.
- *
- * The point of the whole flow: nothing lands until the user has read what is
- * about to land. A setup command that writes first and reports after is one the
- * user has to undo with git rather than with an answer.
- */
+/** Nothing lands until the user has read what is about to land. */
 export function showPlan(
   actions: FileAction[],
   already: string[],
@@ -271,9 +252,7 @@ export function noteEnvironment(prodDrains: DrainId[]): void {
     .flatMap(destination => destination?.env.map(variable => ({ ...variable, label: destination.label })) ?? [])
   if (variables.length === 0) return
 
-  /* Deliberately not prompted for. A setup command that asks for an API token
-     is a setup command that writes a secret into a file it chose, and the
-     answer scrolls into the terminal history either way. */
+  // Never prompted for: a token typed here lands in a file we chose and in shell history.
   const width = Math.max(...variables.map(variable => variable.name.length))
   note(
     variables.map(variable => `${variable.name.padEnd(width)}  ${variable.hint}`).join('\n'),
@@ -287,12 +266,7 @@ export function noteManual(steps: ManualStep[]): void {
   }
 }
 
-/**
- * Run the verification step in the same session.
- *
- * The real question after a setup is "did it work", and answering it with
- * "now run this other command" is leaving the job half done.
- */
+/** The question after a setup is "did it work" — answer it here. */
 export async function runVerification(verify: () => Promise<string>): Promise<void> {
   await tasks([
     {
