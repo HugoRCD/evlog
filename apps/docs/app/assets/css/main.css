@@ -49,16 +49,12 @@
 }
 
 /**
- * The blurred duplicate that gives a title its glow.
+ * The blurred duplicate that gives a title its glow. Effect only — typography
+ * stays in the markup, since the header logo glows at its own size.
  *
- * Carries the effect only — the typography stays in the markup, since the
- * header logo glows at its own size rather than a section title's.
- *
- * Its own compositing layer, so the blur and the text-shadow are rasterized
- * once and the pulse only changes the layer's opacity. Left on the main layer,
- * every step of the animation re-runs a 24px shadow and a filter over the whole
- * heading — and since CSS animations do not stop when an element scrolls out of
- * view, that cost was being paid by every title on the page at once.
+ * Its own compositing layer, so the blur rasterizes once and the pulse only
+ * changes opacity. CSS animations do not stop off-screen, so on the main layer
+ * every title on the page paid for its filter continuously.
  */
 .title-glow {
   @apply absolute inset-0 blur-xs pointer-events-none;

@@ -15,13 +15,7 @@ const LOCKFILES: Record<PackageManager, string[]> = {
   npm: ['package-lock.json'],
 }
 
-/**
- * Pick the package manager from lockfiles, nearest directory first.
- *
- * `packageManager` in package.json would be more explicit when it is there, but
- * it usually is not, and a workspace lockfile at the root is the thing that
- * actually decides which client can install into this package.
- */
+/** Pick the package manager from lockfiles, nearest directory first. */
 export function detectPackageManager(dirs: string[]): PackageManager {
   for (const dir of dirs) {
     for (const [manager, files] of Object.entries(LOCKFILES) as [PackageManager, string[]][]) {
@@ -36,13 +30,7 @@ export function installCommand(manager: PackageManager, pkg = 'evlog'): string {
   return manager === 'npm' ? `npm install ${pkg}` : `${manager} add ${pkg}`
 }
 
-/**
- * Run the install in `cwd`.
- *
- * Returns the failure instead of throwing: an install that could not run is a
- * step the user finishes by hand, not a reason to abandon the wiring that
- * already landed on disk.
- */
+/** Returns the failure rather than throwing — the wiring already on disk stands. */
 export async function runInstall(
   manager: PackageManager,
   cwd: string,
