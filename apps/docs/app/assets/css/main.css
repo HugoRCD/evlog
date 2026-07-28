@@ -48,6 +48,36 @@
   text-shadow: 0 4px 24px rgba(0, 0, 0, 0.5);
 }
 
+/**
+ * The blurred duplicate that gives a title its glow.
+ *
+ * Carries the effect only — the typography stays in the markup, since the
+ * header logo glows at its own size rather than a section title's.
+ *
+ * Its own compositing layer, so the blur and the text-shadow are rasterized
+ * once and the pulse only changes the layer's opacity. Left on the main layer,
+ * every step of the animation re-runs a 24px shadow and a filter over the whole
+ * heading — and since CSS animations do not stop when an element scrolls out of
+ * view, that cost was being paid by every title on the page at once.
+ */
+.title-glow {
+  @apply absolute inset-0 blur-xs pointer-events-none;
+  will-change: opacity;
+  transform: translateZ(0);
+  animation: title-glow-pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes title-glow-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .title-glow {
+    animation: none;
+  }
+}
+
 .landing-code pre[style] {
   background-color: var(--ui-bg-muted) !important;
 }

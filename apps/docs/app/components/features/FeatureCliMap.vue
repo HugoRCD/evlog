@@ -56,7 +56,7 @@ function barTone(value: number): string {
 }
 
 const timers: ReturnType<typeof setTimeout>[] = []
-let ticker: ReturnType<typeof setInterval> | undefined
+let frame: number | undefined
 let observer: IntersectionObserver | undefined
 
 function snapToEnd() {
@@ -66,14 +66,24 @@ function snapToEnd() {
   raised.value = true
 }
 
+const COUNT_UP_MS = 900
+
+/**
+ * Count to the score on the frame clock rather than a 24ms interval.
+ *
+ * A timer that fires at ~41Hz lands between frames, so some frames render the
+ * same number twice and others skip one — visible as stutter next to the bars
+ * animating beside it. Driving it from `requestAnimationFrame` means one update
+ * per frame, and the browser pauses it with the rest of the tab.
+ */
 function countUp() {
-  ticker = setInterval(() => {
-    score.value += 2
-    if (score.value >= FINAL_SCORE) {
-      score.value = FINAL_SCORE
-      clearInterval(ticker)
-    }
-  }, 24)
+  const startedAt = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min((now - startedAt) / COUNT_UP_MS, 1)
+    score.value = Math.round(FINAL_SCORE * progress)
+    if (progress < 1) frame = requestAnimationFrame(step)
+  }
+  frame = requestAnimationFrame(step)
 }
 
 function start() {
@@ -118,7 +128,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect()
   timers.forEach(clearTimeout)
-  if (ticker) clearInterval(ticker)
+  if (frame !== undefined) cancelAnimationFrame(frame)
 })
 </script>
 
@@ -139,7 +149,7 @@ onBeforeUnmount(() => {
           <h2 class="section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-2xl blur-xs animate-pulse pointer-events-none">
+          <div aria-hidden="true" class="title-glow section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>
@@ -195,13 +205,21 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="flex-1 flex h-14 items-end gap-px" aria-hidden="true">
+                <!--
+                  Scaled, not resized. Animating `height` on 29 siblings inside
+                  a flex row re-runs layout for the whole row on every frame of
+                  every bar; `transform` is composited and touches neither
+                  layout nor paint. `transition-transform` rather than
+                  `transition-all` for the same reason — the browser stops
+                  watching properties nobody is animating.
+                -->
                 <div
                   v-for="(value, i) in skyline"
                   :key="i"
-                  class="flex-1 transition-all ease-out"
+                  class="flex-1 h-full origin-bottom transition-transform ease-out"
                   :class="barTone(value)"
                   :style="{
-                    height: started ? `${value}%` : '4%',
+                    transform: `scaleY(${started ? value / 100 : 0.04})`,
                     transitionDuration: prefersReducedMotion ? '0ms' : '500ms',
                     transitionDelay: prefersReducedMotion ? '0ms' : `${i * 22}ms`,
                   }"
@@ -218,10 +236,10 @@ onBeforeUnmount(() => {
                 <span class="w-28 shrink-0 truncate text-muted">{{ area.label }}</span>
                 <div class="relative h-1.5 flex-1 bg-elevated">
                   <div
-                    class="absolute inset-y-0 left-0 transition-all ease-out"
+                    class="absolute inset-0 origin-left transition-transform ease-out"
                     :class="barTone(area.score)"
                     :style="{
-                      width: started ? `${area.score}%` : '0%',
+                      transform: `scaleX(${started ? area.score / 100 : 0})`,
                       transitionDuration: prefersReducedMotion ? '0ms' : '700ms',
                       transitionDelay: prefersReducedMotion ? '0ms' : `${900 + i * 140}ms`,
                     }"
