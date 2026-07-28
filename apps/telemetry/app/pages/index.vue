@@ -84,19 +84,10 @@ const statsQuery = computed(() => ({
   environment: environment.value === ALL ? undefined : environment.value,
 }))
 
-const { data: stats, error: statsError, refresh: refreshStats } = await useFetch<StatsResponse>(
+const statsAsync = useFetch<StatsResponse>(
   '/api/telemetry/stats',
   { query: statsQuery, watch: [statsQuery] },
 )
-
-const toolOptions = computed(() => [
-  { label: 'All tools', value: ALL },
-  ...(stats.value?.tools.map(t => ({ label: t.tool, value: t.tool })) ?? []),
-])
-const environmentOptions = computed(() => [
-  { label: 'All environments', value: ALL },
-  ...(stats.value?.environments.map(e => ({ label: e.environment, value: e.environment })) ?? []),
-])
 
 const runsQuery = computed(() => ({
   range: range.value,
@@ -108,16 +99,15 @@ const runsQuery = computed(() => ({
   pageSize: PAGE_SIZE,
 }))
 
-const { data: runsData, error: runsError, status: runsStatus, refresh: refreshRuns } = await useFetch<RunsResponse>(
+const runsAsync = useFetch<RunsResponse>(
   '/api/telemetry/runs',
   { query: runsQuery, watch: [runsQuery] },
 )
 
-const runs = computed(() => runsData.value?.runs ?? [])
-const runsTotal = computed(() => runsData.value?.total ?? 0)
-
 // Dedicated newest-first page for the live feed — independent from the main
 // table's sort/pagination so sorting by duration doesn't scramble the ticker.
+// `withTotal: false` skips the range-wide `count(*)`: the ticker shows 8 rows
+// and no pagination, so the number would be computed and thrown away.
 const feedQuery = computed(() => ({
   range: range.value,
   tool: tool.value === ALL ? undefined : tool.value,
@@ -126,14 +116,36 @@ const feedQuery = computed(() => ({
   order: 'desc',
   page: 1,
   pageSize: 8,
+  withTotal: 'false',
 }))
 
-const { data: feedData, error: feedError, refresh: refreshFeed } = await useFetch<RunsResponse>(
+const feedAsync = useFetch<RunsResponse>(
   '/api/telemetry/runs',
   { query: feedQuery, watch: [feedQuery] },
 )
 
+// The three fetches above are deliberately started before this line and
+// awaited together: `await useFetch(...)` three times in a row would only
+// begin each request once the previous had come back, serialising three
+// database round trips into the server-rendered response.
+await Promise.all([statsAsync, runsAsync, feedAsync])
+
+const { data: stats, error: statsError, refresh: refreshStats } = statsAsync
+const { data: runsData, error: runsError, status: runsStatus, refresh: refreshRuns } = runsAsync
+const { data: feedData, error: feedError, refresh: refreshFeed } = feedAsync
+
+const runs = computed(() => runsData.value?.runs ?? [])
+const runsTotal = computed(() => runsData.value?.total ?? 0)
 const feedRuns = computed(() => feedData.value?.runs ?? [])
+
+const toolOptions = computed(() => [
+  { label: 'All tools', value: ALL },
+  ...(stats.value?.tools.map(t => ({ label: t.tool, value: t.tool })) ?? []),
+])
+const environmentOptions = computed(() => [
+  { label: 'All environments', value: ALL },
+  ...(stats.value?.environments.map(e => ({ label: e.environment, value: e.environment })) ?? []),
+])
 
 function onSortChange({ sort: nextSort, order: nextOrder }: { sort: RunSortKey, order: SortOrder }) {
   sort.value = nextSort
@@ -175,19 +187,53 @@ const successRate = computed(() => totals.value.total > 0 ? Math.round((totals.v
 const errorRate = computed(() => totals.value.total > 0 ? Math.round((totals.value.errors / totals.value.total) * 100) : 0)
 const p95DurationMs = computed(() => stats.value?.durations.p95 ?? 0)
 
-// Live refresh: silent 5s poll of all three fetches — paused while the run
-// detail slideover is open so a manually sorted page never shifts mid-read.
-// `useFetch`'s `refresh()` resolves even on a failed request (the error
-// lands in its `.error` ref instead of rejecting), so re-throw here for
+// Live refresh, in two tiers.
+//
+// Every tick polls `/api/telemetry/cursor` — two indexed `max()` lookups, a
+// fraction of a millisecond — and only refetches the real payloads when that
+// token moved. The old behaviour re-ran all three fetches every 5s no matter
+// what, and the stats fetch alone is ~14 aggregate queries over the whole
+// selected window (~800ms of database CPU on a 30-day range). An idle
+// dashboard now costs essentially nothing, which is what buys the headroom to
+// poll *more* often: 3s instead of 5s, so new runs surface noticeably faster.
+//
+// Paused while the run detail slideover is open so a manually sorted page
+// never shifts mid-read.
+const CURSOR_POLL_MS = 3000
+/** Refresh stats even without new events — the range is a sliding window. */
+const STATS_HEARTBEAT_MS = 60_000
+
+/** `null` until the first tick has established a baseline to compare against. */
+let lastCursorId: number | null = null
+let lastStatsAt = Date.now()
+
+// Covers the refreshes this tick doesn't drive (filter/range changes go
+// through `useFetch`'s own `watch`), so the heartbeat measures staleness
+// rather than time since the last poll.
+watch(stats, () => {
+  lastStatsAt = Date.now()
+})
+
+// `useFetch`'s `refresh()` resolves even on a failed request (the error lands
+// in its `.error` ref instead of rejecting), so re-throw here for
 // `useLiveRefresh` to notice and `LiveIndicator` to stop claiming "Live"
 // while requests are actually failing.
 const { active: liveActive, lastError: liveError, toggle: toggleLive } = useLiveRefresh(
   async () => {
-    await Promise.all([refreshStats(), refreshRuns(), refreshFeed()])
+    const cursor = await $fetch<RunsCursor>('/api/telemetry/cursor')
+    const changed = lastCursorId !== null && cursor.latestId !== lastCursorId
+    lastCursorId = cursor.latestId
+
+    const pending: Promise<unknown>[] = []
+    if (changed) pending.push(refreshRuns(), refreshFeed())
+    if (changed || Date.now() - lastStatsAt >= STATS_HEARTBEAT_MS) pending.push(refreshStats())
+    if (pending.length === 0) return
+
+    await Promise.all(pending)
     const error = statsError.value ?? runsError.value ?? feedError.value
     if (error) throw error
   },
-  { suspended: detailOpen },
+  { intervalMs: CURSOR_POLL_MS, suspended: detailOpen },
 )
 
 async function onLogout() {

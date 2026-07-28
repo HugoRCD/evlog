@@ -55,6 +55,7 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@evlog/telemetry": "workspace:*",
     "citty": "^0.2.2",
     "evlog": "workspace:*",

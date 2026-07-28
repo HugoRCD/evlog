@@ -4,9 +4,56 @@ export const DEFAULT_ALLOWED_TOOLS = ['evlog-cli']
 /**
  * Custom field keys accepted per tool. Mirrors `telemetry.set()` calls in each
  * tool's source — anything not listed here is dropped by `parseIngestBody()`.
+ *
+ * The list is deliberately per-name rather than a `init*` prefix rule: the
+ * client decides what to send, this decides what is worth storing, and a
+ * namespace rule would accept a key nobody here has looked at.
+ *
+ * `init*` comes from `initTelemetryFieldNames()` in `@evlog/cli`
+ * (`src/lib/init/telemetry.ts`). Growing the CLI's catalog adds names there,
+ * and a name missing here is dropped silently — so regenerate this list when
+ * destinations, extras or enrichers change.
  */
 export const DEFAULT_ALLOWED_CUSTOM_KEYS: Record<string, string[]> = {
-  'evlog-cli': ['checksFailed', 'checksWarned', 'workspace'],
+  'evlog-cli': [
+    'checksFailed',
+    'checksWarned',
+    'workspace',
+    // evlog init — which options were picked
+    'initFramework',
+    'initDevDrain',
+    'initSampling',
+    'initInteractive',
+    'initCancelled',
+    'initProdDrainCount',
+    'initFilesWritten',
+    'initManualSteps',
+    'initDryRun',
+    'initDoctorFail',
+    'initHadRepeatedErrors',
+    'initHadAuditGaps',
+    'initProdFs',
+    'initProdAxiom',
+    'initProdOtlp',
+    'initProdPosthog',
+    'initProdSentry',
+    'initProdBetterStack',
+    'initProdDatadog',
+    'initProdHyperdx',
+    'initProdNone',
+    'initExtraEnrichers',
+    'initExtraPipeline',
+    'initExtraSampling',
+    'initExtraErrorCatalog',
+    'initExtraAuditCatalog',
+    'initExtraVite',
+    'initExtraAi',
+    'initExtraBetterAuth',
+    'initEnricherUserAgent',
+    'initEnricherGeo',
+    'initEnricherRequestSize',
+    'initEnricherTraceContext',
+  ],
 }
 
 /** Parse a comma-separated allowlist of tool names from an env value. */

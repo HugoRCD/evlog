@@ -68,7 +68,7 @@ function setOutput(type: 'success' | 'error') {
           <h2 class="section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-2xl blur-xs animate-pulse pointer-events-none">
+          <div aria-hidden="true" class="title-glow section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>

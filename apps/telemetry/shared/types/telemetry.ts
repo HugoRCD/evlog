@@ -142,6 +142,18 @@ export interface RunsResponse {
   total: number
 }
 
+/**
+ * Change token for the `runs` table, polled by the dashboard's live refresh on
+ * its fast cadence so the expensive stats/runs queries only re-run once an
+ * event has actually landed.
+ */
+export interface RunsCursor {
+  /** Highest row id, or `0` when the table is empty (or serving mock data). */
+  latestId: number
+  /** ISO timestamp of the newest event — `null` when there is none. */
+  latestAt: string | null
+}
+
 /** Environment snapshot captured alongside a run — see `@evlog/telemetry`'s `EnvInfo`. */
 export interface RunEnvInfo {
   node: string
