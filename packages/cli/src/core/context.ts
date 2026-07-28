@@ -14,6 +14,14 @@ export interface CliContext {
   nodeVersion: string
   /** Whether the terminal is interactive (stdout or stderr is a TTY). */
   tty: boolean
+  /**
+   * Whether stdin is a terminal.
+   *
+   * Separate from {@link tty} because they answer different questions: `tty`
+   * says output can be styled, this says a prompt has somebody to answer it.
+   * A run with piped stdin and a terminal stdout has one and not the other.
+   */
+  stdinTty: boolean
   /** Whether ANSI styling should be emitted. */
   color: boolean
   /** Terminal width in columns (80 when unknown). */
@@ -42,6 +50,7 @@ export function createContext(overrides: Partial<CliContext> = {}): CliContext {
     env,
     nodeVersion: overrides.nodeVersion ?? process.version,
     tty,
+    stdinTty: overrides.stdinTty ?? process.stdin.isTTY === true,
     color: overrides.color ?? useColors(env, tty),
     columns: overrides.columns ?? process.stdout.columns ?? process.stderr.columns ?? 80,
   }

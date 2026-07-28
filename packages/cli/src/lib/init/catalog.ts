@@ -161,7 +161,7 @@ export const DEV_DESTINATIONS = DESTINATIONS.filter(d => d.id === 'fs' || d.id =
  * serving the request, which is a local convenience and not a place anybody
  * reads production logs from.
  */
-export const PROD_DESTINATIONS = DESTINATIONS.filter(d => d.productionSafe && d.id !== 'none')
+export const PROD_DESTINATIONS = DESTINATIONS.filter(d => d.productionSafe && d.factory !== null)
 
 /* ── enrichers ──────────────────────────────────────────────────────────── */
 

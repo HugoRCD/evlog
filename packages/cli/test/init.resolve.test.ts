@@ -3,7 +3,7 @@ import { createContext } from '../src/core/context'
 import { availableExtras, DESTINATIONS, EXTRAS, findDestination } from '../src/lib/init/catalog'
 import type { DrainId } from '../src/lib/init/catalog'
 import { canPrompt } from '../src/lib/init/prompts'
-import { droppedExtras, parseDrainArg, parseExtrasArg, resolveAnswers } from '../src/lib/init/resolve'
+import { droppedExtras, parseDrainArg, parseExtrasArg, parseProdDrainsArg, resolveAnswers } from '../src/lib/init/resolve'
 
 describe('parseDrainArg', () => {
   it('accepts every id the catalog advertises', () => {
@@ -25,6 +25,19 @@ describe('parseDrainArg', () => {
   it('treats an absent flag as no opinion', () => {
     expect(parseDrainArg(undefined)).toBeUndefined()
     expect(parseDrainArg('')).toBeUndefined()
+  })
+})
+
+describe('parseProdDrainsArg', () => {
+  it('refuses the filesystem sink for production', () => {
+    /* The one rule that stops a per-box file sink being wired into production,
+       where nobody would ever read it. */
+    expect(() => parseProdDrainsArg('fs')).toThrow(/Unknown --drain "fs"/)
+    expect(() => parseProdDrainsArg('none')).toThrow(/Unknown --drain "none"/)
+  })
+
+  it('accepts several hosted destinations at once', () => {
+    expect(parseProdDrainsArg('axiom, sentry ,axiom')).toEqual(['axiom', 'sentry'])
   })
 })
 
@@ -142,36 +155,41 @@ describe('the catalog', () => {
 })
 
 describe('canPrompt', () => {
-  const ctx = (env: Record<string, string | undefined>) =>
-    createContext({ cwd: '/tmp', env, nodeVersion: 'v22.0.0', tty: true, color: false, columns: 80 })
+  /* The context owns the terminal state, so a case says what it means instead
+     of patching `process` and hoping the runner agrees. */
+  const ctx = (overrides: Partial<Parameters<typeof createContext>[0]> = {}) =>
+    createContext({
+      cwd: '/tmp',
+      env: {},
+      nodeVersion: 'v22.0.0',
+      tty: true,
+      stdinTty: true,
+      color: false,
+      columns: 80,
+      ...overrides,
+    })
 
-  it('refuses to prompt under CI even on a terminal', () => {
+  it('prompts on a terminal with nothing saying otherwise', () => {
+    expect(canPrompt(ctx())).toBe(true)
+  })
+
+  it('refuses under CI even on a terminal', () => {
     /* An agent or a workflow runner must never end up waiting on a keystroke
        that is not coming. */
-    expect(canPrompt(ctx({ CI: 'true' }))).toBe(false)
-    expect(canPrompt(ctx({ CI: '1' }))).toBe(false)
+    expect(canPrompt(ctx({ env: { CI: 'true' } }))).toBe(false)
+    expect(canPrompt(ctx({ env: { CI: '1' } }))).toBe(false)
   })
 
   it('ignores a CI variable that says it is off', () => {
-    const stdin = process.stdin.isTTY
-    const stdout = process.stdout.isTTY
-    Object.defineProperty(process.stdin, 'isTTY', { value: true, configurable: true })
-    Object.defineProperty(process.stdout, 'isTTY', { value: true, configurable: true })
-    try {
-      expect(canPrompt(ctx({ CI: 'false' }))).toBe(true)
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', { value: stdin, configurable: true })
-      Object.defineProperty(process.stdout, 'isTTY', { value: stdout, configurable: true })
-    }
+    expect(canPrompt(ctx({ env: { CI: 'false' } }))).toBe(true)
+    expect(canPrompt(ctx({ env: { CI: '0' } }))).toBe(true)
   })
 
-  it('refuses when stdin is not a terminal', () => {
-    const stdin = process.stdin.isTTY
-    Object.defineProperty(process.stdin, 'isTTY', { value: false, configurable: true })
-    try {
-      expect(canPrompt(ctx({}))).toBe(false)
-    } finally {
-      Object.defineProperty(process.stdin, 'isTTY', { value: stdin, configurable: true })
-    }
+  it('refuses when stdin is piped, however good the output side looks', () => {
+    expect(canPrompt(ctx({ stdinTty: false }))).toBe(false)
+  })
+
+  it('refuses when there is nowhere to draw', () => {
+    expect(canPrompt(ctx({ tty: false }))).toBe(false)
   })
 })

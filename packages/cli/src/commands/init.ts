@@ -24,7 +24,7 @@ const FRAMEWORKS: readonly Framework[] = ['nuxt', 'nitro', 'next', 'tanstack-sta
 function parseFrameworkArg(value: unknown): Framework | undefined {
   if (typeof value !== 'string' || value.length === 0) return undefined
   if (!(FRAMEWORKS as readonly string[]).includes(value)) {
-    throw cliErrors.MAP_INVALID_FRAMEWORK({ value })
+    throw cliErrors.INIT_INVALID_FRAMEWORK({ value })
   }
   return value as Framework
 }
@@ -100,6 +100,22 @@ export default defineEvlogCommand('init', {
         ? args.apps.split(',').map(entry => entry.trim()).filter(Boolean)
         : null
 
+      if (requested) {
+        /* A name that matches nothing has to stop the run even when its
+           neighbours matched. `--apps web,shopp` setting up `web` and saying
+           nothing about `shopp` is the silent-default behaviour every other
+           flag here refuses. */
+        const unknown = requested.filter(
+          entry => !targets.some(app => app.label === entry || app.name === entry),
+        )
+        if (unknown.length > 0) {
+          return fail(
+            cliErrors.INIT_NO_APPS({ value: unknown.join(', '), known: targets.map(app => app.label).join(', ') }),
+            { args, log, ui },
+          )
+        }
+      }
+
       let selected = requested
         ? targets.filter(app => requested.includes(app.label) || requested.includes(app.name))
         : targets
@@ -121,26 +137,34 @@ export default defineEvlogCommand('init', {
       }
 
       if (selected.length === 0) {
-        ui.done({
-          jsonMode: args.json,
-          json: { error: { code: 'cli.INIT_NO_APPS', message: 'No matching workspace app' } },
-          human: `No workspace app matched --apps. Found: ${targets.map(app => app.label).join(', ')}`,
-        })
-        ui.exit(EXIT_FAIL)
-        return
+        return fail(
+          cliErrors.INIT_NO_APPS({ value: 'nothing', known: targets.map(app => app.label).join(', ') }),
+          { args, log, ui },
+        )
       }
 
       const results: InitResult[] = []
       for (const app of selected) {
         if (!args.json) ui.human(formatWorkspaceHeading(ctx, app.label))
-        const result = await runInit({ ...ctx, cwd: app.dir }, log, { ...options, framework: app.framework })
-        results.push(result)
-        if (!args.json && !result.interactive) ui.human(formatInitReport(ctx, result))
+        try {
+          const result = await runInit({ ...ctx, cwd: app.dir }, log, { ...options, framework: app.framework })
+          results.push(result)
+          if (!args.json && !result.interactive) ui.human(formatInitReport(ctx, result))
+        } catch (error) {
+          /* Ctrl-C in the middle of a workspace run stops the loop rather than
+             throwing past it: the apps already set up keep what they got, and
+             the ones after are simply not touched. */
+          if (error instanceof InitCancelled) {
+            closeCancelled()
+            break
+          }
+          return fail(error, { args, log, ui })
+        }
       }
 
       ui.done({
         jsonMode: args.json,
-        json: { workspace: true, apps: selected.map((app, index) => ({ app: app.label, ...toJson(results[index]!) })) },
+        json: { workspace: true, apps: results.map((result, index) => ({ app: selected[index]!.label, ...toJson(result) })) },
       })
       if (results.some(result => result.install.status === 'failed')) ui.exit(EXIT_FAIL)
       return

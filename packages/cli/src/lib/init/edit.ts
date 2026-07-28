@@ -74,6 +74,7 @@ export function getProperty(object: ObjectNode, name: string): Node | null {
   return null
 }
 
+/** Whether an object literal already declares `name`. */
 export function hasProperty(object: ObjectNode, name: string): boolean {
   return object.properties.some(prop => propertyName(prop) === name)
 }
@@ -116,7 +117,9 @@ function indentUnit(source: string): string {
   return found.startsWith('\t') ? '\t' : ' '.repeat(Math.min(found.length, 4))
 }
 
+/** Text to insert at a byte offset — the only edit this module ever makes. */
 export interface Splice {
+  /** Byte offset in the original source. */
   at: number
   text: string
 }

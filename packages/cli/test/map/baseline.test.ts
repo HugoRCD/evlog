@@ -21,7 +21,7 @@ afterEach(async () => {
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
-function route(path: string, checks: Partial<Record<CheckId, CheckResult>>, id = path): RouteEntry {
+function route(path: string, checks: Partial<Record<CheckId, CheckResult>>, id = path, score = 100): RouteEntry {
   return {
     id,
     framework: 'nuxt',
@@ -33,7 +33,7 @@ function route(path: string, checks: Partial<Record<CheckId, CheckResult>>, id =
     checks,
     suggestions: {},
     sensitivity: { level: 'none', reasons: [] },
-    score: 100,
+    score,
   }
 }
 
@@ -51,12 +51,12 @@ function mapOf(routes: RouteEntry[], score = 80): MapFile {
 describe('compareToBaseline', () => {
   it('reports a check that went from pass to fail', () => {
     const before = mapOf([route('/checkout', { 'wide-event': { status: 'pass' } })])
-    const after = mapOf([route('/checkout', { 'wide-event': { status: 'fail' } })], 60)
+    const after = mapOf([route('/checkout', { 'wide-event': { status: 'fail' } }, '/checkout', 60)], 60)
 
     const comparison = compareToBaseline(before, after, SOURCE)
 
     expect(comparison.regressions).toEqual([expect.objectContaining({ path: '/checkout', check: 'wide-event', to: 'fail' }),])
-    expect(comparison.delta).toBe(-20)
+    expect(comparison.delta).toBe(-40)
     expect(hasRegressed(comparison)).toBe(true)
   })
 
@@ -80,14 +80,17 @@ describe('compareToBaseline', () => {
   })
 
   it('counts a fixed check without calling it a regression', () => {
-    const before = mapOf([route('/checkout', { 'wide-event': { status: 'fail' } })])
+    const before = mapOf([route('/checkout', { 'wide-event': { status: 'fail' } }, '/checkout', 40)])
     const after = mapOf([route('/checkout', { 'wide-event': { status: 'pass' } })], 95)
 
     const comparison = compareToBaseline(before, after, SOURCE)
 
     expect(comparison.regressions).toHaveLength(0)
-    expect(comparison.fixed).toHaveLength(1)
-    expect(comparison.delta).toBe(15)
+    /* A fix is not a regression with the sign flipped: it carries no `to`, so
+       a consumer of the JSON cannot read it as a check that broke. */
+    expect(comparison.fixed).toEqual([expect.objectContaining({ path: '/checkout', check: 'wide-event' })])
+    expect(comparison.fixed[0]).not.toHaveProperty('to')
+    expect(comparison.delta).toBe(60)
     expect(hasRegressed(comparison)).toBe(false)
   })
 
@@ -117,11 +120,45 @@ describe('compareToBaseline', () => {
     expect(comparison.regressions).toHaveLength(0)
   })
 
-  it('fails on a score drop even when no single check regressed', () => {
-    const before = mapOf([], 80)
-    const after = mapOf([], 79)
+  it('fails when an entry point that survived lost score, with no check to name it', () => {
+    const before = mapOf([route('/checkout', { 'wide-event': { status: 'pass' } })])
+    const after = mapOf([route('/checkout', { 'wide-event': { status: 'pass' } }, '/checkout', 70)])
 
     expect(hasRegressed(compareToBaseline(before, after, SOURCE))).toBe(true)
+  })
+
+  it('does not let a new dark route drag the gate down', () => {
+    /* The global score is a weighted average, so adding an uninstrumented
+       endpoint lowers it on its own. Gating on that number would fail exactly
+       the pull requests this comparison promises not to fail. */
+    const before = mapOf([route('/checkout', { 'wide-event': { status: 'pass' } })], 100)
+    const after = mapOf([
+      route('/checkout', { 'wide-event': { status: 'pass' } }),
+      route('/reports', { 'wide-event': { status: 'fail' } }, '/reports', 0),
+    ], 50)
+
+    const comparison = compareToBaseline(before, after, SOURCE)
+
+    expect(comparison.totalDelta).toBe(-50)
+    expect(comparison.delta).toBe(0)
+    expect(hasRegressed(comparison)).toBe(false)
+  })
+
+  it('leaves an exempt new route out of the dark list', () => {
+    /* A page that fetches nothing has nothing to log — the scan's classifier
+       calls it exempt, and reporting it as needing instrumentation would be
+       this comparison disagreeing with the report it sits under. */
+    const before = mapOf([])
+    const page: RouteEntry = {
+      ...route('/about', { 'page-error-handling': { status: 'n/a' } }),
+      kind: 'page',
+      method: null,
+    }
+    const after = mapOf([page])
+
+    const comparison = compareToBaseline(before, after, SOURCE)
+
+    expect(comparison.added).toEqual([expect.objectContaining({ path: '/about', dark: false })])
   })
 })
 
@@ -136,7 +173,9 @@ describe('loadBaseline', () => {
     expect(source).toEqual({ kind: 'file', label: 'evlog.map.json' })
   })
 
-  it('falls back to git when the working copy was already overwritten', async () => {
+  /* Four git invocations, and git under parallel load on macOS is not quick —
+     the default 5s is enough until something else is hammering the disk. */
+  it('falls back to git when the working copy was already overwritten', { timeout: 30_000 }, async () => {
     const dir = await tempProject()
     const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' })
     await writeFile(join(dir, 'evlog.map.json'), JSON.stringify(mapOf([], 70)), 'utf8')
