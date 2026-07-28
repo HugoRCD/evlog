@@ -9,8 +9,10 @@ export default defineEventHandler(async (event): Promise<RunsResponse> => {
   const order = parseOrder(query.order)
   const pageSize = clampLimit(query.pageSize)
   const page = parsePage(query.page)
+  // The live feed opts out of the range-wide `count(*)` it never displays.
+  const withTotal = query.withTotal !== 'false'
 
-  log.set({ query: { ...filter, sort, order, page, pageSize } })
+  log.set({ query: { ...filter, sort, order, page, pageSize, withTotal } })
 
-  return getRunsPageForFilter(filter, { sort, order, page, pageSize })
+  return getRunsPageForFilter(filter, { sort, order, page, pageSize, withTotal })
 })
