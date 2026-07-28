@@ -27,9 +27,8 @@ export default defineNuxtConfig({
     preference: 'dark',
   },
 
-  // Away from 3000, which the docs site (and anything else) tends to hold.
   devServer: {
-    port: 4000,
+    port: 3000,
   },
 
   fonts: {
@@ -54,6 +53,13 @@ export default defineNuxtConfig({
     // The pixel font is a public asset of the docs app, and the capture inlines
     // whatever `@font-face` resolves to — so it has to be served from here too.
     publicAssets: [{ dir: `${docs}/public`, maxAge: 0 }],
+
+    // The app is a single client-rendered route, so its shell is the same bytes
+    // for everyone. Prerendering it means a deployment serves a static file
+    // rather than waking a function for every visit.
+    prerender: {
+      routes: ['/'],
+    },
   },
 
   icon: {

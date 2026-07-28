@@ -49,16 +49,31 @@ export function loadStored(): LabDocument | null {
   }
 }
 
-export function saveStored(document: LabDocument) {
+/**
+ * Persist the working copy.
+ *
+ * Returns what went wrong rather than swallowing it. Local storage caps around
+ * five megabytes and an imported video is inlined as a data URL, so a real
+ * project reaches the limit easily — and a save that fails in silence means the
+ * next reload quietly discards an afternoon's work.
+ */
+export function saveStored(document: LabDocument): { ok: true } | { ok: false, reason: string } {
   try {
     localStorage.setItem(KEY, JSON.stringify({
       ...settingsToQuery(document.settings),
       [LAYERS_PARAM]: document.layers,
       [CAMERA_PARAM]: document.camera,
     }))
-  } catch {
-    // Storage being unavailable — or full, which an inlined image can manage on
-    // its own — must not break the session.
+    return { ok: true }
+  } catch (cause) {
+    const quota = cause instanceof DOMException
+      && (cause.name === 'QuotaExceededError' || cause.name === 'NS_ERROR_DOM_QUOTA_REACHED')
+    return {
+      ok: false,
+      reason: quota
+        ? 'This project is too large to save — imported media is stored inside it. Remove a video or an image, or export what you have now.'
+        : 'This project could not be saved to local storage.',
+    }
   }
 }
 

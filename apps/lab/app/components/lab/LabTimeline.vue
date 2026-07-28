@@ -110,9 +110,22 @@ function run(action: 'duplicate' | 'copy' | 'split' | 'remove') {
 onMounted(() => window.addEventListener('pointerdown', closeMenu))
 onBeforeUnmount(() => window.removeEventListener('pointerdown', closeMenu))
 
+/**
+ * The ruler runs past the end of the take.
+ *
+ * The timeline is exactly as long as its content, so without headroom every
+ * clip ends flush against the right edge and there is nowhere to drag it to
+ * make it longer. The spare quarter is scrubbing and editing room, not part of
+ * the export — the shaded band marks where the take actually stops.
+ */
+const HEADROOM = 1.25
+/** Floor for that headroom, so a short take still has room to drag into. */
+const MIN_HEADROOM = 3000
+
+const span = computed(() => Math.max(1, props.length * HEADROOM, props.length + MIN_HEADROOM))
+
 function percent(ms: number) {
-  if (props.length <= 0) return 0
-  return Math.min(100, Math.max(0, (ms / props.length) * 100))
+  return Math.min(100, Math.max(0, (ms / span.value) * 100))
 }
 
 function trackWidth(): number {
@@ -123,7 +136,7 @@ function msAtClientX(clientX: number): number {
   const rect = ruler.value?.getBoundingClientRect()
   if (!rect?.width) return 0
   const ratio = Math.min(1, Math.max(0, (clientX - rect.left) / rect.width))
-  return ratio * props.length
+  return ratio * span.value
 }
 
 /**
@@ -133,7 +146,7 @@ function msAtClientX(clientX: number): number {
  * and the result is off by a frame nobody can see but the export can.
  */
 function snap(ms: number, ignoreId?: string): number {
-  const tolerance = (SNAP_PIXELS / trackWidth()) * props.length
+  const tolerance = (SNAP_PIXELS / trackWidth()) * span.value
   const candidates = [0, props.length, props.playhead]
   for (const layer of layers.value) {
     if (layer.id === ignoreId) continue
@@ -178,13 +191,13 @@ function applyDrag(event: PointerEvent) {
 
   if (current.grab === 'body') {
     const start = snap(raw - current.offset, layer.id)
-    updated.start = Math.max(0, Math.min(start, props.length - layer.duration))
+    updated.start = Math.max(0, Math.min(start, span.value - layer.duration))
   } else if (current.grab === 'start') {
     const start = Math.max(0, Math.min(snap(raw, layer.id), layerEnd(layer) - MIN_SEGMENT))
     updated.duration = layerEnd(layer) - start
     updated.start = start
   } else {
-    const end = Math.min(props.length, Math.max(snap(raw, layer.id), layer.start + MIN_SEGMENT))
+    const end = Math.min(span.value, Math.max(snap(raw, layer.id), layer.start + MIN_SEGMENT))
     updated.duration = end - layer.start
   }
 
@@ -211,7 +224,7 @@ function onClipDown(event: PointerEvent, layer: Layer, grab: 'body' | 'start' | 
  * than crowding into a solid band on a long take.
  */
 const ticks = computed(() => {
-  const seconds = props.length / 1000
+  const seconds = span.value / 1000
   const step = seconds <= 4 ? 0.5 : seconds <= 12 ? 1 : seconds <= 30 ? 2 : 5
   const marks: { at: number, label: string }[] = []
   for (let t = 0; t <= seconds + 1e-6; t += step) {
@@ -336,6 +349,10 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           @pointerup="endDrag"
           @pointercancel="endDrag"
         >
+          <!-- Past the take: scrubbing room, never exported. -->
+          <div class="pointer-events-none absolute inset-y-0 right-0 bg-black/50" :style="{ left: `${percent(length)}%` }" />
+          <div class="pointer-events-none absolute inset-y-0 w-px bg-zinc-700" :style="{ left: `${percent(length)}%` }" />
+
           <div
             v-for="tick in ticks"
             :key="tick.at"

@@ -51,9 +51,29 @@ interface Natives {
   setTimeout: typeof window.setTimeout
 }
 
-/** Let queued microtasks (Vue's render flush) settle before the next frame. */
-function settle(natives: Natives): Promise<void> {
-  return new Promise(resolve => natives.setTimeout.call(window, resolve, 0))
+/**
+ * Let queued microtasks (Vue's render flush) settle before the next frame.
+ *
+ * A message port rather than a timer: browsers clamp `setTimeout` to roughly a
+ * second in a background tab, and an export waits on this twice per frame. On a
+ * timer, looking away mid-render would take a thirty second take to well over
+ * an hour. Message channel tasks are not throttled.
+ */
+function createSettle(): () => Promise<void> {
+  const channel = new MessageChannel()
+  let pending: (() => void) | null = null
+
+  channel.port1.onmessage = () => {
+    const resolve = pending
+    pending = null
+    resolve?.()
+  }
+
+  return () => new Promise<void>((resolve) => {
+    // Only one settle is ever in flight, so a single slot is enough.
+    pending = resolve
+    channel.port2.postMessage(null)
+  })
 }
 
 export function createClock(): Clock {
@@ -63,6 +83,8 @@ export function createClock(): Clock {
     performanceNow: performance.now.bind(performance),
     setTimeout: window.setTimeout.bind(window),
   }
+
+  const settle = createSettle()
 
   let mode: ClockMode = 'live'
   let virtualTime = 0
@@ -175,11 +197,11 @@ export function createClock(): Clock {
       if (mode !== 'virtual') return
       runBatch(deltaMs)
 
-      await settle(natives)
+      await settle()
       syncAnimations()
       // A second settle: the first lets Vue apply state changes, this one lets
       // any transition those changes started register itself.
-      await settle(natives)
+      await settle()
     },
 
     raf: callback => natives.requestAnimationFrame(callback),

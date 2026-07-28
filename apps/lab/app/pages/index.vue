@@ -423,7 +423,12 @@ watch([() => settings.value.stageWidth, () => settings.value.stageHeight], () =>
 let saveTimer: ReturnType<typeof setTimeout> | undefined
 watch([settings, layers, camera], () => {
   clearTimeout(saveTimer)
-  saveTimer = setTimeout(() => saveStored(currentDocument()), 300)
+  saveTimer = setTimeout(() => {
+    const saved = saveStored(currentDocument())
+    // Surfaced rather than logged: losing a project on the next reload is not
+    // something to discover afterwards.
+    if (!saved.ok) error.value = saved.reason
+  }, 300)
 }, { deep: true })
 onBeforeUnmount(() => {
   clearTimeout(saveTimer)
@@ -946,11 +951,19 @@ async function exportVideo() {
         progress.value = rendered / total
       },
       renderFrame: async (index) => {
-        // Frame 0 is the scene at t=0; every later frame is exactly one
-        // interval on, regardless of how long the previous one took to build.
-        // Frame 0 is the scene at the in point, already reached by priming.
+        // Frame 0 is the scene at t=0; every later frame is exactly one interval
+        // on, regardless of how long the previous one took to build.
         await clock?.advance(index === 0 ? 0 : frameInterval)
+
+        // The preview loop is stopped while exporting, so the playhead has to be
+        // moved here. It is what every layer's span, fade and video frame is
+        // read against — left behind, the whole take renders at time zero, and
+        // anything that does not start at zero never appears at all.
+        playhead.value = clock?.now ?? 0
+        await nextTick()
+
         await captureStage()
+        await syncVideoFrames(playhead.value, true)
         renderer?.render(shotSettings.value, clock?.now ?? 0, layerPlanes.value, overlayQuads.value)
       },
     })

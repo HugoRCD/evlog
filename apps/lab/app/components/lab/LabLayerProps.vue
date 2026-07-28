@@ -24,6 +24,15 @@ const FONTS = [
   { value: 'mono', label: 'mono' },
 ] as const
 
+/**
+ * Ceiling for a clip's own span.
+ *
+ * Deliberately not the timeline's length: the timeline is derived from the
+ * clips, so capping a clip at it means a clip can only ever shrink. There would
+ * be no value left to type that makes it longer.
+ */
+const MAX_SPAN = 120_000
+
 const SPACES = [
   { value: 'plate', label: 'on plate', hint: 'Sits on the animation and takes its tilt' },
   { value: 'scene', label: 'in scene', hint: 'Floats at its own depth' },
@@ -221,7 +230,7 @@ const ALIGNMENTS = [
       :model-value="layer.start"
       label="Start"
       :min="0"
-      :max="timelineLength"
+      :max="MAX_SPAN"
       :step="10"
       unit="ms"
       :default="0"
@@ -231,7 +240,7 @@ const ALIGNMENTS = [
       :model-value="layer.duration"
       label="Length"
       :min="100"
-      :max="timelineLength"
+      :max="MAX_SPAN"
       :step="10"
       unit="ms"
       :default="2000"
