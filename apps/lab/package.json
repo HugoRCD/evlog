@@ -1,0 +1,21 @@
+{
+  "name": "evlog-lab",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "dev:prepare": "nuxt prepare",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@nuxt/fonts": "0.14.0",
+    "@nuxt/ui": "^4.10.0",
+    "motion-v": "^2.3.0",
+    "nuxt": "^4.4.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5"
+  }
+}
