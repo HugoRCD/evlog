@@ -192,8 +192,14 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="p-5 sm:p-6 flex-1 space-y-5">
-            <div class="flex items-end gap-5">
-              <div class="shrink-0">
+            <!--
+              The score column matches the coverage labels below — same width,
+              same gap — so the skyline starts on the same vertical as the
+              coverage tracks. Left to its intrinsic width it lined up with
+              nothing, and moved with the font.
+            -->
+            <div class="flex items-end gap-3">
+              <div class="w-32 shrink-0">
                 <p class="font-mono text-[10px] uppercase tracking-wide text-dimmed">
                   score
                 </p>
@@ -233,7 +239,7 @@ onBeforeUnmount(() => {
                 :key="area.label"
                 class="flex items-center gap-3 font-mono text-[11px]"
               >
-                <span class="w-28 shrink-0 truncate text-muted">{{ area.label }}</span>
+                <span class="w-32 shrink-0 truncate text-muted">{{ area.label }}</span>
                 <div class="relative h-1.5 flex-1 bg-elevated">
                   <div
                     class="absolute inset-0 origin-left transition-transform ease-out"
