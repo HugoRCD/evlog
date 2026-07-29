@@ -36,11 +36,30 @@ export interface Clock {
    * nobody can see, and which the export path does not tolerate.
    */
   advanceSync: (deltaMs: number) => void
+  /**
+   * Run everything waiting on a frame without moving time.
+   *
+   * The patch is installed on `window`, so it catches the lab's own interface as
+   * well as the shot — and Vue schedules a frame to take an enter class back off
+   * an element it has just mounted. While the playhead sits still nothing
+   * advances the clock, that callback never runs, and the element stays at the
+   * opacity it entered from: a dialog that is present, invisible and swallowing
+   * every click. Draining on the real display loop keeps the interface animating
+   * at its own rate while the shot only ever moves when asked.
+   */
+  flush: () => void
+
   /** Schedule on the real display loop, bypassing the patch. */
   raf: (callback: FrameRequestCallback) => number
   cancelRaf: (handle: number) => void
-  /** Rewind to zero. Callers are expected to remount the scene alongside this. */
-  reset: () => void
+  /**
+   * Rewind. Callers are expected to remount the scene alongside this.
+   *
+   * `to` is normally zero, and negative when a clip needs its source to have
+   * been running before the take starts — the take then begins part-way through
+   * a replay that started earlier.
+   */
+  reset: (to?: number) => void
   dispose: () => void
 }
 
@@ -119,8 +138,24 @@ export function createClock(): Clock {
    * paused and seeked individually, and re-scanned every frame because Vue
    * transitions create new ones mid-capture.
    */
+  /**
+   * Does this animation belong to the shot?
+   *
+   * The stage subtree is marked in the DOM; anything running outside it is the
+   * lab's own interface and keeps its real timeline.
+   */
+  function isStaged(animation: Animation): boolean {
+    const target = (animation.effect as KeyframeEffect | null)?.target
+    return target instanceof Element && !!target.closest('[data-lab-stage]')
+  }
+
   function syncAnimations() {
     for (const animation of document.getAnimations()) {
+      // Only what is being filmed. `document.getAnimations()` returns the lab's
+      // own transitions too, and pausing those froze the interface at whatever
+      // opacity it happened to be mid-fade — a panel that had just opened stayed
+      // invisible while still taking clicks.
+      if (!isStaged(animation)) continue
       if (!captured.has(animation)) {
         captured.add(animation)
         try {
@@ -204,11 +239,17 @@ export function createClock(): Clock {
       await settle()
     },
 
+    flush() {
+      // Zero delta: anything integrating between timestamps sees no elapsed
+      // time and holds its pose, so draining is free of side effects on the shot.
+      if (mode === 'virtual') runBatch(0)
+    },
+
     raf: callback => natives.requestAnimationFrame(callback),
     cancelRaf: handle => natives.cancelAnimationFrame(handle),
 
-    reset() {
-      virtualTime = 0
+    reset(to = 0) {
+      virtualTime = to
       queue = new Map()
       releaseAnimations()
     },

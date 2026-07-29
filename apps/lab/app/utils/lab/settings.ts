@@ -8,15 +8,19 @@
  */
 
 export interface LabSettings {
-  /** Stage size in CSS pixels, before any camera transform. */
+  /**
+   * The viewport the component is laid out in, in CSS pixels.
+   *
+   * Set by the device presets rather than typed: this is the width a responsive
+   * component reads to decide its layout, so the useful values are the ones real
+   * screens have.
+   */
   stageWidth: number
   stageHeight: number
-  /** Supersampling of the rasterized plate. Higher costs capture time, buys sharpness. */
-  plateScale: number
-  /** Output frame size. */
+  /** Output frame size, set by the delivery presets. */
   outputWidth: number
   outputHeight: number
-  /** Frame rate of the export. */
+  /** Frame rate of the export, one of `FRAME_RATES`. */
   fps: number
   /**
    * How far into the component's own timeline the lab can scrub, in ms.
@@ -80,12 +84,23 @@ export interface LabSettings {
   grain: number
   attenuation: number
   background: string
+
+  /**
+   * Name of the look in force, or empty for none.
+   *
+   * The values it produced are written into the fields above rather than being
+   * resolved from here on every frame — the renderer reads one flat set of
+   * numbers, and a look is only ever a way of filling them in. This is kept so
+   * the amount dial knows what to re-blend from, and so a chip can be lit.
+   */
+  look: string
+  /** Strength of that look, 0 = neutral, 1 = as authored. See `looks.ts`. */
+  lookAmount: number
 }
 
 export const DEFAULT_SETTINGS: LabSettings = {
   stageWidth: 1100,
   stageHeight: 720,
-  plateScale: 2,
   outputWidth: 1920,
   outputHeight: 1080,
   fps: 30,
@@ -123,6 +138,13 @@ export const DEFAULT_SETTINGS: LabSettings = {
   grain: 0.015,
   attenuation: 0,
   background: '#000000',
+
+  // No look selected, and the grade above is left exactly as it was. Seeding a
+  // look here would have shifted the look values, and every document already
+  // stored omits whatever matches a default — so old shots would have silently
+  // re-graded themselves on the next load.
+  look: '',
+  lookAmount: 1,
 }
 
 /** Bounds and step for every numeric control, driving both the UI and URL clamping. */
@@ -141,8 +163,7 @@ export const HINTS: Partial<Record<string, string>> = {
   aperture: 'How strongly out-of-focus areas blur. Zero turns depth of field off.',
   blurRadius: 'Widest the bokeh can grow, measured on a 1080p frame.',
   dofSamples: 'Taps per pixel in the bokeh. Higher is smoother and slower.',
-  plateScale: 'How densely the staged animation is rasterized. Raise it if text looks soft.',
-  emission: 'Pushes the plate above full white so bloom has something to catch.',
+  emission: 'How bright the picture is before it glows. Raise it to give bloom something to catch; it is what feeds the glow, not the glow itself.',
   attenuation: 'Darkens the scene as it recedes, which reads as depth.',
   bloomThreshold: 'Brightness a pixel must reach before it glows.',
   bloomKnee: 'Softness of that threshold, so glow fades in instead of popping.',
@@ -150,6 +171,7 @@ export const HINTS: Partial<Record<string, string>> = {
   aberration: 'Splits the colour channels towards the edges, the way a real lens does.',
   tail: 'Black held after the last clip ends, so a shot can land instead of cutting.',
   speed: 'Playback rate. Below 1 the animation is stepped in smaller increments — real slow motion.',
+  lookAmount: 'How far towards the look to go. Past 1 it is pushed beyond what it was authored at.',
 } as const
 
 export const RANGES = {
@@ -181,7 +203,6 @@ export const RANGES = {
   grain: { min: 0, max: 0.12, step: 0.001 },
   attenuation: { min: 0, max: 1, step: 0.005 },
 
-  plateScale: { min: 1, max: 4, step: 0.25, unit: '×' },
   stageWidth: { min: 320, max: 2400, step: 10, unit: 'px' },
   stageHeight: { min: 240, max: 1600, step: 10, unit: 'px' },
   // Low minimums on purpose: clamping an output size silently changes the
@@ -191,127 +212,88 @@ export const RANGES = {
   tail: { min: 0, max: 10000, step: 50, unit: 'ms' },
   fps: { min: 12, max: 60, step: 1, unit: 'fps' },
   speed: { min: 0.1, max: 2, step: 0.05, unit: '×' },
+  // Past 1 the look is extrapolated rather than reached — see MAX_LOOK_AMOUNT.
+  lookAmount: { min: 0, max: 1.5, step: 0.01, unit: '×' },
 } as const satisfies Record<string, { min: number, max: number, step: number, unit?: string }>
 
 export type RangedKey = keyof typeof RANGES
 
 /**
- * Named looks.
+ * How densely the staged animation is rasterized.
  *
- * These are starting points, not a closed set — the point of the lab is to
- * drag sliders. `flat` exists so there is always a way back to a clean,
- * undistorted capture of a component.
+ * A constant rather than a control: two is sharp enough that text holds up at
+ * 4K and cheap enough that capture stays interactive, and nobody shooting a
+ * release video wants to be asked about supersampling first.
  */
-export const PRESETS: Record<string, Partial<LabSettings>> = {
-  flat: {
-    pitch: 0,
-    yaw: 0,
-    roll: 0,
-    zoom: 1,
-    fov: 32,
-    focus: 0.5,
-    focusRange: 0.35,
-    aperture: 0,
-    bloomIntensity: 0.2,
-    vignette: 0.2,
-    grain: 0.01,
-    aberration: 0,
-    attenuation: 0,
-    emission: 1,
-  },
-  // The look from the reference frame: steep tilt, shallow focus, heavy falloff
-  // into black, just enough bloom to make the blues bleed.
-  cinematic: {
-    pitch: 16,
-    yaw: -21,
-    roll: -8,
-    zoom: 1.08,
-    fov: 30,
-    focus: 0.45,
-    focusRange: 0.5,
-    aperture: 0.9,
-    blurRadius: 13,
-    dofSamples: 48,
-    bloomIntensity: 0.62,
-    bloomThreshold: 0.62,
-    bloomKnee: 0.4,
-    bloomRadius: 1.4,
-    emission: 1.35,
-    exposure: 1.05,
-    contrast: 1.08,
-    saturation: 1.12,
-    aberration: 0.22,
-    vignette: 0.62,
-    grain: 0.022,
-    attenuation: 0.55,
-  },
-  // Straight-on but not flat: a hint of roll, wide open, strong glow. Reads well
-  // cropped to a square for social.
-  glow: {
-    pitch: 4,
-    yaw: -6,
-    roll: -2,
-    zoom: 1.02,
-    fov: 34,
-    focus: 0.5,
-    focusRange: 0.7,
-    aperture: 0.5,
-    blurRadius: 10,
-    bloomIntensity: 1.1,
-    bloomThreshold: 0.5,
-    bloomKnee: 0.5,
-    bloomRadius: 1.8,
-    emission: 1.5,
-    exposure: 1.02,
-    saturation: 1.18,
-    aberration: 0.15,
-    vignette: 0.45,
-    grain: 0.018,
-    attenuation: 0.2,
-  },
-  // Tilt-shift: a band of the plate is sharp and the rest falls away. Strong,
-  // but the sharp band still has to carry readable content — pushed much past
-  // this the frame stops being a shot of a component and becomes an abstract.
-  macro: {
-    pitch: 24,
-    yaw: -26,
-    roll: -10,
-    zoom: 1.2,
-    fov: 38,
-    focus: 0.42,
-    focusRange: 0.26,
-    aperture: 1,
-    blurRadius: 26,
-    dofSamples: 64,
-    bloomIntensity: 0.5,
-    bloomThreshold: 0.7,
-    bloomRadius: 1.6,
-    emission: 1.3,
-    exposure: 1.1,
-    contrast: 1.12,
-    aberration: 0.35,
-    vignette: 0.6,
-    grain: 0.025,
-    attenuation: 0.4,
-  },
-}
+export const PLATE_SCALE = 2
 
-/** Aspect presets for the output frame. */
-export const FORMATS = [
-  { label: '16:9', width: 1920, height: 1080 },
-  { label: '1:1', width: 1080, height: 1080 },
-  { label: '4:5', width: 1080, height: 1350 },
-  { label: '9:16', width: 1080, height: 1920 },
-  { label: '2:1', width: 1920, height: 960 },
+/**
+ * Where the video is going, rather than what shape it is.
+ *
+ * A ratio is a fact about the frame; a destination is the reason you picked it.
+ * "16:9" made you do the translation yourself every time — and the pixel count
+ * still matters, so it is stated underneath instead of being the whole label.
+ */
+export const OUTPUT_PRESETS = [
+  { id: 'post', label: 'X post', note: 'Landscape, the safe default', width: 1920, height: 1080 },
+  { id: 'readme', label: 'README', note: 'Lighter file for a repo', width: 1600, height: 900 },
+  { id: 'email', label: 'Email', note: 'Fits a newsletter column', width: 1200, height: 675 },
+  { id: 'square', label: 'Square', note: 'Feeds that crop the sides', width: 1080, height: 1080 },
+  { id: 'story', label: 'Shorts', note: 'Vertical, full screen', width: 1080, height: 1920 },
+  { id: 'hero', label: 'Hero', note: 'Wide banner strip', width: 1920, height: 960 },
 ] as const
 
+/**
+ * Screens to lay the component out at.
+ *
+ * The viewport is the one setting here that changes what is being filmed rather
+ * than how it is filmed — a component at 390 wide stacks what it lays side by
+ * side at 1440 — so the presets are the widths that trip real breakpoints.
+ */
+export const VIEWPORTS = [
+  { id: 'desktop', label: 'Desktop', width: 1440, height: 900 },
+  { id: 'laptop', label: 'Laptop', width: 1100, height: 720 },
+  { id: 'tablet', label: 'Tablet', width: 834, height: 1112 },
+  { id: 'phone', label: 'Phone', width: 390, height: 844 },
+] as const
+
+/**
+ * The rates anyone actually delivers at.
+ *
+ * A slider invited you to land on 37fps, which is never what you meant.
+ */
+export const FRAME_RATES = [24, 30, 60] as const
+
+/** Playback rates, as multiples of the animation's own speed. */
+export const SPEEDS = [0.25, 0.5, 1, 2] as const
+
 const BOOLEAN_KEYS = ['tonemap'] as const
-const STRING_KEYS = ['background', 'container'] as const
+const STRING_KEYS = ['background', 'container', 'look'] as const
 
 function clampRanged(key: string, value: number): number {
   const range = (RANGES as Record<string, { min: number, max: number } | undefined>)[key]
   if (!range) return value
   return Math.min(range.max, Math.max(range.min, value))
+}
+
+/**
+ * Clamp to a control's range and round to its step.
+ *
+ * Blending two looks lands between steps, and a slider handed 0.6173 shows one
+ * number while holding another. Rounding at the source keeps every value in the
+ * settings on the same grid the controls put them on.
+ */
+export function snapToRange(key: string, value: number): number {
+  const range = (RANGES as Record<string, { min: number, max: number, step: number } | undefined>)[key]
+  if (!range) return value
+
+  const stepped = Math.round(value / range.step) * range.step
+  const clamped = Math.min(range.max, Math.max(range.min, stepped))
+  // The step is the precision: deriving it from the string avoids the float
+  // noise that `0.1 * 3` style arithmetic leaves behind.
+  const text = String(range.step)
+  const dot = text.indexOf('.')
+  return Number(clamped.toFixed(dot === -1 ? 0 : text.length - dot - 1))
 }
 
 /**
@@ -379,14 +361,6 @@ export function frameStep(settings: LabSettings): number {
 /** Frames the current segment will produce. */
 export function frameCountFor(settings: LabSettings): number {
   return Math.max(1, Math.round((outputDuration(settings) / 1000) * settings.fps))
-}
-
-export function applyPreset(settings: LabSettings, name: string): LabSettings {
-  const preset = PRESETS[name]
-  if (!preset) return settings
-  // Framing is the shot, not the look — a preset must not silently reframe what
-  // is being filmed.
-  return { ...settings, ...preset }
 }
 
 export function hexToLinearRgb(hex: string): [number, number, number] {

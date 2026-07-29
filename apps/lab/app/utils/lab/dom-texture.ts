@@ -12,6 +12,19 @@
  * tool.
  */
 
+/**
+ * A frame of the stage, in the only form worth keeping.
+ *
+ * Two strings rather than a rasterized picture: a plate is megabytes as pixels
+ * and tens of kilobytes as markup, which is the difference between holding a few
+ * frames and holding a whole take. Rasterizing one back is a decode, with no
+ * remount and no replay behind it.
+ */
+export interface PlateMarkup {
+  head: string
+  body: string
+}
+
 export interface DomTexture {
   /**
    * Rasterize the current state of the element.
@@ -20,10 +33,13 @@ export interface DomTexture {
    * and rasterizes at `scale`× that, so the plate carries more detail than the
    * frame needs and survives being magnified by the camera.
    *
-   * Returns `null` when the markup is byte-for-byte what the last capture
-   * produced — the caller already has that texture uploaded.
+   * `image` is null when the markup is byte-for-byte what the last capture
+   * produced — the caller already has that texture uploaded. `markup` is
+   * returned either way, so a frame can be remembered even when nothing moved.
    */
-  capture: (element: HTMLElement, width: number, height: number, scale: number) => Promise<HTMLImageElement | null>
+  capture: (element: HTMLElement, width: number, height: number, scale: number) => Promise<{ image: HTMLImageElement | null, markup: PlateMarkup }>
+  /** Rebuild a picture from markup kept earlier. */
+  rasterize: (markup: PlateMarkup) => Promise<HTMLImageElement>
   /** Drop the cached stylesheet and font payload — call after a hot reload. */
   invalidate: () => void
   dispose: () => void
@@ -339,8 +355,9 @@ export function createDomTexture(): DomTexture {
     // markup has not moved, the rasterized plate cannot have either — so skip
     // the decode, the upload and the mipmap generation entirely. That is most of
     // the per-frame cost, and it is pure waste on a frame that is identical.
+    const markup: PlateMarkup = { head, body }
     const signature = head + body
-    if (signature === lastMarkup) return null
+    if (signature === lastMarkup) return { image: null, markup }
     lastMarkup = signature
 
     // `encodeURIComponent` maps each character independently, so encoding the
@@ -349,17 +366,30 @@ export function createDomTexture(): DomTexture {
     // be encoded once instead of on every frame.
     encodedStyle ??= encodeURIComponent(styleElement(css))
 
+    return { image: await toImage(markup, pixelWidth, pixelHeight), markup }
+  }
+
+  async function toImage(markup: PlateMarkup, pixelWidth: number, pixelHeight: number): Promise<HTMLImageElement> {
     const image = new Image()
     image.decoding = 'sync'
     image.width = pixelWidth
     image.height = pixelHeight
-    image.src = DATA_PREFIX + encodeURIComponent(head) + encodedStyle + encodeURIComponent(body)
+    image.src = DATA_PREFIX + encodeURIComponent(markup.head) + encodedStyle + encodeURIComponent(markup.body)
     await image.decode()
     return image
   }
 
   return {
     capture,
+
+    async rasterize(markup: PlateMarkup) {
+      // The stylesheet is shared and may not have been encoded yet in this
+      // session — a cached frame can be asked for before any capture has run.
+      encodedStyle ??= encodeURIComponent(styleElement(await styles()))
+      const size = /width="(\d+)" height="(\d+)"/.exec(markup.head)
+      return toImage(markup, Number(size?.[1] ?? 0), Number(size?.[2] ?? 0))
+    },
+
     invalidate: () => {
       lastMarkup = ''
     },

@@ -10,13 +10,42 @@
 import type { Layer } from '~/utils/lab/layers'
 import { ENTRIES } from '~/utils/lab/registry'
 
-const props = defineProps<{ layer: Layer, timelineLength: number }>()
+const props = defineProps<{
+  layer: Layer
+  timelineLength: number
+  /**
+   * Length this clip's animation declares, in ms.
+   *
+   * Absent for media, and for the components that drive themselves without the
+   * shared sequencer — there is nothing to ask them.
+   */
+  sequenceMs?: number
+}>()
 
 const emit = defineEmits<{
   update: [patch: Partial<Layer>]
   remove: []
   duplicate: []
 }>()
+
+/**
+ * What fitting would set the length to, or null when it would change nothing.
+ *
+ * What is left of the cycle after the trim, not the whole of it: a clip starting
+ * two seconds in has two seconds less to run.
+ */
+const fitLength = computed(() => {
+  if (!props.sequenceMs) return null
+  const length = Math.max(100, props.sequenceMs - (props.layer.trim ?? 0))
+  return Math.abs(length - props.layer.duration) < 50 ? null : length
+})
+
+const KINDS = {
+  component: { label: 'animation', icon: 'i-lucide-square-play' },
+  video: { label: 'video', icon: 'i-lucide-film' },
+  image: { label: 'image', icon: 'i-lucide-image' },
+  text: { label: 'text', icon: 'i-lucide-type' },
+} as const
 
 const FONTS = [
   { value: 'pixel', label: 'pixel' },
@@ -54,16 +83,35 @@ const ALIGNMENTS = [
   { value: 'center', icon: 'i-lucide-align-center' },
   { value: 'right', icon: 'i-lucide-align-right' },
 ] as const
+
+/**
+ * Each button is set the way it sets the text.
+ *
+ * An italic button in italics and a caps button in caps need no label read to be
+ * understood, and they double as a preview of what the type will do.
+ */
+const TEXT_TOGGLES = [
+  { key: 'italic', label: 'Italic', style: 'font-style: italic' },
+  { key: 'uppercase', label: 'CAPS', style: 'letter-spacing: 0.1em' },
+] as const
 </script>
 
 <template>
-  <LabSection title="Layer">
-    <input
-      :value="layer.name"
-      type="text"
-      class="mb-2 w-full border border-zinc-800 bg-zinc-900/40 px-2 py-1.5 font-mono text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
-      @input="emit('update', { name: ($event.target as HTMLInputElement).value })"
-    >
+  <LabSection :title="`Editing ${KINDS[layer.kind].label}`">
+    <!--
+      What is selected, stated rather than implied. The panel used to open on a
+      bare text field and you had to work out from its contents whether you were
+      editing an image, a title or the animation.
+    -->
+    <div class="mb-2 flex items-center gap-2 border border-blue-500/40 bg-blue-500/10 px-2 py-1.5">
+      <UIcon :name="KINDS[layer.kind].icon" class="size-3.5 shrink-0 text-blue-300" />
+      <input
+        :value="layer.name"
+        type="text"
+        class="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-zinc-100 outline-none"
+        @input="emit('update', { name: ($event.target as HTMLInputElement).value })"
+      >
+    </div>
 
     <!--
       Which built-in animation this layer stages. It lives here rather than in a
@@ -147,6 +195,73 @@ const ALIGNMENTS = [
         :default="500"
         @update:model-value="emit('update', { weight: $event })"
       />
+      <LabNumber
+        :model-value="layer.lineHeight ?? 1.15"
+        label="Line height"
+        hint="Space between lines, as a multiple of the size. Tighten it as type gets bigger."
+        :min="0.7"
+        :max="2.5"
+        :step="0.01"
+        :default="1.15"
+        @update:model-value="emit('update', { lineHeight: $event })"
+      />
+      <LabNumber
+        :model-value="layer.letterSpacing ?? 0"
+        label="Tracking"
+        hint="Space between letters, in ems. Large type usually wants a little less than none."
+        :min="-0.1"
+        :max="0.5"
+        :step="0.005"
+        :default="0"
+        @update:model-value="emit('update', { letterSpacing: $event })"
+      />
+
+      <!-- Two switches rather than two rows: they are on or off, not a value. -->
+      <div class="mb-2 mt-1 flex gap-1">
+        <button
+          v-for="toggle in TEXT_TOGGLES"
+          :key="toggle.key"
+          type="button"
+          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          :class="layer[toggle.key]
+            ? 'border-blue-500/60 text-blue-300'
+            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+          :style="toggle.style"
+          @click="emit('update', { [toggle.key]: !layer[toggle.key] })"
+        >
+          {{ toggle.label }}
+        </button>
+      </div>
+
+      <LabNumber
+        :model-value="layer.glow ?? 0"
+        label="Glow"
+        hint="A halo in the text's own colour, baked into the layer — unlike bloom, which lifts the whole frame."
+        :min="0"
+        :max="1"
+        :step="0.01"
+        :default="0"
+        @update:model-value="emit('update', { glow: $event })"
+      />
+      <LabNumber
+        :model-value="layer.stroke ?? 0"
+        label="Outline"
+        hint="Width of the outline, as a fraction of the size. What keeps a title readable over a busy plate."
+        :min="0"
+        :max="0.3"
+        :step="0.005"
+        :default="0"
+        @update:model-value="emit('update', { stroke: $event })"
+      />
+      <div v-if="(layer.stroke ?? 0) > 0" class="mb-2 flex items-center gap-2">
+        <span class="font-mono text-[10px] text-zinc-500">Outline colour</span>
+        <input
+          :value="layer.strokeColor ?? '#000000'"
+          type="color"
+          class="ml-auto h-6 w-12 shrink-0 border border-zinc-800 bg-transparent"
+          @input="emit('update', { strokeColor: ($event.target as HTMLInputElement).value })"
+        >
+      </div>
     </template>
 
     <!--
@@ -246,6 +361,22 @@ const ALIGNMENTS = [
       :default="2000"
       @update:model-value="emit('update', { duration: $event })"
     />
+
+    <!--
+      Offered rather than applied. A new clip is cut to its animation on the way
+      in, but once it is on the timeline its length is an edit — swapping the
+      component underneath must not silently undo a trim, so the fit waits to be
+      asked for and says what it would give you.
+    -->
+    <button
+      v-if="fitLength !== null"
+      type="button"
+      class="mb-2 w-full border border-zinc-800 py-1 font-mono text-[10px] text-zinc-400 transition-colors hover:border-blue-500/50 hover:text-blue-300"
+      :title="`This animation runs ${((sequenceMs ?? 0) / 1000).toFixed(1)}s in full.`"
+      @click="emit('update', { duration: fitLength })"
+    >
+      fit to the animation · {{ (fitLength / 1000).toFixed(1) }}s
+    </button>
     <LabEffects
       :effects="layer.effects ?? []"
       empty-label="No animation — the media cuts in and out."

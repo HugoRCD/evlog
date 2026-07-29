@@ -14,8 +14,9 @@ import { createComponentLayer, sanitizeLayers } from './layers'
 import type { Layer } from './layers'
 import { sanitizeEffects } from './effects'
 import type { LayerEffect } from './effects'
+import { LOOK_PARAM, applyLookEntry, decodeLook } from './looks'
 
-const KEY = 'evlog-lab:settings'
+const KEY = 'render-labs:settings'
 /** Query key carrying the overlay layers in a share link. */
 const LAYERS_PARAM = 'layers'
 const CAMERA_PARAM = 'camera'
@@ -127,7 +128,32 @@ function parseLayersParam(value: unknown): Layer[] {
  * shot, not yours — and is then written to storage so a refresh keeps it.
  */
 export function resolveInitialDocument(query: Record<string, unknown>): LabDocument & { fromLink: boolean } {
-  const fromLink = Object.keys(query).length > 0
+  const keys = Object.keys(query)
+
+  /**
+   * A look link is not a document link.
+   *
+   * Somebody sending you a grade they like should not replace the shot you were
+   * working on — so a URL carrying nothing but a look keeps the stored document
+   * and puts the look on it. Treated as a full link it would have opened an empty
+   * timeline and quietly discarded the session.
+   */
+  if (keys.length === 1 && keys[0] === LOOK_PARAM) {
+    const stored = loadStored()
+    const document: LabDocument = {
+      settings: stored?.settings ?? { ...DEFAULT_SETTINGS },
+      layers: stored?.layers ?? [],
+      camera: stored?.camera ?? [],
+    }
+    const entry = decodeLook(String(query[LOOK_PARAM] ?? ''))
+    if (entry) document.settings = applyLookEntry(document.settings, entry, document.settings.lookAmount)
+    // `fromLink` so the query is dropped from the address bar, exactly as a
+    // document link is — but the look is saved as part of the working copy.
+    saveStored(document)
+    return { ...document, fromLink: true }
+  }
+
+  const fromLink = keys.length > 0
   if (fromLink) {
     const document: LabDocument = {
       settings: settingsFromQuery(query),

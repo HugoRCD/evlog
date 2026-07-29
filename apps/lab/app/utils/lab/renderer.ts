@@ -525,3 +525,88 @@ export function distanceToFit(fov: number, outputAspect: number, sourceAspect: n
   const byWidth = (PLANE_HALF_HEIGHT * sourceAspect) / (tanHalf * outputAspect)
   return Math.max(byHeight, byWidth)
 }
+
+export interface Framing {
+  fov: number
+  pitch: number
+  yaw: number
+  roll: number
+  panX: number
+  panY: number
+  /** Output frame aspect. */
+  outputAspect: number
+  /** Stage aspect — the shape of what is being filmed. */
+  sourceAspect: number
+}
+
+/**
+ * How much of the frame the plate covers at a given zoom, as a fraction.
+ *
+ * 1 means a corner sits exactly on an edge. Above 1 the plate is cropped, which
+ * is legitimate for a push-in and fatal for a hero shot — the caller decides.
+ *
+ * `distanceToFit` only answers this for a plate square to the sensor. Rotate it
+ * and the projected outline grows by an amount that depends on the angles *and*
+ * on the plate's own aspect: the same 20° yaw overflows a wide panel and barely
+ * touches a tall one. That interaction is the whole reason a stored zoom cannot
+ * travel between shots.
+ */
+export function frameCoverage(framing: Framing, zoom: number): number {
+  const { fov, pitch, yaw, roll, panX, panY, outputAspect, sourceAspect } = framing
+
+  const tanHalf = Math.tan((fov * DEGREES) / 2)
+  const distance = distanceToFit(fov, outputAspect, sourceAspect) / Math.max(zoom, 0.05)
+
+  const basis = rotationMatrix(pitch * DEGREES, yaw * DEGREES, roll * DEGREES)
+  const halfWidth = PLANE_HALF_HEIGHT * sourceAspect
+  const halfHeight = PLANE_HALF_HEIGHT
+
+  let extent = 0
+  for (const u of [-1, 1]) {
+    for (const v of [-1, 1]) {
+      // Same convention as `camera()`: the plate's centre sits at +distance and
+      // the rotated corner offset is subtracted in depth.
+      const x = (basis[0] ?? 0) * u * halfWidth + (basis[3] ?? 0) * v * halfHeight + panX
+      const y = (basis[1] ?? 0) * u * halfWidth + (basis[4] ?? 0) * v * halfHeight + panY
+      const z = distance - ((basis[2] ?? 0) * u * halfWidth + (basis[5] ?? 0) * v * halfHeight)
+
+      // Behind or level with the camera: the projection is meaningless, and the
+      // framing is unusable at any zoom. Report it as overflowing so a solver
+      // backs off rather than converging on a degenerate answer.
+      if (z <= 1e-3) return Infinity
+
+      extent = Math.max(extent, Math.abs(x / (z * tanHalf * outputAspect)), Math.abs(y / (z * tanHalf)))
+    }
+  }
+  return extent
+}
+
+/**
+ * The zoom at which the rotated plate covers exactly `fill` of the frame.
+ *
+ * Bisected rather than solved: coverage is not linear in zoom, because each
+ * corner sits at its own depth once the plate is tilted and perspective divides
+ * by that depth. Forty iterations over four corners is nothing next to a single
+ * frame of bokeh, and this runs when a look is applied, not per frame.
+ *
+ * This is what lets a look state an intent — "a 3/4 angle that fills the frame"
+ * — instead of a number that was only ever right for the plate it was found on.
+ */
+export function zoomToFill(framing: Framing, fill: number): number {
+  const min = 0.05
+  const max = 4
+
+  // Coverage falls as zoom falls, so a bisection needs the bracket that way
+  // round: `lo` overflows less than the target, `hi` more.
+  let lo = min
+  let hi = max
+  if (frameCoverage(framing, min) > fill) return min
+  if (frameCoverage(framing, max) < fill) return max
+
+  for (let i = 0; i < 40; i++) {
+    const mid = (lo + hi) / 2
+    if (frameCoverage(framing, mid) > fill) hi = mid
+    else lo = mid
+  }
+  return Number(((lo + hi) / 2).toFixed(3))
+}

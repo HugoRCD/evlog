@@ -1,24 +1,29 @@
 <script setup lang="ts">
 /**
- * The render lab.
+ * Render labs.
  *
  * A live doc component is staged off to the side, serialized into a texture
  * every frame, and put through a small camera-and-lens pipeline: tilt, depth of
- * field, bloom, grade. The result can be exported as a WebM at any resolution.
+ * field, bloom, grade. The result comes out as a still or a take at any
+ * resolution — the pipeline is the same either way, and a single frame is just
+ * a take one frame long.
  *
  * Its own app rather than a docs route: none of this ships to readers, and the
  * pipeline has nothing in common with a documentation site. The components it
- * films do still come from the docs app, which is the point — a release video
- * is shot from the real component, not from a copy that has drifted.
+ * stages do still come from the docs app, which is the point — a shot is taken
+ * from the real component, not from a copy that has drifted.
  */
 
+import { useResizable } from '~/composables/useResizable'
 import { createClock } from '~/utils/lab/clock'
 import { createDomTexture, invalidateStyles } from '~/utils/lab/dom-texture'
+import type { PlateMarkup } from '~/utils/lab/dom-texture'
 import { LabRenderer } from '~/utils/lab/renderer'
 import { canvasToBlob, download, encodeVideo, isEncodingSupported, takeName } from '~/utils/lab/record'
 import type { Container } from '~/utils/lab/record'
 import { DEFAULT_COMPONENT, resolveEntry } from '~/utils/lab/registry'
-import { DEFAULT_SETTINGS, applyPreset, frameCountFor, frameStep, outputDuration } from '~/utils/lab/settings'
+import { DEFAULT_SETTINGS, PLATE_SCALE, frameCountFor, frameStep, outputDuration } from '~/utils/lab/settings'
+import { useSequenceDurations } from '~/utils/lab/sequence'
 import { MAX_SHARE_URL, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
 import {
   cloneLayer,
@@ -29,17 +34,17 @@ import {
   createTextLayer,
   layerDepth,
   layerStateAt,
-  layerTextureKey, layerEnd 
+  layerTextureKey, layerEnd, layerOrigin, canJoin
 } from '~/utils/lab/layers'
 import type { Layer } from '~/utils/lab/layers'
 import { evaluateEffects } from '~/utils/lab/effects'
 import { getVideo, rasterizeLayer, seekVideo } from '~/utils/lab/layer-textures'
 import type { LayerPlane, OverlayQuad } from '~/utils/lab/renderer'
 
-useHead({
-  title: 'evlog render lab',
-  meta: [{ name: 'robots', content: 'noindex, nofollow' }],
-})
+// No head here on purpose. `ssr: false` means this component never runs during
+// prerender, so anything set from the page is invisible to crawlers and
+// unfurlers. The whole head lives in `nuxt.config.ts`, which does get rendered
+// into the shell.
 
 const route = useRoute()
 const router = useRouter()
@@ -52,10 +57,24 @@ const layers = ref<Layer[]>(initial.layers)
 const selectedId = ref<string | null>(null)
 /** Camera moves over the take. */
 const camera = ref(initial.camera)
+/**
+ * Clips whose length is still a guess, waiting on the animation to state its own.
+ *
+ * A component cannot be asked how long it runs before it exists: the number
+ * arrives from its sequencer during the first mount, a tick after the clip does.
+ * So a new clip is marked here, cut to length when the report lands, and dropped
+ * from the set — a clip trimmed later is nobody's business but the editor's.
+ *
+ * Deliberately not reactive. It is a note about intent, not part of the document.
+ */
+const awaitingFit = new Set<string>()
+
 // A fresh session opens on a built-in animation rather than an empty frame:
 // it is the fastest way to see what the lab does.
 if (!layers.value.length) {
-  layers.value = [createComponentLayer(DEFAULT_COMPONENT, 0, settings.value.timelineLength)]
+  const first = createComponentLayer(DEFAULT_COMPONENT, 0, settings.value.timelineLength)
+  awaitingFit.add(first.id)
+  layers.value = [first]
   // Written straight away rather than waiting for the first edit, so a reload
   // resumes the same document instead of seeding a second one.
   saveStored(currentDocument())
@@ -68,6 +87,28 @@ if (initial.fromLink) router.replace({ query: {} })
 
 const showSource = ref(false)
 const panelVisible = ref(true)
+const shortcutsOpen = ref(false)
+
+/** Composition overlay — thirds, safe area, rulers. Never filmed. */
+const guides = ref(false)
+/** Pointer over the frame, 0..1, for the crosshair readout. */
+const framePointer = ref<{ x: number, y: number } | null>(null)
+
+function onFramePointer(event: PointerEvent) {
+  // Only tracked while the reticle needs it. Nothing else reads this, and
+  // recomputing a rectangle on every pointer move over the frame is a cost with
+  // nothing to show for it the rest of the time.
+  if (!picking.value) {
+    framePointer.value = null
+    return
+  }
+  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
+  framePointer.value = {
+    x: (event.clientX - box.left) / box.width,
+    y: (event.clientY - box.top) / box.height,
+  }
+}
+const timeline = useTemplateRef('timeline')
 /** Armed by the crosshair button; the next click on the frame sets the focal plane. */
 const picking = ref(false)
 
@@ -84,7 +125,14 @@ const stagedComponents = computed(() =>
 
 /** Position on the component's own timeline, in ms. */
 const playhead = ref(0)
-const playing = ref(true)
+/**
+ * Opens paused, on the first frame.
+ *
+ * Arriving to something already in motion means the first thing you do is stop
+ * it — and if the take is short you have missed it before you found the button.
+ * The playhead is a tool, not a demo reel: it moves when asked.
+ */
+const playing = ref(false)
 const seeking = ref(false)
 
 const busy = ref(false)
@@ -201,7 +249,7 @@ async function captureStage(): Promise<void> {
   // The virtual clock owns `performance.now`, so timing has to come from the
   // real one — otherwise every capture measures as taking zero time.
   const started = Date.now()
-  const { stageWidth, stageHeight, plateScale } = settings.value
+  const { stageWidth, stageHeight } = settings.value
 
   for (const layer of componentLayers.value) {
     const element = stagesRoot.value.querySelector<HTMLElement>(`[data-stage="${layer.id}"]`)
@@ -213,10 +261,12 @@ async function captureStage(): Promise<void> {
       stageTextures.set(layer.id, serializer)
     }
 
-    const image = await serializer.capture(element, stageWidth, stageHeight, plateScale)
+    const { image, markup } = await serializer.capture(element, stageWidth, stageHeight, PLATE_SCALE)
     if (!renderer) return
     // Null means the markup was unchanged and the uploaded texture still stands.
     if (image) renderer.setLayerTexture(layer.id, image)
+
+    rememberPlate(layer.id, clock?.now ?? 0, markup)
 
     // Recorded on every pass, not only when a new picture arrives. A capture
     // that reports "unchanged" would otherwise never restore an aspect that
@@ -238,8 +288,15 @@ async function captureStage(): Promise<void> {
 async function runSeek(goal: number) {
   if (!clock) return
 
-  if (goal < clock.now - 1) {
-    clock.reset()
+  // `sceneOutOfStep` forces the replay branch: the frame on screen came from the
+  // cache, so the clock's idea of where the scene is no longer matches what the
+  // live components are actually showing, and stepping forward from it would
+  // carry that disagreement into everything after.
+  if (goal < clock.now - 1 || sceneOutOfStep || replayedSignature !== originSignature.value) {
+    sceneOutOfStep = false
+    replayedSignature = originSignature.value
+    clock.reset(stageOrigin.value)
+    playhead.value = clock.now
     invalidateStageMarkup()
     stageKey.value++
     await nextTick()
@@ -248,7 +305,7 @@ async function runSeek(goal: number) {
     await realDelay(120)
   }
 
-  advanceToTime(goal)
+  await advanceToTime(goal)
 
   // One settled frame at the end, so any transition the last step started is
   // registered before the plate is captured.
@@ -263,17 +320,191 @@ async function runSeek(goal: number) {
  * Stepping on the frame grid rather than by an arbitrary interval is what makes
  * a scrub land on the same state the export will render at that instant.
  */
-function advanceToTime(goal: number) {
+async function advanceToTime(goal: number) {
   if (!clock) return
   const step = frameStep(settings.value)
   let guard = 0
   while (clock.now < goal - 0.001 && guard++ < 20000) {
+    const before = clock.now
     clock.advanceSync(Math.min(step, goal - clock.now))
+    const after = clock.now
+    playhead.value = after
+
+    // A staged component whose origin the clock has just passed has to be
+    // mounted and running before time moves on without it — that mount is what
+    // sets where in its own sequence the clip is.
+    const crossed = componentLayers.value.some((layer) => {
+      const origin = layerOrigin(layer)
+      return origin > before && origin <= after
+    })
+    if (crossed) {
+      await nextTick()
+      // Most of these components start themselves from an IntersectionObserver,
+      // which fires on a real task rather than on a frame.
+      await realDelay(120)
+    }
   }
+}
+
+/**
+ * Where the replay has to begin.
+ *
+ * A clip trimmed past its own placement needs its source to have been running
+ * before the take opens — a cut at 1.5s whose tail is dragged to zero is asking
+ * for an animation that is already 1.5s old on the first frame. So the clock
+ * starts early and the take joins a replay in progress. Zero when nothing is
+ * trimmed, which is every document that has never been cut.
+ */
+const stageOrigin = computed(() => Math.min(0, ...componentLayers.value.map(layerOrigin)))
+
+/**
+ * When the replay itself, rather than the position in it, has changed.
+ *
+ * Moving a clip or cutting one moves the instant its source starts, and a
+ * running scene cannot be corrected in place — the component would have to
+ * un-run. So the whole take is replayed from the earliest origin whenever any of
+ * them moves, which is the same path a backward scrub already takes.
+ */
+const originSignature = computed(() => componentLayers.value.map(layerOrigin).join(','))
+let replayedSignature: string | null = null
+
+/**
+ * Frames already seen, kept so going back does not mean going again.
+ *
+ * Backwards is the expensive direction: a sequence cannot be un-run, so landing
+ * on an earlier instant means remounting the scene and replaying it. That is why
+ * dragging the playhead left sat on a stale frame and then flashed through a
+ * replay, while dragging right was smooth — one direction was reading, the other
+ * was re-deriving.
+ *
+ * A frame is cached as the stage's markup, not as pixels: tens of kilobytes
+ * instead of megabytes, so a whole take fits where a couple of seconds of
+ * texture would not. Replaying one is a decode.
+ */
+const plateFrames = new Map<string, PlateMarkup>()
+/** Enough for a long take at 60fps, bounded so a session cannot grow without end. */
+const MAX_CACHED_FRAMES = 1200
+
+function frameKey(layerId: string, time: number): string {
+  return `${layerId}@${Math.round(time / frameStep(settings.value))}`
+}
+
+function rememberPlate(layerId: string, time: number, markup: PlateMarkup) {
+  if (plateFrames.size >= MAX_CACHED_FRAMES) {
+    // Oldest first: insertion order is play order, and the frames you are about
+    // to scrub back through are the ones you just made.
+    const oldest = plateFrames.keys().next().value
+    if (oldest) plateFrames.delete(oldest)
+  }
+  plateFrames.set(frameKey(layerId, time), markup)
+}
+
+/**
+ * Anything that changes what a plate looks like invalidates every frame of it.
+ *
+ * Kept deliberately broad. A stale plate is a wrong picture presented as a real
+ * one, which is far worse than the cost of filling the cache again.
+ */
+watch(
+  () => [settings.value.stageWidth, settings.value.stageHeight, stageKey.value, originSignature.value].join(':'),
+  () => plateFrames.clear(),
+)
+
+/**
+ * Paint an earlier instant from what was already seen.
+ *
+ * Only used while the playhead is being dragged. It moves the picture, not the
+ * scene: the live components stay where the clock left them, and the drag ending
+ * is what reconciles the two. Returns false if any layer is missing that frame,
+ * in which case the caller falls back to replaying properly.
+ */
+async function previewCachedFrame(time: number): Promise<boolean> {
+  if (!renderer || !componentLayers.value.length) return false
+
+  const wanted = componentLayers.value.map(layer => ({
+    id: layer.id,
+    markup: plateFrames.get(frameKey(layer.id, time)),
+  }))
+  if (wanted.some(entry => !entry.markup)) return false
+
+  for (const entry of wanted) {
+    const serializer = stageTextures.get(entry.id)
+    if (!serializer || !entry.markup) return false
+    const image = await serializer.rasterize(entry.markup)
+    if (!renderer) return false
+    renderer.setLayerTexture(entry.id, image)
+  }
+  return true
 }
 
 /** Latest requested position while a seek is already running. */
 let pendingSeek: number | null = null
+
+/** True while the playhead is being dragged along the ruler. */
+const scrubDragging = ref(false)
+/** The last position the pointer asked for, as opposed to where the replay is. */
+let scrubTarget = 0
+
+/**
+ * Dragging the playhead, in the direction that costs something.
+ *
+ * Forward is cheap: the clock advances and the sequence carries on. Backward is
+ * not — a sequence cannot be un-run, so every backward step remounts the scene
+ * and replays it from the beginning, each one costing a mount and a wait for the
+ * observers that start these components. A drag emits dozens of positions, and
+ * chaining a replay to each of them is why pulling the playhead left felt like
+ * dragging through treacle while pulling it right was fine.
+ *
+ * So a backward move during a drag waits for the pointer to pause. The marker
+ * has already gone where you put it, and the picture lands on the position you
+ * settled on rather than on every position you passed through.
+ */
+function onScrub(target: number) {
+  // Remembered, because `playhead` cannot serve as the record of it: a replay
+  // walks the playhead forward one frame at a time, so reading it back mid-seek
+  // returns wherever the walk had got to. Ending a drag on that value sent the
+  // take back to the start of the replay it was in the middle of.
+  scrubTarget = target
+
+  if (!scrubDragging.value || !clock || target >= clock.now - 1) {
+    void seekTo(target)
+    return
+  }
+
+  // Backwards, mid-drag. Show the frame rather than rebuild it: the picture
+  // keeps up with the pointer the way a video would, and the scene is put back
+  // in step once, when the drag ends.
+  playhead.value = Math.max(0, Math.min(target, settings.value.timelineLength))
+  void paintCached(playhead.value)
+}
+
+let painting = false
+
+async function paintCached(time: number) {
+  if (painting || !renderer) return
+  painting = true
+  try {
+    if (await previewCachedFrame(time)) {
+      sceneOutOfStep = true
+      renderer?.render(shotSettings.value, clock?.now ?? 0, layerPlanes.value, overlayQuads.value)
+    }
+  } finally {
+    painting = false
+  }
+}
+
+/**
+ * True when the picture on screen came from the cache and the live scene has
+ * not been moved to match it. The next real seek has to replay rather than
+ * assume it can step forward from where the clock happens to be.
+ */
+let sceneOutOfStep = false
+
+function endScrub() {
+  scrubDragging.value = false
+  // Land on where the drag finished, whatever the last cached frame showed.
+  void seekTo(scrubTarget)
+}
 
 async function seekTo(target: number) {
   const clamped = Math.max(0, Math.min(target, settings.value.timelineLength))
@@ -298,7 +529,16 @@ async function seekTo(target: number) {
 /** Live loop: re-serialize the DOM on a budget, but composite every frame. */
 function tick(now: number) {
   rafHandle = clock?.raf(tick) ?? 0
-  if (busy.value || !renderer) return
+
+  // Let the interface have its frame. The clock's patch is global, so every
+  // Vue transition in the lab queues against it and would otherwise wait for a
+  // playhead that is standing still.
+  clock?.flush()
+
+  // Nothing to draw for: the frame is covered. Serializing the stage and
+  // compositing behind a full-screen sheet costs exactly as much as doing it in
+  // view, and on a real GPU that is enough to make the sheet itself feel stuck.
+  if (busy.value || !renderer || shortcutsOpen.value) return
 
   // Step the staged component by the real elapsed time, scaled. The clock is
   // virtual even in preview, so `speed` is honoured on screen and not just in
@@ -390,6 +630,12 @@ onMounted(async () => {
   await captureStage().catch(() => {})
   await syncLayerTextures()
   rafHandle = clock.raf(tick)
+
+  // A document that opens on a trimmed clip has to run its pre-roll before the
+  // first frame is anything but a guess. Nothing else asks for a seek on load,
+  // so without this the take opened on the top of a sequence the timeline says
+  // was already part-way through — and stayed wrong until the playhead moved.
+  if (stageOrigin.value < 0) await seekTo(playhead.value)
 })
 
 onBeforeUnmount(() => {
@@ -407,9 +653,35 @@ watch(previewSize, (size) => {
 
 watch(stageAspect, aspect => renderer?.setStageAspect(aspect))
 
-watch(() => componentLayers.value.map(layer => layer.component).join('|'), () => {
+/**
+ * Remount only when a layer changes which component it stages.
+ *
+ * Comparing the joined list meant splitting a clip — which duplicates a name —
+ * read as a change and restarted every animation on the timeline. Adding or
+ * removing a layer needs no remount either: Vue mounts the new stage and drops
+ * the old one on its own.
+ */
+let stagedBefore = new Map<string, string | undefined>()
+watch(componentLayers, (list) => {
+  const now = new Map(list.map(layer => [layer.id, layer.component]))
+  const swapped = [...now].some(([id, component]) => stagedBefore.has(id) && stagedBefore.get(id) !== component)
+  stagedBefore = now
+  if (!swapped) return
   stageKey.value++
   lastCaptureAt = 0
+}, { deep: true, immediate: true })
+
+/**
+ * A cut, or a clip moved, takes effect immediately.
+ *
+ * `runSeek` already replays whenever the origins have shifted, but it only runs
+ * when someone scrubs. Without this, splitting a clip left the scene exactly as
+ * it was until the next seek — the edit had happened everywhere except on
+ * screen, which reads as the split having done nothing at all.
+ */
+watch(originSignature, () => {
+  if (busy.value) return
+  void seekTo(playhead.value)
 })
 
 // Re-serializing after a size change picks up the new layout; without it the
@@ -510,10 +782,10 @@ async function syncLayerTextures() {
   for (const layer of layers.value) {
     // Component layers get their picture from the stage capture instead.
     if (layer.kind === 'component') continue
-    const key = layerTextureKey(layer, stageBox.value, settings.value.plateScale)
+    const key = layerTextureKey(layer, stageBox.value, PLATE_SCALE)
     if (textureKeys.get(layer.id) === key) continue
 
-    const bitmap = await rasterizeLayer(layer, stageBox.value, settings.value.plateScale)
+    const bitmap = await rasterizeLayer(layer, stageBox.value, PLATE_SCALE)
     if (!renderer) return
     if (!bitmap) {
       // Empty text, or an image that would not decode: drop whatever was there
@@ -530,7 +802,7 @@ async function syncLayerTextures() {
 }
 
 watch(
-  [layers, () => settings.value.stageWidth, () => settings.value.stageHeight, () => settings.value.plateScale],
+  [layers, () => settings.value.stageWidth, () => settings.value.stageHeight],
   () => void syncLayerTextures(),
   { deep: true },
 )
@@ -633,15 +905,11 @@ function addMedia() {
   fileInput.value?.click()
 }
 
-async function onImagePicked(event: Event) {
-  const input = event.target as HTMLInputElement
-  const file = input.files?.[0]
-  input.value = ''
-  if (!file) return
-
+/** The bytes, inlined. */
+function readAsDataUrl(file: File): Promise<string> {
   // Inlined rather than referenced: the capture seals the SVG, so anything the
   // stage points at has to already be in the document.
-  const src = await new Promise<string>((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     const reader = new FileReader()
     reader.onload = () => resolve(String(reader.result))
     reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
@@ -650,32 +918,66 @@ async function onImagePicked(event: Event) {
     error.value = cause.message
     return ''
   })
-  if (!src) return
+}
+
+/**
+ * Place one file as a clip starting at `start`, and report where it ends.
+ *
+ * The end is what makes a multi-file drop land as a sequence rather than as a
+ * stack: each clip starts where the last one finished.
+ */
+async function importFile(file: File, start: number): Promise<number> {
+  const src = await readAsDataUrl(file)
+  if (!src) return start
 
   const name = file.name.replace(/\.[^.]+$/, '')
-  const { start } = defaultSpan()
+  const isVideo = file.type.startsWith('video/')
 
-  if (file.type.startsWith('video/')) {
+  let length = defaultSpan().duration
+  if (isVideo) {
     const video = await getVideo(src)
     if (!video) {
       error.value = `${file.name} could not be decoded. Chrome plays MP4/H.264 and WebM.`
-      return
+      return start
     }
-    // A clip opens at its own length, clamped to the timeline: importing footage
-    // and having it silently truncated to a default span is not useful.
-    const length = Math.round(video.duration * 1000) || 2000
-    addLayer(createMediaLayer({
-      kind: 'video',
-      start,
-      duration: Math.min(length, settings.value.timelineLength - start),
-      src,
-      name,
-    }))
-    return
+    // Footage opens at its own length: importing a clip and having it silently
+    // truncated to a default span is not useful.
+    length = Math.round(video.duration * 1000) || 2000
   }
 
-  const { duration } = defaultSpan()
-  addLayer(createMediaLayer({ kind: 'image', start, duration, src, name }))
+  // Make room before adding rather than clamping into what is already there —
+  // otherwise a clip dropped past the end of the take is quietly dragged back on
+  // top of the one before it. The timeline follows its content anyway, so this
+  // only ever pre-empts the growth the watcher is about to apply.
+  settings.value.timelineLength = Math.max(
+    settings.value.timelineLength,
+    start + length + settings.value.tail,
+  )
+
+  addLayer(createMediaLayer({ kind: isVideo ? 'video' : 'image', start, duration: length, src, name }))
+  return start + length
+}
+
+async function onImagePicked(event: Event) {
+  const input = event.target as HTMLInputElement
+  const files = Array.from(input.files ?? [])
+  input.value = ''
+  if (!files.length) return
+  await importFiles(files, defaultSpan().start)
+}
+
+/**
+ * Media dropped onto the timeline, laid end to end from where it landed.
+ *
+ * One at a time, in order: two `await`s racing on the same cursor would put both
+ * clips at the same start, and the reason to drop at a point on the timeline is
+ * to say where things go.
+ */
+async function importFiles(files: File[], atMs: number) {
+  let cursor = Math.max(0, atMs)
+  for (const file of files) {
+    cursor = await importFile(file, cursor)
+  }
 }
 
 /**
@@ -735,10 +1037,61 @@ function splitLayer(id: string) {
     ...cloneLayer(layer, ''),
     start: at,
     duration: layerEnd(layer) - at,
+    // The cut moves the tail's way into its source as well as its place on the
+    // timeline. Without this the second piece plays its media from the top, so
+    // dragging it back to zero replays what the first piece already showed
+    // instead of carrying on from the frame the blade landed on.
+    trim: (layer.trim ?? 0) + (at - layer.start),
     effects: layer.effects.filter(e => e.at === 'out'),
   }
   layers.value = layers.value.flatMap(entry => (entry.id === id ? [head, tail] : [entry]))
   selectedId.value = tail.id
+}
+
+/** The clip this one can be rejoined with, if any. */
+function joinPartner(layer: Layer): Layer | null {
+  return layers.value.find(other => other.id !== layer.id && canJoin(layer, other))
+    ?? layers.value.find(other => other.id !== layer.id && canJoin(other, layer))
+    ?? null
+}
+
+function joinLayer(id: string) {
+  const layer = layers.value.find(entry => entry.id === id)
+  if (!layer) return
+  const partner = joinPartner(layer)
+  if (!partner) return
+
+  const [first, second] = layer.start <= partner.start ? [layer, partner] : [partner, layer]
+  const merged: Layer = {
+    ...first,
+    duration: layerEnd(second) - first.start,
+    // The entrance from the head and the exit from the tail: the same two ends
+    // the split handed out, so a cut and a join return you to where you began.
+    effects: [
+      ...first.effects.filter(effect => effect.at === 'in'),
+      ...second.effects.filter(effect => effect.at === 'out'),
+    ],
+  }
+
+  layers.value = layers.value
+    .filter(entry => entry.id !== second.id)
+    .map(entry => (entry.id === first.id ? merged : entry))
+  selectedId.value = merged.id
+}
+
+/**
+ * Move a track up or down the stack.
+ *
+ * Order is draw order — later layers land on top — so this is how something gets
+ * put in front of something else. It is the one property of a layer that cannot
+ * be expressed as a number in the panel.
+ */
+function reorderLayers(from: number, to: number) {
+  const next = [...layers.value]
+  const [moved] = next.splice(from, 1)
+  if (!moved) return
+  next.splice(Math.max(0, Math.min(to, next.length)), 0, moved)
+  layers.value = next
 }
 
 function copyLayer(id: string) {
@@ -772,17 +1125,60 @@ function pasteClipboard() {
  * element box matches the frame exactly (aspect-ratio plus max-width/height), so
  * the element's own rect is the frame and no letterbox correction is needed.
  */
-function onFrameClick(event: MouseEvent) {
-  if (!picking.value || !renderer) return
-  const rect = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  if (!rect.width || !rect.height) return
-
-  const ndcX = ((event.clientX - rect.left) / rect.width) * 2 - 1
+function focusFromPointer(clientX: number, clientY: number, box: DOMRect): number | null {
+  if (!renderer || !box.width || !box.height) return null
+  const ndcX = ((clientX - box.left) / box.width) * 2 - 1
   // Clip space has y up; a pointer event has it down.
-  const ndcY = 1 - ((event.clientY - rect.top) / rect.height) * 2
+  const ndcY = 1 - ((clientY - box.top) / box.height) * 2
+  return renderer.focusAt(shotSettings.value, ndcX, ndcY)
+}
 
-  const focus = renderer.focusAt(shotSettings.value, ndcX, ndcY)
+/**
+ * Focus follows the reticle, live.
+ *
+ * Aiming a focal plane by clicking and judging the result is a guessing game:
+ * the whole point of a shallow depth of field is what it does to everything you
+ * did not aim at, and that cannot be read from a number. Racking it under the
+ * pointer turns it into what a focus ring actually is — you watch the frame, not
+ * the control.
+ *
+ * It is affordable because none of it is a render: the plane is found by
+ * intersecting one ray with one plane, and the frame was going to be drawn this
+ * tick regardless.
+ */
+function onFocusHover(event: PointerEvent) {
+  if (!picking.value) return
+  const focus = focusFromPointer(event.clientX, event.clientY, (event.currentTarget as HTMLElement).getBoundingClientRect())
   if (focus !== null) settings.value.focus = Number(focus.toFixed(3))
+}
+
+/** What focus was before the reticle was armed, so leaving without a click undoes it. */
+let focusBeforePicking = 0
+
+watch(picking, (armed) => {
+  if (armed) focusBeforePicking = settings.value.focus
+})
+
+function cancelPicking() {
+  if (!picking.value) return
+  settings.value.focus = focusBeforePicking
+  picking.value = false
+}
+
+function onFrameClick(event: MouseEvent) {
+  // Clicking the frame itself is clicking nothing in particular, so it clears
+  // the selection — and the panel, having only the shot left to show, shows it.
+  // Leaving a clip selected while you work on the camera means the next delete
+  // or paste lands somewhere you stopped thinking about.
+  if (!picking.value) {
+    selectedId.value = null
+    return
+  }
+
+  // The hover has already set it; the click is what makes it stick.
+  const focus = focusFromPointer(event.clientX, event.clientY, (event.currentTarget as HTMLElement).getBoundingClientRect())
+  if (focus !== null) settings.value.focus = Number(focus.toFixed(3))
+  focusBeforePicking = settings.value.focus
   picking.value = false
 }
 
@@ -793,11 +1189,24 @@ function onFrameClick(event: MouseEvent) {
  * plate below them is dead frame the camera still has to compose around.
  */
 function fitStage() {
-  const content = stage.value?.firstElementChild
+  // Any stage will do — they are all laid out at the same size — but it has to be
+  // a stage. `stage` was never declared, so this threw the moment it was clicked.
+  const stage = stagesRoot.value?.querySelector<HTMLElement>('[data-stage]')
+  const content = stage?.firstElementChild
   if (!content) return
   const height = Math.ceil(content.getBoundingClientRect().height)
   if (height > 0) settings.value.stageHeight = Math.min(1600, Math.max(240, height))
   lastCaptureAt = 0
+}
+
+/**
+ * Whether the playhead is inside a clip's span.
+ *
+ * Only for the eye: with the stages overlapping, `show the plain layout` has to
+ * put the clip you are actually looking at in front of the others.
+ */
+function isLive(layer: Layer): boolean {
+  return playhead.value >= layer.start && playhead.value <= layerEnd(layer)
 }
 
 /** Back to a square-on, edge-to-edge framing without touching the grade. */
@@ -829,12 +1238,48 @@ function resetEverything() {
 /** Add another built-in animation as a layer. */
 function addComponent() {
   const { start, duration } = defaultSpan()
-  addLayer(createComponentLayer(DEFAULT_COMPONENT, start, duration))
+  const layer = createComponentLayer(DEFAULT_COMPONENT, start, duration)
+  // The default span is a placeholder: it holds for the frame or two before the
+  // animation reports its real length, and for good on the few that never do.
+  awaitingFit.add(layer.id)
+  addLayer(layer)
 }
 
-function onPreset(name: string) {
-  settings.value = applyPreset(settings.value, name)
+/**
+ * Cut a clip to the length its animation declares.
+ *
+ * Reported in component milliseconds, which is what the timeline is measured in,
+ * so it transfers across as-is. A trimmed clip gets what is left after the trim
+ * rather than the whole cycle.
+ */
+function fitToSequence(id: string, reportedMs: number) {
+  const layer = layers.value.find(candidate => candidate.id === id)
+  if (!layer) return
+  const duration = Math.max(100, reportedMs - (layer.trim ?? 0))
+  if (Math.abs(layer.duration - duration) < 50) return
+  layers.value = layers.value.map(candidate =>
+    candidate.id === id ? { ...candidate, duration } : candidate,
+  )
 }
+
+const sequenceDurations = useSequenceDurations()
+
+/** The length the selected clip's animation declares, if it declares one. */
+const selectedSequenceMs = computed(() =>
+  selectedId.value ? sequenceDurations.value[selectedId.value] : undefined,
+)
+
+// Only clips still waiting are touched. Every remount re-reports, and a shot
+// where every trim snapped back to the full cycle on reload would be worse than
+// one that never fitted anything.
+watch(sequenceDurations, (reported) => {
+  if (!awaitingFit.size) return
+  for (const [id, ms] of Object.entries(reported)) {
+    if (!awaitingFit.has(id)) continue
+    awaitingFit.delete(id)
+    fitToSequence(id, ms)
+  }
+}, { deep: true })
 
 const linkCopied = ref(false)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
@@ -881,8 +1326,9 @@ async function primeVirtualStage() {
   }
 
   clock?.enterVirtual()
-  clock?.reset()
-  playhead.value = 0
+  replayedSignature = originSignature.value
+  clock?.reset(stageOrigin.value)
+  playhead.value = stageOrigin.value
   invalidateStageMarkup()
   stageKey.value++
   await nextTick()
@@ -896,6 +1342,12 @@ async function primeVirtualStage() {
   // whatever that started register before anything is captured.
   await clock?.advance(0)
   await clock?.advance(0)
+
+  // Run the pre-roll off before frame one. Anything trimmed has to reach the
+  // pose the cut left it in, and the take opens on that pose rather than on the
+  // beginning of a sequence the timeline says was already over.
+  await advanceToTime(0)
+
   await captureStage()
 }
 
@@ -976,7 +1428,8 @@ async function exportVideo() {
   } finally {
     // Stay virtual. The preview runs on this clock too, so handing time back to
     // the real loop here would silently drop `speed` until the next reload.
-    clock?.reset()
+    replayedSignature = originSignature.value
+    clock?.reset(stageOrigin.value)
     invalidateStageMarkup()
     renderer.resize(previewSize.value.width, previewSize.value.height)
     lastCaptureAt = 0
@@ -996,6 +1449,9 @@ function cancelExport() {
  * Camera gestures on the frame itself. Disabled while the focus picker is armed,
  * so that click means "focus here" and nothing else.
  */
+const panel = useResizable({ key: 'panel-width', initial: 290, min: 240, max: 560, axis: 'x' })
+const dock = useResizable({ key: 'timeline-height', initial: 232, min: 140, max: 520, axis: 'y' })
+
 const gestures = useCameraGestures(
   settings,
   () => !picking.value && !busy.value,
@@ -1006,6 +1462,9 @@ defineShortcuts({
   r: replay,
   h: () => {
     panelVisible.value = !panelVisible.value
+  },
+  g: () => {
+    guides.value = !guides.value
   },
 })
 
@@ -1038,12 +1497,59 @@ function onKeydown(event: KeyboardEvent) {
     return
   }
   if (!accel && event.key === 'Escape') {
-    selectedId.value = null
+    // Escape puts things back rather than just closing them: a focus racked
+    // while hunting for the right plane is a change nobody committed to.
+    if (picking.value) cancelPicking()
+    else if (shortcutsOpen.value) shortcutsOpen.value = false
+    else selectedId.value = null
     return
   }
   if (event.code === 'Space') {
     event.preventDefault()
     togglePlay()
+    return
+  }
+
+  // Frame stepping, the way every editor does it. Holding shift moves ten,
+  // which is what you reach for when hunting for a moment rather than a frame.
+  if (event.key === 'ArrowLeft' || event.key === 'ArrowRight') {
+    event.preventDefault()
+    playing.value = false
+    const direction = event.key === 'ArrowRight' ? 1 : -1
+    const step = frameStep(settings.value) * (event.shiftKey ? 10 : 1)
+    void seekTo(playhead.value + direction * step)
+    return
+  }
+  if (event.key === 'Home') {
+    event.preventDefault()
+    playing.value = false
+    void seekTo(0)
+    return
+  }
+  if (event.key === 'End') {
+    event.preventDefault()
+    playing.value = false
+    void seekTo(settings.value.timelineLength)
+    return
+  }
+  if (event.key === 'z') {
+    timeline.value?.fitView()
+    return
+  }
+  // The razor. `C` is where the hand goes — it is the blade in Premiere and in
+  // Resolve; `S` stays bound because it was, and unlearning a key nobody asked
+  // to lose is a worse trade than carrying two.
+  if ((event.key === 'c' || event.key === 's') && selectedId.value) {
+    splitLayer(selectedId.value)
+    return
+  }
+  if (event.key === 'j' && selectedId.value) {
+    joinLayer(selectedId.value)
+    return
+  }
+  if (event.key === '?') {
+    event.preventDefault()
+    shortcutsOpen.value = !shortcutsOpen.value
   }
 }
 onMounted(() => window.addEventListener('keydown', onKeydown))
@@ -1053,26 +1559,89 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 <template>
   <div class="fixed inset-0 flex overflow-hidden bg-black">
     <div class="flex min-w-0 flex-1 flex-col">
-      <main class="relative flex min-h-0 flex-1 items-center justify-center p-8">
-        <canvas
-          ref="canvas"
-          class="max-h-full max-w-full touch-none border border-zinc-900"
-          :class="picking ? 'cursor-crosshair border-blue-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
+      <!-- The margin around the frame is empty space too, and clears the selection. -->
+      <main
+        class="relative flex min-h-0 flex-1 items-center justify-center p-8"
+        @pointerdown.self="selectedId = null"
+      >
+        <div
+          class="relative max-h-full max-w-full"
           :style="{ aspectRatio: `${settings.outputWidth} / ${settings.outputHeight}` }"
-          @click="onFrameClick"
-          @pointerdown="gestures.onPointerDown"
-          @pointermove="gestures.onPointerMove"
-          @pointerup="gestures.onPointerUp"
-          @pointercancel="gestures.onPointerUp"
-          @wheel="gestures.onWheel"
-        />
+          @pointermove="onFramePointer($event); onFocusHover($event)"
+          @pointerleave="framePointer = null"
+        >
+          <canvas
+            ref="canvas"
+            class="block h-full w-full touch-none border border-zinc-900"
+            :class="picking ? 'cursor-crosshair border-blue-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
+            @click="onFrameClick"
+            @pointerdown="gestures.onPointerDown"
+            @pointermove="gestures.onPointerMove"
+            @pointerup="gestures.onPointerUp"
+            @pointercancel="gestures.onPointerUp"
+            @wheel="gestures.onWheel"
+          />
+          <LabGuides
+            v-if="guides"
+            :width="settings.outputWidth"
+            :height="settings.outputHeight"
+          />
+
+          <!--
+            The reticle belongs to the act of focusing, not to the guides.
+            Two lines across the whole frame said nothing about what they were
+            for and were on whether or not anyone had asked. Focusing is a
+            question about one spot, so the instrument is a small target that
+            rides the pointer and says what clicking will do.
+          -->
+          <div
+            v-if="picking && framePointer"
+            class="pointer-events-none absolute size-14 -translate-x-1/2 -translate-y-1/2"
+            :style="{ left: `${framePointer.x * 100}%`, top: `${framePointer.y * 100}%` }"
+          >
+            <div class="absolute inset-0 rounded-full border border-blue-400/80" />
+            <div class="absolute inset-[38%] rounded-full bg-blue-400/80" />
+            <div class="absolute left-1/2 top-0 h-2 w-px -translate-x-1/2 bg-blue-400/80" />
+            <div class="absolute bottom-0 left-1/2 h-2 w-px -translate-x-1/2 bg-blue-400/80" />
+            <div class="absolute left-0 top-1/2 h-px w-2 -translate-y-1/2 bg-blue-400/80" />
+            <div class="absolute right-0 top-1/2 h-px w-2 -translate-y-1/2 bg-blue-400/80" />
+            <span class="absolute left-1/2 top-full mt-1.5 -translate-x-1/2 whitespace-nowrap rounded-[2px] bg-blue-500 px-1.5 py-px font-mono text-[9px] leading-tight text-white">
+              focus here
+            </span>
+          </div>
+
+          <!--
+            The instruments, gathered where they act.
+            Both of these change what the frame shows rather than what it
+            contains, so they live on the frame instead of down a section of the
+            panel — and being visible is how anyone finds out they exist.
+          -->
+          <div class="absolute left-2 top-2 flex flex-col gap-1">
+            <button
+              v-for="tool in [
+                { key: 'guides', icon: 'i-lucide-grid-2x2', label: 'Guides, safe area and rulers (G)', on: guides },
+                { key: 'focus', icon: 'i-lucide-crosshair', label: 'Click a spot in the frame to focus on it', on: picking },
+              ]"
+              :key="tool.key"
+              type="button"
+              class="flex size-6 items-center justify-center border backdrop-blur-[2px] transition-colors"
+              :class="tool.on
+                ? 'border-blue-500/60 bg-blue-500/15 text-blue-300'
+                : 'border-white/10 bg-black/40 text-zinc-500 hover:border-white/25 hover:text-zinc-200'"
+              :title="tool.label"
+              @click="tool.key === 'guides' ? (guides = !guides) : (picking ? cancelPicking() : (picking = true))"
+            >
+              <UIcon :name="tool.icon" class="size-3.5" />
+            </button>
+          </div>
+        </div>
 
         <div class="pointer-events-none absolute bottom-4 left-4 font-mono text-[10px] text-zinc-700">
           <template v-if="picking">
-            click the part of the frame that should be sharp
+            focus follows the reticle · click to keep it · esc to put it back
           </template>
           <template v-else>
-            {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ layers.length }} layers · h to hide panel, r to replay
+            {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ layers.length }} layers · g guides · h panels · r replay · ? keys
           </template>
         </div>
 
@@ -1084,22 +1653,46 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         </p>
       </main>
 
+      <!--
+        Grab edge for the timeline's height.
+        A hairline to look at, six pixels to hit. The two do not have to be the
+        same thing, and making them so forces a choice between a border thick
+        enough to read as a divider and a target thin enough to be fiddly.
+      -->
+      <div
+        v-show="panelVisible"
+        class="group/split relative h-1.5 shrink-0 cursor-ns-resize"
+        @pointerdown="dock.onPointerDown"
+      >
+        <div
+          class="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors"
+          :class="dock.dragging.value ? 'bg-blue-500' : 'bg-zinc-900 group-hover/split:bg-blue-500/60'"
+        />
+      </div>
       <LabTimeline
         v-show="panelVisible"
+        ref="timeline"
         v-model:layers="layers"
+        :style="{ height: `${dock.size.value}px` }"
         :playhead
         :length="settings.timelineLength"
         :playing
         :seeking
         :output-ms
         :frames="frameCount"
+        :fps="settings.fps"
         :selected-id
-        @scrub="seekTo"
+        @scrub="onScrub"
+        @scrub-start="scrubDragging = true"
+        @scrub-end="endScrub"
+        @join="joinLayer"
+        @reorder="reorderLayers"
         @toggle-play="togglePlay"
         @select="selectedId = $event"
         @add-text="addText"
         @add-image="addMedia"
         @add-component="addComponent"
+        @drop-files="importFiles"
         @duplicate="selectedId = $event; duplicateSelected()"
         @copy="copyLayer"
         @paste="pasteClipboard"
@@ -1112,9 +1705,23 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       ref="fileInput"
       type="file"
       accept="image/png,image/jpeg,image/svg+xml,image/webp,video/mp4,video/webm,video/quicktime"
+      multiple
       class="hidden"
       @change="onImagePicked"
     >
+
+    <!-- Grab edge for the panel's width, on the same hairline-and-hit-zone terms. -->
+    <div
+      v-show="panelVisible"
+      class="group/split relative w-1.5 shrink-0 cursor-ew-resize"
+      @pointerdown="panel.onPointerDown"
+    >
+      <div
+        class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors"
+        :class="panel.dragging.value ? 'bg-blue-500' : 'bg-zinc-900 group-hover/split:bg-blue-500/60'"
+      />
+    </div>
+    <LabShortcuts v-model="shortcutsOpen" />
 
     <LabPanel
       v-show="panelVisible"
@@ -1122,22 +1729,24 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       v-model:show-source="showSource"
       v-model:picking="picking"
       v-model:camera="camera"
+      :style="{ width: `${panel.size.value}px` }"
       :link-copied
       :busy
       :progress
       :high-precision
       :capture-ms
       :selected-layer
+      :sequence-ms="selectedSequenceMs"
       @update-layer="updateLayer"
       @remove-layer="removeSelected"
       @duplicate-layer="duplicateSelected"
-      @preset="onPreset"
       @fit="resetCamera"
       @fit-stage="fitStage"
       @replay="replay"
       @export-video="exportVideo"
       @export-png="exportPng"
       @copy-link="copyLink"
+      @shortcuts="shortcutsOpen = true"
       @reset-settings="resetSettings"
       @reset-everything="resetEverything"
       @cancel="cancelExport"
@@ -1151,17 +1760,45 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     -->
     <div
       ref="stagesRoot"
+      data-lab-stage
       class="pointer-events-none fixed left-0 top-0"
       :class="showSource ? 'z-50 opacity-100' : 'z-0 opacity-[0.002]'"
     >
+      <!--
+        Each instance is mounted at its clip's origin, not at the top of the
+        take. Mounting is what starts these components, so the moment it happens
+        is the moment their sequence begins — which is how a trimmed clip shows
+        its source part-way through instead of replaying it from the beginning.
+      -->
+      <!--
+        Every stage occupies the same corner, one on top of another.
+        They used to stack down the page, which put the second one below the fold
+        of a normal window — and these components start themselves from an
+        IntersectionObserver at a 20% threshold. A clip whose stage was off screen
+        therefore never started: its plate stayed on the initial state, and the
+        take went blank for exactly the span of that clip. Capture reads each
+        stage by element, not by what is painted, so overlapping costs nothing —
+        and it means clip five sits precisely where clip one does, which is the
+        only position known to be visible.
+      -->
       <div
         v-for="staged in stagedComponents"
         :key="staged.layer.id"
         :data-stage="staged.layer.id"
-        class="overflow-hidden bg-default"
-        :style="{ width: `${settings.stageWidth}px`, height: `${settings.stageHeight}px` }"
+        class="absolute left-0 top-0 overflow-hidden bg-default"
+        :style="{
+          width: `${settings.stageWidth}px`,
+          height: `${settings.stageHeight}px`,
+          zIndex: isLive(staged.layer) ? 1 : 0,
+        }"
       >
-        <component :is="staged.component" v-if="staged.component" :key="stageKey" />
+        <LabStage :layer-id="staged.layer.id">
+          <component
+            :is="staged.component"
+            v-if="staged.component && playhead >= layerOrigin(staged.layer)"
+            :key="`${stageKey}:${layerOrigin(staged.layer)}`"
+          />
+        </LabStage>
       </div>
     </div>
   </div>

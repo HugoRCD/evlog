@@ -74,17 +74,53 @@ function valueAtClientX(clientX: number): number {
 /** Rebased whenever shift is pressed or released mid-drag. */
 let fineAnchorX = 0
 let fineAnchorValue = 0
-let wasFine = false
+let lastX = 0
+/**
+ * Fine mode, as state rather than as a fact read off each event.
+ *
+ * Holding shift changed what a drag did with nothing on screen to say so, which
+ * left the ratio to be inferred from how the number moved. It also has to react
+ * to shift being pressed while the pointer is still — so it cannot live only in
+ * the pointer handler.
+ */
+const dragFine = ref(false)
+const hovering = ref(false)
+const shiftDown = useShiftKey()
+
+/**
+ * Shown as fine while dragging, and while merely hovering with shift held.
+ *
+ * The second half is the point: a modifier that only reveals itself once you
+ * have committed to a drag is a mode you discover by having already used it.
+ */
+const fine = computed(() => (dragging.value ? dragFine.value : hovering.value && shiftDown.value))
+
+/** The value before the current click, so a double-click can put it back. */
+let valueBeforeClick = 0
+let lastDownAt = -Infinity
+let lastDownX = 0
+
+/** Type an exact value, on the number the field had before the pair of clicks. */
+function onDoubleClick() {
+  dragging.value = false
+  dragFine.value = false
+  model.value = valueBeforeClick
+  void startEditing()
+}
+
+function setFine(next: boolean, atX: number) {
+  if (next === dragFine.value) return
+  dragFine.value = next
+  // Rebase on the switch: the value must not jump when the ratio changes.
+  fineAnchorX = atX
+  fineAnchorValue = model.value
+}
 
 function applyPointer(event: PointerEvent) {
-  const fine = event.shiftKey
-  if (fine !== wasFine) {
-    wasFine = fine
-    fineAnchorX = event.clientX
-    fineAnchorValue = model.value
-  }
+  lastX = event.clientX
+  setFine(event.shiftKey, event.clientX)
 
-  if (!fine) {
+  if (!dragFine.value) {
     commit(valueAtClientX(event.clientX))
     return
   }
@@ -95,13 +131,32 @@ function applyPointer(event: PointerEvent) {
   commit(fineAnchorValue + delta)
 }
 
+/** Shift can be pressed or let go without the pointer moving at all. */
+function onModifier(event: KeyboardEvent) {
+  if (dragging.value) setFine(event.shiftKey, lastX)
+}
+
 function onPointerDown(event: PointerEvent) {
   if (editing.value || event.button !== 0) return
   event.preventDefault()
+
+  // `event.detail` cannot be used to spot the second click here: the
+  // `preventDefault` above suppresses the compatibility mouse events, and the
+  // click counter rides on those — it stays at one forever.
+  const doubled = event.timeStamp - lastDownAt < 400 && Math.abs(event.clientX - lastDownX) < 5
+  lastDownAt = event.timeStamp
+  lastDownX = event.clientX
+
+  // Keep the value from before the *first* click of a pair, so the double-click
+  // can put it back. Without that, opening the field on a slider hands you the
+  // number the first click knocked it to rather than the one you meant to edit.
+  if (!doubled) valueBeforeClick = model.value
   dragging.value = true
-  wasFine = event.shiftKey
+  dragFine.value = event.shiftKey
   fineAnchorX = event.clientX
   fineAnchorValue = model.value
+  window.addEventListener('keydown', onModifier)
+  window.addEventListener('keyup', onModifier)
   ;(event.currentTarget as HTMLElement).setPointerCapture(event.pointerId)
   applyPointer(event)
 }
@@ -113,8 +168,16 @@ function onPointerMove(event: PointerEvent) {
 function onPointerUp(event: PointerEvent) {
   if (!dragging.value) return
   dragging.value = false
+  dragFine.value = false
+  window.removeEventListener('keydown', onModifier)
+  window.removeEventListener('keyup', onModifier)
   ;(event.currentTarget as HTMLElement).releasePointerCapture(event.pointerId)
 }
+
+onBeforeUnmount(() => {
+  window.removeEventListener('keydown', onModifier)
+  window.removeEventListener('keyup', onModifier)
+})
 
 async function startEditing() {
   draft.value = display.value
@@ -170,25 +233,52 @@ function reset() {
     <div
       v-else
       ref="track"
-      class="relative h-6.5 cursor-ew-resize select-none overflow-hidden border bg-zinc-900/40 transition-colors"
-      :class="dragging ? 'border-zinc-600' : 'border-zinc-800/80 hover:border-zinc-700'"
+      class="relative h-6.5 select-none overflow-hidden border bg-zinc-900/40 transition-colors"
+      :class="[
+        fine ? 'cursor-col-resize border-blue-500/70' : 'cursor-ew-resize',
+        fine ? '' : dragging ? 'border-zinc-600' : 'border-zinc-800/80 hover:border-zinc-700',
+      ]"
       :title="hint ? `${label} — ${hint}\n\nDrag to set · shift for fine · double-click to type · right-click resets` : undefined"
+      @pointerenter="hovering = true"
+      @pointerleave="hovering = false"
       @pointerdown="onPointerDown"
       @pointermove="onPointerMove"
       @pointerup="onPointerUp"
       @pointercancel="onPointerUp"
-      @dblclick="startEditing"
+      @dblclick="onDoubleClick"
       @contextmenu.prevent="reset"
     >
       <div
-        class="pointer-events-none absolute inset-y-0 left-0 bg-zinc-700/40"
+        class="pointer-events-none absolute inset-y-0 left-0 transition-colors"
+        :class="fine ? 'bg-blue-500/25' : 'bg-zinc-700/40'"
         :style="{ width: `${fraction * 100}%` }"
       />
       <!-- The exact position: a hairline reads precisely where a filled bar alone does not. -->
       <div
-        class="pointer-events-none absolute inset-y-0 w-px bg-zinc-400/70"
+        class="pointer-events-none absolute inset-y-0 w-px"
+        :class="fine ? 'bg-blue-300' : 'bg-zinc-400/70'"
         :style="{ left: `${fraction * 100}%` }"
       />
+      <!--
+        The scale, revealed with the mode.
+        Fine movement is worth a fifth of the travel per pixel, which is a claim
+        about resolution — so the track shows the resolution it has gained. It
+        fades in rather than appearing, because a row of hairlines snapping on
+        under the pointer reads as a glitch.
+      -->
+      <div
+        class="pointer-events-none absolute inset-x-0 bottom-0 flex h-1.5 justify-between px-px transition-opacity duration-200"
+        :class="fine ? 'opacity-100' : 'opacity-0'"
+      >
+        <span
+          v-for="index in 21"
+          :key="index"
+          class="w-px origin-bottom bg-blue-400/50 transition-transform duration-200"
+          :class="[(index - 1) % 5 === 0 ? 'h-full' : 'h-1/2', fine ? 'scale-y-100' : 'scale-y-0']"
+          :style="{ transitionDelay: `${Math.abs(index - 11) * 8}ms` }"
+        />
+      </div>
+
       <div
         v-if="defaultFraction !== null"
         class="pointer-events-none absolute bottom-0 h-0.75 w-px bg-zinc-600"
@@ -196,11 +286,19 @@ function reset() {
       />
 
       <div class="pointer-events-none relative flex h-full items-center justify-between gap-2 px-2">
-        <span class="truncate font-mono text-[11px] leading-none text-zinc-400 group-hover:text-zinc-300">
+        <!-- The label gives way to the mode: while fine is on, that is the more useful fact. -->
+        <span
+          v-if="fine"
+          class="shrink-0 font-mono text-[10px] leading-none text-blue-300"
+        >⇧ fine · ⅕</span>
+        <span v-else class="truncate font-mono text-[11px] leading-none text-zinc-400 group-hover:text-zinc-300">
           {{ label }}
         </span>
-        <span class="shrink-0 font-mono text-[11px] leading-none text-zinc-200 tabular-nums">
-          {{ display }}<span v-if="unit" class="text-zinc-500">{{ unit }}</span>
+        <span
+          class="shrink-0 font-mono text-[11px] leading-none tabular-nums"
+          :class="fine ? 'text-blue-200' : 'text-zinc-200'"
+        >
+          {{ display }}<span v-if="unit" :class="fine ? 'text-blue-400/70' : 'text-zinc-500'">{{ unit }}</span>
         </span>
       </div>
     </div>

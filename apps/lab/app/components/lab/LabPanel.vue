@@ -1,10 +1,11 @@
 <script setup lang="ts">
-import { DEFAULT_SETTINGS, FORMATS, HINTS, PRESETS, RANGES, frameCountFor, outputDuration } from '~/utils/lab/settings'
+import type { LabMenuAction } from './LabMenu.vue'
+import { DEFAULT_SETTINGS, FRAME_RATES, HINTS, OUTPUT_PRESETS, RANGES, SPEEDS, VIEWPORTS, frameCountFor, outputDuration } from '~/utils/lab/settings'
 import type { LabSettings, RangedKey } from '~/utils/lab/settings'
 import type { Layer } from '~/utils/lab/layers'
 import type { LayerEffect } from '~/utils/lab/effects'
 
-defineProps<{
+const props = defineProps<{
   /** Set while a video export is running; blocks anything that would change the frame. */
   busy: boolean
   progress: number
@@ -14,16 +15,18 @@ defineProps<{
   /** Briefly true after a share link is copied. */
   linkCopied: boolean
   selectedLayer: Layer | null
+  /** Length the selected clip's animation declares, when it declares one. */
+  sequenceMs?: number
 }>()
 
 const emit = defineEmits<{
-  preset: [name: string]
   fit: []
   fitStage: []
   replay: []
   exportVideo: []
   exportPng: []
   copyLink: []
+  shortcuts: []
   resetSettings: []
   resetEverything: []
   cancel: []
@@ -47,18 +50,110 @@ function range(key: RangedKey) {
   return { ...RANGES[key], default: DEFAULT_SETTINGS[key] as number, hint: HINTS[key] }
 }
 
-const activeFormat = computed(() =>
-  FORMATS.find(format => format.width === settings.value.outputWidth && format.height === settings.value.outputHeight)?.label ?? null,
+/**
+ * Presets as the only way in, and the size stated as the consequence.
+ *
+ * Width and height were two sliders that could disagree about the ratio, and
+ * nobody shooting for a post wants to arrive at 1920 by pixel. A shot arriving
+ * from an older link can still hold any size — it just matches no card, and the
+ * choice reads as custom rather than as nothing.
+ */
+const OUTPUT_OPTIONS = OUTPUT_PRESETS.map(preset => ({
+  value: preset.id,
+  label: preset.label,
+  note: `${preset.width}×${preset.height}`,
+  title: preset.note,
+}))
+
+const activeOutput = computed(() =>
+  OUTPUT_PRESETS.find(preset =>
+    preset.width === settings.value.outputWidth && preset.height === settings.value.outputHeight,
+  )?.id,
 )
 
-function setFormat(format: typeof FORMATS[number]) {
-  settings.value.outputWidth = format.width
-  settings.value.outputHeight = format.height
+function setOutput(id: string) {
+  const preset = OUTPUT_PRESETS.find(entry => entry.id === id)
+  if (!preset) return
+  settings.value.outputWidth = preset.width
+  settings.value.outputHeight = preset.height
 }
 
-// Clearing throws away imported media, so it asks once rather than acting on a
-// stray click next to the reset it sits beside.
-const confirmingReset = ref(false)
+const VIEWPORT_OPTIONS = VIEWPORTS.map(viewport => ({
+  value: viewport.id,
+  label: viewport.label,
+  note: `${viewport.width}×${viewport.height}`,
+}))
+
+const activeViewport = computed(() =>
+  VIEWPORTS.find(viewport =>
+    viewport.width === settings.value.stageWidth && viewport.height === settings.value.stageHeight,
+  )?.id,
+)
+
+function setViewport(id: string) {
+  const viewport = VIEWPORTS.find(entry => entry.id === id)
+  if (!viewport) return
+  settings.value.stageWidth = viewport.width
+  settings.value.stageHeight = viewport.height
+}
+
+const RATE_OPTIONS = FRAME_RATES.map(rate => ({ value: rate, label: `${rate}fps` }))
+const SPEED_OPTIONS = SPEEDS.map(speed => ({ value: speed, label: `${speed}×` }))
+
+/** Icons per kind, so the tab says what sort of thing is selected at a glance. */
+const KIND_ICON: Record<string, string> = {
+  text: 'i-lucide-type',
+  image: 'i-lucide-image',
+  video: 'i-lucide-film',
+  component: 'i-lucide-square-play',
+}
+
+const TABS = computed(() => [
+  {
+    value: 'layer' as const,
+    label: props.selectedLayer?.name ?? 'Layer',
+    icon: props.selectedLayer ? KIND_ICON[props.selectedLayer.kind] : undefined,
+  },
+  { value: 'shot' as const, label: 'Shot', icon: 'i-lucide-aperture' },
+])
+
+const activeTab = ref<'layer' | 'shot'>('shot')
+
+// Selecting a clip is a statement of intent: show what was just selected rather
+// than leaving it to be found behind a tab.
+watch(() => props.selectedLayer?.id, (id) => {
+  activeTab.value = id ? 'layer' : 'shot'
+})
+
+/**
+ * The panel's own housekeeping, behind one button.
+ *
+ * Clearing throws away imported media, so it asks once — inside the menu, where
+ * there is room to say what it will take with it.
+ */
+const ACTIONS = computed<LabMenuAction[]>(() => [
+  {
+    label: props.linkCopied ? 'Link copied' : 'Copy link',
+    icon: props.linkCopied ? 'i-lucide-check' : 'i-lucide-link',
+    hint: 'The whole shot, as a URL.',
+    keepOpen: true,
+    select: () => emit('copyLink'),
+  },
+  {
+    label: 'Reset settings',
+    icon: 'i-lucide-rotate-ccw',
+    hint: 'Back to defaults. The layers are kept.',
+    select: () => emit('resetSettings'),
+  },
+  {
+    label: 'Clear everything',
+    icon: 'i-lucide-trash-2',
+    hint: 'Reset the settings and remove every layer.',
+    danger: true,
+    confirm: 'Clear it all — sure?',
+    select: () => emit('resetEverything'),
+  },
+])
 
 const frameCount = computed(() => frameCountFor(settings.value))
 const outputSeconds = computed(() => (outputDuration(settings.value) / 1000).toFixed(1))
@@ -74,103 +169,152 @@ const hasDepth = computed(() =>
   Math.abs(settings.value.pitch) > 0.5 || Math.abs(settings.value.yaw) > 0.5,
 )
 
-const SPEEDS = [0.25, 0.5, 1, 1.5, 2] as const
-
 const CONTAINERS = [
-  { value: 'mp4', label: 'mp4 · h.264' },
-  { value: 'webm', label: 'webm · vp9' },
+  { value: 'mp4', label: 'mp4', note: 'h.264 · plays anywhere' },
+  { value: 'webm', label: 'webm', note: 'vp9 · smaller file' },
 ] as const
 </script>
 
 <template>
-  <aside class="flex h-full w-[290px] shrink-0 flex-col border-l border-zinc-900 bg-black">
-    <header class="flex items-center justify-between border-b border-zinc-900 px-4 py-3">
-      <span class="font-pixel text-[11px] uppercase tracking-[0.2em] text-zinc-200">Render lab</span>
-      <div class="flex items-center gap-3">
+  <!--
+    A container, so the controls inside can answer the panel's width rather than
+    the window's. This panel is dragged between 240 and 560 pixels: a five-across
+    row of buttons that is comfortable at one end is unreadable at the other, and
+    a media query cannot tell the difference because the window never changed.
+  -->
+  <!-- No left border: the splitter beside it is the divider. -->
+  <aside class="@container flex h-full shrink-0 flex-col bg-black">
+    <header class="flex items-center justify-between gap-2 border-b border-zinc-900 px-3 py-3 @min-[280px]:px-4">
+      <!--
+        The title holds one line and gives up characters before it gives up the
+        row. Wrapping "Render labs" onto two lines pushed the help button under
+        the actions and made a tidy header look broken.
+      -->
+      <span class="min-w-0 truncate font-pixel text-[11px] uppercase tracking-[0.2em] text-zinc-200">
+        Render labs
+      </span>
+
+      <div class="flex shrink-0 items-center gap-1">
+        <!--
+          Sized to be found. At sixteen pixels this read as punctuation after the
+          title rather than as the way into the only documentation the tool has.
+        -->
         <button
           type="button"
-          class="font-mono text-[10px] text-zinc-600 transition-colors hover:text-zinc-300"
-          title="Restore every setting to its default. The component and the layers are kept."
-          @click="emit('resetSettings')"
+          class="flex size-5 items-center justify-center rounded-full border border-zinc-800 font-mono text-[11px] leading-none text-zinc-500 transition-colors hover:border-blue-500/60 hover:bg-blue-500/10 hover:text-blue-300"
+          aria-label="Keyboard shortcuts"
+          title="Keyboard shortcuts (?)"
+          @click="emit('shortcuts')"
         >
-          reset
+          ?
         </button>
-        <button
-          type="button"
-          class="font-mono text-[10px] text-zinc-700 transition-colors hover:text-red-400"
-          title="Reset the settings and remove every layer."
-          @click="confirmingReset ? emit('resetEverything') : (confirmingReset = true)"
-          @blur="confirmingReset = false"
-        >
-          {{ confirmingReset ? 'sure?' : 'clear' }}
-        </button>
-        <button
-          type="button"
-          class="font-mono text-[10px] transition-colors"
-          :class="linkCopied ? 'text-blue-300' : 'text-zinc-600 hover:text-zinc-300'"
-          @click="emit('copyLink')"
-        >
-          {{ linkCopied ? 'copied' : 'copy link' }}
-        </button>
+        <LabMenu :actions="ACTIONS" label="Panel actions" />
       </div>
     </header>
 
-    <div class="min-h-0 flex-1 overflow-y-auto">
+    <!--
+      The strip exists only when there is a choice to make.
+      A permanent "Layer" tab that is disabled most of the time advertises a
+      place you are usually not allowed to go, which reads as something broken
+      rather than as something empty. With nothing selected there is exactly one
+      thing this panel can show, so it shows it and says nothing. The moment a
+      clip is selected a second destination exists — and it is named after the
+      clip, so the panel states what is being edited instead of leaving it to be
+      inferred from the fields.
+    -->
+    <div v-if="selectedLayer" class="flex shrink-0 border-b border-zinc-900">
+      <button
+        v-for="tab in TABS"
+        :key="tab.value"
+        type="button"
+        class="relative min-w-0 flex-1 px-3 py-2 font-mono text-[10px] transition-colors"
+        :class="activeTab === tab.value ? 'text-zinc-100' : 'text-zinc-600 hover:text-zinc-300'"
+        @click="activeTab = tab.value"
+      >
+        <span class="flex items-center justify-center gap-1.5">
+          <UIcon v-if="tab.icon" :name="tab.icon" class="size-3 shrink-0 opacity-70" />
+          <span class="truncate">{{ tab.label }}</span>
+        </span>
+        <span
+          class="absolute inset-x-0 bottom-0 h-px transition-colors"
+          :class="activeTab === tab.value ? 'bg-blue-400' : 'bg-transparent'"
+        />
+      </button>
+    </div>
+
+    <div v-if="selectedLayer" v-show="activeTab === 'layer'" class="min-h-0 flex-1 overflow-y-auto">
       <LabLayerProps
-        v-if="selectedLayer"
         :layer="selectedLayer"
         :timeline-length="settings.timelineLength"
+        :sequence-ms
         @update="emit('updateLayer', selectedLayer.id, $event)"
         @remove="emit('removeLayer')"
         @duplicate="emit('duplicateLayer')"
       />
+    </div>
 
-      <LabSection title="Stage">
-        <LabNumber v-model="settings.stageWidth" label="Stage width" v-bind="range('stageWidth')" />
-        <LabNumber v-model="settings.stageHeight" label="Stage height" v-bind="range('stageHeight')" />
-        <LabNumber v-model="settings.plateScale" label="Plate detail" v-bind="range('plateScale')" />
-        <LabToggle v-model="showSource" label="Show raw stage" />
+    <div v-show="activeTab === 'shot' || !selectedLayer" class="min-h-0 flex-1 overflow-y-auto">
+      <!--
+        Named for what it is. "Stage" was a word from the renderer's vocabulary —
+        it meant nothing to anyone opening the panel, and the two pixel fields
+        under it asked for a number without saying what the number decided.
+      -->
+      <LabSection title="Viewport">
+        <p class="mb-2 font-mono text-[10px] leading-relaxed text-zinc-500">
+          The window your component is laid out in before it is filmed. Narrow it
+          to shoot the layout a phone gets.
+        </p>
 
-        <div class="mt-2 flex gap-1">
+        <LabChoice
+          label="Screen"
+          :options="VIEWPORT_OPTIONS"
+          :model-value="activeViewport"
+          cards
+          @update:model-value="setViewport(String($event))"
+        />
+
+        <div class="grid grid-cols-1 gap-1 @min-[300px]:grid-cols-2">
           <button
             type="button"
-            class="flex-1 border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            class="border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            title="Trim the viewport height to what the component actually occupies, so the camera has no dead frame to compose around."
+            @click="emit('fitStage')"
+          >
+            trim to content
+          </button>
+          <button
+            type="button"
+            class="border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            title="Restart the staged animation from its first frame."
             @click="emit('replay')"
           >
             replay
           </button>
-          <button
-            type="button"
-            class="flex-1 border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
-            @click="emit('fitStage')"
-          >
-            fit stage
-          </button>
-          <button
-            type="button"
-            class="flex-1 border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
-            @click="emit('fit')"
-          >
-            reset cam
-          </button>
+        </div>
+
+        <div class="mt-2">
+          <LabToggle v-model="showSource" label="Show the plain layout" />
         </div>
       </LabSection>
 
       <LabSection title="Look">
-        <div class="grid grid-cols-2 gap-1">
-          <button
-            v-for="(_, name) in PRESETS"
-            :key="name"
-            type="button"
-            class="border border-zinc-800 py-[6px] font-mono text-[10px] text-zinc-400 hover:border-blue-500/50 hover:text-blue-300 transition-colors"
-            @click="emit('preset', name)"
-          >
-            {{ name }}
-          </button>
-        </div>
+        <LabLooks v-model:settings="settings" />
       </LabSection>
 
       <LabSection title="Camera">
+        <!--
+          Framing lives with the framing controls. This sat in the stage section
+          next to "replay", where it read as one of three unrelated verbs.
+        -->
+        <button
+          type="button"
+          class="mb-2 w-full border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          title="Back to a square-on, edge-to-edge framing. The grade is left alone."
+          @click="emit('fit')"
+        >
+          reset the framing
+        </button>
+
         <LabNumber v-model="settings.pitch" label="Pitch" v-bind="range('pitch')" />
         <LabNumber v-model="settings.yaw" label="Yaw" v-bind="range('yaw')" />
         <LabNumber v-model="settings.roll" label="Roll" v-bind="range('roll')" />
@@ -222,6 +366,7 @@ const CONTAINERS = [
       </LabSection>
 
       <LabSection title="Bloom">
+        <LabNumber v-model="settings.emission" label="Source brightness" v-bind="range('emission')" />
         <LabNumber v-model="settings.bloomIntensity" label="Intensity" v-bind="range('bloomIntensity')" />
         <LabNumber v-model="settings.bloomThreshold" label="Threshold" v-bind="range('bloomThreshold')" />
         <LabNumber v-model="settings.bloomKnee" label="Knee" v-bind="range('bloomKnee')" />
@@ -229,7 +374,6 @@ const CONTAINERS = [
       </LabSection>
 
       <LabSection title="Grade">
-        <LabNumber v-model="settings.emission" label="Plate emission" v-bind="range('emission')" />
         <LabNumber v-model="settings.exposure" label="Exposure" v-bind="range('exposure')" />
         <LabNumber v-model="settings.contrast" label="Contrast" v-bind="range('contrast')" />
         <LabNumber v-model="settings.saturation" label="Saturation" v-bind="range('saturation')" />
@@ -250,64 +394,53 @@ const CONTAINERS = [
       </LabSection>
 
       <LabSection title="Output">
-        <div class="mb-2 grid grid-cols-5 gap-1">
-          <button
-            v-for="format in FORMATS"
-            :key="format.label"
-            type="button"
-            class="border py-[5px] font-mono text-[9px] transition-colors"
-            :class="activeFormat === format.label
-              ? 'border-blue-500/60 text-blue-300'
-              : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
-            @click="setFormat(format)"
-          >
-            {{ format.label }}
-          </button>
-        </div>
+        <LabChoice
+          label="Size"
+          :options="OUTPUT_OPTIONS"
+          :model-value="activeOutput"
+          cards
+          @update:model-value="setOutput(String($event))"
+        />
 
-        <LabNumber v-model="settings.outputWidth" label="Width" v-bind="range('outputWidth')" />
-        <LabNumber v-model="settings.outputHeight" label="Height" v-bind="range('outputHeight')" />
+        <LabChoice
+          label="Frame rate"
+          :options="RATE_OPTIONS"
+          :model-value="settings.fps"
+          @update:model-value="settings.fps = Number($event)"
+        />
+
+        <LabChoice
+          label="Speed"
+          :hint="HINTS.speed"
+          :options="SPEED_OPTIONS"
+          :model-value="settings.speed"
+          @update:model-value="settings.speed = Number($event)"
+        />
+
+        <LabChoice
+          label="File"
+          :options="CONTAINERS"
+          :model-value="settings.container"
+          cards
+          @update:model-value="settings.container = String($event)"
+        />
+
         <LabNumber v-model="settings.tail" label="Tail" v-bind="range('tail')" />
-        <LabNumber v-model="settings.fps" label="Frame rate" v-bind="range('fps')" />
-        <LabNumber v-model="settings.speed" label="Playback speed" v-bind="range('speed')" />
 
-        <div class="mt-1 grid grid-cols-5 gap-1">
-          <button
-            v-for="preset in SPEEDS"
-            :key="preset"
-            type="button"
-            class="border py-[5px] font-mono text-[9px] transition-colors"
-            :class="Math.abs(settings.speed - preset) < 0.001
-              ? 'border-blue-500/60 text-blue-300'
-              : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
-            @click="settings.speed = preset"
-          >
-            {{ preset }}×
-          </button>
-        </div>
-
-        <div class="mt-2 flex gap-1">
-          <button
-            v-for="format in CONTAINERS"
-            :key="format.value"
-            type="button"
-            class="flex-1 border py-[5px] font-mono text-[10px] transition-colors"
-            :class="settings.container === format.value
-              ? 'border-blue-500/60 text-blue-300'
-              : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
-            @click="settings.container = format.value"
-          >
-            {{ format.label }}
-          </button>
-        </div>
-
+        <!--
+          The size is here rather than on a control: with the presets doing the
+          setting, this is the only place the pixels are stated, and a shot out of
+          an old link that matches no preset would otherwise never say its own
+          frame size out loud.
+        -->
         <p class="mt-2 font-mono text-[10px] leading-relaxed text-zinc-600">
-          {{ frameCount }} frames · {{ segmentSeconds }}s of animation → {{ outputSeconds }}s of video
+          {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ frameCount }} frames ·
+          {{ segmentSeconds }}s of animation → {{ outputSeconds }}s of video
         </p>
       </LabSection>
     </div>
 
-    <footer class="border-t border-zinc-900 p-4">
+    <footer class="border-t border-zinc-900 p-3 @min-[280px]:p-4">
       <div v-if="busy" class="mb-2">
         <!--
           scaleX rather than an animated width. A width transition is a layout

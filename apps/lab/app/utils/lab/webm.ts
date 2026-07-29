@@ -188,8 +188,8 @@ export class WebmMuxer {
     const info = element(ID.Info, concat([
       // One millisecond per timestamp unit — the scale every timestamp above assumes.
       uintElement(ID.TimestampScale, 1_000_000),
-      stringElement(ID.MuxingApp, 'evlog-lab'),
-      stringElement(ID.WritingApp, 'evlog-lab'),
+      stringElement(ID.MuxingApp, 'render-labs'),
+      stringElement(ID.WritingApp, 'render-labs'),
       floatElement(ID.Duration, this.lastTimestamp),
     ]))
 

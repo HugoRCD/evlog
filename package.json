@@ -13,7 +13,7 @@
     "dev": "turbo run dev --filter=evlog-playground",
     "dev:prepare": "turbo run dev:prepare",
     "docs": "turbo run dev --filter=evlog-docs",
-    "lab": "turbo run dev --filter=evlog-lab",
+    "lab": "turbo run dev --filter=render-labs",
     "analytics": "turbo run dev --filter=evlog-telemetry",
     "dev:just-use-evlog": "turbo run dev --filter=evlog-just-use",
     "dev:telemetry": "turbo run dev --filter=evlog-telemetry",

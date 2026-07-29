@@ -1,5 +1,5 @@
 /**
- * GLSL for the render lab pipeline.
+ * GLSL for the Render labs pipeline.
  *
  * The chain is: stage (DOM plane in 3D) → DOF → bloom (down/up mip chain) →
  * composite (aberration, tonemap, grade, vignette, grain).
@@ -367,13 +367,32 @@ void main() {
 
   float luma = dot(colour, vec3(0.2126, 0.7152, 0.0722));
   colour = mix(vec3(luma), colour, uSaturation);
-  colour = (colour - 0.5) * uContrast + 0.5;
 
   // Vignette in a corrected aspect so it stays circular on a 16:9 frame.
   vec2 vig = centred * vec2(uResolution.x / uResolution.y, 1.0);
   colour *= mix(1.0, smoothstep(1.05, 0.25, length(vig)), uVignette);
 
   colour = toSrgb(max(colour, 0.0));
+
+  /*
+   * Contrast as a symmetric S-curve in display space.
+   *
+   * It used to be a linear stretch about 0.5, applied before this conversion —
+   * two mistakes compounding. A 0.5 pivot is far above the linear value of a
+   * perceptual mid-grey (~0.21), and the plates this thing films are darker
+   * again: most of a dark UI sits below 0.05 linear. So everything under
+   * 0.5 - 0.5/contrast came out negative and was clamped to black. A contrast
+   * of 1.45 did not add contrast to a dark shot, it deleted the shot.
+   *
+   * This curve is pinned at 0, 0.5 and 1, is monotonic, and cannot clip: dark
+   * content gets darker relative to its neighbours instead of vanishing.
+   */
+  if (abs(uContrast - 1.0) > 1e-4) {
+    vec3 c = clamp(colour, 0.0, 1.0);
+    vec3 lo = pow(c, vec3(uContrast));
+    vec3 hi = pow(1.0 - c, vec3(uContrast));
+    colour = lo / max(lo + hi, vec3(1e-6));
+  }
 
   if (uGrain > 0.0) {
     // Signed noise, so grain does not lift the blacks the way additive noise does.

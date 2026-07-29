@@ -64,6 +64,25 @@ export interface Layer {
   weight?: number
   font?: 'sans' | 'mono' | 'pixel'
   align?: 'left' | 'center' | 'right'
+  /** Line box as a multiple of the size — the one control that sets a block's texture. */
+  lineHeight?: number
+  /** Tracking, in ems. Negative tightens, which is what large type usually wants. */
+  letterSpacing?: number
+  italic?: boolean
+  uppercase?: boolean
+  /**
+   * Halo around the glyphs, as a fraction of the size, in the text's own colour.
+   *
+   * The docs theme leans on glow, so a title that carries some belongs to the
+   * same world as the animation behind it. It is drawn into the texture rather
+   * than left to the bloom pass: bloom reacts to brightness across the whole
+   * frame, which cannot be aimed at one title without dragging everything else
+   * up with it.
+   */
+  glow?: number
+  /** Outline width as a fraction of the size — legibility over a busy plate. */
+  stroke?: number
+  strokeColor?: string
 
   /** Registry name of the staged animation, for `component` layers. */
   component?: string
@@ -188,6 +207,39 @@ export function layerEnd(layer: Layer): number {
 }
 
 /**
+ * The instant the clip's source is at its own zero.
+ *
+ * A clip trimmed by 1.5s and placed at 4s is showing a source that began at
+ * 2.5s. For a staged component that is not a lookup — the animation has to have
+ * been running since then — so this is the moment its instance is mounted, and
+ * everything it does afterwards falls out of the clock on its own.
+ *
+ * It sits before the clip when trimmed, and can land before zero, which is
+ * exactly the case of a cut whose tail was dragged back to the top.
+ */
+export function layerOrigin(layer: Layer): number {
+  return layer.start - (layer.trim ?? 0)
+}
+
+/**
+ * Can these two be put back into one clip?
+ *
+ * A split is reversible in every editor worth using, because cutting is how you
+ * find out where the cut should have been. Rejoining is only offered where it is
+ * honest: the same source, meeting end to end, and continuous through the seam.
+ * Fusing two clips that merely touch would silently drop whatever sits between
+ * the first one's out point and the second one's in.
+ */
+const JOIN_TOLERANCE = 60
+
+export function canJoin(a: Layer, b: Layer): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.component !== b.component || a.src !== b.src) return false
+  if (Math.abs(layerEnd(a) - b.start) > JOIN_TOLERANCE) return false
+  return Math.abs((b.trim ?? 0) - ((a.trim ?? 0) + a.duration)) <= JOIN_TOLERANCE
+}
+
+/**
  * Where a layer is, and how visible, at a given instant.
  *
  * Returns null outside the clip's span so the renderer can skip it entirely
@@ -234,6 +286,13 @@ export function layerTextureKey(layer: Layer, stage: { width: number, height: nu
     layer.font,
     layer.align,
     layer.width,
+    layer.lineHeight,
+    layer.letterSpacing,
+    layer.italic,
+    layer.uppercase,
+    layer.glow,
+    layer.stroke,
+    layer.strokeColor,
     Math.round(stage.width),
     Math.round(stage.height),
     scale,

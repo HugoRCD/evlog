@@ -61,7 +61,7 @@ const DIRECTIONS = ['left', 'right', 'up', 'down'] as const
     <div v-if="adding" class="mb-2 border border-zinc-800 bg-zinc-900/40 p-1.5">
       <div v-for="at in (['in', 'out'] as const)" :key="at" class="mb-1 last:mb-0">
         <span class="mb-1 block font-mono text-[9px] uppercase tracking-wider text-zinc-600">{{ at }}</span>
-        <div class="grid grid-cols-3 gap-1">
+        <div class="grid grid-cols-2 gap-1 @min-[320px]:grid-cols-3">
           <button
             v-for="descriptor in EFFECT_LIBRARY"
             :key="descriptor.kind"

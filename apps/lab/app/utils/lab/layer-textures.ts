@@ -33,19 +33,24 @@ const TEXT_PADDING = 0.25
  * type rather than in a lookalike.
  */
 function drawText(layer: Layer, stage: { width: number, height: number }, scale: number): LayerBitmap | null {
-  const text = layer.text ?? ''
-  if (!text.trim()) return null
+  const raw = layer.text ?? ''
+  if (!raw.trim()) return null
+  const text = layer.uppercase ? raw.toUpperCase() : raw
 
   const fontSize = Math.max(1, (layer.fontSize ?? 0.12) * stage.height * scale)
   const boxWidth = Math.max(1, layer.width * stage.width * scale)
   const family = getComputedStyle(document.documentElement)
     .getPropertyValue(layerFontFamily(layer).replace(/^var\((--[^,)]+).*$/, '$1').trim())
     .trim() || 'monospace'
-  const font = `${layer.weight ?? 500} ${fontSize}px ${family}`
+  const font = `${layer.italic ? 'italic ' : ''}${layer.weight ?? 500} ${fontSize}px ${family}`
+  // Chrome takes tracking on the context; ems rather than pixels so it survives
+  // a change of size, which is how tracking is specified everywhere else.
+  const tracking = `${(layer.letterSpacing ?? 0) * fontSize}px`
 
   const measure = document.createElement('canvas').getContext('2d')
   if (!measure) return null
   measure.font = font
+  measure.letterSpacing = tracking
 
   // Wrap on the layer's width, so the box in the panel is what constrains the
   // type rather than an invisible canvas edge.
@@ -64,16 +69,23 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
     lines.push(line)
   }
 
-  const lineHeight = fontSize * 1.15
-  const padding = fontSize * TEXT_PADDING
+  const lineHeight = fontSize * (layer.lineHeight ?? 1.15)
+  const glow = Math.max(0, layer.glow ?? 0)
+  const stroke = Math.max(0, layer.stroke ?? 0)
+  // The padding has to cover whatever is drawn outside the glyphs, or a halo
+  // gets a square edge where the texture stops.
+  const padding = fontSize * (TEXT_PADDING + glow * 0.75 + stroke * 0.5)
+
   const canvas = document.createElement('canvas')
   canvas.width = Math.ceil(boxWidth + padding * 2)
   canvas.height = Math.ceil(lines.length * lineHeight + padding * 2)
 
   const ctx = canvas.getContext('2d')
   if (!ctx) return null
+  const colour = layer.color ?? '#ffffff'
   ctx.font = font
-  ctx.fillStyle = layer.color ?? '#ffffff'
+  ctx.letterSpacing = tracking
+  ctx.fillStyle = colour
   ctx.textBaseline = 'middle'
   ctx.textAlign = layer.align ?? 'center'
 
@@ -82,7 +94,32 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
     : layer.align === 'right' ? canvas.width - padding : canvas.width / 2
 
   lines.forEach((line, index) => {
-    ctx.fillText(line, anchor, padding + lineHeight * (index + 0.5))
+    const y = padding + lineHeight * (index + 0.5)
+
+    // The halo first, as its own passes. Canvas shadows are drawn per call, so
+    // repeating a faint one builds a soft falloff where a single wide blur is
+    // flat and looks printed on.
+    if (glow > 0) {
+      ctx.shadowColor = colour
+      for (const spread of [0.4, 0.8, 1.4]) {
+        ctx.shadowBlur = glow * fontSize * spread
+        ctx.fillText(line, anchor, y)
+      }
+      ctx.shadowBlur = 0
+      ctx.shadowColor = 'transparent'
+    }
+
+    if (stroke > 0) {
+      ctx.lineWidth = stroke * fontSize
+      ctx.strokeStyle = layer.strokeColor ?? '#000000'
+      // Rounded joins: a mitre on a thick outline grows spikes off every sharp
+      // corner of the type.
+      ctx.lineJoin = 'round'
+      ctx.miterLimit = 2
+      ctx.strokeText(line, anchor, y)
+    }
+
+    ctx.fillText(line, anchor, y)
   })
 
   return { source: canvas, aspect: canvas.width / canvas.height }

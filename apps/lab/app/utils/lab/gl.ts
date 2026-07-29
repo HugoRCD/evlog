@@ -1,5 +1,5 @@
 /**
- * Minimal WebGL2 helpers for the render lab.
+ * Minimal WebGL2 helpers for Render labs.
  *
  * Everything the pipeline needs and nothing else: shader compilation with
  * readable errors, ping-pongable float render targets, and a fullscreen triangle.
