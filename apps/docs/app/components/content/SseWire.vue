@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Motion } from 'motion-v'
 import type { TimedEvent } from '~/composables/useTimedSequence'
 
 type FrameType = 'hello' | 'replay' | 'event' | 'ping'
@@ -107,13 +106,7 @@ const replayCount = computed(() => visible.value.filter((v, i) => v && frames[i]
 </script>
 
 <template>
-  <Motion
-    :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.5 }"
-    :in-view-options="{ once: true, amount: 0.2 }"
-    class="not-prose my-8"
-  >
+  <div class="not-prose my-8">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-2">
         <UIcon name="i-lucide-radio" class="size-3 text-primary" />
@@ -181,5 +174,5 @@ const replayCount = computed(() => visible.value.filter((v, i) => v && frames[i]
         </div>
       </div>
     </div>
-  </Motion>
+  </div>
 </template>
