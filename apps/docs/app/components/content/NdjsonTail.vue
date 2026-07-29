@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Motion } from 'motion-v'
 import type { TimedEvent } from '~/composables/useTimedSequence'
 
 interface Line {
@@ -125,13 +124,7 @@ const progress = computed(() => cursor.value < 0 ? 0 : ((cursor.value + 1) / lin
 </script>
 
 <template>
-  <Motion
-    :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.5 }"
-    :in-view-options="{ once: true, amount: 0.2 }"
-    class="not-prose my-8"
-  >
+  <div class="not-prose my-8">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-1.5">
         <UIcon name="i-lucide-folder-search" class="size-3 text-primary" />
@@ -238,5 +231,5 @@ const progress = computed(() => cursor.value < 0 ? 0 : ((cursor.value + 1) / lin
         </span>
       </div>
     </div>
-  </Motion>
+  </div>
 </template>

@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Motion } from 'motion-v'
 import type { TimedEvent, UseTimedSequenceOptions } from '~/composables/useTimedSequence'
 
 type Cell = 'pending' | 'pass' | 'fail' | 'na' | 'disabled'
@@ -135,13 +134,7 @@ const failingReqs = computed(() =>
 </script>
 
 <template>
-  <Motion
-    :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.5 }"
-    :in-view-options="{ once: true, amount: 0.2 }"
-    class="not-prose my-8"
-  >
+  <div class="not-prose my-8">
     <div ref="wrapperRef" class="w-full min-h-[248px] overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-2">
         <UIcon name="i-lucide-list-checks" class="size-3 text-primary shrink-0" />
@@ -228,5 +221,5 @@ const failingReqs = computed(() =>
         </span>
       </div>
     </div>
-  </Motion>
+  </div>
 </template>
