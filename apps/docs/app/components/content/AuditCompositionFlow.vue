@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Motion } from 'motion-v'
 import type { TimedEvent } from '~/composables/useTimedSequence'
 
 interface Stage {
@@ -148,13 +147,7 @@ const fanOutReached = computed(() => phase.value === 'fan-out' || phase.value ==
 </script>
 
 <template>
-  <Motion
-    :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.5 }"
-    :in-view-options="{ once: true, amount: 0.2 }"
-    class="not-prose my-8"
-  >
+  <div class="not-prose my-8">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2">
         <div class="flex gap-1.5">
@@ -325,5 +318,5 @@ const fanOutReached = computed(() => phase.value === 'fan-out' || phase.value ==
         </span>
       </div>
     </div>
-  </Motion>
+  </div>
 </template>
