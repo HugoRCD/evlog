@@ -89,9 +89,15 @@ export interface Layer {
 
   // Image and video
   /**
-   * Data URL. Media is inlined so a render never depends on a fetch, and so a
-   * document is self-contained — the cost being that a large clip is a large
-   * document.
+   * `asset:<hash>`, resolved against the stored blob when the layer is drawn.
+   *
+   * Media used to be inlined here as a data URL, which made a document
+   * self-contained and made it enormous. The bytes moved to IndexedDB; this is a
+   * reference to them, so a document stays small enough for local storage, for
+   * an undo snapshot and for a link.
+   *
+   * A data URL still resolves, untouched, because documents saved before the
+   * move carry one and there is no reason to make them stop opening.
    */
   src?: string
   /** Where in the source clip the layer starts, in ms. */
@@ -135,7 +141,7 @@ export interface MediaLayerInit {
   kind: 'image' | 'video'
   start: number
   duration: number
-  /** Data URL of the file. */
+  /** `asset:<hash>` reference to the stored bytes. */
   src: string
   name: string
 }
@@ -276,7 +282,11 @@ export function layerFontFamily(layer: Layer): string {
  */
 export function layerTextureKey(layer: Layer, stage: { width: number, height: number }, scale: number): string {
   if (layer.kind === 'component') return `${layer.id}|${layer.component}`
-  if (layer.kind !== 'text') return `${layer.id}|${layer.src?.length ?? 0}`
+  // The whole source, not its length. Length was a stand-in from when a `src`
+  // was a data URL megabytes long, and it was already wrong for two files that
+  // happened to weigh the same. An asset reference is a fixed 38 characters, so
+  // length had stopped telling any two of them apart at all.
+  if (layer.kind !== 'text') return `${layer.id}|${layer.src ?? ''}`
   return [
     layer.id,
     layer.text,

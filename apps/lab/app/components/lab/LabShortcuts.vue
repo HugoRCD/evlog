@@ -1,4 +1,5 @@
 <script setup lang="ts">
+
 /**
  * Everything the keyboard does, in one place.
  *
@@ -9,6 +10,12 @@
  */
 
 const open = defineModel<boolean>({ required: true })
+
+// Teleported to `body`, which is outside `.lab-chrome` where the theme's tokens
+// live — so the overlay has to carry the scope with it or it draws itself in the
+// document's colours, which are the stage's and are always dark. See
+// `useLabTheme`.
+const { isDark } = useLabTheme()
 
 interface Shortcut {
   keys: string[]
@@ -41,8 +48,14 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
     ],
   },
   {
-    title: 'Layers',
+    // Named for what it holds rather than for layers alone: undo reaches the
+    // grade, the framing and the output settings too.
+    title: 'Editing',
     items: [
+      { keys: ['⌘', 'Z'], label: 'Undo' },
+      { keys: ['⌘', '⇧', 'Z'], label: 'Redo' },
+      { keys: ['⌘', 'O'], label: 'Projects — save, open, export' },
+      { keys: ['⌘', 'S'], label: 'Save into the open project' },
       { keys: ['⌘', 'C'], label: 'Copy the selected layer' },
       { keys: ['⌘', 'V'], label: 'Paste at the playhead' },
       { keys: ['⌘', 'D'], label: 'Duplicate' },
@@ -94,6 +107,10 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
     opening this sheet into a stall. The preview pauses behind it anyway, so
     there is no motion left for a blur to soften.
 
+    Its black is a literal, not a token: a scrim's job is to darken what is
+    behind it, and that is the same job in either theme. `bg-inverted` follows
+    the ink and would come out white in dark — a flash instead of a scrim.
+
     Nothing may sit between `<Transition>` and its element — not even a comment.
     A second child leaves the transition unable to resolve which node it drives,
     and `enter-from` is then never taken off: the sheet stays at opacity zero
@@ -109,7 +126,8 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
     >
       <div
         v-if="open"
-        class="fixed inset-0 z-300 flex items-center justify-center bg-black/85 p-8"
+        class="lab-chrome fixed inset-0 z-300 flex items-center justify-center bg-[var(--lab-scrim)] p-8"
+        :data-theme="isDark ? 'dark' : 'light'"
         @click="open = false"
       >
         <Transition
@@ -118,16 +136,16 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
           enter-from-class="scale-[0.98] opacity-0"
         >
           <div
-            class="max-h-full w-full max-w-3xl overflow-y-auto border border-zinc-800 bg-zinc-950 p-6 shadow-2xl"
+            class="max-h-full w-full max-w-3xl overflow-y-auto border border-muted bg-muted p-6 shadow-[var(--lab-shadow-sheet)]"
             @click.stop
           >
             <div class="mb-5 flex items-baseline justify-between">
-              <h2 class="font-pixel text-[12px] uppercase tracking-[0.2em] text-zinc-200">
+              <h2 class="font-pixel text-[12px] uppercase tracking-[0.2em] text-default">
                 Keyboard
               </h2>
               <button
                 type="button"
-                class="font-mono text-[10px] text-zinc-600 transition-colors hover:text-zinc-300"
+                class="font-mono text-[10px] text-dimmed/70 transition-colors hover:text-toned"
                 @click="open = false"
               >
                 close · esc
@@ -136,7 +154,7 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
 
             <div class="grid grid-cols-1 gap-x-8 gap-y-5 sm:grid-cols-2 lg:grid-cols-3">
               <section v-for="group in GROUPS" :key="group.title">
-                <h3 class="mb-2 font-pixel text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+                <h3 class="mb-2 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
                   {{ group.title }}
                 </h3>
                 <ul class="space-y-1.5">
@@ -145,12 +163,12 @@ const GROUPS: { title: string, items: Shortcut[] }[] = [
                     :key="item.label"
                     class="flex items-baseline justify-between gap-3"
                   >
-                    <span class="font-mono text-[11px] leading-tight text-zinc-400">{{ item.label }}</span>
+                    <span class="font-mono text-[11px] leading-tight text-muted">{{ item.label }}</span>
                     <span class="flex shrink-0 gap-0.5">
                       <kbd
                         v-for="key in item.keys"
                         :key
-                        class="border border-zinc-800 bg-zinc-900 px-1.5 py-px font-mono text-[10px] text-zinc-300"
+                        class="border border-muted bg-elevated px-1.5 py-px font-mono text-[10px] text-toned"
                       >{{ key }}</kbd>
                     </span>
                   </li>

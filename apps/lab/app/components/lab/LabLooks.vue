@@ -202,8 +202,8 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
         type="button"
         class="group relative border py-1.5 pr-1 pl-2 text-left font-mono text-[10px] transition-colors"
         :class="active?.name === entry.name
-          ? 'border-blue-500/60 text-blue-300'
-          : 'border-zinc-800 text-zinc-400 hover:border-blue-500/50 hover:text-blue-300'"
+          ? 'border-primary-500/60 text-primary'
+          : 'border-muted text-muted hover:border-primary-500/50 hover:text-primary'"
         :title="entry.note"
         @click="pick(entry)"
       >
@@ -215,7 +215,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
         -->
         <span
           v-if="!isBuiltIn(entry.name)"
-          class="absolute inset-y-0 right-0 hidden items-center px-1.5 text-zinc-600 hover:text-red-400 group-hover:flex"
+          class="absolute inset-y-0 right-0 hidden items-center px-1.5 text-dimmed/70 hover:text-error group-hover:flex"
           title="Delete this look"
           @click.stop="remove(entry)"
         >
@@ -232,7 +232,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
       -->
       <button
         type="button"
-        class="flex items-center justify-center gap-1 border border-dashed border-zinc-800 py-1.5 font-mono text-[10px] text-zinc-500 transition-colors hover:border-blue-500/50 hover:text-blue-300"
+        class="flex items-center justify-center gap-1 border border-dashed border-muted py-1.5 font-mono text-[10px] text-dimmed transition-colors hover:border-primary-500/50 hover:text-primary"
         title="Add the shot's current framing and grade to this list as a look of your own"
         @click="startNaming"
       >
@@ -245,7 +245,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
       The note earns its space: the names alone do not say which looks need a
       focal plane placed and which work on anything.
     -->
-    <p v-if="active" class="mt-1.5 font-mono text-[10px] leading-relaxed text-zinc-500">
+    <p v-if="active" class="mt-1.5 font-mono text-[10px] leading-relaxed text-dimmed">
       {{ active.note }}
     </p>
 
@@ -253,22 +253,22 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
       <LabNumber v-model="amount" label="Amount" v-bind="amountRange" />
     </div>
 
-    <p v-if="modified" class="mt-1 font-mono text-[10px] text-amber-500/80">
+    <p v-if="modified" class="mt-1 font-mono text-[10px] text-warning">
       Edited by hand — dragging Amount will discard those edits.
     </p>
 
-    <div v-if="naming" class="mt-1.5 flex items-center gap-1 border border-zinc-600 bg-zinc-900/60 px-2 py-1">
+    <div v-if="naming" class="mt-1.5 flex items-center gap-1 border border-accented bg-elevated/60 px-2 py-1">
       <input
         ref="nameInput"
         v-model="draftName"
         type="text"
         :maxlength="MAX_LOOK_NAME"
         placeholder="name this look"
-        class="min-w-0 flex-1 bg-transparent font-mono text-[11px] leading-none text-zinc-100 outline-none placeholder:text-zinc-600"
+        class="min-w-0 flex-1 bg-transparent font-mono text-[11px] leading-none text-highlighted outline-none placeholder:text-dimmed/70"
         @keydown.enter.prevent="commitName"
         @keydown.esc.prevent="naming = false"
       >
-      <button type="button" class="shrink-0 font-mono text-[10px] text-blue-300 hover:text-blue-200" @click="commitName">
+      <button type="button" class="shrink-0 font-mono text-[10px] text-primary/85 hover:text-primary" @click="commitName">
         save
       </button>
     </div>
@@ -276,7 +276,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
     <div v-else class="mt-1.5 flex gap-1">
       <button
         type="button"
-        class="flex-1 border border-zinc-800 py-1.25 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        class="flex-1 border border-muted py-1.25 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         title="Copy a link carrying this look alone — not your composition"
         @click="copyLook"
       >
@@ -284,7 +284,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
       </button>
       <button
         type="button"
-        class="flex-1 border border-zinc-800 py-1.25 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        class="flex-1 border border-muted py-1.25 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         title="Apply a look link from the clipboard"
         @click="pasteLook"
       >
@@ -292,7 +292,7 @@ const amountRange = { ...RANGES.lookAmount, default: DEFAULT_SETTINGS.lookAmount
       </button>
     </div>
 
-    <p v-if="notice" class="mt-1 font-mono text-[10px] leading-relaxed text-zinc-400">
+    <p v-if="notice" class="mt-1 font-mono text-[10px] leading-relaxed text-muted">
       {{ notice }}
     </p>
   </div>

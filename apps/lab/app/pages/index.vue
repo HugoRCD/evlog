@@ -40,6 +40,21 @@ import type { Layer } from '~/utils/lab/layers'
 import { evaluateEffects } from '~/utils/lab/effects'
 import { getVideo, rasterizeLayer, seekVideo } from '~/utils/lab/layer-textures'
 import type { LayerPlane, OverlayQuad } from '~/utils/lab/renderer'
+import { isAssetRef, putAsset } from '~/utils/lab/assets'
+import { persist, storageEstimate } from '~/utils/lab/db'
+import {
+  deleteProject,
+  duplicateProject,
+  exportProject,
+  importProject,
+  listProjects,
+  openProject,
+  projectFilename,
+  renameProject,
+  saveProject,
+  sweepAssets,
+} from '~/utils/lab/projects'
+import type { ProjectSummary } from '~/utils/lab/projects'
 
 // No head here on purpose. `ssr: false` means this component never runs during
 // prerender, so anything set from the page is invisible to crawlers and
@@ -114,6 +129,9 @@ const picking = ref(false)
 
 const canvas = useTemplateRef('canvas')
 const stagesRoot = useTemplateRef('stagesRoot')
+
+// Only to put the theme on the chrome; nothing here reads it.
+const { isDark } = useLabTheme()
 
 /** Bumped to remount every staged component, restarting their sequences at zero. */
 const stageKey = ref(0)
@@ -231,6 +249,26 @@ const stageAspect = computed(() => settings.value.stageWidth / settings.value.st
 function currentDocument() {
   return { settings: settings.value, layers: layers.value, camera: camera.value }
 }
+
+/**
+ * Undo over the same document that is saved and shared.
+ *
+ * Seeded after the opening layer is placed, so the first undo of a fresh session
+ * reverses an edit rather than emptying the frame back to a state nobody was
+ * ever shown.
+ */
+const { undo, redo, canUndo, canRedo } = useLabHistory(currentDocument, (state) => {
+  settings.value = state.settings
+  layers.value = state.layers
+  camera.value = state.camera
+  // A layer that only exists in the future is not something to keep selected;
+  // the panel would hold a tab for a clip the timeline no longer draws.
+  if (selectedId.value && !state.layers.some(layer => layer.id === selectedId.value)) selectedId.value = null
+  // The scene is still wherever the undone edit left it. `originSignature`
+  // catches a clip that moved, but not a look, a viewport or a text layer's
+  // wording — so replay unconditionally and let the frame match the document.
+  void seekTo(playhead.value)
+})
 
 /** What a take is named after: the first thing in it that has a name. */
 const takeSubject = computed(() => layers.value[0]?.name ?? 'lab')
@@ -538,7 +576,7 @@ function tick(now: number) {
   // Nothing to draw for: the frame is covered. Serializing the stage and
   // compositing behind a full-screen sheet costs exactly as much as doing it in
   // view, and on a real GPU that is enough to make the sheet itself feel stuck.
-  if (busy.value || !renderer || shortcutsOpen.value) return
+  if (busy.value || !renderer || shortcutsOpen.value || projectsOpen.value) return
 
   // Step the staged component by the real elapsed time, scaled. The clock is
   // virtual even in preview, so `speed` is honoured on screen and not just in
@@ -708,15 +746,22 @@ onBeforeUnmount(() => {
   saveStored(currentDocument())
 })
 
-/** Restart the segment from its in point. */
 /** Force every stage to re-serialize, after a remount reset their DOM. */
 function invalidateStageMarkup() {
   for (const serializer of stageTextures.values()) serializer.invalidate()
 }
 
+/**
+ * Back to the top, rolling.
+ *
+ * The take has no in point — one existed briefly and the timeline is measured
+ * from zero now — so the top is zero. This used to seek to a field that had gone
+ * with it, which is `undefined`, which clamps to `NaN`, which takes no branch:
+ * the button and the `R` key both quietly meant "resume from wherever you are".
+ */
 function replay() {
   playing.value = true
-  void seekTo(settings.value.trimIn)
+  void seekTo(0)
 }
 
 function togglePlay() {
@@ -905,19 +950,21 @@ function addMedia() {
   fileInput.value?.click()
 }
 
-/** The bytes, inlined. */
-function readAsDataUrl(file: File): Promise<string> {
-  // Inlined rather than referenced: the capture seals the SVG, so anything the
-  // stage points at has to already be in the document.
-  return new Promise<string>((resolve, reject) => {
-    const reader = new FileReader()
-    reader.onload = () => resolve(String(reader.result))
-    reader.onerror = () => reject(new Error(`Could not read ${file.name}.`))
-    reader.readAsDataURL(file)
-  }).catch((cause: Error) => {
-    error.value = cause.message
+/**
+ * The bytes, stored once, and a reference to them.
+ *
+ * Media is not inlined into the document any more. A layer points at a hash and
+ * the file itself lives in IndexedDB, which is what lets a shot with a video in
+ * it fit in the working copy, in an undo snapshot, and in a project file that is
+ * the bytes rather than a third more than the bytes.
+ */
+async function storeFile(file: File): Promise<string> {
+  try {
+    return await putAsset(file, file.name)
+  } catch {
+    error.value = `${file.name} could not be stored. The browser may be out of room for this site.`
     return ''
-  })
+  }
 }
 
 /**
@@ -927,7 +974,7 @@ function readAsDataUrl(file: File): Promise<string> {
  * stack: each clip starts where the last one finished.
  */
 async function importFile(file: File, start: number): Promise<number> {
-  const src = await readAsDataUrl(file)
+  const src = await storeFile(file)
   if (!src) return start
 
   const name = file.name.replace(/\.[^.]+$/, '')
@@ -1285,9 +1332,16 @@ const linkCopied = ref(false)
 let copiedTimer: ReturnType<typeof setTimeout> | undefined
 
 async function copyLink() {
+  // Media lives in this browser now, so a link that names it would arrive on the
+  // other machine pointing at nothing. Said here rather than letting the layer
+  // quietly fail to draw for whoever opened it.
+  if (layers.value.some(layer => isAssetRef(layer.src))) {
+    error.value = 'A link cannot carry imported media — it stays in this browser. Export the project instead, from Projects.'
+    return
+  }
   const url = shareUrl(currentDocument())
   if (url.length > MAX_SHARE_URL) {
-    error.value = `This shot carries ${(url.length / 1024).toFixed(0)}KB of layer data — mostly inlined images — and the link would be truncated in transit. Remove the image layers to share it.`
+    error.value = `This shot carries ${(url.length / 1024).toFixed(0)}KB of layer data and the link would be truncated in transit. Export it as a project instead.`
     return
   }
   await navigator.clipboard.writeText(url)
@@ -1297,6 +1351,162 @@ async function copyLink() {
     linkCopied.value = false
   }, 1600)
 }
+
+/**
+ * The project library.
+ *
+ * The working copy is still what is being edited, always. A project is a
+ * snapshot of it under a name, so opening one replaces the working copy and
+ * saving writes the working copy into it — the same two moves a file has in any
+ * editor, with the "file" living in this browser and the export being the way it
+ * becomes an actual one.
+ */
+const projectsOpen = ref(false)
+const projects = ref<ProjectSummary[]>([])
+/** Which project the working copy came from, so ⌘S has something to overwrite. */
+const activeProjectId = ref<string | null>(null)
+const ACTIVE_KEY = 'render-labs:project'
+/** Serializes the library actions; they all touch the same database. */
+const projectBusy = ref(false)
+
+const activeProject = computed(() => projects.value.find(entry => entry.id === activeProjectId.value) ?? null)
+const suggestedName = computed(() => activeProject.value?.name ?? takeSubject.value)
+/** Room used and available for this site, refreshed whenever the library changes. */
+const storage = ref<{ usage: number, quota: number } | null>(null)
+const storagePersisted = ref(false)
+
+/**
+ * The frame on screen, small, as the project's picture.
+ *
+ * Taken from the live canvas rather than re-rendered: the shot is already
+ * composited there, and asking the renderer for another frame would move the
+ * clock. WebP because a poster is decoration — a quarter of the size of a PNG
+ * and nothing here is looked at closely enough to notice.
+ */
+async function capturePoster(): Promise<Blob | undefined> {
+  const source = canvas.value
+  if (!source?.width) return undefined
+  try {
+    const width = 320
+    const thumb = document.createElement('canvas')
+    thumb.width = width
+    thumb.height = Math.max(1, Math.round((width * source.height) / source.width))
+    thumb.getContext('2d')?.drawImage(source, 0, 0, thumb.width, thumb.height)
+    return await new Promise<Blob | undefined>(resolve =>
+      thumb.toBlob(blob => resolve(blob ?? undefined), 'image/webp', 0.75),
+    )
+  } catch {
+    // A poster is worth nothing next to the save it would otherwise fail.
+    return undefined
+  }
+}
+
+function setActiveProject(id: string | null) {
+  activeProjectId.value = id
+  try {
+    if (id) localStorage.setItem(ACTIVE_KEY, id)
+    else localStorage.removeItem(ACTIVE_KEY)
+  } catch {
+    // Only affects which name the save field offers next time.
+  }
+}
+
+async function refreshProjects() {
+  projects.value = await listProjects()
+  // A project deleted in another tab should not stay named in this one.
+  if (activeProjectId.value && !projects.value.some(entry => entry.id === activeProjectId.value)) {
+    setActiveProject(null)
+  }
+  storage.value = await storageEstimate()
+}
+
+/** Every library action, with the one error surface and the one busy flag. */
+async function runProjectAction(action: () => Promise<void>) {
+  if (projectBusy.value) return
+  projectBusy.value = true
+  try {
+    await action()
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
+    projectBusy.value = false
+  }
+}
+
+function saveCurrentProject(name: string, overwrite: string | null) {
+  void runProjectAction(async () => {
+    const summary = await saveProject(name, currentDocument(), overwrite ?? undefined, await capturePoster())
+    setActiveProject(summary.id)
+    // Asked at the first save, which is the first moment there is something to
+    // lose. Granted or not, the answer only changes what the footer says.
+    storagePersisted.value = await persist()
+    await refreshProjects()
+  })
+}
+
+function openStoredProject(id: string) {
+  void runProjectAction(async () => {
+    const document = await openProject(id)
+    if (!document) {
+      error.value = 'That project could not be read.'
+      return
+    }
+    settings.value = document.settings
+    layers.value = document.layers
+    camera.value = document.camera
+    selectedId.value = null
+    setActiveProject(id)
+    projectsOpen.value = false
+    // Everything on the timeline is new, so nothing on screen belongs to it.
+    invalidateStageMarkup()
+    stageKey.value++
+    await seekTo(0)
+  })
+}
+
+function exportStoredProject(id: string) {
+  void runProjectAction(async () => {
+    const entry = projects.value.find(project => project.id === id)
+    const document = await openProject(id)
+    if (!entry || !document) {
+      error.value = 'That project could not be read.'
+      return
+    }
+    download(await exportProject(entry.name, document, entry.poster), projectFilename(entry.name))
+  })
+}
+
+function importProjectFile(file: File) {
+  void runProjectAction(async () => {
+    const { name, document, poster } = await importProject(file)
+    // Saved on arrival rather than only opened: an imported file that is not in
+    // the library is a project you cannot get back to once you edit over it.
+    const summary = await saveProject(name, document, undefined, poster)
+    await refreshProjects()
+    openStoredProject(summary.id)
+  })
+}
+
+function removeStoredProject(id: string) {
+  void runProjectAction(async () => {
+    await deleteProject(id, currentDocument())
+    if (activeProjectId.value === id) setActiveProject(null)
+    await refreshProjects()
+  })
+}
+
+onMounted(async () => {
+  try {
+    activeProjectId.value = localStorage.getItem(ACTIVE_KEY)
+  } catch {
+    activeProjectId.value = null
+  }
+  storagePersisted.value = await navigator.storage?.persisted?.().catch(() => false) ?? false
+  await refreshProjects()
+  // Reclaim media no project and no working copy still points at — media
+  // outlives the layer that imported it, and nothing else would ever free it.
+  await sweepAssets(currentDocument()).catch(() => 0)
+})
 
 /** Wait on a real timer — the clock only patches rAF, so this survives virtual mode. */
 function realDelay(ms: number) {
@@ -1477,29 +1687,64 @@ function onKeydown(event: KeyboardEvent) {
   if (target?.tagName === 'INPUT' || target?.tagName === 'TEXTAREA' || target?.tagName === 'SELECT' || target?.isContentEditable) return
 
   const accel = event.metaKey || event.ctrlKey
-  if (accel && event.key === 'c') {
+  // `key` carries the shifted character, so ⌘⇧Z arrives as `Z`. Folded for the
+  // single-character keys only — the named ones are already stable, and lowering
+  // them turns `ArrowLeft` into a string nothing below matches.
+  const key = event.key.length === 1 ? event.key.toLowerCase() : event.key
+
+  if (accel && key === 'z') {
+    event.preventDefault()
+    if (event.shiftKey) redo()
+    else undo()
+    return
+  }
+  // The other half of the pair on Windows and Linux, where ⇧ is not how redo is
+  // spelled.
+  if (accel && key === 'y') {
+    event.preventDefault()
+    redo()
+    return
+  }
+  // The file keys, where a browser has nothing useful to offer a page like this
+  // one: ⌘S would save the app shell as HTML, ⌘O would open a file picker with
+  // no idea what to do with the result.
+  if (accel && key === 's') {
+    event.preventDefault()
+    // Straight to the project it came from. Without one there is nothing to
+    // overwrite, so it asks for a name instead.
+    if (activeProjectId.value) saveCurrentProject(suggestedName.value, activeProjectId.value)
+    else projectsOpen.value = true
+    return
+  }
+  if (accel && key === 'o') {
+    event.preventDefault()
+    projectsOpen.value = !projectsOpen.value
+    return
+  }
+  if (accel && key === 'c') {
     copySelected()
     return
   }
-  if (accel && event.key === 'v') {
+  if (accel && key === 'v') {
     event.preventDefault()
     pasteClipboard()
     return
   }
-  if (accel && event.key === 'd') {
+  if (accel && key === 'd') {
     event.preventDefault()
     duplicateSelected()
     return
   }
-  if (!accel && (event.key === 'Delete' || event.key === 'Backspace') && selectedId.value) {
+  if (!accel && (key === 'Delete' || key === 'Backspace') && selectedId.value) {
     event.preventDefault()
     removeSelected()
     return
   }
-  if (!accel && event.key === 'Escape') {
+  if (!accel && key === 'Escape') {
     // Escape puts things back rather than just closing them: a focus racked
     // while hunting for the right plane is a change nobody committed to.
     if (picking.value) cancelPicking()
+    else if (projectsOpen.value) projectsOpen.value = false
     else if (shortcutsOpen.value) shortcutsOpen.value = false
     else selectedId.value = null
     return
@@ -1520,34 +1765,37 @@ function onKeydown(event: KeyboardEvent) {
     void seekTo(playhead.value + direction * step)
     return
   }
-  if (event.key === 'Home') {
+  if (key === 'Home') {
     event.preventDefault()
     playing.value = false
     void seekTo(0)
     return
   }
-  if (event.key === 'End') {
+  if (key === 'End') {
     event.preventDefault()
     playing.value = false
     void seekTo(settings.value.timelineLength)
     return
   }
-  if (event.key === 'z') {
+  // Every bare letter below is guarded against the accelerator. Unguarded, the
+  // browser's own ⌘S reached the razor and cut the selected clip in half on the
+  // way to a save dialog the page does not even use.
+  if (!accel && key === 'z') {
     timeline.value?.fitView()
     return
   }
   // The razor. `C` is where the hand goes — it is the blade in Premiere and in
   // Resolve; `S` stays bound because it was, and unlearning a key nobody asked
   // to lose is a worse trade than carrying two.
-  if ((event.key === 'c' || event.key === 's') && selectedId.value) {
+  if (!accel && (key === 'c' || key === 's') && selectedId.value) {
     splitLayer(selectedId.value)
     return
   }
-  if (event.key === 'j' && selectedId.value) {
+  if (!accel && key === 'j' && selectedId.value) {
     joinLayer(selectedId.value)
     return
   }
-  if (event.key === '?') {
+  if (!accel && key === '?') {
     event.preventDefault()
     shortcutsOpen.value = !shortcutsOpen.value
   }
@@ -1557,7 +1805,17 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
 </script>
 
 <template>
-  <div class="fixed inset-0 flex overflow-hidden bg-black">
+  <!--
+    `lab-chrome` is what carries the theme, and `data-theme` is what picks it.
+    Every colour token the tool draws itself in is scoped to this pair rather
+    than to `<html>`, so the theme stops at the edge of the tool — see
+    `assets/css/main.css` and `composables/useLabTheme.ts`, and the stage below,
+    which is deliberately not inside it.
+  -->
+  <div
+    class="lab-chrome fixed inset-0 flex overflow-hidden bg-default"
+    :data-theme="isDark ? 'dark' : 'light'"
+  >
     <div class="flex min-w-0 flex-1 flex-col">
       <!-- The margin around the frame is empty space too, and clears the selection. -->
       <main
@@ -1572,8 +1830,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         >
           <canvas
             ref="canvas"
-            class="block h-full w-full touch-none border border-zinc-900"
-            :class="picking ? 'cursor-crosshair border-blue-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
+            class="block h-full w-full touch-none border border-default"
+            :class="picking ? 'cursor-crosshair border-primary-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
             @click="onFrameClick"
             @pointerdown="gestures.onPointerDown"
             @pointermove="gestures.onPointerMove"
@@ -1587,6 +1845,14 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             :height="settings.outputHeight"
           />
 
+          <!--
+            From here to the end of the frame, the colours are literal and stay
+            that way. Everything inside this box is drawn over the picture, and
+            the picture's background is a setting rather than a theme — putting
+            the panel in a light theme does not turn the shot white, so an
+            instrument that followed the panel would vanish against the thing it
+            is pointing at.
+          -->
           <!--
             The reticle belongs to the act of focusing, not to the guides.
             Two lines across the whole frame said nothing about what they were
@@ -1627,7 +1893,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               class="flex size-6 items-center justify-center border backdrop-blur-[2px] transition-colors"
               :class="tool.on
                 ? 'border-blue-500/60 bg-blue-500/15 text-blue-300'
-                : 'border-white/10 bg-black/40 text-zinc-500 hover:border-white/25 hover:text-zinc-200'"
+                : 'border-white/10 bg-black/40 text-white/45 hover:border-white/25 hover:text-white/90'"
               :title="tool.label"
               @click="tool.key === 'guides' ? (guides = !guides) : (picking ? cancelPicking() : (picking = true))"
             >
@@ -1636,18 +1902,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           </div>
         </div>
 
-        <div class="pointer-events-none absolute bottom-4 left-4 font-mono text-[10px] text-zinc-700">
+        <div class="pointer-events-none absolute bottom-4 left-4 font-mono text-[10px] text-dimmed/55">
           <template v-if="picking">
             focus follows the reticle · click to keep it · esc to put it back
           </template>
           <template v-else>
-            {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ layers.length }} layers · g guides · h panels · r replay · ? keys
+            <!-- The open project first: it is the only part of this line that
+                 changes what a save will overwrite. -->
+            <span v-if="activeProject" class="text-muted">{{ activeProject.name }}</span>
+            <span v-else class="text-dimmed/70">unsaved</span>
+            · {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ layers.length }} layers · g guides · h panels · ⌘o projects · ? keys
           </template>
         </div>
 
         <p
           v-if="error"
-          class="absolute left-4 top-4 max-w-md border border-red-900/60 bg-red-950/40 px-3 py-2 font-mono text-[10px] leading-relaxed text-red-300"
+          class="absolute left-4 top-4 max-w-md border border-error/30 bg-error/10 px-3 py-2 font-mono text-[10px] leading-relaxed text-error"
         >
           {{ error }}
         </p>
@@ -1666,7 +1936,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       >
         <div
           class="absolute inset-x-0 top-1/2 h-px -translate-y-1/2 transition-colors"
-          :class="dock.dragging.value ? 'bg-blue-500' : 'bg-zinc-900 group-hover/split:bg-blue-500/60'"
+          :class="dock.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
         />
       </div>
       <LabTimeline
@@ -1718,10 +1988,27 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     >
       <div
         class="absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors"
-        :class="panel.dragging.value ? 'bg-blue-500' : 'bg-zinc-900 group-hover/split:bg-blue-500/60'"
+        :class="panel.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
       />
     </div>
     <LabShortcuts v-model="shortcutsOpen" />
+
+    <LabProjects
+      v-model="projectsOpen"
+      :projects
+      :active-id="activeProjectId"
+      :suggested-name="suggestedName"
+      :busy="projectBusy"
+      :storage
+      :persisted="storagePersisted"
+      @save="saveCurrentProject"
+      @open-project="openStoredProject"
+      @rename="(id, name) => runProjectAction(async () => { await renameProject(id, name); await refreshProjects() })"
+      @duplicate="(id) => runProjectAction(async () => { await duplicateProject(id); await refreshProjects() })"
+      @remove="removeStoredProject"
+      @export-project="exportStoredProject"
+      @import-file="importProjectFile"
+    />
 
     <LabPanel
       v-show="panelVisible"
@@ -1737,6 +2024,10 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :capture-ms
       :selected-layer
       :sequence-ms="selectedSequenceMs"
+      :can-undo
+      :can-redo
+      @undo="undo"
+      @redo="redo"
       @update-layer="updateLayer"
       @remove-layer="removeSelected"
       @duplicate-layer="duplicateSelected"
@@ -1747,59 +2038,77 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @export-png="exportPng"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"
+      @projects="projectsOpen = true"
       @reset-settings="resetSettings"
       @reset-everything="resetEverything"
       @cancel="cancelExport"
     />
+  </div>
 
+  <!--
+    The live stage. It has to be genuinely on screen and not display:none —
+    most of these components start themselves from an IntersectionObserver,
+    which reports nothing for a hidden element. So it sits pinned behind the
+    UI at near-zero opacity, where it lays out and animates normally.
+  -->
+  <!--
+    Outside `lab-chrome`, and carrying no theme of its own.
+
+    Being outside is what stops the tool's theme from reaching the thing being
+    filmed: these components are the site's, drawn with the site's tokens, and a
+    plate rasterized under the panel's variables would come out in the lab's
+    colours instead of the site's. It is `position: fixed`, so lifting it out of
+    the flex row costs nothing in layout.
+
+    Carrying nothing is the other half, and it is the half that is easy to get
+    wrong. Putting `dark` here to shield it looks like the safe move and is not:
+    a class on the element wins over a value inherited from `:root`, so the
+    source stylesheet's `--ui-bg: zinc-950` lost to Nuxt UI's default `.dark`
+    block and every export came out a step lighter than the site. The stage
+    inherits from `<html>`, which stays dark, and the panel's theme never enters
+    the room.
+  -->
+  <div
+    ref="stagesRoot"
+    data-lab-stage
+    class="pointer-events-none fixed left-0 top-0"
+    :class="showSource ? 'z-50 opacity-100' : 'z-0 opacity-[0.002]'"
+  >
     <!--
-      The live stage. It has to be genuinely on screen and not display:none —
-      most of these components start themselves from an IntersectionObserver,
-      which reports nothing for a hidden element. So it sits pinned behind the
-      UI at near-zero opacity, where it lays out and animates normally.
+      Each instance is mounted at its clip's origin, not at the top of the
+      take. Mounting is what starts these components, so the moment it happens
+      is the moment their sequence begins — which is how a trimmed clip shows
+      its source part-way through instead of replaying it from the beginning.
+    -->
+    <!--
+      Every stage occupies the same corner, one on top of another.
+      They used to stack down the page, which put the second one below the fold
+      of a normal window — and these components start themselves from an
+      IntersectionObserver at a 20% threshold. A clip whose stage was off screen
+      therefore never started: its plate stayed on the initial state, and the
+      take went blank for exactly the span of that clip. Capture reads each
+      stage by element, not by what is painted, so overlapping costs nothing —
+      and it means clip five sits precisely where clip one does, which is the
+      only position known to be visible.
     -->
     <div
-      ref="stagesRoot"
-      data-lab-stage
-      class="pointer-events-none fixed left-0 top-0"
-      :class="showSource ? 'z-50 opacity-100' : 'z-0 opacity-[0.002]'"
+      v-for="staged in stagedComponents"
+      :key="staged.layer.id"
+      :data-stage="staged.layer.id"
+      class="absolute left-0 top-0 overflow-hidden bg-default"
+      :style="{
+        width: `${settings.stageWidth}px`,
+        height: `${settings.stageHeight}px`,
+        zIndex: isLive(staged.layer) ? 1 : 0,
+      }"
     >
-      <!--
-        Each instance is mounted at its clip's origin, not at the top of the
-        take. Mounting is what starts these components, so the moment it happens
-        is the moment their sequence begins — which is how a trimmed clip shows
-        its source part-way through instead of replaying it from the beginning.
-      -->
-      <!--
-        Every stage occupies the same corner, one on top of another.
-        They used to stack down the page, which put the second one below the fold
-        of a normal window — and these components start themselves from an
-        IntersectionObserver at a 20% threshold. A clip whose stage was off screen
-        therefore never started: its plate stayed on the initial state, and the
-        take went blank for exactly the span of that clip. Capture reads each
-        stage by element, not by what is painted, so overlapping costs nothing —
-        and it means clip five sits precisely where clip one does, which is the
-        only position known to be visible.
-      -->
-      <div
-        v-for="staged in stagedComponents"
-        :key="staged.layer.id"
-        :data-stage="staged.layer.id"
-        class="absolute left-0 top-0 overflow-hidden bg-default"
-        :style="{
-          width: `${settings.stageWidth}px`,
-          height: `${settings.stageHeight}px`,
-          zIndex: isLive(staged.layer) ? 1 : 0,
-        }"
-      >
-        <LabStage :layer-id="staged.layer.id">
-          <component
-            :is="staged.component"
-            v-if="staged.component && playhead >= layerOrigin(staged.layer)"
-            :key="`${stageKey}:${layerOrigin(staged.layer)}`"
-          />
-        </LabStage>
-      </div>
+      <LabStage :layer-id="staged.layer.id">
+        <component
+          :is="staged.component"
+          v-if="staged.component && playhead >= layerOrigin(staged.layer)"
+          :key="`${stageKey}:${layerOrigin(staged.layer)}`"
+        />
+      </LabStage>
     </div>
   </div>
 </template>

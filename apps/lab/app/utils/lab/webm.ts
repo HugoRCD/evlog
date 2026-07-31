@@ -132,7 +132,14 @@ export class WebmMuxer {
   private clusters: Element[] = []
   private blocks: PendingBlock[] = []
   private clusterStart = 0
-  private lastTimestamp = 0
+  /**
+   * End of the last frame, not its start.
+   *
+   * Written as the start, the duration was short by one frame interval — and a
+   * single-frame take reported zero, which players read as a still image rather
+   * than as a video one frame long.
+   */
+  private durationMs = 0
 
   constructor(private track: WebmTrack) {}
 
@@ -151,7 +158,7 @@ export class WebmMuxer {
     if (!this.blocks.length) this.clusterStart = timestampMs
 
     this.blocks.push({ timestampMs, keyframe, data })
-    this.lastTimestamp = timestampMs
+    this.durationMs = timestampMs + Math.round((chunk.duration ?? 0) / 1000)
   }
 
   private flushCluster() {
@@ -190,7 +197,7 @@ export class WebmMuxer {
       uintElement(ID.TimestampScale, 1_000_000),
       stringElement(ID.MuxingApp, 'render-labs'),
       stringElement(ID.WritingApp, 'render-labs'),
-      floatElement(ID.Duration, this.lastTimestamp),
+      floatElement(ID.Duration, this.durationMs),
     ]))
 
     const tracks = element(ID.Tracks, element(ID.TrackEntry, concat([

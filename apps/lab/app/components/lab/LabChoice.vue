@@ -52,16 +52,16 @@ const matched = computed(() => props.options.some(option => option.value === pro
 <template>
   <div class="mb-2">
     <div class="mb-1 flex items-baseline justify-between gap-2">
-      <span class="font-mono text-[11px] text-zinc-400">{{ label }}</span>
+      <span class="font-mono text-[11px] text-muted">{{ label }}</span>
       <!--
         What the setting is right now, for the case the presets cannot show: a
         size out of a shared link matches no card, and without this the row would
         claim nothing is set.
       -->
-      <span v-if="!matched" class="shrink-0 font-mono text-[9px] text-zinc-600">custom</span>
+      <span v-if="!matched" class="shrink-0 font-mono text-[9px] text-dimmed/70">custom</span>
     </div>
 
-    <p v-if="hint" class="mb-1.5 font-mono text-[10px] leading-snug text-zinc-600">
+    <p v-if="hint" class="mb-1.5 font-mono text-[10px] leading-snug text-dimmed/70">
       {{ hint }}
     </p>
 
@@ -80,8 +80,8 @@ const matched = computed(() => props.options.some(option => option.value === pro
         :class="[
           cards ? 'py-1.5 text-left' : 'min-w-14 flex-1 py-[5px] text-center',
           modelValue === option.value
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300',
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned',
         ]"
         :title="option.title"
         @click="emit('update:modelValue', option.value)"
@@ -90,7 +90,7 @@ const matched = computed(() => props.options.some(option => option.value === pro
         <span
           v-if="option.note"
           class="mt-0.5 block truncate font-mono text-[9px] leading-tight"
-          :class="modelValue === option.value ? 'text-blue-400/70' : 'text-zinc-600'"
+          :class="modelValue === option.value ? 'text-primary/60' : 'text-dimmed/70'"
         >
           {{ option.note }}
         </span>

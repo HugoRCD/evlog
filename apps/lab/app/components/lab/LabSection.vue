@@ -28,19 +28,19 @@ function toggle() {
 </script>
 
 <template>
-  <section class="border-b border-zinc-900">
+  <section class="border-b border-default">
     <button
       type="button"
-      class="group flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-zinc-900/50 @min-[280px]:px-4"
+      class="group flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-colors hover:bg-elevated/50 @min-[280px]:px-4"
       :aria-expanded="expanded"
       @click="toggle"
     >
-      <span class="min-w-0 truncate font-pixel text-[10px] uppercase tracking-[0.18em] text-zinc-400 transition-colors group-hover:text-zinc-200">
+      <span class="min-w-0 truncate font-pixel text-[10px] uppercase tracking-[0.18em] text-muted transition-colors group-hover:text-default">
         {{ title }}
       </span>
       <UIcon
         name="i-lucide-chevron-down"
-        class="size-3 text-zinc-600 transition-all duration-200 group-hover:text-zinc-400"
+        class="size-3 text-dimmed/70 transition-all duration-200 group-hover:text-muted"
         :class="{ '-rotate-90': !expanded }"
       />
     </button>
