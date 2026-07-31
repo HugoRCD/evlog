@@ -1,25 +1,24 @@
 /**
  * The catalogue of stageable components.
  *
- * Built from a glob rather than a hand-written list: every animation added to
- * `content/` or `features/` shows up in the lab on its own, and one that gets
- * deleted stops being an option instead of becoming a broken entry.
+ * Built from globs rather than a hand-written list: a component added to a
+ * configured source shows up in the lab on its own, and one that gets deleted
+ * stops being an option instead of becoming a broken entry.
+ *
+ * The globs themselves are declared in `nuxt.config` and resolved by
+ * `modules/stages.ts`. Nothing here knows which project is being filmed, which
+ * is what lets this be pointed at any component library rather than only at the
+ * one it grew up next to.
  */
 
 import { defineAsyncComponent } from 'vue'
 import type { Component } from 'vue'
-
-// Reaching into the docs app on purpose: the animations stay where they are
-// maintained, and the lab films the same files the site ships.
-const modules = {
-  ...import.meta.glob('../../../../docs/app/components/content/*.vue'),
-  ...import.meta.glob('../../../../docs/app/components/features/*.vue'),
-} as Record<string, () => Promise<{ default: Component }>>
+import { STAGE_MODULES } from '#render-labs/stages'
 
 export interface LabEntry {
   /** File name without extension, e.g. `MapScoreClimb`. The URL key. */
   name: string
-  /** `content` or `features`. */
+  /** The source this came from, as named in the config. */
   group: string
   /** Spaced-out name for the picker. */
   label: string
@@ -31,10 +30,9 @@ function humanize(name: string): string {
   return name.replace(/([a-z\d])([A-Z])/g, '$1 $2').replace(/([A-Z]+)([A-Z][a-z])/g, '$1 $2')
 }
 
-export const ENTRIES: LabEntry[] = Object.entries(modules)
-  .map(([path, load]) => {
+export const ENTRIES: LabEntry[] = Object.entries(STAGE_MODULES)
+  .map(([path, { group, load }]) => {
     const name = path.split('/').pop()?.replace(/\.vue$/, '') ?? ''
-    const group = path.includes('/features/') ? 'features' : 'content'
     return { name, group, label: humanize(name), load }
   })
   .filter(entry => entry.name)

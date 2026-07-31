@@ -1,19 +1,11 @@
 /*
- * The docs site's stylesheet, verbatim.
+ * The lab's own chrome, and nothing about what it films.
  *
- * The staged components are styled entirely by it — design tokens, the pixel
- * font, the glow utilities. Importing the real file rather than copying the
- * parts that seemed necessary means a theme change in the docs shows up here
- * with nothing to keep in sync.
+ * A stage source brings its stylesheet and its Tailwind scan path with it, both
+ * declared in `nuxt.config` and wired up by `modules/stages.ts`. They used to be
+ * two hard-coded paths into a sibling app, which meant this file decided what
+ * the lab was allowed to film.
  */
-@import "../../../../docs/app/assets/css/main.css";
-
-/*
- * Tailwind scans for class names from the importing project, and the components
- * being filmed live in a sibling app it would never look into — every utility
- * they use would be missing from the generated CSS.
- */
-@source "../../../../docs/app";
 
 /*
  * Interactive elements look interactive.

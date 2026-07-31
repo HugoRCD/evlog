@@ -115,10 +115,13 @@ const head = {
 /**
  * Render labs: a rig for composing and rendering shots.
  *
- * It stages the docs site's own components, so those stay where they are and
- * this app reaches across to read them. That keeps a single source of truth — a
- * component tweaked for the docs is the one that gets shot, with no copy to
- * drift — at the price of a few paths pointing into a sibling app.
+ * What it films is configuration, not an assumption. The `stages` block below is
+ * the only place that names another project — point it somewhere else and this
+ * becomes a lab for that instead, with nothing in the source to edit.
+ *
+ * evlog's documentation is the source configured here, and the reason is worth
+ * keeping: the components stay where they are maintained, so a component tweaked
+ * for the site is the one that gets shot, with no copy left to drift.
  */
 export default defineNuxtConfig({
   // Analytics is mounted as a component in `app.vue`, not listed here: the
@@ -131,6 +134,29 @@ export default defineNuxtConfig({
   ssr: false,
 
   css: ['~/assets/css/main.css'],
+
+  /**
+   * What can be put on the stage.
+   *
+   * A source brings three things: the components, the stylesheet they are drawn
+   * with, and the directory Tailwind has to scan to generate the utilities they
+   * use. Filming a component out of its own app without the last two gives the
+   * right layout in the wrong type and colours.
+   */
+  stages: {
+    sources: [
+      {
+        glob: `${docs}/app/components/content/*.vue`,
+        group: 'content',
+        css: `${docs}/app/assets/css/main.css`,
+        source: `${docs}/app`,
+      },
+      {
+        glob: `${docs}/app/components/features/*.vue`,
+        group: 'features',
+      },
+    ],
+  },
 
   // Dark only. The whole point is filming against black.
   colorMode: {
@@ -191,12 +217,4 @@ export default defineNuxtConfig({
     provider: 'iconify',
   },
 
-  vite: {
-    server: {
-      fs: {
-        // The staged components are imported from outside this app's root.
-        allow: [fileURLToPath(new URL('..', import.meta.url))],
-      },
-    },
-  },
 })
