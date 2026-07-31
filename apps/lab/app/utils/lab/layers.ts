@@ -1,0 +1,340 @@
+/**
+ * Overlay layers: what gets composed on top of the staged component.
+ *
+ * They live inside the stage rather than over the finished frame, so a title or
+ * a logo goes through the same camera the component does — it sits on the tilted
+ * plane, catches the same bokeh and the same bloom. An overlay composited after
+ * the render would sit flat on the glass and read as a caption stuck to the
+ * screen rather than as part of the shot.
+ *
+ * Each layer owns a span of the timeline. Outside it the layer is simply not
+ * there, and the fades at either end are what makes an entrance rather than a
+ * hard cut.
+ */
+
+import { evaluateEffects, sanitizeEffects } from './effects'
+import type { EffectResult, LayerEffect } from './effects'
+
+export type LayerKind = 'text' | 'image' | 'video' | 'component'
+
+/**
+ * Where a layer lives.
+ *
+ * `plate` pins it to the staged animation's own surface, so a caption sits on
+ * the panel and takes its tilt. `scene` floats it in front or behind at its own
+ * depth. `overlay` skips the camera entirely and draws flat on the finished
+ * frame — a watermark or a lower third that should stay sharp and square no
+ * matter how the shot is angled.
+ */
+export type LayerSpace = 'plate' | 'scene' | 'overlay'
+
+export interface Layer {
+  id: string
+  kind: LayerKind
+  name: string
+  /** Span on the component timeline, in ms. */
+  start: number
+  duration: number
+  /** Entrance and exit effects, evaluated against the clip's local time. */
+  effects: LayerEffect[]
+
+  /** Placement as a fraction of the stage, so it survives a stage resize. */
+  x: number
+  y: number
+  /**
+   * Distance from the component's plane, in world units.
+   *
+   * Negative floats the layer towards the camera, positive pushes it behind.
+   * A layer at zero sits exactly on the plate — which is where an overlay
+   * composited into the stage was stuck, sharing the component's tilt, focus
+   * and parallax whether that was wanted or not.
+   */
+  depth: number
+  space?: LayerSpace
+  /** Width as a fraction of the stage; height follows the content. */
+  width: number
+  rotation: number
+  opacity: number
+
+  // Text
+  text?: string
+  /** Font size as a fraction of stage height, so type scales with the stage. */
+  fontSize?: number
+  color?: string
+  weight?: number
+  font?: 'sans' | 'mono' | 'pixel'
+  align?: 'left' | 'center' | 'right'
+  /** Line box as a multiple of the size — the one control that sets a block's texture. */
+  lineHeight?: number
+  /** Tracking, in ems. Negative tightens, which is what large type usually wants. */
+  letterSpacing?: number
+  italic?: boolean
+  uppercase?: boolean
+  /**
+   * Halo around the glyphs, as a fraction of the size, in the text's own colour.
+   *
+   * The docs theme leans on glow, so a title that carries some belongs to the
+   * same world as the animation behind it. It is drawn into the texture rather
+   * than left to the bloom pass: bloom reacts to brightness across the whole
+   * frame, which cannot be aimed at one title without dragging everything else
+   * up with it.
+   */
+  glow?: number
+  /** Outline width as a fraction of the size — legibility over a busy plate. */
+  stroke?: number
+  strokeColor?: string
+
+  /** Registry name of the staged animation, for `component` layers. */
+  component?: string
+
+  // Image and video
+  /**
+   * Data URL. Media is inlined so a render never depends on a fetch, and so a
+   * document is self-contained — the cost being that a large clip is a large
+   * document.
+   */
+  src?: string
+  /** Where in the source clip the layer starts, in ms. */
+  trim?: number
+}
+
+let counter = 0
+
+function nextId(): string {
+  counter += 1
+  return `layer-${Date.now().toString(36)}-${counter}`
+}
+
+export function createTextLayer(start: number, duration: number): Layer {
+  return {
+    id: nextId(),
+    kind: 'text',
+    name: 'Text',
+    start,
+    duration,
+    // No animation by default. Media should appear exactly as authored; motion
+    // is something you add deliberately, not something to notice and undo.
+    effects: [],
+    x: 0.5,
+    y: 0.5,
+    depth: -0.35,
+    space: 'scene',
+    width: 0.6,
+    rotation: 0,
+    opacity: 1,
+    text: 'evlog',
+    fontSize: 0.12,
+    color: '#ffffff',
+    weight: 500,
+    font: 'pixel',
+    align: 'center',
+  }
+}
+
+export interface MediaLayerInit {
+  kind: 'image' | 'video'
+  start: number
+  duration: number
+  /** Data URL of the file. */
+  src: string
+  name: string
+}
+
+export function createMediaLayer({ kind, start, duration, src, name }: MediaLayerInit): Layer {
+  return {
+    id: nextId(),
+    kind,
+    name,
+    start,
+    duration,
+    effects: [],
+    x: 0.5,
+    y: 0.5,
+    depth: -0.35,
+    space: 'scene',
+    width: kind === 'video' ? 0.6 : 0.3,
+    rotation: 0,
+    opacity: 1,
+    src,
+    trim: 0,
+  }
+}
+
+/** Video frames change with the playhead; everything else is drawn once. */
+export function isTimeVarying(layer: Layer): boolean {
+  return layer.kind === 'video'
+}
+
+/**
+ * A built-in animation, staged as a layer like anything else.
+ *
+ * It used to be the one plane the renderer treated specially — it painted the
+ * background and owned the whole timeline. As a layer it gets everything the
+ * others already had: a right-click menu, effects, a depth, a span it can be
+ * trimmed to, and the option of not being there at all.
+ */
+export function createComponentLayer(component: string, start: number, duration: number): Layer {
+  return {
+    id: nextId(),
+    kind: 'component',
+    name: component,
+    start,
+    duration,
+    effects: [],
+    x: 0.5,
+    y: 0.5,
+    depth: 0,
+    space: 'scene',
+    width: 1,
+    rotation: 0,
+    opacity: 1,
+    component,
+  }
+}
+
+/** A copy with a fresh identity, so duplicating never aliases the original. */
+export function cloneLayer(layer: Layer, nameSuffix = ' copy'): Layer {
+  return { ...layer, id: nextId(), name: `${layer.name}${nameSuffix}` }
+}
+
+/** `plate` layers ride on the animation's surface, so their depth is not theirs. */
+export function layerDepth(layer: Layer): number {
+  return layer.space === 'plate' ? 0 : layer.depth
+}
+
+export function layerEnd(layer: Layer): number {
+  return layer.start + layer.duration
+}
+
+/**
+ * The instant the clip's source is at its own zero.
+ *
+ * A clip trimmed by 1.5s and placed at 4s is showing a source that began at
+ * 2.5s. For a staged component that is not a lookup — the animation has to have
+ * been running since then — so this is the moment its instance is mounted, and
+ * everything it does afterwards falls out of the clock on its own.
+ *
+ * It sits before the clip when trimmed, and can land before zero, which is
+ * exactly the case of a cut whose tail was dragged back to the top.
+ */
+export function layerOrigin(layer: Layer): number {
+  return layer.start - (layer.trim ?? 0)
+}
+
+/**
+ * Can these two be put back into one clip?
+ *
+ * A split is reversible in every editor worth using, because cutting is how you
+ * find out where the cut should have been. Rejoining is only offered where it is
+ * honest: the same source, meeting end to end, and continuous through the seam.
+ * Fusing two clips that merely touch would silently drop whatever sits between
+ * the first one's out point and the second one's in.
+ */
+const JOIN_TOLERANCE = 60
+
+export function canJoin(a: Layer, b: Layer): boolean {
+  if (a.kind !== b.kind) return false
+  if (a.component !== b.component || a.src !== b.src) return false
+  if (Math.abs(layerEnd(a) - b.start) > JOIN_TOLERANCE) return false
+  return Math.abs((b.trim ?? 0) - ((a.trim ?? 0) + a.duration)) <= JOIN_TOLERANCE
+}
+
+/**
+ * Where a layer is, and how visible, at a given instant.
+ *
+ * Returns null outside the clip's span so the renderer can skip it entirely
+ * rather than issue a draw call for something nobody can see.
+ */
+export function layerStateAt(layer: Layer, time: number): EffectResult | null {
+  if (time < layer.start || time > layerEnd(layer)) return null
+
+  const effects = evaluateEffects(layer.effects, time - layer.start, layer.duration)
+  const opacity = Math.max(0, Math.min(1, layer.opacity * effects.opacity))
+  if (opacity <= 0.001) return null
+
+  return { ...effects, opacity }
+}
+
+const FONT_STACK: Record<NonNullable<Layer['font']>, string> = {
+  sans: 'var(--font-sans, sans-serif)',
+  mono: 'var(--font-mono, monospace)',
+  pixel: 'var(--font-pixel, monospace)',
+}
+
+/** Font family for a layer, resolved against the fonts the app already loads. */
+export function layerFontFamily(layer: Layer): string {
+  return FONT_STACK[layer.font ?? 'pixel']
+}
+
+/**
+ * What the texture for a layer depends on.
+ *
+ * Anything not in this key can change without redrawing the layer — which is
+ * the point: opacity and placement became uniforms, so a fade or a move costs
+ * nothing but a draw call. Baking opacity into the texture is what made a
+ * fading title re-rasterize on every frame.
+ */
+export function layerTextureKey(layer: Layer, stage: { width: number, height: number }, scale: number): string {
+  if (layer.kind === 'component') return `${layer.id}|${layer.component}`
+  if (layer.kind !== 'text') return `${layer.id}|${layer.src?.length ?? 0}`
+  return [
+    layer.id,
+    layer.text,
+    layer.fontSize,
+    layer.color,
+    layer.weight,
+    layer.font,
+    layer.align,
+    layer.width,
+    layer.lineHeight,
+    layer.letterSpacing,
+    layer.italic,
+    layer.uppercase,
+    layer.glow,
+    layer.stroke,
+    layer.strokeColor,
+    Math.round(stage.width),
+    Math.round(stage.height),
+    scale,
+  ].join('|')
+}
+
+/** Clamp a layer's span into the timeline, preserving its length where possible. */
+export function constrainToTimeline(layer: Layer, timelineLength: number): Layer {
+  const duration = Math.max(100, Math.min(layer.duration, timelineLength))
+  const start = Math.max(0, Math.min(layer.start, timelineLength - duration))
+  return { ...layer, start, duration }
+}
+
+/** Drop anything that is not a layer we can render, so bad storage cannot break the page. */
+export function sanitizeLayers(value: unknown): Layer[] {
+  if (!Array.isArray(value)) return []
+  return value
+    .filter((entry): entry is Layer =>
+      Boolean(entry)
+      && typeof entry === 'object'
+      && typeof (entry as Layer).id === 'string'
+      && ['text', 'image', 'video', 'component'].includes((entry as Layer).kind),
+    )
+    .map((layer) => {
+      const legacy = layer as Layer & { fadeIn?: number, fadeOut?: number }
+      // Documents written before the effect library stored two bare fade
+      // durations; carry them over rather than dropping somebody's shot.
+      const migrated: LayerEffect[] = []
+      if (!layer.effects && legacy.fadeIn) {
+        migrated.push({ kind: 'fade', at: 'in', duration: legacy.fadeIn, easing: 'out', amount: 0 })
+      }
+      if (!layer.effects && legacy.fadeOut) {
+        migrated.push({ kind: 'fade', at: 'out', duration: legacy.fadeOut, easing: 'inOut', amount: 0 })
+      }
+
+      return {
+        ...layer,
+        effects: layer.effects ? sanitizeEffects(layer.effects) : migrated,
+        depth: Number.isFinite(layer.depth) ? layer.depth : 0,
+        space: ['plate', 'scene', 'overlay'].includes(layer.space ?? '') ? layer.space : 'scene',
+        start: Number.isFinite(layer.start) ? Math.max(0, layer.start) : 0,
+        duration: Number.isFinite(layer.duration) ? Math.max(100, layer.duration) : 1000,
+      }
+    })
+}

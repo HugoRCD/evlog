@@ -1,0 +1,80 @@
+/*
+ * The lab's own chrome, and nothing about what it films.
+ *
+ * A stage source brings its stylesheet and its Tailwind scan path with it, both
+ * declared in `nuxt.config` and wired up by `modules/stages.ts`. They used to be
+ * two hard-coded paths into a sibling app, which meant this file decided what
+ * the lab was allowed to film.
+ */
+
+/*
+ * Interactive elements look interactive.
+ *
+ * Tailwind's preflight resets `button` to `cursor: default`, which is correct
+ * for the web at large and wrong for a tool: here a control that does not change
+ * the pointer reads as decoration, and half the panel stopped feeling clickable.
+ */
+button:not(:disabled),
+select:not(:disabled),
+summary,
+[role="switch"],
+input[type="color"]:not(:disabled),
+input[type="file"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+}
+
+/*
+ * Typing is a different gesture from clicking.
+ *
+ * Numeric fields here are also drag targets, so they carry their own resize
+ * cursor and must not be caught by this; a plain text or number input, though,
+ * should say that a caret goes in it.
+ */
+input[type="text"]:not(:disabled),
+input[type="number"]:not(:disabled),
+textarea:not(:disabled) {
+  cursor: text;
+}
+
+/*
+ * The chrome is not a document.
+ *
+ * Selection was switched off control by control, which never held: a drag keeps
+ * going after it leaves the element it started on, so sweeping a slider still
+ * painted a blue streak across every label further along, and let go of it
+ * somewhere nobody had thought to exempt. In a tool the default belongs the
+ * other way round — nothing is selectable, and the places where selecting text
+ * is the point say so.
+ */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable],
+[data-selectable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/*
+ * Keyboard focus stays visible, mouse focus does not.
+ *
+ * A ring around every button that was merely clicked is noise; a ring around
+ * the control you tabbed to is the only way to know where you are.
+ */
+:focus-visible {
+  outline: 1px solid var(--color-blue-500);
+  outline-offset: 1px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}

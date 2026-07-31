@@ -1,0 +1,47 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 630" width="1200" height="630">
+  <defs>
+    <!-- Echoes the blue that sits above the wordmark in evlog's own mark. -->
+    <radialGradient id="glow" cx="50%" cy="34%" r="66%">
+      <stop offset="0%" stop-color="#0032FF" stop-opacity="0.26"/>
+      <stop offset="55%" stop-color="#001E99" stop-opacity="0.07"/>
+      <stop offset="100%" stop-color="#000000" stop-opacity="0"/>
+    </radialGradient>
+    <!-- The scanline texture the evlog wordmark is built from. -->
+    <pattern id="scan" width="4" height="4" patternUnits="userSpaceOnUse">
+      <rect width="4" height="2" fill="#ffffff" fill-opacity="0.022"/>
+    </pattern>
+    <linearGradient id="bar" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="#0032FF"/>
+      <stop offset="100%" stop-color="#001E99" stop-opacity="0.15"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="1200" height="630" fill="#000000"/>
+  <rect width="1200" height="630" fill="url(#scan)"/>
+  <rect width="1200" height="630" fill="url(#glow)"/>
+
+  <!-- Framing marks, the one motif that belongs to the lab rather than evlog. -->
+  <g fill="none" stroke="#0032FF" stroke-width="3" stroke-linecap="square" stroke-opacity="0.85">
+    <path d="M64 118V64h54"/>
+    <path d="M1082 64h54v54"/>
+    <path d="M1136 512v54h-54"/>
+    <path d="M118 566H64v-54"/>
+  </g>
+
+  <rect x="64" y="176" width="26" height="58" fill="url(#bar)"/>
+
+  <g transform="translate(64 300)">
+    <text x="0" y="-52" fill="#5b8cff" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" letter-spacing="4.5">BY EVLOG</text>
+    <text x="0" y="18" fill="#ffffff" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="88" font-weight="600" letter-spacing="-3">Render labs</text>
+    <text x="0" y="76" fill="#a1a1aa" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="32" font-weight="400" letter-spacing="-0.4">Compose and render shots in the browser.</text>
+    <text x="0" y="124" fill="#71717a" font-family="Helvetica Neue, Helvetica, Arial, sans-serif" font-size="32" font-weight="400" letter-spacing="-0.4">Stage it live, then tilt, focus, bloom and grade.</text>
+  </g>
+
+  <!-- The 40×40 slot at (64, 462) is left empty: the generator composites
+       evlog's own icon there rather than inlining a copy of the mark.
+       Sits above y=512 so it clears the arms of the bottom framing marks —
+       lower down, the blue rules ran straight through the mark. -->
+  <text x="122" y="489" fill="#d4d4d8" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" letter-spacing="0.4">lab.evlog.dev</text>
+
+  <text x="1136" y="489" fill="#52525b" text-anchor="end" font-family="ui-monospace, SFMono-Regular, Menlo, monospace" font-size="22" letter-spacing="0.4">stills · motion · up to 4K</text>
+</svg>
