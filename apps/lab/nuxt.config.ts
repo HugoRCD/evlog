@@ -121,6 +121,8 @@ const head = {
  * drift — at the price of a few paths pointing into a sibling app.
  */
 export default defineNuxtConfig({
+  // Analytics is mounted as a component in `app.vue`, not listed here: the
+  // module's plugin template did not survive this Nuxt version's build.
   modules: ['@nuxt/ui', '@nuxt/fonts', 'motion-v/nuxt'],
 
   // Client only. Every part of this touches the DOM, a canvas or a GPU, and
