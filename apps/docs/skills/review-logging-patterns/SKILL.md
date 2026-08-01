@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog map`) to score entry-point coverage on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog), sampling, enrichers, and AI SDK integration.
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog map`) to score entry-point coverage on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
@@ -847,6 +847,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | Sentry | `evlog/sentry` | `SENTRY_DSN` |
 | Better Stack | `evlog/better-stack` | `BETTER_STACK_API_KEY` |
 | Datadog | `evlog/datadog` | `DD_API_KEY` or `DATADOG_API_KEY`, optional `DD_SITE` / `DATADOG_LOGS_URL` |
+| Grafana Loki | `evlog/loki` | `LOKI_ENDPOINT`, optional `LOKI_API_KEY` + `LOKI_USER` (Grafana Cloud) or `LOKI_TENANT_ID` (multi-tenant) |
 | File System | `evlog/fs` | None (local file system) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
