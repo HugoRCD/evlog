@@ -72,7 +72,7 @@ PR titles and commits follow [Conventional Commits](https://conventionalcommits.
 - **Subject must not start with an uppercase letter.** `feat: add stream server` ✓ — `feat: Add stream server` ✗.
 - **Omit the scope when the change is cross-cutting** (touches multiple subsystems, or is repo-wide). Don't use `evlog` as a scope: the whole monorepo *is* evlog, so a no-scope title already means "evlog itself".
 - **Use a scope only to point at one subsystem.** Adapters get their own scope (one per entrypoint, e.g. `axiom`, `datadog`, `fs`); framework integrations get the framework's name (`nuxt`, `next`, `hono`, ...); core internals (logger, pipeline, error, redact, catalog) go under `core`.
-- **When you add a new subsystem** (adapter, integration, top-level entrypoint), add its scope to **both** the workflow and the template in the same PR. Keep both lists alphabetically sorted.
+- **When you add a new subsystem** (adapter, integration, top-level entrypoint), add its scope to **both** the workflow and the template. Keep both lists alphabetically sorted. Because title validation reads the base branch's scope list, either register the scope in a preceding PR or omit the scope from the subsystem PR title.
 
 ### Doc animation components (`apps/docs/app/components/content/`)
 

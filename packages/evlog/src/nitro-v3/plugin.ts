@@ -70,6 +70,7 @@ function buildHookContext(
   }
 }
 
+// eslint-disable-next-line max-params
 async function callDrainHook(
   hooks: Hooks,
   emittedEvent: WideEvent | null,
@@ -123,6 +124,7 @@ async function callDrainHook(
   }
 }
 
+// eslint-disable-next-line max-params
 async function callEnrichAndDrain(
   hooks: Hooks,
   emittedEvent: WideEvent | null,
