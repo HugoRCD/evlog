@@ -2,9 +2,39 @@ import type { Context, MiddlewareHandler } from 'hono'
 import type { AuditableLogger } from '../audit'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
+import { createLoggerStorage } from '../shared/storage'
 import { shouldDeferEmitForResponse } from '../shared/streamResponse'
 
+const { storage, useLogger } = createLoggerStorage(
+  'middleware context. Make sure app.use(evlog()) is registered before your routes.',
+  'evlog:hono',
+)
+
 export type EvlogHonoOptions = BaseEvlogOptions
+
+/**
+ * Get the request-scoped logger from anywhere in the call stack, without
+ * threading the Hono `Context` through every function.
+ *
+ * `c.get('log')` stays the idiomatic accessor inside route handlers — this is
+ * for the layers underneath (services, repositories) where `c` is not in hand.
+ * Both return the same logger.
+ *
+ * Backed by `AsyncLocalStorage`, so on Cloudflare Workers this requires the
+ * `nodejs_compat` (or `nodejs_als`) compatibility flag. `c.get('log')` works
+ * with or without it.
+ *
+ * @example
+ * ```ts
+ * import { useLogger } from 'evlog/hono'
+ *
+ * async function chargeCard(amount: number) {
+ *   const log = useLogger()
+ *   log.set({ payment: { amount } })
+ * }
+ * ```
+ */
+export { useLogger }
 
 /**
  * Hono variables type for typed `c.get('log')` access.
@@ -33,6 +63,7 @@ const integration = defineFrameworkIntegration<Context>({
   attachLogger: (c, logger) => {
     c.set('log', logger)
   },
+  storage,
   extractWaitUntil: (c) => {
     // Hono's `executionCtx` getter throws when the adapter has none (Node,
     // Bun, Deno). Only Workers / Vercel Edge provide one.
@@ -67,13 +98,13 @@ const integration = defineFrameworkIntegration<Context>({
  */
 export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
   return async (c, next) => {
-    const { skipped, finish, finishResponse } = integration.start(c, options)
+    const { skipped, finish, finishResponse, runWith } = integration.start(c, options)
     if (skipped) {
       await next()
       return
     }
     try {
-      await next()
+      await runWith(next)
       if (shouldDeferEmitForResponse(c.res)) {
         // Assign directly — Hono's compose ignores middleware return values when
         // context.finalized is already true, so returning the wrapped response
