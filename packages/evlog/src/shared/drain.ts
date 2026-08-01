@@ -56,6 +56,13 @@ export interface HttpDrainRequest {
 export interface HttpDrainOptions<TConfig> {
   /** Stable identifier used in error logs. */
   name: string
+  /**
+   * Human-readable name prefixing HTTP error messages (`"Axiom API error: …"`).
+   * Defaults to {@link HttpDrainOptions.name}. Set it to the same value the
+   * adapter's standalone `sendBatchTo*` helper passes so both paths report a
+   * failure identically.
+   */
+  label?: string
   /** Return `null` to skip draining (e.g. missing API key in dev). */
   resolve: () => TConfig | null | Promise<TConfig | null>
   /** Return `null` to skip the batch without raising. */
@@ -71,6 +78,39 @@ export interface HttpDrainOptions<TConfig> {
 }
 
 const DEFAULT_HTTP_TIMEOUT = 5000
+
+/**
+ * POST an already-encoded {@link HttpDrainRequest} with the adapter's
+ * timeout/retry defaults and evlog identity headers.
+ *
+ * Lets an adapter's standalone `sendBatchTo*` helper reuse the very same
+ * encoder its `defineHttpDrain({ encode })` uses, instead of rebuilding the
+ * URL, headers and body a second time.
+ *
+ * @example
+ * ```ts
+ * export async function sendBatchToMy(events: WideEvent[], config: MyConfig) {
+ *   if (events.length === 0) return
+ *   await sendEncodedDrainRequest(encodeMyRequest(events, config), {
+ *     label: 'My', source: 'my', timeout: config.timeout, retries: config.retries,
+ *   })
+ * }
+ * ```
+ */
+export async function sendEncodedDrainRequest(
+  request: HttpDrainRequest,
+  options: { label: string; source: string; timeout?: number; retries?: number },
+): Promise<void> {
+  await httpPost({
+    url: request.url,
+    headers: request.headers,
+    body: request.body,
+    timeout: options.timeout ?? DEFAULT_HTTP_TIMEOUT,
+    retries: options.retries,
+    label: options.label,
+    source: options.source,
+  })
+}
 
 /**
  * Build an HTTP drain. Timeouts/retries are resolved from the config (with
@@ -116,7 +156,7 @@ export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): (c
         body: request.body,
         timeout,
         retries,
-        label: options.name,
+        label: options.label ?? options.name,
         source: options.name,
       })
     },

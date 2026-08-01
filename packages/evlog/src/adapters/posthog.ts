@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineDrain, defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineDrain, defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 import { sendBatchToOTLP } from './otlp'
 import type { OTLPConfig } from './otlp'
 
@@ -134,14 +134,8 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
         }
         return config as PostHogConfig
       },
-      encode: (events, config) => ({
-        url: `${resolveHost(config)}/batch/`,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          api_key: config.apiKey,
-          batch: events.map(event => toPostHogEvent(event, config)),
-        }),
-      }),
+      label: 'PostHog',
+      encode: encodePostHogEventsRequest,
     })
   }
 
@@ -196,16 +190,26 @@ export async function sendToPostHogEvents(event: WideEvent, config: PostHogConfi
  */
 export async function sendBatchToPostHogEvents(events: WideEvent[], config: PostHogConfig): Promise<void> {
   if (events.length === 0) return
-  await httpPost({
+  await sendEncodedDrainRequest(encodePostHogEventsRequest(events, config), {
+    label: 'PostHog',
+    source: 'posthog',
+    timeout: config.timeout,
+    retries: config.retries,
+  })
+}
+
+/**
+ * Encode a batch of wide events into the PostHog custom-events `/batch/`
+ * request. Shared by {@link createPostHogDrain} in `events` mode and
+ * {@link sendBatchToPostHogEvents}.
+ */
+function encodePostHogEventsRequest(events: WideEvent[], config: PostHogConfig): HttpDrainRequest {
+  return {
     url: `${resolveHost(config)}/batch/`,
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       api_key: config.apiKey,
       batch: events.map(event => toPostHogEvent(event, config)),
     }),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
-    label: 'PostHog',
-    source: 'posthog',
-  })
+  }
 }

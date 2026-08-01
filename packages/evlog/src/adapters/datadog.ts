@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 
 export interface DatadogConfig {
   /** Datadog API key with Logs intake permission */
@@ -191,15 +191,24 @@ export function createDatadogDrain(overrides?: Partial<DatadogConfig>) {
       }
       return config as DatadogConfig
     },
-    encode: (events, config) => ({
-      url: resolveDatadogIntakeUrl(config),
-      headers: {
-        'Content-Type': 'application/json',
-        'DD-API-KEY': config.apiKey,
-      },
-      body: JSON.stringify(events.map(toDatadogLog)),
-    }),
+    label: 'Datadog',
+    encode: encodeDatadogRequest,
   })
+}
+
+/**
+ * Encode a batch of wide events into the Datadog Logs intake request. Shared by
+ * {@link createDatadogDrain} and {@link sendBatchToDatadog}.
+ */
+function encodeDatadogRequest(events: WideEvent[], config: DatadogConfig): HttpDrainRequest {
+  return {
+    url: resolveDatadogIntakeUrl(config),
+    headers: {
+      'Content-Type': 'application/json',
+      'DD-API-KEY': config.apiKey,
+    },
+    body: JSON.stringify(events.map(toDatadogLog)),
+  }
 }
 
 /**
@@ -214,19 +223,10 @@ export async function sendToDatadog(event: WideEvent, config: DatadogConfig): Pr
  */
 export async function sendBatchToDatadog(events: WideEvent[], config: DatadogConfig): Promise<void> {
   if (events.length === 0) return
-
-  const url = resolveDatadogIntakeUrl(config)
-
-  await httpPost({
-    url,
-    headers: {
-      'Content-Type': 'application/json',
-      'DD-API-KEY': config.apiKey,
-    },
-    body: JSON.stringify(events.map(toDatadogLog)),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  await sendEncodedDrainRequest(encodeDatadogRequest(events, config), {
     label: 'Datadog',
     source: 'datadog',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }
