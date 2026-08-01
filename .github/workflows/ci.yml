@@ -17,6 +17,33 @@ env:
   TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
 
 jobs:
+  changeset:
+    name: Changeset
+    if: |
+      github.event_name == 'pull_request'
+      && github.actor != 'renovate[bot]'
+      && !contains(github.event.pull_request.labels.*.name, 'skip-changeset')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+      - uses: pnpm/action-setup@v6
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 22
+          cache: 'pnpm'
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+      - name: Fetch base branch
+        run: git fetch --no-tags origin ${{ github.base_ref }}:refs/remotes/origin/${{ github.base_ref }}
+      # Only the four published packages are considered — apps/* and examples/* carry no `version`
+      # field, so changesets never sees them and a docs-only PR passes with no changeset. The
+      # privatePackages: false in .changeset/config.json keeps that true if one ever gains a
+      # version. Label a PR `skip-changeset` to bypass.
+      - name: Require a changeset
+        run: pnpm exec changeset status --since=origin/${{ github.base_ref }}
+
   lint:
     runs-on: ubuntu-latest
     steps:
