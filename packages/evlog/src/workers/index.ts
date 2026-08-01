@@ -1,6 +1,8 @@
 import { initLogger, createRequestLogger } from '../logger'
 import type { AuditableLogger } from '../audit'
 import type { LoggerConfig } from '../types'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 
 /**
  * Minimal Cloudflare Workers execution context (`fetch` third argument).
@@ -119,6 +121,108 @@ function pickCfContext(request: Request): Record<string, unknown> {
   if (typeof cf.country === 'string') out.country = cf.country
   if (typeof cf.asn === 'number') out.asn = cf.asn
   return out
+}
+
+/** Options accepted by {@link withEvlog}. */
+export type EvlogWorkersOptions = BaseEvlogOptions
+
+interface WorkersRequestContext {
+  request: Request
+  ctx?: WorkerExecutionContext
+}
+
+/**
+ * Cloudflare-specific context every wide event carries: `cf-ray`, the
+ * `traceparent` header, and the safe subset of `request.cf`.
+ */
+function applyCloudflareContext(request: Request, logger: AuditableLogger): void {
+  logger.set({
+    cfRay: request.headers.get('cf-ray') ?? undefined,
+    traceparent: request.headers.get('traceparent') ?? undefined,
+    ...pickCfContext(request),
+  })
+}
+
+// No AsyncLocalStorage: `evlog/workers` must stay free of `node:async_hooks`
+// so it runs without `nodejs_compat`. The logger reaches user code as the
+// handler's fourth argument instead of through `useLogger()`.
+const integration = defineFrameworkIntegration<WorkersRequestContext>({
+  name: 'workers',
+  extractRequest: ({ request }) => ({
+    method: request.method,
+    path: new URL(request.url).pathname,
+    headers: request.headers,
+    // `x-request-id` first to match every other integration; `cf-ray` is the
+    // Cloudflare-native fallback when the caller sends no explicit id.
+    requestId: request.headers.get('x-request-id') ?? request.headers.get('cf-ray') ?? undefined,
+  }),
+  attachLogger: ({ request }, logger) => {
+    applyCloudflareContext(request, logger as AuditableLogger)
+  },
+  extractWaitUntil: ({ ctx }) =>
+    ctx ? ctx.waitUntil.bind(ctx) : undefined,
+})
+
+/**
+ * Wrap a Workers `fetch` handler so each request emits one wide event through
+ * the same middleware pipeline every other evlog integration uses.
+ *
+ * Unlike {@link defineWorkerFetch}, the event is emitted for you when the
+ * handler returns, and the full {@link BaseEvlogOptions} surface applies:
+ * `include` / `exclude`, per-route `routes` overrides, `redact`, `enrich`,
+ * `keep` tail sampling, `plugins` and `drain`. Streaming responses defer the
+ * emit until the body completes, and `ctx.waitUntil` is picked up
+ * automatically so drains finish after the response is returned.
+ *
+ * Filtered-out routes run the handler with no instrumentation.
+ *
+ * @example
+ * ```ts
+ * import { initWorkersLogger, withEvlog } from 'evlog/workers'
+ * import { createAxiomDrain } from 'evlog/axiom'
+ *
+ * initWorkersLogger({ env: { service: 'my-api' } })
+ *
+ * export default withEvlog(
+ *   async (request, env, ctx, log) => {
+ *     log.set({ route: 'health' })
+ *     return new Response('ok')
+ *   },
+ *   {
+ *     drain: createAxiomDrain(),
+ *     exclude: ['/health'],
+ *   },
+ * )
+ * ```
+ */
+export function withEvlog<TEnv = unknown>(
+  handler: (
+    request: Request,
+    env: TEnv,
+    ctx: WorkerExecutionContext,
+    log: AuditableLogger,
+  ) => Response | Promise<Response>,
+  options: EvlogWorkersOptions = {},
+): {
+  fetch: (request: Request, env: TEnv, ctx: WorkerExecutionContext) => Promise<Response>
+} {
+  return {
+    async fetch(request, env, ctx) {
+      const { logger, finish, finishResponse, skipped } = integration.start({ request, ctx }, options)
+
+      if (skipped) {
+        return await handler(request, env, ctx, createWorkersLogger(request, { executionCtx: ctx }))
+      }
+
+      try {
+        const response = await handler(request, env, ctx, logger)
+        return await finishResponse(response, { status: response.status })
+      } catch (error) {
+        await finish({ error: error as Error })
+        throw error
+      }
+    },
+  }
 }
 
 /**
