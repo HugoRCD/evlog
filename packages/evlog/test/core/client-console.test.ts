@@ -163,3 +163,43 @@ describe('client minLevel', () => {
     expect(infoSpy).toHaveBeenCalledTimes(1)
   })
 })
+
+describe('client log.error with an Error instance', () => {
+  let errorSpy: ReturnType<typeof vi.spyOn>
+
+  beforeEach(() => {
+    errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.spyOn(globalThis, 'fetch').mockResolvedValue(new Response(null, { status: 200 }))
+  })
+
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  const emitted = () => JSON.parse(errorSpy.mock.calls[0]![0] as string)
+
+  it('keeps name, message and stack', () => {
+    initLog({ enabled: true, pretty: false })
+
+    log.error(new Error('Payment declined'))
+
+    expect(emitted().error).toMatchObject({ name: 'Error', message: 'Payment declined' })
+    expect(emitted().error.stack).toBeTruthy()
+  })
+
+  it('carries the extra fields attached to the error', () => {
+    initLog({ enabled: true, pretty: false })
+
+    log.error(Object.assign(new Error('Nope'), { code: 'E_DECLINED', status: 402 }))
+
+    expect(emitted().error).toMatchObject({ code: 'E_DECLINED', status: 402 })
+  })
+
+  it('leaves plain event objects untouched', () => {
+    initLog({ enabled: true, pretty: false })
+
+    log.error({ action: 'payment', error: 'declined' })
+
+    expect(emitted()).toMatchObject({ action: 'payment', error: 'declined' })
+  })
+})
