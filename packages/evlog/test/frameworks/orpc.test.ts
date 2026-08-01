@@ -22,6 +22,38 @@ import {
   findEventViaDrain,
   waitForDrainCalls,
 } from '../helpers/framework'
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+// oRPC routes are RPC-shaped, so the shared matrix drives `withEvlog` over a
+// minimal fetch handler that answers `/api/users` — the same contract surface
+// every other integration is held to.
+describeStandardHttpMatrix({
+  name: 'orpc',
+  mount(options) {
+    const handler = withEvlog({
+      handle: (request: Request) => {
+        const url = new URL(request.url)
+        return Promise.resolve(
+          url.pathname === '/api/users'
+            ? { matched: true as const, response: Response.json({ users: [] }) }
+            : { matched: false as const, response: undefined },
+        )
+      },
+    }, options)
+
+    return {
+      async fire(req) {
+        const { matched, response } = await handler.handle(
+          new Request(`http://localhost${req.path}`, {
+            method: req.method || 'GET',
+            headers: req.headers,
+          }),
+        )
+        return { status: matched ? response.status : 404 }
+      },
+    }
+  },
+})
 
 interface ProcedureContext extends EvlogOrpcContext {
   pingTrace?: { sawLogger: boolean, fromUseLogger: boolean }

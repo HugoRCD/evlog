@@ -10,6 +10,33 @@ vi.mock('next/server', () => ({
   after: undefined,
 }))
 
+import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+
+// `withEvlog` wraps a route handler rather than mounting middleware, so the
+// shared matrix drives it over a handler answering `/api/users`.
+describeStandardHttpMatrix({
+  name: 'next',
+  mount(options) {
+    const withEvlog = createWithEvlog({ ...options, pretty: false })
+    const handler = withEvlog((request: Request) => {
+      const url = new URL(request.url)
+      return url.pathname === '/api/users'
+        ? Response.json({ users: [] })
+        : new Response('not found', { status: 404 })
+    })
+
+    return {
+      async fire(req) {
+        const response = await handler(new Request(`http://localhost${req.path}`, {
+          method: req.method || 'GET',
+          headers: req.headers,
+        }))
+        return { status: response.status }
+      },
+    }
+  },
+})
+
 describe('withEvlog', () => {
   let consoleSpy: ReturnType<typeof vi.spyOn>
   let consoleErrorSpy: ReturnType<typeof vi.spyOn>
