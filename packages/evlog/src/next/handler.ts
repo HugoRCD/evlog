@@ -1,10 +1,6 @@
-import type { DrainContext, EnrichContext, TailSamplingContext, WideEvent } from '../types'
-import { createRequestLogger, getGlobalDrain, initLogger, isEnabled, isLoggerLocked, markWideEventDrainStarted } from '../logger'
-import { attachForkToLogger } from '../shared/fork'
-import type { MiddlewareLoggerOptions } from '../shared/middleware'
-import { shouldLog, getServiceForPath } from '../shared/routes'
-import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
-import { filterSafeHeaders } from '../utils'
+import { initLogger, isEnabled, isLoggerLocked } from '../logger'
+import { defineFrameworkIntegration } from '../shared/integration'
+import { pickBaseEvlogOptions } from '../shared/middleware'
 import { EvlogError } from '../error'
 import { enrichNextErrorStackForDev } from './enrich-error-stack'
 import type { NextEvlogOptions } from './types'
@@ -29,8 +25,8 @@ export function configureHandler(options: NextEvlogOptions): void {
   if (isLoggerLocked()) return
 
   // Don't pass drain to initLogger — the global drain fires inside emitWideEvent
-  // which doesn't have request/header context. Instead, we call drain ourselves
-  // in callEnrichAndDrain after enrich, with full context.
+  // which doesn't have request/header context. The shared middleware pipeline
+  // calls the drain itself, after enrich, with full request context.
   initLogger({
     enabled: options.enabled,
     env: {
@@ -47,74 +43,24 @@ export function configureHandler(options: NextEvlogOptions): void {
   })
 }
 
-function extractRequestInfo(request: Request): { method: string, path: string, headers: Record<string, string> } {
-  const { method } = request
-  const url = new URL(request.url, 'http://localhost')
-  const path = url.pathname
+type AfterFn = (task: () => unknown) => void
 
-  const headers: Record<string, string> = {}
-  request.headers.forEach((value, key) => {
-    headers[key] = value
-  })
+let cachedAfter: AfterFn | null | undefined
 
-  return { method, path, headers: filterSafeHeaders(headers) }
-}
-
-async function callEnrichAndDrain(
-  emittedEvent: WideEvent | null,
-  requestInfo: { method: string, path: string, requestId: string },
-  headers: Record<string, string>,
-  responseStatus?: number,
-): Promise<void> {
-  if (!emittedEvent) return
-
-  const { enrich } = state.options
-  const drain = state.options.drain ?? getGlobalDrain()
-
-  const run = async () => {
-    if (enrich) {
-      const enrichCtx: EnrichContext = {
-        event: emittedEvent,
-        request: requestInfo,
-        headers,
-        response: { status: responseStatus },
-      }
-      try {
-        await enrich(enrichCtx)
-      } catch (err) {
-        console.error('[evlog] enrich failed:', err)
-      }
-    }
-
-    markWideEventDrainStarted(emittedEvent)
-
-    if (drain) {
-      const drainCtx: DrainContext = {
-        event: emittedEvent,
-        request: requestInfo,
-        headers,
-      }
-      try {
-        await drain(drainCtx)
-      } catch (err) {
-        console.error('[evlog] drain failed:', err)
-      }
-    }
-  }
-
-  // Use next/server after() if available to run enrich+drain after response
+/**
+ * Resolve Next's `after()` once. It is the Next equivalent of a serverless
+ * `waitUntil`: work registered with it runs once the response has been sent.
+ * Returns `null` on older Next versions or outside a Next runtime.
+ */
+async function resolveAfter(): Promise<AfterFn | null> {
+  if (cachedAfter !== undefined) return cachedAfter
   try {
     const { after } = await import('next/server')
-    if (typeof after === 'function') {
-      after(run)
-      return
-    }
+    cachedAfter = typeof after === 'function' ? (after as AfterFn) : null
   } catch {
-    // next/server not available or after() not exported — run inline
+    cachedAfter = null
   }
-
-  // Fallback: fire-and-forget (enrich still awaited for correctness)
-  run().catch(() => {})
+  return cachedAfter
 }
 
 /**
@@ -145,32 +91,31 @@ async function rethrowIfNextNavigationSignal(error: unknown): Promise<void> {
   unstableRethrow(error)
 }
 
-async function emitRequestEvent(
-  logger: ReturnType<typeof createRequestLogger>,
-  requestInfo: { method: string, path: string, requestId: string },
-  headers: Record<string, string>,
-  status: number,
-): Promise<void> {
-  let forceKeep = false
-  if (state.options.keep) {
-    try {
-      const tailCtx: TailSamplingContext = {
-        status,
-        path: requestInfo.path,
-        method: requestInfo.method,
-        context: logger.getContext(),
-        shouldKeep: false,
-      }
-      await state.options.keep(tailCtx)
-      forceKeep = tailCtx.shouldKeep ?? false
-    } catch (err) {
-      console.error('[evlog] keep callback failed:', err)
-    }
-  }
-
-  const emittedEvent = logger.emit({ _forceKeep: forceKeep })
-  await callEnrichAndDrain(emittedEvent, requestInfo, headers, status)
+/**
+ * Request shape handed to the shared integration. `withEvlog` also wraps
+ * server actions, whose first argument is not a `Request` — those log under
+ * `UNKNOWN /`.
+ */
+interface NextRequestContext {
+  request?: Request
 }
+
+const integration = defineFrameworkIntegration<NextRequestContext>({
+  name: 'next',
+  extractRequest: ({ request }) => {
+    if (!request) return { method: 'UNKNOWN', path: '/' }
+    return {
+      method: request.method,
+      path: new URL(request.url, 'http://localhost').pathname,
+      headers: request.headers,
+      requestId: request.headers.get('x-request-id') ?? undefined,
+    }
+  },
+  attachLogger: () => {
+    /* Next exposes the logger through AsyncLocalStorage only (`useLogger()`). */
+  },
+  storage: evlogStorage,
+})
 
 /**
  * Wrap a Next.js route handler or server action with evlog request-scoped logging.
@@ -205,81 +150,39 @@ export function createWithEvlog(options: NextEvlogOptions) {
       // Extract request info from first argument if it's a Request
       const [firstArg] = args
       const isRequest = firstArg instanceof Request
+      const request = isRequest ? firstArg : undefined
 
-      let method = 'UNKNOWN'
-      let path = '/'
-      let headers: Record<string, string> = {}
-      let requestId = crypto.randomUUID()
+      // Next's `after()` is its `waitUntil`: drain work runs once the response
+      // has been sent. Resolved before `start()` so it reaches the pipeline.
+      const after = await resolveAfter()
+      const { logger, finish, finishResponse, skipped, runWith } = integration.start(
+        { request },
+        {
+          ...pickBaseEvlogOptions(state.options),
+          ...(after ? { waitUntil: (promise: Promise<unknown>) => after(() => promise) } : {}),
+        },
+      )
 
-      if (isRequest) {
-        ({ method, path, headers } = extractRequestInfo(firstArg))
-
-        // Reuse request-id from middleware if present
-        const middlewareRequestId = firstArg.headers.get('x-request-id')
-        if (middlewareRequestId) requestId = middlewareRequestId
-      }
-
-      // Check include/exclude patterns
-      if (!shouldLog(path, state.options.include, state.options.exclude)) {
+      if (skipped) {
         return await handler(...args) as Awaited<TReturn>
       }
 
-      const logger = createRequestLogger({ method, path, requestId }, { _deferDrain: true })
-
-      const middlewareOpts: MiddlewareLoggerOptions = {
-        method,
-        path,
-        requestId,
-        headers,
-        include: state.options.include,
-        exclude: state.options.exclude,
-        routes: state.options.routes,
-        drain: state.options.drain,
-        enrich: state.options.enrich,
-        keep: state.options.keep,
-        redact: state.options.redact,
-      }
-      attachForkToLogger(evlogStorage, logger, middlewareOpts)
-
-      // Apply route-based service configuration
-      const routeService = getServiceForPath(path, state.options.routes)
-      if (routeService) {
-        logger.set({ service: routeService })
-      }
-
       // Apply start time from middleware if present
-      if (isRequest) {
-        const startHeader = firstArg.headers.get('x-evlog-start')
+      if (request) {
+        const startHeader = request.headers.get('x-evlog-start')
         if (startHeader) {
           logger.set({ middlewareStart: Number(startHeader) })
         }
       }
 
       try {
-        const result = await evlogStorage.run(logger, () => handler(...args))
-        const requestInfo = { method, path, requestId }
+        const result = await runWith(() => handler(...args))
 
-        if (result instanceof Response && shouldDeferEmitForResponse(result)) {
-          const wrapped = bindStreamingResponseLifecycle(result, async (meta) => {
-            if (meta.error) {
-              logger.error(meta.error)
-            }
-            const finalStatus = meta.status ?? result.status
-            logger.set({ status: finalStatus })
-            await emitRequestEvent(logger, requestInfo, headers, finalStatus)
-          })
-          return wrapped as Awaited<TReturn>
-        }
-
-        // Extract response status
-        let { status } = { status: 200 }
         if (result instanceof Response) {
-          ({ status } = result)
+          return await finishResponse(result, { status: result.status }) as Awaited<TReturn>
         }
-        logger.set({ status })
 
-        await emitRequestEvent(logger, requestInfo, headers, status)
-
+        await finish({ status: 200 })
         return result as Awaited<TReturn>
       } catch (error) {
         // redirect()/notFound()/forbidden()/unauthorized() throw a control-flow signal
@@ -289,14 +192,10 @@ export function createWithEvlog(options: NextEvlogOptions) {
 
         const err = error instanceof Error ? error : new Error(String(error))
         await enrichNextErrorStackForDev(err, { pretty: state.options.pretty })
-        logger.error(err)
 
-        const errorStatus = (error as { status?: number }).status
-          ?? (error as { statusCode?: number }).statusCode
-          ?? 500
-        logger.set({ status: errorStatus })
-
-        await emitRequestEvent(logger, { method, path, requestId }, headers, errorStatus)
+        // `finish({ error })` records the error and derives the status via the
+        // shared `extractErrorStatus`, matching every other integration.
+        await finish({ error: err })
 
         // Return structured JSON response for EvlogErrors (like H3 does for Nuxt)
         if (isRequest && EvlogError.isEvlogError(error)) {

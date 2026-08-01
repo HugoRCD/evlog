@@ -1,0 +1,5 @@
+---
+"evlog": minor
+---
+
+refactor(next): run `withEvlog()` through the shared middleware pipeline — `evlog/next` reimplemented the whole request pipeline (route filtering, per-route service, tail sampling, emit, enrich, drain) instead of calling `createMiddlewareLogger`, so it silently drifted from every other integration. Two options declared on `NextEvlogOptions` never did anything: `plugins` was never applied, because Next built no plugin runner at all, and global `sampling.keep` tail conditions were never evaluated — Next only called the user's `keep` callback, and its tail context carried no `duration`, so duration-based keep rules could not match. Both now work. `keep` callbacks also receive `ctx.duration`, and error statuses are derived through the shared `extractErrorStatus`. Next's `after()` is wired as the pipeline's `waitUntil`, so drain work still runs after the response is sent; enrich now runs before the response returns, matching the documented `waitUntil` contract and every other integration — move latency-sensitive work into `drain` if you relied on enrich being deferred
