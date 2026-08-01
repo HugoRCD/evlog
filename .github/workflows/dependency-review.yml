@@ -1,8 +1,5 @@
 name: dependency review
 
-# Flags dependencies added in a PR that carry a known vulnerability or a
-# licence we do not want to ship. Runs on the PR diff only, so it stays fast.
-
 on:
   pull_request:
     branches:

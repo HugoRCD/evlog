@@ -1,8 +1,7 @@
 name: clean branch caches
 
-# The pnpm store cache is keyed per branch, so merged and closed PRs leave
-# entries behind. The repo-wide Actions cache quota is 10 GB and evicts by
-# least-recently-used, which would otherwise start evicting main's cache.
+# Closed PRs leave per-branch cache entries behind, and the 10 GB repo quota
+# evicts least-recently-used, which would eventually evict main's cache.
 
 on:
   pull_request:
@@ -27,15 +26,13 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          # workflow_dispatch carries no pull_request payload, so a manual run
-          # supplies the number instead.
+          # workflow_dispatch carries no pull_request payload
           PR: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           ids=$(gh api --method GET "repos/$REPO/actions/caches" \
             -f ref="refs/pull/$PR/merge" -f per_page=100 --jq '.actions_caches[].id')
 
-          # Best effort: a cleanup failure must never fail the workflow.
-          set +e
+          set +e # best effort, never fail the workflow
           for id in $ids; do
             gh api --method DELETE "repos/$REPO/actions/caches/$id"
           done

@@ -1,8 +1,5 @@
 #!/usr/bin/env node
 /**
- * Runs any playground or example from the monorepo root, so adding one to
- * `apps/` or `examples/` never means adding a script to the root package.json.
- *
  *   pnpm example              # pick from a list
  *   pnpm example hono         # run examples/hono
  *   pnpm playground next      # run apps/next-playground
@@ -22,7 +19,6 @@ const paint = (code, text) => color ? `\x1B[${code}m${text}\x1B[0m` : text
 const dim = text => paint('2', text)
 const bold = text => paint('1', text)
 
-/** Every workspace under `dir`, as { slug, name } sorted by slug. */
 function collect(dir) {
   const base = join(ROOT, dir)
   if (!existsSync(base)) return []
@@ -34,7 +30,6 @@ function collect(dir) {
       if (!existsSync(manifest)) return []
 
       const { name, scripts } = JSON.parse(readFileSync(manifest, 'utf8'))
-      // Skeletons are libraries with nothing to run.
       const script = ['dev', 'start'].find(candidate => scripts?.[candidate])
       if (!name || !script) return []
 
@@ -73,7 +68,6 @@ let target = query
   : await pick(kind, entries)
 
 if (!target && query) {
-  // A bare `next` should still find `next-playground`.
   const partial = entries.filter(entry => entry.slug.includes(query))
   if (partial.length === 1) target = partial[0]
 }
@@ -86,8 +80,7 @@ if (!target) {
 
 console.log(`\n${dim('→')} ${bold(target.name)}\n`)
 
-// `dev` goes through turbo so the linked packages get built first; `start`
-// is not a turbo task, so it runs straight through pnpm.
+// `start` is not a turbo task, so it runs straight through pnpm
 const args = target.script === 'dev'
   ? ['exec', 'dotenv', '--', 'turbo', 'run', 'dev', `--filter=${target.name}`]
   : ['exec', 'dotenv', '--', 'pnpm', '--filter', target.name, 'run', target.script]
