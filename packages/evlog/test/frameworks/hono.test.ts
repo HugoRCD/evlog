@@ -177,6 +177,53 @@ describe('evlog/hono', () => {
     expect(logValue).toBeUndefined()
   })
 
+  describe('waitUntil', () => {
+    it('defers drain to executionCtx.waitUntil when the adapter provides one', async () => {
+      const { drain } = createPipelineSpies()
+      const pending: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test', {}, {}, executionCtx)
+
+      expect(pending.length).toBeGreaterThan(0)
+      await Promise.all(pending)
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('drains inline when the runtime has no executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test')
+
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('per-request options.waitUntil takes precedence over executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+      const fromOption: Promise<unknown>[] = []
+      const fromCtx: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => fromCtx.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain, waitUntil: (p) => fromOption.push(p) }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test', {}, {}, executionCtx)
+
+      expect(fromOption.length).toBeGreaterThan(0)
+      expect(fromCtx).toHaveLength(0)
+      await Promise.all(fromOption)
+    })
+  })
+
   describe('drain / enrich / keep', () => {
     it('calls drain with emitted event (shared helpers)', async () => {
       const { drain } = createPipelineSpies()

@@ -94,5 +94,6 @@ export function toMiddlewareOptions<T extends BaseEvlogOptions>(config: EvlogCon
   if (config.keep) out.keep = config.keep
   if (config.redact !== undefined) out.redact = config.redact
   if (config.plugins) out.plugins = config.plugins
+  if (config.waitUntil) out.waitUntil = config.waitUntil
   return out as T
 }
