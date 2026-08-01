@@ -178,8 +178,15 @@ describe('evlog/hono', () => {
   })
 
   describe('waitUntil', () => {
-    it('defers drain to executionCtx.waitUntil when the adapter provides one', async () => {
-      const { drain } = createPipelineSpies()
+    it('returns the response before a slow drain settles, via executionCtx.waitUntil', async () => {
+      // A drain that stays pending until we release it: if the response only
+      // resolved after the drain, this test would time out rather than pass.
+      let releaseDrain!: () => void
+      const drainDone = new Promise<void>((resolve) => {
+        releaseDrain = resolve
+      })
+      const drain = vi.fn().mockReturnValue(drainDone)
+
       const pending: Promise<unknown>[] = []
       const executionCtx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => {} }
 
@@ -187,10 +194,24 @@ describe('evlog/hono', () => {
       app.use(evlog({ drain }))
       app.get('/api/test', (c) => c.json({ ok: true }))
 
-      await app.request('/api/test', {}, {}, executionCtx)
+      const response = await app.request('/api/test', {}, {}, executionCtx)
 
-      expect(pending.length).toBeGreaterThan(0)
+      // Response is done while the drain is still in flight.
+      expect(response.status).toBe(200)
+      expect(drain).toHaveBeenCalledTimes(1)
+      expect(pending).toHaveLength(1)
+
+      let settled = false
+      void Promise.all(pending).then(() => {
+        settled = true
+      })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      releaseDrain()
       await Promise.all(pending)
+      expect(settled).toBe(true)
+
       assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
     })
 
