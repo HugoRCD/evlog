@@ -89,6 +89,13 @@ const state = globalConfig
 /**
  * Initialize the logger with configuration.
  * Call this once at application startup.
+ *
+ * Every field is overwritten on each call, and the state is process-wide —
+ * shared with any duplicate install of the same major. Last call wins, so a
+ * second `initLogger()` without a `drain` clears the drain for every copy.
+ * Integrations that initialize implicitly must therefore check
+ * {@link isLoggerLocked} / {@link isLoggerInitialized} first, as `next/handler`
+ * and `eve` do.
  */
 export function initLogger(config: LoggerConfig = {}): void {
   state.enabled = config.enabled ?? true

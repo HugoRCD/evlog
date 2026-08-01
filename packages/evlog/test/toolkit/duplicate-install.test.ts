@@ -96,6 +96,24 @@ describe('duplicate installs (#462)', () => {
     expect(copyB.isLoggerLocked()).toBe(true)
   })
 
+  it('applies a redaction policy configured by one copy to another copy events', async () => {
+    const copyA = await loadCopy(() => import('../../src/logger'))
+    const copyB = await loadCopy(() => import('../../src/logger'))
+
+    const drained: Array<Record<string, unknown>> = []
+    copyA.initLogger({
+      silent: true,
+      redact: { paths: ['user.email'] },
+      drain: ({ event }) => {
+        drained.push(event as Record<string, unknown>)
+      },
+    })
+
+    copyB.log.info({ name: 'checkout', user: { email: 'someone@example.com' } })
+    await vi.waitFor(() => expect(drained).toHaveLength(1))
+    expect((drained[0]!.user as Record<string, unknown>).email).toBe('[REDACTED]')
+  })
+
   it('recognizes an EvlogError thrown by another copy', async () => {
     const copyA = await loadCopy(() => import('../../src/error'))
     const copyB = await loadCopy(() => import('../../src/error'))
@@ -126,14 +144,30 @@ describe('duplicate installs (#462)', () => {
   })
 
   it('warns once when a second major joins the process', async () => {
-    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
-    const major = Number(pkg.version.split('.')[0])
-    const majors = (globalThis as Record<symbol, Set<number> | undefined>)[Symbol.for('evlog.majors')]
-    majors?.delete(major)
-    majors?.add(major + 1)
+    const majorsKey = Symbol.for('evlog.majors')
+    const host = globalThis as Record<symbol, Set<number> | undefined>
 
-    await loadCopy(() => import('../../src/shared/globalRegistry'))
+    // Establish the slot ourselves rather than relying on an earlier import,
+    // so the test holds when it runs alone.
+    await import('../../src/shared/globalRegistry')
+    const majors = host[majorsKey]!
+    const previous = new Set(majors)
 
-    expect(warn).toHaveBeenCalledWith(expect.stringContaining('Multiple major versions of evlog'))
+    try {
+      majors.clear()
+      majors.add(Number(pkg.version.split('.')[0]) + 1)
+
+      const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      await loadCopy(() => import('../../src/shared/globalRegistry'))
+      expect(warn).toHaveBeenCalledTimes(1)
+      expect(warn).toHaveBeenCalledWith(expect.stringContaining('Multiple major versions of evlog'))
+
+      // A third copy of the same major must stay quiet.
+      await loadCopy(() => import('../../src/shared/globalRegistry'))
+      expect(warn).toHaveBeenCalledTimes(1)
+    } finally {
+      majors.clear()
+      for (const major of previous) majors.add(major)
+    }
   })
 })

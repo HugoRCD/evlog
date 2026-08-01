@@ -9,7 +9,7 @@ import { getEmptyPluginRunner } from './plugin'
  * Major version this build belongs to. Bump on every major release — the
  * registry key embeds it so two majors never share mutable state.
  *
- * Kept in sync with `package.json` by `test/toolkit/global-registry.test.ts`.
+ * Kept in sync with `package.json` by `test/toolkit/duplicate-install.test.ts`.
  */
 const EVLOG_MAJOR = 2
 
@@ -129,9 +129,14 @@ export function getSharedStorage<T>(
   return storage as AsyncLocalStorageLike<T>
 }
 
-/** @internal Reset shared state between tests. */
+/**
+ * @internal Reset shared state between tests. Also drops the recorded majors so
+ * the multi-major warning can fire again — `vi.resetModules()` re-evaluates
+ * modules but leaves `globalThis` untouched.
+ */
 export function resetGlobalRegistry(): void {
   const host = globalThis as RegistryHost
   Object.assign(globalConfig, createConfig())
   host[REGISTRY_KEY]?.storages.clear()
+  host[MAJORS_KEY]?.clear()
 }
