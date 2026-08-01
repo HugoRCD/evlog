@@ -35,6 +35,7 @@ export default defineConfig({
     'adapters/hyperdx': 'src/adapters/hyperdx.ts',
     'adapters/datadog': 'src/adapters/datadog.ts',
     'adapters/loki': 'src/adapters/loki.ts',
+    'adapters/clickhouse': 'src/adapters/clickhouse.ts',
     'adapters/fs': 'src/adapters/fs.ts',
     'adapters/memory': 'src/adapters/memory.ts',
     'enrichers': 'src/enrichers/index.ts',

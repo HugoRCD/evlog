@@ -10,3 +10,15 @@ datasources:
       # Loki 3 needs this to expose structured metadata / newer query features.
       timeout: 60
       maxLines: 1000
+
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: evlog-clickhouse
+    jsonData:
+      host: clickhouse
+      port: 8123
+      protocol: http
+      secure: false
+      username: default
+      defaultDatabase: default
+      defaultTable: evlog_events

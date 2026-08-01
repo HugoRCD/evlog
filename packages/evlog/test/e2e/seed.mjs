@@ -1,6 +1,6 @@
 /**
  * Fill the local sandbox with realistic wide events so you can browse them in
- * Grafana.
+ * the provisioned Grafana dashboard.
  *
  * Events go through the real public API — `createRequestLogger()` + the actual
  * drains — so what you see is exactly what an instrumented app produces, not a
@@ -9,18 +9,23 @@
  *   pnpm run sandbox:seed
  */
 import { createLokiDrain } from 'evlog/loki'
+import { createClickHouseDrain } from 'evlog/clickhouse'
 import { initLogger, createRequestLogger } from 'evlog'
 
 const LOKI = process.env.LOKI_ENDPOINT ?? 'http://localhost:3100'
+const CLICKHOUSE = process.env.CLICKHOUSE_ENDPOINT ?? 'http://localhost:8123'
 const COUNT = Number(process.env.SEED_COUNT ?? 40)
 
 const loki = createLokiDrain({ endpoint: LOKI })
+const clickhouse = createClickHouseDrain({ endpoint: CLICKHOUSE })
 
 initLogger({
   env: { service: 'evlog-sandbox', environment: 'development' },
   pretty: false,
   silent: true,
-  drain: loki,
+  drain: async (ctx) => {
+    await Promise.all([loki(ctx), clickhouse(ctx)])
+  },
 })
 
 const ROUTES = [
@@ -83,7 +88,8 @@ async function emitRequest(index) {
 }
 
 console.log(`Seeding ${COUNT} wide events`)
-console.log(`  Loki       ${LOKI}\n`)
+console.log(`  Loki       ${LOKI}`)
+console.log(`  ClickHouse ${CLICKHOUSE}\n`)
 
 const statuses = []
 for (let i = 0; i < COUNT; i++) {
@@ -98,4 +104,5 @@ await new Promise(r => setTimeout(r, 1500))
 const errors = statuses.filter(s => s >= 400).length
 console.log(`Done — ${COUNT} events (${errors} errors, ${COUNT - errors} ok)\n`)
 console.log('Browse them:')
-console.log('  Grafana     http://localhost:3001/explore  →  {service="evlog-sandbox"}')
+console.log('  Dashboard  http://localhost:3001/d/evlog-wide-events')
+console.log('  Explore    http://localhost:3001/explore  →  Loki: {service="evlog-sandbox"}')

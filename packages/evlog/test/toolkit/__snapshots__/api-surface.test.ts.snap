@@ -70,6 +70,15 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "defineError",
     "defineErrorCatalog",
   ],
+  "./clickhouse": [
+    "createClickHouseDrain",
+    "resolveClickHouseUrl",
+    "sendBatchToClickHouse",
+    "sendToClickHouse",
+    "toClickHouseDateTime",
+    "toClickHouseRow",
+    "toJSONEachRow",
+  ],
   "./client": [
     "clearIdentity",
     "initLog",
