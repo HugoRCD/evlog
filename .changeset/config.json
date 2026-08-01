@@ -6,6 +6,7 @@
   "linked": [],
   "access": "public",
   "baseBranch": "main",
+  "privatePackages": false,
   "updateInternalDependencies": "patch",
   "ignore": [],
   "___experimentalUnsafeOptions_WILL_CHANGE_IN_PATCH": {
