@@ -1,8 +1,7 @@
 import { createContext } from 'react-router'
 import type { AuditableLogger } from '../audit'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { attachForkToLogger } from '../shared/fork'
-import { extractSafeHeaders } from '../shared/headers'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
@@ -30,6 +29,25 @@ export type EvlogReactRouterOptions = BaseEvlogOptions
 
 export { useLogger }
 
+interface ReactRouterContext {
+  request: Request
+  context: { set(ctx: unknown, value: unknown): void }
+}
+
+const integration = defineFrameworkIntegration<ReactRouterContext>({
+  name: 'react-router',
+  extractRequest: ({ request }) => ({
+    method: request.method,
+    path: new URL(request.url).pathname,
+    headers: request.headers,
+    requestId: request.headers.get('x-request-id') ?? undefined,
+  }),
+  attachLogger: ({ context }, logger) => {
+    context.set(loggerContext, logger)
+  },
+  storage,
+})
+
 /**
  * Create an evlog middleware for React Router.
  *
@@ -45,28 +63,17 @@ export { useLogger }
  */
 export function evlog(options: EvlogReactRouterOptions = {}) {
   return async (
-    { request, context }: { request: Request; context: { set(ctx: unknown, value: unknown): void } },
+    ctx: ReactRouterContext,
     next: () => Promise<Response>,
   ): Promise<Response> => {
-    const url = new URL(request.url)
-    const middlewareOpts = {
-      method: request.method,
-      path: url.pathname,
-      requestId: request.headers.get('x-request-id') || crypto.randomUUID(),
-      headers: extractSafeHeaders(request.headers),
-      ...options,
-    }
-    const { logger, finish, finishResponse, skipped } = createMiddlewareLogger(middlewareOpts)
+    const { finish, finishResponse, skipped, runWith } = integration.start(ctx, options)
 
     if (skipped) {
       return next()
     }
 
-    attachForkToLogger(storage, logger, middlewareOpts)
-    context.set(loggerContext, logger)
-
     try {
-      const response = await storage.run(logger, () => next())
+      const response = await runWith(next)
       return finishResponse(response, { status: response.status })
     } catch (error) {
       await finish({ error: error as Error })

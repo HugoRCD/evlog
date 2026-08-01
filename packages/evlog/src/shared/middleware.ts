@@ -44,6 +44,28 @@ export interface BaseEvlogOptions {
   waitUntil?: (promise: Promise<unknown>) => void
 }
 
+/**
+ * Project any superset of {@link BaseEvlogOptions} onto just the middleware
+ * surface, dropping caller-specific extras.
+ *
+ * This is the single place listing the {@link BaseEvlogOptions} fields — adding
+ * an option here makes it flow through `defineEvlog()` and every integration
+ * that builds middleware options from its own richer option type.
+ */
+export function pickBaseEvlogOptions(options: BaseEvlogOptions): BaseEvlogOptions {
+  const out: BaseEvlogOptions = {}
+  if (options.include) out.include = options.include
+  if (options.exclude) out.exclude = options.exclude
+  if (options.routes) out.routes = options.routes
+  if (options.drain) out.drain = options.drain
+  if (options.enrich) out.enrich = options.enrich
+  if (options.keep) out.keep = options.keep
+  if (options.redact !== undefined) out.redact = options.redact
+  if (options.plugins) out.plugins = options.plugins
+  if (options.waitUntil) out.waitUntil = options.waitUntil
+  return out
+}
+
 /** Internal options accepted by `createMiddlewareLogger`. */
 export interface MiddlewareLoggerOptions extends BaseEvlogOptions {
   method: string

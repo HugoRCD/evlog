@@ -1,8 +1,7 @@
 import type { RequestLogger } from '../types'
 import { registerDiskPrettyErrorSnippetReader } from '../shared/register-disk-snippet'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { attachForkToLogger } from '../shared/fork'
-import { extractSafeHeaders } from '../shared/headers'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 import { resolveEvlogError, extractErrorStatus, serializeEvlogErrorResponse } from '../nitro'
 import { EvlogError } from '../error'
@@ -22,9 +21,30 @@ export { useLogger }
  * SvelteKit `Handle` function signature — avoids a hard dependency on `@sveltejs/kit`.
  */
 type SvelteKitHandle = (input: {
-  event: { request: Request; url: URL; locals: Record<string, any> }
+  event: SvelteKitRequestEvent
   resolve: (...args: any[]) => Response | Promise<Response>
 }) => Promise<Response>
+
+/** The subset of SvelteKit's `RequestEvent` the integration reads. */
+interface SvelteKitRequestEvent {
+  request: Request
+  url: URL
+  locals: Record<string, any>
+}
+
+const integration = defineFrameworkIntegration<SvelteKitRequestEvent>({
+  name: 'sveltekit',
+  extractRequest: ({ request, url }) => ({
+    method: request.method,
+    path: url.pathname,
+    headers: request.headers,
+    requestId: request.headers.get('x-request-id') ?? undefined,
+  }),
+  attachLogger: (event, logger) => {
+    event.locals.log = logger
+  },
+  storage,
+})
 
 /**
  * SvelteKit `HandleServerError` signature — avoids a hard dependency on `@sveltejs/kit`.
@@ -133,23 +153,13 @@ function readEvlogResponseData(response: Record<string, unknown>): { why?: strin
  */
 export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
   return async ({ event, resolve }) => {
-    const middlewareOpts = {
-      method: event.request.method,
-      path: event.url.pathname,
-      requestId: event.request.headers.get('x-request-id') || crypto.randomUUID(),
-      headers: extractSafeHeaders(event.request.headers),
-      ...options,
-    }
-    const { logger, finish, finishResponse, skipped } = createMiddlewareLogger(middlewareOpts)
+    const { logger, finish, finishResponse, skipped, runWith } = integration.start(event, options)
 
     if (skipped) {
       return await resolve(event)
     }
 
-    attachForkToLogger(storage, logger, middlewareOpts)
-    event.locals.log = logger
-
-    return storage.run(logger, async () => {
+    return runWith(async () => {
       try {
         const response = await resolve(event)
 
