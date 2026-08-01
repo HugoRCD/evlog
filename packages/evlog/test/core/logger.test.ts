@@ -188,6 +188,27 @@ describe('createLogger', () => {
     expect(context.workerId).toBe('w-1')
   })
 
+  // A handler that logs the error it then throws hands the same instance to
+  // log.error() and to the integration's finish({ error }) (#457).
+  it('records the same error twice without touching its read-only fields', () => {
+    const internal = Object.defineProperty({}, 'code', {
+      value: 'UPSTREAM_TIMEOUT',
+      enumerable: true,
+      writable: false,
+    })
+    const error = createError({ message: 'Upstream request failed', internal })
+    const logger = createLogger()
+
+    logger.error(error)
+    expect(() => logger.error(error)).not.toThrow()
+
+    const event = defined(logger.emit(), 'emitted event')
+    expect(event.error).toMatchObject({
+      message: 'Upstream request failed',
+      internal: { code: 'UPSTREAM_TIMEOUT' },
+    })
+  })
+
   it('creates logger with empty context by default', () => {
     const logger = createLogger()
 

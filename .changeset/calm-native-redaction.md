@@ -2,4 +2,4 @@
 "evlog": patch
 ---
 
-fix(core): treat native errors and Web API objects as opaque during redaction so getter-only properties are never mutated
+fix(core): redact own enumerable fields only, so getter-only prototype accessors such as `DOMException.code` are never assigned to. A field that still refuses the write now warns instead of throwing, and redaction keeps covering the own fields of class instances.

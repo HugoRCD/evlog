@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { redactEvent, normalizeRedactConfig, resolveRedactConfig, builtinPatterns, hasFunctionRedactPolicy } from '../../src/redact'
+import { redactEvent, normalizeRedactConfig, resolveRedactConfig, builtinPatterns, hasFunctionRedactPolicy, compileRedactPathMatchers, redactPathsInTree } from '../../src/redact'
 import type { RedactConfig } from '../../src/types'
 import { createLogger, initLogger } from '../../src/logger'
 import { defined } from '../helpers/defined'
@@ -347,7 +347,8 @@ describe('redactEvent - edge cases', () => {
     expect(redacted).not.toHaveProperty('handler')
   })
 
-  it('treats native objects as opaque during path redaction', () => {
+  it('leaves prototype accessors of native objects alone during path redaction', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const cause = new DOMException('Upstream request timed out', 'TimeoutError')
     const redacted = redactEvent(
       {
@@ -366,9 +367,12 @@ describe('redactEvent - edge cases', () => {
       },
     })
     expect(cause.name).toBe('TimeoutError')
+    // `DOMException.code` matches `*code`, but it lives on the prototype: the walk
+    // never sees it, so there is nothing to fail to write.
+    expect(warnSpy).not.toHaveBeenCalled()
   })
 
-  it('treats native objects as opaque during pattern redaction', () => {
+  it('leaves prototype accessors of native objects alone during pattern redaction', () => {
     const cause = new DOMException('Contact alice@example.com', 'NetworkError')
     const redacted = redactEvent(
       {
@@ -388,7 +392,7 @@ describe('redactEvent - edge cases', () => {
     })
   })
 
-  it('treats native objects as opaque during built-in masking', () => {
+  it('leaves prototype accessors of native objects alone during built-in masking', () => {
     const cause = new DOMException('Contact alice@example.com', 'NetworkError')
     const config = defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config')
     const redacted = redactEvent(
@@ -407,6 +411,35 @@ describe('redactEvent - edge cases', () => {
         }),
       },
     })
+  })
+
+  // Skipping every non-plain object would also skip these — a class instance
+  // reaching the walker un-cloned still carries its own fields in the open.
+  it('redacts own fields of a class instance', () => {
+    class Session {
+      constructor(public readonly userId: string, public token: string) {}
+    }
+
+    const tree: Record<string, unknown> = { session: new Session('u_1', 'sk_live_secret') }
+    redactPathsInTree(tree, defined(compileRedactPathMatchers(['token']), 'matchers'), '[REDACTED]')
+
+    expect((tree.session as Session).token).toBe('[REDACTED]')
+    expect((tree.session as Session).userId).toBe('u_1')
+  })
+
+  it('warns instead of throwing when a matched field cannot be rewritten', () => {
+    const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const frozen = Object.defineProperty({}, 'token', {
+      value: 'sk_live_secret',
+      enumerable: true,
+      writable: false,
+      configurable: false,
+    })
+
+    expect(() => {
+      redactPathsInTree({ frozen }, defined(compileRedactPathMatchers(['token']), 'matchers'), '[REDACTED]')
+    }).not.toThrow()
+    expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('frozen.token'))
   })
 
   it('handles empty config gracefully', () => {

@@ -148,17 +148,45 @@ export function redactPathsInTree(
   }
 
   if (typeof obj === 'object') {
-    if (!isPlainRecord(obj)) return
-    const record = obj
-    for (const key in record) {
+    const record = obj as Record<string, unknown>
+    for (const key of redactableKeys(record)) {
       const fullPath = prefix ? `${prefix}.${key}` : key
       if (matchesRedactPath(fullPath, key, matchers)) {
-        record[key] = resolveReplacement(replacement, record[key], { path: fullPath, key })
+        setRedacted(record, key, resolveReplacement(replacement, record[key], { path: fullPath, key }), fullPath)
       } else {
         redactPathsInTree(record[key], matchers, replacement, fullPath)
       }
     }
   }
+}
+
+/**
+ * Own enumerable keys only.
+ *
+ * `for…in` walks the prototype chain, which on platform objects hands back
+ * getter-only accessors — a `DOMException` cause yields `code`, `name` and 25
+ * legacy constants, none of them assignable. Own keys keep the walk on data the
+ * caller actually set, on plain records and class instances alike.
+ */
+function redactableKeys(record: Record<string, unknown>): string[] {
+  return Object.keys(record)
+}
+
+/**
+ * Write a redacted value onto a record evlog does not own. `Reflect.set` reports
+ * failure instead of throwing, so a field that cannot be scrubbed degrades to a
+ * warning rather than taking down the request that produced the event.
+ */
+function setRedacted(record: Record<string, unknown>, key: string, value: unknown, path: string): void {
+  if (Reflect.set(record, key, value)) return
+
+  const desc = Object.getOwnPropertyDescriptor(record, key)
+  if (desc && 'value' in desc && desc.configurable) {
+    Object.defineProperty(record, key, { ...desc, value })
+    return
+  }
+
+  console.warn(`[evlog] redact could not rewrite read-only field "${path}" — value left as-is`)
 }
 
 /**
@@ -408,13 +436,12 @@ function redactPatterns(obj: unknown, patterns: RegExp[], replacement: RedactRep
   }
 
   if (typeof obj === 'object') {
-    if (!isPlainRecord(obj)) return
-    const record = obj
-    for (const key in record) {
+    const record = obj as Record<string, unknown>
+    for (const key of redactableKeys(record)) {
       const val = record[key]
       const fullPath = prefix ? `${prefix}.${key}` : key
       if (typeof val === 'string') {
-        record[key] = applyPatterns(val, patterns, replacement, fullPath, key)
+        setRedacted(record, key, applyPatterns(val, patterns, replacement, fullPath, key), fullPath)
       } else if (typeof val === 'object') {
         redactPatterns(val, patterns, replacement, fullPath)
       }
@@ -470,12 +497,11 @@ function applyMaskersToTree(obj: unknown, maskers: Masker[]): void {
   }
 
   if (typeof obj === 'object') {
-    if (!isPlainRecord(obj)) return
-    const record = obj
-    for (const key in record) {
+    const record = obj as Record<string, unknown>
+    for (const key of redactableKeys(record)) {
       const val = record[key]
       if (typeof val === 'string') {
-        record[key] = applyMaskers(val, maskers)
+        setRedacted(record, key, applyMaskers(val, maskers), key)
       } else if (typeof val === 'object') {
         applyMaskersToTree(val, maskers)
       }

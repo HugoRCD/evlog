@@ -45,12 +45,19 @@ function mergeInto(target: Record<string, unknown>, source: Record<string, unkno
     const sourceVal = source[key]
     if (sourceVal === undefined || sourceVal === null) continue
     const targetVal = target[key]
+    // Same reference on both sides — recording the same error twice, which every
+    // integration does when a handler logs the error it then throws. Merging an
+    // object into itself changes nothing, but walking into it would write to the
+    // caller's own object and throw on any read-only field it carries (#457).
+    if (sourceVal === targetVal) continue
     if (isPlainObject(sourceVal) && isPlainObject(targetVal)) {
       mergeInto(targetVal, sourceVal)
     } else if (Array.isArray(targetVal) && Array.isArray(sourceVal)) {
       target[key] = [...targetVal, ...sourceVal]
     } else {
-      target[key] = sourceVal
+      // Context can hold objects evlog does not own; a field that refuses the
+      // write must not abort the merge and lose the rest of the event.
+      Reflect.set(target, key, sourceVal)
     }
   }
 }
