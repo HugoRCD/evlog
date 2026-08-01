@@ -109,11 +109,13 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   }
 }
 
+const ERROR_FIELDS = ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'internal', 'why', 'fix', 'link'] as const
+
 /**
  * `name`, `message` and `stack` live on the prototype, so spreading an Error
  * into an event yields nothing. Mirrors the shape the server logger stores.
  */
-function serializeError(error: Error): Record<string, unknown> {
+function serializeError(error: Error, seen = new Set<unknown>()): Record<string, unknown> {
   const serialized: Record<string, unknown> = {
     name: error.name,
     message: error.message,
@@ -121,8 +123,17 @@ function serializeError(error: Error): Record<string, unknown> {
   }
 
   const record = error as unknown as Record<string, unknown>
-  for (const key of ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'cause'] as const) {
+  for (const key of ERROR_FIELDS) {
     if (key in error) serialized[key] = record[key]
+  }
+
+  if ('cause' in error) {
+    seen.add(error)
+    const { cause } = error
+    // A nested Error would JSON.stringify to {}, dropping its message entirely.
+    serialized.cause = cause instanceof Error && !seen.has(cause)
+      ? serializeError(cause, seen)
+      : cause
   }
 
   return serialized

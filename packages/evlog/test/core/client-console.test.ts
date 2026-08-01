@@ -195,6 +195,44 @@ describe('client log.error with an Error instance', () => {
     expect(emitted().error).toMatchObject({ code: 'E_DECLINED', status: 402 })
   })
 
+  it('keeps internal and the EvlogError metadata the server logger stores', () => {
+    initLog({ enabled: true, pretty: false })
+
+    log.error(Object.assign(new Error('Declined'), {
+      internal: true,
+      why: 'card expired',
+      fix: 'ask for another card',
+      link: 'https://example.com/declined',
+    }))
+
+    expect(emitted().error).toMatchObject({
+      internal: true,
+      why: 'card expired',
+      fix: 'ask for another card',
+      link: 'https://example.com/declined',
+    })
+  })
+
+  it('serializes an Error cause instead of flattening it to {}', () => {
+    initLog({ enabled: true, pretty: false })
+
+    log.error(new Error('Outer', { cause: new Error('Inner') }))
+
+    expect(emitted().error.cause).toMatchObject({ name: 'Error', message: 'Inner' })
+    expect(emitted().error.cause.stack).toBeTruthy()
+  })
+
+  it('survives a cyclic cause chain', () => {
+    initLog({ enabled: true, pretty: false })
+
+    const outer = new Error('Outer')
+    const inner = new Error('Inner', { cause: outer })
+    ;(outer as Error & { cause?: unknown }).cause = inner
+
+    expect(() => log.error(outer)).not.toThrow()
+    expect(emitted().error.cause).toMatchObject({ message: 'Inner' })
+  })
+
   it('leaves plain event objects untouched', () => {
     initLog({ enabled: true, pretty: false })
 

@@ -24,7 +24,9 @@ jobs:
     timeout-minutes: 5
     permissions:
       contents: read
-      pull-requests: write # sticky comment reporting the title error
+      pull-requests: read
+    outputs:
+      error_message: ${{ steps.lint_pr_title.outputs.error_message }}
     steps:
       - uses: amannn/action-semantic-pull-request@48f256284bd46cdaab1048c3721360e808335d50 # v6.1.1
         id: lint_pr_title
@@ -88,10 +90,18 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
+  report:
+    name: Report title errors
+    needs: validate-pr
+    if: ${{ always() && !contains(github.actor, 'renovate') }}
+
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write # posts and clears the sticky comment
+    steps:
       - uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
-        # When the previous steps fail, the workflow would stop. By adding this
-        # condition you can continue the execution with the populated error message.
-        if: always() && (steps.lint_pr_title.outputs.error_message != null)
+        if: needs.validate-pr.outputs.error_message != null
         with:
           header: pr-title-lint-error
           message: |
@@ -102,11 +112,10 @@ jobs:
             Details:
 
             ```
-            ${{ steps.lint_pr_title.outputs.error_message }}
+            ${{ needs.validate-pr.outputs.error_message }}
             ```
 
-      # Delete a previous comment when the issue has been resolved
-      - if: ${{ steps.lint_pr_title.outputs.error_message == null }}
+      - if: needs.validate-pr.outputs.error_message == null
         uses: marocchino/sticky-pull-request-comment@5770ad5eb8f42dd2c4f34da00c94c5381e49af88 # v3.0.5
         with:
           header: pr-title-lint-error
