@@ -19,7 +19,9 @@
         ".vercel/output/**",
         ".next/**",
         "!.next/cache/**",
-        "!.next/dev/**"
+        "!.next/dev/**",
+        ".svelte-kit/**",
+        "build/**"
       ],
       "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
       "env": [
