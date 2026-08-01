@@ -69,7 +69,7 @@ export const DESTINATIONS: readonly Destination[] = [
       { name: 'OTEL_EXPORTER_OTLP_ENDPOINT', hint: 'collector URL' },
       { name: 'OTEL_SERVICE_NAME', hint: 'defaults to your evlog service name' },
     ],
-    docs: '/integrate/adapters/cloud/otlp',
+    docs: '/integrate/adapters/hybrid/otlp',
     productionSafe: true,
   },
   {
@@ -125,7 +125,7 @@ export const DESTINATIONS: readonly Destination[] = [
     specifier: 'evlog/hyperdx',
     factory: 'createHyperDXDrain()',
     env: [{ name: 'HYPERDX_API_KEY', hint: 'ingestion key' }],
-    docs: '/integrate/adapters/cloud/hyperdx',
+    docs: '/integrate/adapters/hybrid/hyperdx',
     productionSafe: true,
   },
   {
