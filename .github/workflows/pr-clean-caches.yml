@@ -8,23 +8,31 @@ on:
   pull_request:
     types: [closed]
   workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number whose caches should be deleted
+        required: true
+        type: string
 
-permissions:
-  actions: write
+permissions: {}
 
 jobs:
   cleanup:
     runs-on: ubuntu-slim
     timeout-minutes: 10
+    permissions:
+      actions: write # deletes this branch's cache entries
     steps:
       - name: Delete caches for this branch
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           REPO: ${{ github.repository }}
-          BRANCH: refs/pull/${{ github.event.pull_request.number }}/merge
+          # workflow_dispatch carries no pull_request payload, so a manual run
+          # supplies the number instead.
+          PR: ${{ github.event.pull_request.number || inputs.pr_number }}
         run: |
           ids=$(gh api --method GET "repos/$REPO/actions/caches" \
-            -f ref="$BRANCH" -f per_page=100 --jq '.actions_caches[].id')
+            -f ref="refs/pull/$PR/merge" -f per_page=100 --jq '.actions_caches[].id')
 
           # Best effort: a cleanup failure must never fail the workflow.
           set +e
