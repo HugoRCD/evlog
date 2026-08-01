@@ -872,8 +872,10 @@ export interface Log {
    * Log an error message or wide event
    * @example log.error('payment', 'Payment failed')
    * @example log.error({ action: 'payment', error: 'declined' })
+   * @example log.error(new Error('Payment declined'))
    */
   error(tag: string, message: string): void
+  error(error: Error): void
   error(event: Record<string, unknown>): void
 
   /**
