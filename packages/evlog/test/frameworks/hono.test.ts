@@ -177,6 +177,74 @@ describe('evlog/hono', () => {
     expect(logValue).toBeUndefined()
   })
 
+  describe('waitUntil', () => {
+    it('returns the response before a slow drain settles, via executionCtx.waitUntil', async () => {
+      // A drain that stays pending until we release it: if the response only
+      // resolved after the drain, this test would time out rather than pass.
+      let releaseDrain!: () => void
+      const drainDone = new Promise<void>((resolve) => {
+        releaseDrain = resolve
+      })
+      const drain = vi.fn().mockReturnValue(drainDone)
+
+      const pending: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      const response = await app.request('/api/test', {}, {}, executionCtx)
+
+      // Response is done while the drain is still in flight.
+      expect(response.status).toBe(200)
+      expect(drain).toHaveBeenCalledTimes(1)
+      expect(pending).toHaveLength(1)
+
+      let settled = false
+      void Promise.all(pending).then(() => {
+        settled = true
+      })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      releaseDrain()
+      await Promise.all(pending)
+      expect(settled).toBe(true)
+
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('drains inline when the runtime has no executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test')
+
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('per-request options.waitUntil takes precedence over executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+      const fromOption: Promise<unknown>[] = []
+      const fromCtx: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => fromCtx.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain, waitUntil: (p) => fromOption.push(p) }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test', {}, {}, executionCtx)
+
+      expect(fromOption.length).toBeGreaterThan(0)
+      expect(fromCtx).toHaveLength(0)
+      await Promise.all(fromOption)
+    })
+  })
+
   describe('drain / enrich / keep', () => {
     it('calls drain with emitted event (shared helpers)', async () => {
       const { drain } = createPipelineSpies()

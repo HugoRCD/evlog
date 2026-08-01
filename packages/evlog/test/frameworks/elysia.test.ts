@@ -13,6 +13,7 @@ import {
 } from '../helpers/framework'
 import { defined, getDrainCallArg } from '../helpers/defined'
 import { describeStandardHttpMatrix } from '../helpers/frameworkMatrix'
+import { createDeferredStream } from '../helpers/stream'
 
 describeStandardHttpMatrix({
   name: 'elysia',
@@ -386,6 +387,52 @@ describe('evlog/elysia', () => {
       await waitForDrainCalls(drain)
 
       expect(findEventViaDrain(drain, e => e.fromService === true)).toBeDefined()
+    })
+  })
+
+  describe('streaming responses', () => {
+    it('defers emit until the SSE stream closes and captures mid-stream context (#321)', async () => {
+      const { drain } = createPipelineSpies()
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+      let closeStream!: () => void
+      const app = new Elysia()
+        .use(evlog({ drain }))
+        .get('/api/chat', ({ log }) => {
+          const { stream, close } = createDeferredStream()
+          closeStream = close
+          queueMicrotask(() => {
+            log.set({ ai: { calls: 1, totalTokens: 42 } })
+          })
+          return new Response(stream, {
+            headers: { 'content-type': 'text/event-stream' },
+          })
+        })
+
+      const res = await app.handle(new Request('http://localhost/api/chat'))
+      await delay()
+      expect(drain).not.toHaveBeenCalled()
+
+      closeStream()
+      await expect(res.text()).resolves.toBe('hello world')
+      await vi.waitFor(() => {
+        expect(drain).toHaveBeenCalledTimes(1)
+      })
+
+      expect(warnSpy.mock.calls.some(([m]) => String(m).includes('Keys dropped: ai'))).toBe(false)
+      expect(drain.mock.calls[0]?.[0]?.event?.ai).toEqual({ calls: 1, totalTokens: 42 })
+    })
+
+    it('still emits immediately for non-streaming responses', async () => {
+      const { drain } = createPipelineSpies()
+      const app = new Elysia()
+        .use(evlog({ drain }))
+        .get('/api/plain', () => ({ ok: true }))
+
+      await request(app, '/api/plain')
+      await waitForDrainCalls(drain)
+
+      assertHttpEventEmitted(drain, { path: '/api/plain', status: 200 })
     })
   })
 })
