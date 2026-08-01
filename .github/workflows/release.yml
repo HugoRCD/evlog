@@ -41,16 +41,26 @@ jobs:
           title: "chore(repo): version packages"
           version: pnpm run version
           publish: pnpm run release
+          # Releases are created here, then their bodies are rewritten below.
           createGithubReleases: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           NPM_CONFIG_PROVENANCE: true
 
-      # createGithubReleases publishes one release per package, tagged pkg@version, whose body is
-      # that version's section of the package CHANGELOG. Generating notes from the commit range
-      # instead cross-contaminates packages: monorepo tags interleave, so the range between two
-      # consecutive @evlog/cli tags sweeps up every core/telemetry/docs commit landed in between.
+      # createGithubReleases gives us one release per package, tagged pkg@version — that part
+      # we keep. Its *body* is the CHANGELOG section, which for a dependent package is a wall of
+      # "Updated dependencies [<hash>, <hash>, …]" and is empty for packages with no changeset
+      # of their own. `--generate-notes` is not the answer either: GitHub builds those from a
+      # commit range, and monorepo tags interleave, so each package would list everybody's PRs.
+      # So we rewrite each body from the PRs that actually touched that package's directory,
+      # grouped by the same categories as .github/release.yml.
       - name: Push tags
         if: steps.changesets.outputs.published == 'true'
         run: git push --tags
+
+      - name: Rewrite release notes
+        if: steps.changesets.outputs.published == 'true'
+        run: node scripts/release-notes.mjs '${{ steps.changesets.outputs.publishedPackages }}'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

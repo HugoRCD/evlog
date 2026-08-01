@@ -4,6 +4,8 @@ changelog:
       - ignore-for-release
     authors:
       - octocat
+      # The release bot's own "version packages" PR is not a change anyone reads about.
+      - github-actions[bot]
   categories:
     - title: Breaking Changes 💥
       labels:
