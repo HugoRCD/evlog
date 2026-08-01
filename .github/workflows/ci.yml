@@ -63,7 +63,7 @@ jobs:
     timeout-minutes: 20
     permissions:
       contents: read
-      id-token: write
+      id-token: write # remote cache OIDC
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -94,7 +94,7 @@ jobs:
     timeout-minutes: 30
     permissions:
       contents: read
-      id-token: write
+      id-token: write # remote cache OIDC
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -140,8 +140,8 @@ jobs:
     if: github.event_name != 'push' || github.ref == 'refs/heads/main'
     permissions:
       contents: read
-      id-token: write
-      pull-requests: write
+      id-token: write # remote cache OIDC
+      pull-requests: write # pkg-pr-new comments the preview install command
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
