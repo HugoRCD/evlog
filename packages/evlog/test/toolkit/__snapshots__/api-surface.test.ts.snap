@@ -268,6 +268,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "resolveAdapterConfig",
     "resolveMiddlewarePluginRunner",
     "runEnrichAndDrain",
+    "sendEncodedDrainRequest",
     "shouldDeferEmitForResponse",
     "shouldLog",
     "toLoggerConfig",

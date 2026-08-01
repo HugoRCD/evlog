@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { applyDeprecatedAlias, formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 
 export interface BetterStackConfig {
   /** Better Stack API key (replaces deprecated `sourceToken`). */
@@ -74,15 +74,24 @@ export function createBetterStackDrain(overrides?: Partial<BetterStackConfig>) {
       }
       return config
     },
-    encode: (events, config) => ({
-      url: (config.endpoint ?? 'https://in.logs.betterstack.com').replace(/\/+$/, ''),
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      },
-      body: JSON.stringify(events.map(toBetterStackEvent)),
-    }),
+    label: 'Better Stack',
+    encode: encodeBetterStackRequest,
   })
+}
+
+/**
+ * Encode a batch of wide events into the Better Stack ingest request. Shared by
+ * {@link createBetterStackDrain} and {@link sendBatchToBetterStack}.
+ */
+function encodeBetterStackRequest(events: WideEvent[], config: BetterStackConfig): HttpDrainRequest {
+  return {
+    url: (config.endpoint ?? 'https://in.logs.betterstack.com').replace(/\/+$/, ''),
+    headers: {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${config.apiKey ?? config.sourceToken}`,
+    },
+    body: JSON.stringify(events.map(toBetterStackEvent)),
+  }
 }
 
 /**
@@ -96,20 +105,11 @@ export async function sendToBetterStack(event: WideEvent, config: BetterStackCon
  * Send a batch of events to Better Stack.
  */
 export async function sendBatchToBetterStack(events: WideEvent[], config: BetterStackConfig): Promise<void> {
-  const apiKey = config.apiKey ?? config.sourceToken
-  if (!apiKey) throw new Error('[evlog/better-stack] Missing apiKey')
-  const endpoint = (config.endpoint ?? 'https://in.logs.betterstack.com').replace(/\/+$/, '')
-
-  await httpPost({
-    url: endpoint,
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${apiKey}`,
-    },
-    body: JSON.stringify(events.map(toBetterStackEvent)),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  if (!(config.apiKey ?? config.sourceToken)) throw new Error('[evlog/better-stack] Missing apiKey')
+  await sendEncodedDrainRequest(encodeBetterStackRequest(events, config), {
     label: 'Better Stack',
     source: 'better-stack',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }

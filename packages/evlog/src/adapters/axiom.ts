@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { applyDeprecatedAlias, formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 
 interface BaseAxiomConfig {
   /** Axiom dataset name. */
@@ -109,16 +109,23 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
       }
       return config as AxiomConfig
     },
-    encode: (events, config) => {
-      const url = resolveIngestUrl(config)
-      const headers: Record<string, string> = {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.apiKey}`,
-      }
-      if (config.orgId) headers['X-Axiom-Org-Id'] = config.orgId
-      return { url, headers, body: JSON.stringify(events) }
-    },
+    label: 'Axiom',
+    encode: encodeAxiomRequest,
   })
+}
+
+/**
+ * Encode a batch of wide events into the Axiom ingest request. Shared by
+ * {@link createAxiomDrain} and {@link sendBatchToAxiom} so both paths build
+ * the same URL, headers and body.
+ */
+function encodeAxiomRequest(events: WideEvent[], config: AxiomConfig): HttpDrainRequest {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Authorization': `Bearer ${config.apiKey ?? config.token}`,
+  }
+  if (config.orgId) headers['X-Axiom-Org-Id'] = config.orgId
+  return { url: resolveIngestUrl(config), headers, body: JSON.stringify(events) }
 }
 
 /**
@@ -132,24 +139,14 @@ export async function sendToAxiom(event: WideEvent, config: AxiomConfig): Promis
  * Send a batch of events to Axiom.
  */
 export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig): Promise<void> {
-  const apiKey = config.apiKey ?? config.token
-  if (!apiKey) {
+  if (!(config.apiKey ?? config.token)) {
     throw new Error('[evlog/axiom] Missing apiKey')
   }
-  const url = resolveIngestUrl(config)
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    'Authorization': `Bearer ${apiKey}`,
-  }
-  if (config.orgId) headers['X-Axiom-Org-Id'] = config.orgId
-  await httpPost({
-    url,
-    headers,
-    body: JSON.stringify(events),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  await sendEncodedDrainRequest(encodeAxiomRequest(events, config), {
     label: 'Axiom',
     source: 'axiom',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }
 
