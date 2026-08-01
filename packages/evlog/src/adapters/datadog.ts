@@ -99,11 +99,33 @@ export function resolveDatadogLogStatus(event: WideEvent): 'error' | 'warn' | 'i
 }
 
 /**
+ * Lift `event.traceId` / `event.spanId` into Datadog’s reserved **`dd`** block.
+ *
+ * Datadog’s log-to-trace correlation only reads `dd.trace_id` / `dd.span_id` at the **root** of the
+ * log payload — the copies nested under `evlog` are searchable but never correlate. Populated by
+ * `createTraceContextEnricher` (part of `createDefaultEnrichers()`), so this works out of the box.
+ *
+ * Returns `undefined` when neither id is a non-empty string, so the key stays absent for anyone
+ * not running trace context.
+ */
+export function resolveDatadogTraceContext(event: WideEvent): Record<string, string> | undefined {
+  const dd: Record<string, string> = {}
+  if (typeof event.traceId === 'string' && event.traceId.length > 0) {
+    dd.trace_id = event.traceId
+  }
+  if (typeof event.spanId === 'string' && event.spanId.length > 0) {
+    dd.span_id = event.spanId
+  }
+  return Object.keys(dd).length > 0 ? dd : undefined
+}
+
+/**
  * Map an evlog wide event to a [Datadog Logs API v2](https://docs.datadoghq.com/api/latest/logs/) log object.
  *
  * Shape:
  * - **`message`** — short line for the list view (`formatDatadogMessageLine`)
  * - **`evlog`** — full sanitized wide event (HTTP codes as `httpStatusCode`); use facets like `@evlog.path`
+ * - **`dd`** — `{ trace_id, span_id }` when the event carries trace context, for log-to-trace correlation
  * - **`status`**, **`service`**, **`ddsource`**, **`ddtags`**, **`timestamp`** — Datadog standard fields
  */
 export function toDatadogLog(event: WideEvent): Record<string, unknown> {
@@ -114,6 +136,8 @@ export function toDatadogLog(event: WideEvent): Record<string, unknown> {
     tags.push(`version:${String(versionTag)}`)
   }
 
+  const dd = resolveDatadogTraceContext(event)
+
   return {
     message: formatDatadogMessageLine(event),
     evlog: sanitizeWideEventForDatadog(event),
@@ -121,6 +145,7 @@ export function toDatadogLog(event: WideEvent): Record<string, unknown> {
     status: resolveDatadogLogStatus(event),
     ddsource: 'evlog',
     ddtags: tags.join(','),
+    ...(dd ? { dd } : {}),
     ...(Number.isFinite(ms) ? { timestamp: ms } : {}),
   }
 }
