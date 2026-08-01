@@ -3,6 +3,7 @@ import { fileURLToPath } from 'node:url'
 import type { Nitro } from 'nitro/types'
 import type { NitroModuleOptions } from '../nitro'
 import { prependNitroErrorHandler } from '../nitro'
+import { FUNCTION_REDACT_POLICY_WARNING, hasFunctionRedactPolicy } from '../redact'
 
 export type { NitroModuleOptions }
 
@@ -37,6 +38,11 @@ export default function evlog(options?: NitroModuleOptions) {
         resolveModulePath('errorHandler'),
       )
       nitro.options.errorHandler = Array.isArray(handlers) ? handlers : [handlers]
+
+      // JSON.stringify below drops function-valued redact policy silently.
+      if (hasFunctionRedactPolicy(options?.redact)) {
+        console.warn(FUNCTION_REDACT_POLICY_WARNING)
+      }
 
       // Inject config into runtimeConfig — works in production where the
       // plugin is bundled through Nitro's builder and the virtual
