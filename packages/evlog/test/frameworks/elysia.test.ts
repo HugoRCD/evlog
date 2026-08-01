@@ -1,5 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
+import { createError } from '../../src/error'
 import { initLogger } from '../../src/logger'
 import { evlog, useLogger } from '../../src/elysia/index'
 import {
@@ -132,6 +133,35 @@ describe('evlog/elysia', () => {
       path: '/api/fail',
       level: 'error',
     })
+  })
+
+  it('emits errors with readonly nested context once', async () => {
+    const { drain } = createPipelineSpies()
+    const internal = Object.defineProperty({}, 'code', {
+      value: 'UPSTREAM_TIMEOUT',
+      enumerable: true,
+      writable: false,
+    })
+    const app = new Elysia()
+      .use(evlog({ drain }))
+      .get('/api/fail-readonly', () => {
+        throw createError({
+          message: 'Upstream request failed',
+          internal,
+        })
+      })
+
+    await request(app, '/api/fail-readonly')
+    await waitForDrainCalls(drain)
+
+    const event = assertHttpEventEmitted(drain, {
+      path: '/api/fail-readonly',
+      level: 'error',
+    })
+    expect(event.error).toMatchObject({
+      internal: { code: 'UPSTREAM_TIMEOUT' },
+    })
+    expect(drain).toHaveBeenCalledOnce()
   })
 
   it('captures 404s for unmatched routes', async () => {

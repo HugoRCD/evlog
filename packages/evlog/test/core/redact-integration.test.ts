@@ -9,6 +9,7 @@ describe('initLogger + redact integration', () => {
   beforeEach(() => {
     vi.spyOn(console, 'info').mockImplementation(() => {})
     vi.spyOn(console, 'log').mockImplementation(() => {})
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
@@ -180,6 +181,29 @@ describe('initLogger + redact integration', () => {
     expect(array).toEqual(['10.0.0.1'])
     expect((event.nested as Record<string, unknown>).ip).toBe('***.***.***.100')
     expect(event.array).toEqual(['***.***.***.1'])
+  })
+
+  it('emits native error causes without mutating readonly properties', () => {
+    initLogger({
+      pretty: false,
+      redact: {
+        builtins: false,
+        paths: ['*code'],
+      },
+    })
+
+    const error = Object.assign(new Error('Upstream request failed'), {
+      code: 'UPSTREAM_TIMEOUT',
+      cause: new DOMException('Upstream request timed out', 'TimeoutError'),
+    })
+    const logger = createLogger()
+    logger.error(error)
+    const event = defined(logger.emit(), 'emitted event')
+
+    expect(event.error).toMatchObject({
+      code: '[REDACTED]',
+      cause: expect.any(DOMException),
+    })
   })
 
   it('applies a computed replacement to the console sink', () => {
