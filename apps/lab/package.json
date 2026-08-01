@@ -5,6 +5,7 @@
   "scripts": {
     "dev": "nuxt dev",
     "dev:prepare": "nuxt prepare",
+    "build": "nuxt build",
     "brand:assets": "node scripts/generate-brand-assets.mjs",
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
@@ -19,6 +20,7 @@
   },
   "devDependencies": {
     "eslint": "^9.39.5",
+    "evlog-docs": "workspace:*",
     "sharp": "^0.34.5"
   }
 }

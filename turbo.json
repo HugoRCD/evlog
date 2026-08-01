@@ -44,6 +44,17 @@
         "AXIOM_TOKEN"
       ]
     },
+    "render-labs#build": {
+      "dependsOn": ["dev:prepare"],
+      "outputs": [".nuxt/**", ".output/**", ".vercel/output/**"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"],
+      "env": ["NUXT_PUBLIC_SITE_URL"]
+    },
+    "render-labs#dev:prepare": {
+      "dependsOn": ["evlog-docs#dev:prepare"],
+      "outputs": [".nuxt/**"],
+      "inputs": ["$TURBO_DEFAULT$", ".env", ".env.*"]
+    },
     "dev": {
       "dependsOn": ["dev:prepare"],
       "cache": false,

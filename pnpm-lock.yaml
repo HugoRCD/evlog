@@ -170,6 +170,9 @@ importers:
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(jiti@2.7.0)
+      evlog-docs:
+        specifier: workspace:*
+        version: link:../docs
       sharp:
         specifier: ^0.34.5
         version: 0.34.5
