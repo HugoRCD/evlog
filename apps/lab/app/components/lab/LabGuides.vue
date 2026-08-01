@@ -13,6 +13,12 @@
  * spends that meaning on scenery, and reads as an element of the shot rather
  * than as an instrument laid over it.
  *
+ * The one part of the chrome that ignores the theme, and the only file where a
+ * literal `white/…` is right. Everything here is drawn over the picture, and the
+ * picture's background is a setting rather than a theme — putting the panel in a
+ * light theme does not make the frame white, so a lattice that followed the panel
+ * would go invisible against the shot it is there to measure.
+ *
  * Built from CSS percentages rather than inside an SVG viewBox so the hairlines
  * stay one device pixel and the labels stay one size, whatever the frame is
  * scaled to on screen.

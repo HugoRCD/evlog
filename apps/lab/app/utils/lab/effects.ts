@@ -182,6 +182,21 @@ export function evaluateEffects(effects: LayerEffect[] | undefined, localTime: n
   return result
 }
 
+/**
+ * How long a clip spends arriving, or leaving, in milliseconds.
+ *
+ * The timeline draws this as a ramp, so a clip can say how long its animation
+ * lasts rather than only that it has one. The longest at that end wins: effects
+ * sharing an end run together, and the clip is still arriving until the slowest
+ * of them has landed.
+ */
+export function effectRampMs(effects: LayerEffect[] | undefined, at: 'in' | 'out'): number {
+  if (!effects?.length) return 0
+  return effects.reduce((longest, effect) => (
+    effect.at === at ? Math.max(longest, effect.duration) : longest
+  ), 0)
+}
+
 /** Drop anything unrecognised, so a stale document cannot break a render. */
 export function sanitizeEffects(value: unknown): LayerEffect[] {
   if (!Array.isArray(value)) return []

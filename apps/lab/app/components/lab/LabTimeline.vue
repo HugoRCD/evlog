@@ -17,6 +17,7 @@
  * between shapes with nothing on screen to explain why.
  */
 
+import { effectRampMs } from '~/utils/lab/effects'
 import { canJoin, layerEnd } from '~/utils/lab/layers'
 import type { Layer } from '~/utils/lab/layers'
 
@@ -52,6 +53,27 @@ const emit = defineEmits<{
 }>()
 
 const layers = defineModel<Layer[]>('layers', { required: true })
+
+// Teleported to `body`, which is outside `.lab-chrome` where the theme's tokens
+// live — so the overlay has to carry the scope with it or it draws itself in the
+// document's colours, which are the stage's and are always dark. See
+// `useLabTheme`.
+const { isDark } = useLabTheme()
+
+/**
+ * Ramp widths per clip, as CSS lengths, or null where the clip cuts.
+ *
+ * Resolved once per change rather than in the row: a track redraws on every
+ * pointer move of a drag, and each clip would otherwise walk its effects four
+ * times over — twice to ask whether to draw, twice to ask how wide.
+ */
+const ramps = computed(() => new Map(layers.value.map((layer) => {
+  const width = (at: 'in' | 'out') => {
+    const ms = effectRampMs(layer.effects, at)
+    return ms > 0 ? `${Math.min(100, (ms / Math.max(layer.duration, 1)) * 100)}%` : null
+  }
+  return [layer.id, { in: width('in'), out: width('out') }]
+})))
 
 const ruler = useTemplateRef('ruler')
 
@@ -373,7 +395,7 @@ function applyDrag(event: PointerEvent) {
     // The line goes where the pointer is, now. Rebuilding the frame behind it
     // can take a remount and a replay, and tying the marker to that made the
     // whole timeline feel like it was resisting — you drag, nothing moves, then
-    // it jumps. The amber tint already says the picture is catching up.
+    // it jumps. The warning tint already says the picture is catching up.
     scrubbing.value = Math.round(raw)
     emit('scrub', Math.round(raw))
     return
@@ -504,6 +526,14 @@ function onDrop(event: DragEvent) {
  *
  * Reading a timeline is mostly pattern matching — you want to find the titles
  * among the footage at a glance, not read every label.
+ *
+ * The one place in the chrome that stays on literal hues rather than theme
+ * tokens, because these four are a set: nothing here is a success or a warning,
+ * they only have to be four things telling each other apart. Routing two of them
+ * through the status tokens would leave a palette that matches in one theme and
+ * not the other, and it would mean a clip changed colour the day somebody
+ * retuned what "warning" looks like. Tints and hairlines rather than fills, so
+ * the same four read against black and against white.
  */
 const KIND_STYLE: Record<Layer['kind'], string> = {
   component: 'border-sky-400/40 bg-sky-500/25',
@@ -539,32 +569,32 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
     outlining the area that accepts it, which is the truer shape of the message.
   -->
   <div
-    class="flex shrink-0 flex-col overflow-hidden bg-black transition-shadow"
-    :class="dropAt === null ? '' : 'ring-1 ring-inset ring-blue-500/60'"
+    class="flex shrink-0 flex-col overflow-hidden bg-default transition-shadow"
+    :class="dropAt === null ? '' : 'ring-1 ring-inset ring-primary-500/60'"
     @dragenter="onDragOver"
     @dragover="onDragOver"
     @dragleave="onDragLeave"
     @drop="onDrop"
   >
-    <div class="flex items-center gap-2 border-b border-zinc-900/80 px-3 py-2">
+    <div class="flex items-center gap-2 border-b border-default/80 px-3 py-2">
       <button
         type="button"
-        class="flex size-7 shrink-0 items-center justify-center border border-zinc-800 text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        class="flex size-7 shrink-0 items-center justify-center border border-muted text-muted transition-colors hover:border-accented hover:text-default"
         :title="playing ? 'Pause (space)' : 'Play (space)'"
         @click="emit('togglePlay')"
       >
         <UIcon :name="playing ? 'i-lucide-pause' : 'i-lucide-play'" class="size-3.5" />
       </button>
 
-      <span class="font-mono text-[11px] tabular-nums text-zinc-100">{{ seconds(playhead) }}</span>
-      <span class="font-mono text-[10px] text-zinc-600">/ {{ seconds(length) }}</span>
+      <span class="font-mono text-[11px] tabular-nums text-highlighted">{{ seconds(playhead) }}</span>
+      <span class="font-mono text-[10px] text-dimmed/70">/ {{ seconds(length) }}</span>
 
       <!-- The frame number, because a cut is decided in frames and read in seconds. -->
-      <span class="border border-zinc-800/80 px-1.5 py-px font-mono text-[10px] tabular-nums text-zinc-400">
-        f{{ frameAt }}<span class="text-zinc-600">/{{ totalFrames }}</span>
+      <span class="border border-muted/80 px-1.5 py-px font-mono text-[10px] tabular-nums text-muted">
+        f{{ frameAt }}<span class="text-dimmed/70">/{{ totalFrames }}</span>
       </span>
 
-      <span class="font-mono text-[10px] text-zinc-600">
+      <span class="font-mono text-[10px] text-dimmed/70">
         {{ frames }} frames · {{ seconds(outputMs) }} out
       </span>
 
@@ -573,7 +603,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
       <button
         v-if="zoom > 1.01"
         type="button"
-        class="border border-zinc-800 px-1.5 py-px font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        class="border border-muted px-1.5 py-px font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         title="Fit the whole take (Z)"
         @click="fitView"
       >
@@ -591,8 +621,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           type="button"
           class="border px-2 py-1 font-mono text-[10px] transition-colors"
           :class="mediaMenu
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-400 hover:border-zinc-600 hover:text-zinc-200'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-muted hover:border-accented hover:text-default'"
           @pointerdown.stop
           @click="toggleMediaMenu"
         >
@@ -609,31 +639,32 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
         <Teleport to="body">
           <div
             v-if="mediaMenu && mediaMenuAt"
-            class="fixed z-200 min-w-44 border border-zinc-800 bg-zinc-950 py-1 shadow-xl"
+            class="lab-chrome fixed z-200 min-w-44 border border-muted bg-muted py-1 shadow-[var(--lab-shadow-overlay)]"
+            :data-theme="isDark ? 'dark' : 'light'"
             :style="{ left: `${mediaMenuAt.x}px`, top: `${mediaMenuAt.y}px`, transform: 'translate(-100%, -100%)' }"
             @pointerdown.stop
           >
             <button
               type="button"
-              class="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] text-toned transition-colors hover:bg-elevated hover:text-highlighted"
               @click="mediaMenu = false; emit('addComponent')"
             >
-              <UIcon name="i-lucide-square-play" class="size-3 text-zinc-600" />
+              <UIcon name="i-lucide-square-play" class="size-3 text-dimmed/70" />
               Built-in animation
             </button>
             <button
               type="button"
-              class="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+              class="flex w-full items-center gap-2 px-3 py-1.5 text-left font-mono text-[11px] text-toned transition-colors hover:bg-elevated hover:text-highlighted"
               @click="mediaMenu = false; emit('addImage')"
             >
-              <UIcon name="i-lucide-image" class="size-3 text-zinc-600" />
+              <UIcon name="i-lucide-image" class="size-3 text-dimmed/70" />
               Image or video…
             </button>
           </div>
         </Teleport>
         <button
           type="button"
-          class="border border-zinc-800 px-2 py-1 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          class="border border-muted px-2 py-1 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
           @click="emit('addText')"
         >
           + text
@@ -652,10 +683,10 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
     >
       <!-- Track names, held out of the scrolling time area so they stay readable. -->
       <div
-        class="w-36 shrink-0 border-r border-zinc-900 bg-black"
+        class="w-36 shrink-0 border-r border-default bg-default"
         @pointerdown.self="emit('select', null)"
       >
-        <div class="flex h-7 items-center px-3 font-mono text-[10px] text-zinc-600">
+        <div class="flex h-7 items-center px-3 font-mono text-[10px] text-dimmed/70">
           timeline
         </div>
         <!--
@@ -669,16 +700,16 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           :key="layer.id"
           class="group/name relative flex h-8 w-full items-center gap-1.5 px-3 text-left"
           :class="[
-            selectedId === layer.id ? 'bg-blue-500/10' : 'hover:bg-zinc-900/60',
+            selectedId === layer.id ? 'bg-primary-500/10' : 'hover:bg-elevated/60',
             isLifted(index)
-              ? 'z-20 cursor-grabbing bg-zinc-900 ring-1 ring-blue-400/50'
+              ? 'z-20 cursor-grabbing bg-elevated ring-1 ring-primary-500/50'
               : 'cursor-grab transition-[transform,background-color] duration-200 ease-out',
           ]"
           :style="{
             transform: `translateY(${stackShift(index)}px)`,
             // Inline, not a utility: `ring` and `shadow` share one box-shadow
             // chain in Tailwind v4, and the ring on this row was winning it.
-            boxShadow: isLifted(index) ? '0 8px 24px rgb(0 0 0 / 0.6)' : undefined,
+            boxShadow: isLifted(index) ? 'var(--lab-shadow-overlay)' : undefined,
           }"
           @pointerdown="onStackDown($event, layer, index)"
           @pointermove="onStackMove"
@@ -688,11 +719,11 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           <UIcon
             :name="ICONS[layer.kind]"
             class="size-3 shrink-0 transition-colors"
-            :class="selectedId === layer.id ? 'text-blue-300' : 'text-zinc-600'"
+            :class="selectedId === layer.id ? 'text-primary' : 'text-dimmed/70'"
           />
           <span
             class="truncate font-mono text-[10px] transition-colors"
-            :class="selectedId === layer.id ? 'text-blue-200' : 'text-zinc-400'"
+            :class="selectedId === layer.id ? 'text-primary' : 'text-muted'"
           >{{ layer.name }}</span>
           <!--
             The grip earns its place on approach.
@@ -704,8 +735,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
             name="i-lucide-grip-vertical"
             class="ml-auto size-3 shrink-0 transition-[color,opacity] duration-150"
             :class="isLifted(index)
-              ? 'text-blue-300 opacity-100'
-              : 'text-zinc-600 opacity-0 group-hover/name:opacity-100'"
+              ? 'text-primary opacity-100'
+              : 'text-dimmed/70 opacity-0 group-hover/name:opacity-100'"
           />
         </div>
       </div>
@@ -714,7 +745,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
         <!-- The ruler owns the pointer geometry; every time below is measured against it. -->
         <div
           ref="ruler"
-          class="relative h-7 select-none overflow-hidden border-b border-zinc-900 bg-zinc-950"
+          class="relative h-7 select-none overflow-hidden border-b border-default bg-muted"
           :class="drag?.kind === 'playhead' ? 'cursor-grabbing' : 'cursor-pointer'"
           @wheel="onWheel"
           @pointerdown="startDrag($event, { kind: 'playhead' })"
@@ -723,8 +754,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           @pointercancel="endDrag"
         >
           <!-- Past the take: scrubbing room, never exported. -->
-          <div class="pointer-events-none absolute inset-y-0 right-0 bg-black/50" :style="{ left: `${percent(length)}%` }" />
-          <div class="pointer-events-none absolute inset-y-0 w-px bg-zinc-700" :style="{ left: `${percent(length)}%` }" />
+          <div class="pointer-events-none absolute inset-y-0 right-0 bg-default/50" :style="{ left: `${percent(length)}%` }" />
+          <div class="pointer-events-none absolute inset-y-0 w-px bg-accented" :style="{ left: `${percent(length)}%` }" />
 
           <div
             v-for="tick in ticks"
@@ -732,8 +763,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
             class="pointer-events-none absolute bottom-0 flex h-full flex-col justify-end"
             :style="{ left: `${tick.at}%` }"
           >
-            <span class="absolute bottom-2.5 left-1 font-mono text-[9px] text-zinc-600">{{ tick.label }}</span>
-            <div class="h-1.5 w-px bg-zinc-700" />
+            <span class="absolute bottom-2.5 left-1 font-mono text-[9px] text-dimmed/70">{{ tick.label }}</span>
+            <div class="h-1.5 w-px bg-accented" />
           </div>
 
         </div>
@@ -748,7 +779,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           <div
             v-for="(layer, index) in layers"
             :key="layer.id"
-            class="relative h-8 cursor-default border-b border-zinc-900/60"
+            class="relative h-8 cursor-default border-b border-default/60"
             :class="[
               isLifted(index) ? 'z-20' : 'transition-transform duration-200 ease-out',
               stackDrag?.lifted && !isLifted(index) ? 'opacity-60' : '',
@@ -762,7 +793,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
               :class="[
                 KIND_STYLE[layer.kind],
                 selectedId === layer.id
-                  ? 'z-10 ring-1 ring-blue-400/70 ring-offset-1 ring-offset-black'
+                  ? 'z-10 ring-1 ring-primary-500/70 ring-offset-1 ring-offset-default'
                   : 'hover:-translate-y-px hover:brightness-125',
                 drag?.kind === 'clip' && drag.id === layer.id ? 'cursor-grabbing brightness-125' : '',
               ]"
@@ -775,7 +806,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
               @pointerleave="hoveredId = null"
               @contextmenu.prevent.stop="openMenu($event, layer)"
             >
-              <span class="pointer-events-none flex h-full items-center gap-1 truncate px-2 font-mono text-[9px] text-zinc-100">
+              <span class="pointer-events-none flex h-full items-center gap-1 truncate px-2 font-mono text-[9px] text-highlighted">
                 <UIcon :name="ICONS[layer.kind]" class="size-2.5 shrink-0 opacity-70" />
                 <span class="truncate">{{ layer.name }}</span>
                 <!-- Animated clips carry a mark, so the timeline says which ones move. -->
@@ -796,7 +827,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
               <!-- Drawn, not just hoverable: a handle you cannot see is a handle you cannot aim at. -->
               <div
                 class="absolute inset-y-0 left-0 w-1.5 cursor-col-resize rounded-l-[3px] transition-colors"
-                :class="hoveredId === layer.id || selectedId === layer.id ? 'bg-white/70' : 'bg-white/20'"
+                :class="hoveredId === layer.id || selectedId === layer.id ? 'bg-inverted/70' : 'bg-inverted/20'"
                 @pointerdown="onClipDown($event, layer, 'start')"
                 @pointermove="applyDrag"
                 @pointerup="endDrag"
@@ -804,23 +835,31 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
               />
               <div
                 class="absolute inset-y-0 right-0 w-1.5 cursor-col-resize rounded-r-[3px] transition-colors"
-                :class="hoveredId === layer.id || selectedId === layer.id ? 'bg-white/70' : 'bg-white/20'"
+                :class="hoveredId === layer.id || selectedId === layer.id ? 'bg-inverted/70' : 'bg-inverted/20'"
                 @pointerdown="onClipDown($event, layer, 'end')"
                 @pointermove="applyDrag"
                 @pointerup="endDrag"
                 @pointercancel="endDrag"
               />
 
-              <!-- Fades, shown as the ramps they are. -->
+              <!--
+                The ramps, drawn from the effects that produce them.
+
+                These read `fadeIn` and `fadeOut` until now — fields the effect
+                library replaced, migrated away on load and written by no factory
+                since. So they had quietly stopped drawing on every document made
+                after that change. The sparkles icon says a clip is animated;
+                this says for how long.
+              -->
               <div
-                v-if="layer.fadeIn > 0"
-                class="pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r from-black/60 to-transparent"
-                :style="{ width: `${Math.min(100, (layer.fadeIn / layer.duration) * 100)}%` }"
+                v-if="ramps.get(layer.id)?.in"
+                class="pointer-events-none absolute inset-y-0 left-0 bg-gradient-to-r from-default/60 to-transparent"
+                :style="{ width: ramps.get(layer.id)!.in! }"
               />
               <div
-                v-if="layer.fadeOut > 0"
-                class="pointer-events-none absolute inset-y-0 right-0 bg-gradient-to-l from-black/60 to-transparent"
-                :style="{ width: `${Math.min(100, (layer.fadeOut / layer.duration) * 100)}%` }"
+                v-if="ramps.get(layer.id)?.out"
+                class="pointer-events-none absolute inset-y-0 right-0 bg-gradient-to-l from-default/60 to-transparent"
+                :style="{ width: ramps.get(layer.id)!.out! }"
               />
             </div>
           </div>
@@ -837,13 +876,13 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           <div
             v-if="headAt >= -1 && headAt <= 101"
             class="absolute inset-y-0 w-px"
-            :class="seeking ? 'bg-amber-400' : 'bg-zinc-100'"
+            :class="seeking ? 'bg-warning' : 'bg-inverted'"
             :style="{ left: `${headAt}%` }"
           />
           <div
             v-if="headAt >= -1 && headAt <= 101"
             class="absolute top-0 size-2 -translate-x-1/2"
-            :class="seeking ? 'bg-amber-400' : 'bg-zinc-100'"
+            :class="seeking ? 'bg-warning' : 'bg-inverted'"
             :style="{ left: `${headAt}%` }"
           />
 
@@ -857,7 +896,7 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           <button
             v-if="headAt < -1 || headAt > 101"
             type="button"
-            class="pointer-events-auto absolute top-0 flex h-7 items-center gap-1 bg-zinc-100/90 px-1.5 font-mono text-[9px] text-black transition-colors hover:bg-white"
+            class="pointer-events-auto absolute top-0 flex h-7 items-center gap-1 bg-inverted/90 px-1.5 font-mono text-[9px] text-inverted transition-colors hover:bg-inverted"
             :class="headAt < 0 ? 'left-0' : 'right-0'"
             :title="`Playhead at ${seconds(playhead)} — click to bring it into view`"
             @click="revealPlayhead"
@@ -874,11 +913,11 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           -->
           <template v-if="dropAt !== null">
             <div
-              class="absolute inset-y-0 w-px bg-blue-400"
+              class="absolute inset-y-0 w-px bg-primary-500"
               :style="{ left: `${percent(dropAt)}%` }"
             />
             <span
-              class="absolute top-0.5 whitespace-nowrap border border-blue-500/50 bg-black px-1 py-px font-mono text-[9px] text-blue-300"
+              class="absolute top-0.5 whitespace-nowrap border border-primary-500/50 bg-default px-1 py-px font-mono text-[9px] text-primary"
               :style="{ left: `min(${percent(dropAt)}%, calc(100% - 5.5rem))` }"
             >
               drop at {{ seconds(dropAt) }}
@@ -896,7 +935,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
       <div
         v-if="menu"
         ref="menuEl"
-        class="fixed z-200 min-w-40 border border-zinc-800 bg-zinc-950 py-1 shadow-xl"
+        class="lab-chrome fixed z-200 min-w-40 border border-muted bg-muted py-1 shadow-[var(--lab-shadow-overlay)]"
+        :data-theme="isDark ? 'dark' : 'light'"
         :style="{ left: `${menu.x}px`, top: `${menu.y}px` }"
         @pointerdown.stop
         @contextmenu.prevent
@@ -913,22 +953,22 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
           type="button"
           class="flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left font-mono text-[11px] transition-colors"
           :class="item.enabled
-            ? 'text-zinc-300 hover:bg-zinc-900 hover:text-zinc-100'
-            : 'cursor-not-allowed text-zinc-700'"
+            ? 'text-toned hover:bg-elevated hover:text-highlighted'
+            : 'cursor-not-allowed text-dimmed/55'"
           :disabled="!item.enabled"
           @click="run(item.key as 'duplicate' | 'copy' | 'split' | 'join' | 'remove')"
         >
           <span>{{ item.label }}</span>
-          <span class="text-zinc-600">{{ item.hint }}</span>
+          <span class="text-dimmed/70">{{ item.hint }}</span>
         </button>
-        <div class="my-1 border-t border-zinc-900" />
+        <div class="my-1 border-t border-default" />
         <button
           type="button"
-          class="flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left font-mono text-[11px] text-zinc-300 transition-colors hover:bg-zinc-900 hover:text-zinc-100"
+          class="flex w-full items-center justify-between gap-6 px-3 py-1.5 text-left font-mono text-[11px] text-toned transition-colors hover:bg-elevated hover:text-highlighted"
           @click="closeMenu(); emit('paste')"
         >
           <span>Paste at playhead</span>
-          <span class="text-zinc-600">⌘V</span>
+          <span class="text-dimmed/70">⌘V</span>
         </button>
       </div>
     </Teleport>

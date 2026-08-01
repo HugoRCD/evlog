@@ -103,12 +103,12 @@ const TEXT_TOGGLES = [
       bare text field and you had to work out from its contents whether you were
       editing an image, a title or the animation.
     -->
-    <div class="mb-2 flex items-center gap-2 border border-blue-500/40 bg-blue-500/10 px-2 py-1.5">
-      <UIcon :name="KINDS[layer.kind].icon" class="size-3.5 shrink-0 text-blue-300" />
+    <div class="mb-2 flex items-center gap-2 border border-primary-500/40 bg-primary-500/10 px-2 py-1.5">
+      <UIcon :name="KINDS[layer.kind].icon" class="size-3.5 shrink-0 text-primary" />
       <input
         :value="layer.name"
         type="text"
-        class="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-zinc-100 outline-none"
+        class="min-w-0 flex-1 bg-transparent font-mono text-[11px] text-highlighted outline-none"
         @input="emit('update', { name: ($event.target as HTMLInputElement).value })"
       >
     </div>
@@ -120,7 +120,7 @@ const TEXT_TOGGLES = [
     <select
       v-if="layer.kind === 'component'"
       :value="layer.component"
-      class="mb-2 w-full border border-zinc-800 bg-zinc-900/40 px-2 py-1.5 font-mono text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
+      class="mb-2 w-full border border-muted bg-elevated/40 px-2 py-1.5 font-mono text-[11px] text-default outline-none focus:border-accented"
       @change="emit('update', {
         component: ($event.target as HTMLSelectElement).value,
         name: ($event.target as HTMLSelectElement).value,
@@ -137,7 +137,7 @@ const TEXT_TOGGLES = [
       <textarea
         :value="layer.text"
         rows="2"
-        class="mb-2 w-full resize-none border border-zinc-800 bg-zinc-900/40 px-2 py-1.5 font-mono text-[11px] text-zinc-200 outline-none focus:border-zinc-600"
+        class="mb-2 w-full resize-none border border-muted bg-elevated/40 px-2 py-1.5 font-mono text-[11px] text-default outline-none focus:border-accented"
         @input="emit('update', { text: ($event.target as HTMLTextAreaElement).value })"
       />
 
@@ -148,8 +148,8 @@ const TEXT_TOGGLES = [
           type="button"
           class="flex-1 border py-1 font-mono text-[10px] transition-colors"
           :class="(layer.font ?? 'pixel') === font.value
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           @click="emit('update', { font: font.value })"
         >
           {{ font.label }}
@@ -163,8 +163,8 @@ const TEXT_TOGGLES = [
           type="button"
           class="flex flex-1 items-center justify-center border py-1 transition-colors"
           :class="(layer.align ?? 'center') === alignment.value
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           @click="emit('update', { align: alignment.value })"
         >
           <UIcon :name="alignment.icon" class="size-3" />
@@ -172,7 +172,7 @@ const TEXT_TOGGLES = [
         <input
           :value="layer.color ?? '#ffffff'"
           type="color"
-          class="h-6 w-12 shrink-0 cursor-pointer border border-zinc-800 bg-transparent"
+          class="h-6 w-12 shrink-0 cursor-pointer border border-muted bg-transparent"
           @input="emit('update', { color: ($event.target as HTMLInputElement).value })"
         >
       </div>
@@ -224,8 +224,8 @@ const TEXT_TOGGLES = [
           type="button"
           class="flex-1 border py-1 font-mono text-[10px] transition-colors"
           :class="layer[toggle.key]
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           :style="toggle.style"
           @click="emit('update', { [toggle.key]: !layer[toggle.key] })"
         >
@@ -254,11 +254,11 @@ const TEXT_TOGGLES = [
         @update:model-value="emit('update', { stroke: $event })"
       />
       <div v-if="(layer.stroke ?? 0) > 0" class="mb-2 flex items-center gap-2">
-        <span class="font-mono text-[10px] text-zinc-500">Outline colour</span>
+        <span class="font-mono text-[10px] text-dimmed">Outline colour</span>
         <input
           :value="layer.strokeColor ?? '#000000'"
           type="color"
-          class="ml-auto h-6 w-12 shrink-0 border border-zinc-800 bg-transparent"
+          class="ml-auto h-6 w-12 shrink-0 border border-muted bg-transparent"
           @input="emit('update', { strokeColor: ($event.target as HTMLInputElement).value })"
         >
       </div>
@@ -275,8 +275,8 @@ const TEXT_TOGGLES = [
         type="button"
         class="flex-1 border py-1 font-mono text-[10px] transition-colors"
         :class="(layer.space ?? 'scene') === space.value
-          ? 'border-blue-500/60 text-blue-300'
-          : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+          ? 'border-primary-500/60 text-primary'
+          : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
         :title="space.hint"
         @click="emit('update', { space: space.value })"
       >
@@ -371,7 +371,7 @@ const TEXT_TOGGLES = [
     <button
       v-if="fitLength !== null"
       type="button"
-      class="mb-2 w-full border border-zinc-800 py-1 font-mono text-[10px] text-zinc-400 transition-colors hover:border-blue-500/50 hover:text-blue-300"
+      class="mb-2 w-full border border-muted py-1 font-mono text-[10px] text-muted transition-colors hover:border-primary-500/50 hover:text-primary"
       :title="`This animation runs ${((sequenceMs ?? 0) / 1000).toFixed(1)}s in full.`"
       @click="emit('update', { duration: fitLength })"
     >
@@ -386,14 +386,14 @@ const TEXT_TOGGLES = [
     <div class="mt-2 flex gap-1">
       <button
         type="button"
-        class="flex-1 border border-zinc-800 py-1.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+        class="flex-1 border border-muted py-1.5 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         @click="emit('duplicate')"
       >
         duplicate
       </button>
       <button
         type="button"
-        class="flex-1 border border-zinc-800 py-1.5 font-mono text-[10px] text-zinc-400 transition-colors hover:border-red-900 hover:text-red-300"
+        class="flex-1 border border-muted py-1.5 font-mono text-[10px] text-muted transition-colors hover:border-error/30 hover:text-error"
         @click="emit('remove')"
       >
         delete

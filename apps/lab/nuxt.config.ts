@@ -54,8 +54,10 @@ const head = {
     { name: 'description', content: site.description },
     { name: 'author', content: site.author },
     // Matches the app shell, so the browser chrome does not flash white before
-    // the first paint on mobile.
-    { name: 'theme-color', content: '#09090b' },
+    // the first paint on mobile. Still a single value even though the panel has
+    // two themes: the document itself is permanently dark, and the panel's theme
+    // is a client-side choice this tag is written long before anyone makes.
+    { name: 'theme-color', content: '#000000' },
     // Home-screen and taskbar labels, where a long string is truncated rather
     // than wrapped — the short name only.
     { name: 'apple-mobile-web-app-title', content: site.name },
@@ -158,7 +160,16 @@ export default defineNuxtConfig({
     ],
   },
 
-  // Dark only. The whole point is filming against black.
+  /*
+   * The document stays dark. Always, and not as a preference.
+   *
+   * The panel has a light theme, but this is not where it lives — see
+   * `app/composables/useLabTheme.ts`. Colour mode is a property of the page, and
+   * the page contains the stage: the live node the plate is rasterized from,
+   * which has to keep the colours of the app it was copied out of. Letting this
+   * follow the machine meant the same shot rendered differently at breakfast and
+   * at midnight, which is the one thing a rig like this may never do.
+   */
   colorMode: {
     preference: 'dark',
   },

@@ -28,21 +28,52 @@ export interface LabDocument {
   camera: LayerEffect[]
 }
 
+/**
+ * The document as a plain record, defaults omitted.
+ *
+ * One shape for three destinations — the working copy, a saved project and a
+ * `.rlab` file — so a document written by any of them opens in the others, and
+ * a field added to the settings starts round-tripping everywhere at once.
+ */
+export function serializeDocument(document: LabDocument): Record<string, unknown> {
+  // Round-tripped through JSON rather than spread, because what arrives here is
+  // the live document — Vue reactive proxies, not plain objects. Local storage
+  // never minded: `JSON.stringify` reads straight through a proxy. IndexedDB
+  // uses the structured clone algorithm, which refuses one outright and reports
+  // it as "[object Object] could not be cloned", naming nothing useful.
+  //
+  // The cost is a parse over a few kilobytes. It was a parse over a document
+  // carrying its own video until the media moved out, which is the only reason
+  // this is the cheap fix rather than the expensive one.
+  return JSON.parse(JSON.stringify({
+    ...settingsToQuery(document.settings),
+    [LAYERS_PARAM]: document.layers,
+    [CAMERA_PARAM]: document.camera,
+  })) as Record<string, unknown>
+}
+
+/**
+ * And back, coercing as it goes.
+ *
+ * Unknown keys are dropped and out-of-range values clamped, so a record from an
+ * older build — or from a project file somebody kept for a year — cannot hand
+ * the renderer a value it no longer accepts.
+ */
+export function deserializeDocument(record: Record<string, unknown>): LabDocument {
+  return {
+    settings: settingsFromQuery(record),
+    layers: withMigratedComponent(sanitizeLayers(record[LAYERS_PARAM]), record),
+    camera: sanitizeEffects(record[CAMERA_PARAM]),
+  }
+}
+
 export function loadStored(): LabDocument | null {
   try {
     const raw = localStorage.getItem(KEY)
     if (!raw) return null
     const parsed: unknown = JSON.parse(raw)
     if (!parsed || typeof parsed !== 'object') return null
-    const record = parsed as Record<string, unknown>
-    // Same coercion as the URL path: unknown keys are dropped and out-of-range
-    // values are clamped, so a stale entry from an older build cannot poison
-    // the renderer with a value it no longer accepts.
-    return {
-      settings: settingsFromQuery(record),
-      layers: withMigratedComponent(sanitizeLayers(record[LAYERS_PARAM]), record),
-      camera: sanitizeEffects(record[CAMERA_PARAM]),
-    }
+    return deserializeDocument(parsed as Record<string, unknown>)
   } catch {
     // Private browsing, a quota error, corrupted JSON — a lost look is not
     // worth failing the page over.
@@ -53,18 +84,18 @@ export function loadStored(): LabDocument | null {
 /**
  * Persist the working copy.
  *
- * Returns what went wrong rather than swallowing it. Local storage caps around
- * five megabytes and an imported video is inlined as a data URL, so a real
- * project reaches the limit easily — and a save that fails in silence means the
- * next reload quietly discards an afternoon's work.
+ * Returns what went wrong rather than swallowing it: a save that fails in
+ * silence means the next reload quietly discards an afternoon's work.
+ *
+ * Media used to be inlined here as data URLs, which put a real project past the
+ * five megabyte cap on its first video. The bytes live in IndexedDB now and a
+ * layer carries a reference, so what lands here is a few kilobytes of numbers
+ * whatever the shot points at — the quota branch is kept for the pathological
+ * document rather than for the ordinary one.
  */
 export function saveStored(document: LabDocument): { ok: true } | { ok: false, reason: string } {
   try {
-    localStorage.setItem(KEY, JSON.stringify({
-      ...settingsToQuery(document.settings),
-      [LAYERS_PARAM]: document.layers,
-      [CAMERA_PARAM]: document.camera,
-    }))
+    localStorage.setItem(KEY, JSON.stringify(serializeDocument(document)))
     return { ok: true }
   } catch (cause) {
     const quota = cause instanceof DOMException
@@ -72,7 +103,7 @@ export function saveStored(document: LabDocument): { ok: true } | { ok: false, r
     return {
       ok: false,
       reason: quota
-        ? 'This project is too large to save — imported media is stored inside it. Remove a video or an image, or export what you have now.'
+        ? 'This shot is too large to keep as the working copy. Save it as a project, or remove a few layers.'
         : 'This project could not be saved to local storage.',
     }
   }

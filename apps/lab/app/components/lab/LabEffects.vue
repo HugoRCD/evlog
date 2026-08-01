@@ -48,25 +48,25 @@ const DIRECTIONS = ['left', 'right', 'up', 'down'] as const
       fade and settle forward at once rather than picking one of the three.
     -->
     <div class="mt-3 mb-1 flex items-center justify-between">
-      <span class="font-pixel text-[10px] uppercase tracking-[0.18em] text-zinc-500">Animation</span>
+      <span class="font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">Animation</span>
       <button
         type="button"
-        class="font-mono text-[10px] text-zinc-500 transition-colors hover:text-zinc-200"
+        class="font-mono text-[10px] text-dimmed transition-colors hover:text-default"
         @click="adding = !adding"
       >
         {{ adding ? 'close' : '+ add' }}
       </button>
     </div>
 
-    <div v-if="adding" class="mb-2 border border-zinc-800 bg-zinc-900/40 p-1.5">
+    <div v-if="adding" class="mb-2 border border-muted bg-elevated/40 p-1.5">
       <div v-for="at in (['in', 'out'] as const)" :key="at" class="mb-1 last:mb-0">
-        <span class="mb-1 block font-mono text-[9px] uppercase tracking-wider text-zinc-600">{{ at }}</span>
+        <span class="mb-1 block font-mono text-[9px] uppercase tracking-wider text-dimmed/70">{{ at }}</span>
         <div class="grid grid-cols-2 gap-1 @min-[320px]:grid-cols-3">
           <button
             v-for="descriptor in EFFECT_LIBRARY"
             :key="descriptor.kind"
             type="button"
-            class="border border-zinc-800 py-1 font-mono text-[10px] text-zinc-400 transition-colors hover:border-blue-500/50 hover:text-blue-300"
+            class="border border-muted py-1 font-mono text-[10px] text-muted transition-colors hover:border-primary-500/50 hover:text-primary"
             @click="addEffect(descriptor.kind, at)"
           >
             {{ descriptor.label }}
@@ -75,23 +75,23 @@ const DIRECTIONS = ['left', 'right', 'up', 'down'] as const
       </div>
     </div>
 
-    <p v-if="!effects.length" class="mb-2 font-mono text-[10px] leading-relaxed text-zinc-600">
+    <p v-if="!effects.length" class="mb-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
       {{ emptyLabel }}
     </p>
 
     <div
       v-for="(effect, index) in effects"
       :key="`${effect.kind}-${index}`"
-      class="mb-1.5 border border-zinc-800/80 bg-zinc-900/30 p-1.5"
+      class="mb-1.5 border border-muted/80 bg-elevated/30 p-1.5"
     >
       <div class="mb-1 flex items-center justify-between">
-        <span class="font-mono text-[10px] text-zinc-300">
+        <span class="font-mono text-[10px] text-toned">
           {{ descriptorFor(effect.kind).label }}
-          <span class="text-zinc-600">{{ effect.at }}</span>
+          <span class="text-dimmed/70">{{ effect.at }}</span>
         </span>
         <button
           type="button"
-          class="font-mono text-[10px] text-zinc-600 transition-colors hover:text-red-400"
+          class="font-mono text-[10px] text-dimmed/70 transition-colors hover:text-error"
           @click="removeEffect(index)"
         >
           ×
@@ -123,8 +123,8 @@ const DIRECTIONS = ['left', 'right', 'up', 'down'] as const
           type="button"
           class="border px-1.5 py-0.5 font-mono text-[9px] transition-colors"
           :class="effect.easing === easing
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           @click="patchEffect(index, { easing })"
         >
           {{ easing }}
@@ -138,8 +138,8 @@ const DIRECTIONS = ['left', 'right', 'up', 'down'] as const
           type="button"
           class="flex-1 border py-0.5 font-mono text-[9px] transition-colors"
           :class="effect.direction === direction
-            ? 'border-blue-500/60 text-blue-300'
-            : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           @click="patchEffect(index, { direction })"
         >
           {{ direction }}

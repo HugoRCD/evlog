@@ -15,6 +15,14 @@ export interface LabMenuAction {
   /** One line saying what it does, shown under the label. */
   hint?: string
   danger?: boolean
+  /**
+   * Greyed and inert, for an action with nothing to act on yet.
+   *
+   * Left in the list rather than filtered out: a menu whose items move as its
+   * state changes has to be re-read every time it opens, and an action you
+   * cannot take right now is still worth knowing exists.
+   */
+  disabled?: boolean
   /** Ask once before firing; the label becomes this until it is clicked again. */
   confirm?: string
   /**
@@ -47,6 +55,7 @@ function close(refocus = false) {
 }
 
 function onSelect(action: LabMenuAction) {
+  if (action.disabled) return
   if (action.confirm && confirming.value !== action.label) {
     confirming.value = action.label
     return
@@ -91,8 +100,8 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onPointerDown))
       type="button"
       class="flex size-5 items-center justify-center rounded-full border transition-colors"
       :class="open
-        ? 'border-zinc-600 bg-zinc-900 text-zinc-200'
-        : 'border-transparent text-zinc-600 hover:border-zinc-800 hover:bg-zinc-900/60 hover:text-zinc-300'"
+        ? 'border-accented bg-elevated text-default'
+        : 'border-transparent text-dimmed/70 hover:border-muted hover:bg-elevated/60 hover:text-toned'"
       :aria-label="props.label"
       :aria-expanded="open"
       aria-haspopup="menu"
@@ -104,7 +113,7 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onPointerDown))
     <div
       v-if="open"
       role="menu"
-      class="absolute right-0 top-full z-30 mt-1.5 w-56 border border-zinc-800 bg-black p-1 shadow-[0_12px_32px_rgba(0,0,0,0.8)]"
+      class="absolute right-0 top-full z-30 mt-1.5 w-56 border border-muted bg-default p-1 shadow-[var(--lab-shadow-overlay)]"
     >
       <button
         v-for="action in actions"
@@ -112,9 +121,12 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onPointerDown))
         type="button"
         role="menuitem"
         class="group flex w-full items-start gap-2 px-2 py-1.5 text-left transition-colors"
-        :class="action.danger
-          ? 'text-zinc-400 hover:bg-red-950/40 hover:text-red-300'
-          : 'text-zinc-400 hover:bg-zinc-900 hover:text-zinc-100'"
+        :disabled="action.disabled"
+        :class="action.disabled
+          ? 'cursor-default text-dimmed/55'
+          : action.danger
+            ? 'text-muted hover:bg-error/10 hover:text-error'
+            : 'text-muted hover:bg-elevated hover:text-highlighted'"
         @click="onSelect(action)"
       >
         <UIcon
@@ -128,7 +140,8 @@ onBeforeUnmount(() => window.removeEventListener('pointerdown', onPointerDown))
           </span>
           <span
             v-if="action.hint"
-            class="mt-0.5 block font-mono text-[9px] leading-snug text-zinc-600 transition-colors group-hover:text-zinc-500"
+            class="mt-0.5 block font-mono text-[9px] leading-snug transition-colors"
+            :class="action.disabled ? 'text-dimmed/35' : 'text-dimmed/70 group-hover:text-dimmed'"
           >
             {{ action.hint }}
           </span>

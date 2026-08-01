@@ -13,6 +13,7 @@
  * became uniforms, so fading or moving one costs a draw call and nothing else.
  */
 
+import { resolveSrc } from './assets'
 import { layerFontFamily } from './layers'
 import type { Layer } from './layers'
 
@@ -138,8 +139,14 @@ export async function getVideo(src: string): Promise<HTMLVideoElement | null> {
   const cached = videoCache.get(src)
   if (cached) return cached
   try {
+    // Cached under what the layer carries, built from what that resolves to. An
+    // asset reference becomes an object URL over the stored blob, which is also
+    // the source a decoder seeks through best — a data URL had to be parsed in
+    // full before it could answer for a frame in the middle.
+    const resolved = await resolveSrc(src)
+    if (!resolved) return null
     const video = document.createElement('video')
-    video.src = src
+    video.src = resolved
     video.muted = true
     video.playsInline = true
     video.preload = 'auto'
@@ -191,8 +198,10 @@ async function loadImage(src: string): Promise<HTMLImageElement | null> {
   const cached = imageCache.get(src)
   if (cached) return cached
   try {
+    const resolved = await resolveSrc(src)
+    if (!resolved) return null
     const image = new Image()
-    image.src = src
+    image.src = resolved
     await image.decode()
     imageCache.set(src, image)
     return image

@@ -17,15 +17,20 @@ const props = defineProps<{
   selectedLayer: Layer | null
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
+  canUndo: boolean
+  canRedo: boolean
 }>()
 
 const emit = defineEmits<{
+  undo: []
+  redo: []
   fit: []
   fitStage: []
   replay: []
   exportVideo: []
   exportPng: []
   copyLink: []
+  projects: []
   shortcuts: []
   resetSettings: []
   resetEverything: []
@@ -119,6 +124,11 @@ const TABS = computed(() => [
 
 const activeTab = ref<'layer' | 'shot'>('shot')
 
+// The tool's theme, which is not the document's — see `useLabTheme`. Nothing
+// this button does can reach the stage, which is the one thing anyone would fear
+// from a light switch in a room built for filming against black.
+const { isDark, toggle: toggleTheme } = useLabTheme()
+
 // Selecting a clip is a statement of intent: show what was just selected rather
 // than leaving it to be found behind a tab.
 watch(() => props.selectedLayer?.id, (id) => {
@@ -132,6 +142,31 @@ watch(() => props.selectedLayer?.id, (id) => {
  * there is room to say what it will take with it.
  */
 const ACTIONS = computed<LabMenuAction[]>(() => [
+  // Above the two destructive actions, and in the same menu as them on purpose:
+  // this is the thing that makes "Clear everything" a decision rather than an
+  // accident, so it should be visible from where that decision is taken.
+  {
+    label: 'Undo',
+    icon: 'i-lucide-undo-2',
+    hint: 'Step back. ⌘Z.',
+    disabled: !props.canUndo,
+    keepOpen: true,
+    select: () => emit('undo'),
+  },
+  {
+    label: 'Redo',
+    icon: 'i-lucide-redo-2',
+    hint: 'Step forward again. ⌘⇧Z.',
+    disabled: !props.canRedo,
+    keepOpen: true,
+    select: () => emit('redo'),
+  },
+  {
+    label: 'Projects',
+    icon: 'i-lucide-folder-open',
+    hint: 'Save, open, export. ⌘O.',
+    select: () => emit('projects'),
+  },
   {
     label: props.linkCopied ? 'Link copied' : 'Copy link',
     icon: props.linkCopied ? 'i-lucide-check' : 'i-lucide-link',
@@ -183,25 +218,58 @@ const CONTAINERS = [
     a media query cannot tell the difference because the window never changed.
   -->
   <!-- No left border: the splitter beside it is the divider. -->
-  <aside class="@container flex h-full shrink-0 flex-col bg-black">
-    <header class="flex items-center justify-between gap-2 border-b border-zinc-900 px-3 py-3 @min-[280px]:px-4">
+  <aside class="@container flex h-full shrink-0 flex-col bg-default">
+    <header class="flex items-center justify-between gap-2 border-b border-default px-3 py-3 @min-[280px]:px-4">
       <!--
         The title holds one line and gives up characters before it gives up the
         row. Wrapping "Render labs" onto two lines pushed the help button under
         the actions and made a tidy header look broken.
       -->
-      <span class="min-w-0 truncate font-pixel text-[11px] uppercase tracking-[0.2em] text-zinc-200">
+      <span class="min-w-0 truncate font-pixel text-[11px] uppercase tracking-[0.2em] text-default">
         Render labs
       </span>
 
       <div class="flex shrink-0 items-center gap-1">
+        <!--
+          Out of the menu and into the header. Behind the ellipsis, saving your
+          work was three characters wide and looked like a preference — the one
+          action in the app that decides whether anything survives the tab.
+        -->
+        <button
+          type="button"
+          class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
+          aria-label="Projects"
+          title="Projects — save, open, export (⌘O)"
+          @click="emit('projects')"
+        >
+          <UIcon name="i-lucide-folder" class="size-3" />
+        </button>
+        <!--
+          In the header rather than down the menu, for the same reason Projects
+          is: a control nobody can find is a control nobody has. It also has to
+          be visible to be honest — this is the one button whose whole job is to
+          change how everything else looks, and burying it made the panel seem
+          to have no opinion about light at all.
+
+          It shows the destination, not the state. A moon on a dark panel is a
+          badge saying where you already are; a sun says what clicking does.
+        -->
+        <button
+          type="button"
+          class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
+          :aria-label="isDark ? 'Switch the panel to light' : 'Switch the panel to dark'"
+          :title="isDark ? 'Light panel — the shot is unaffected' : 'Dark panel — the shot is unaffected'"
+          @click="toggleTheme"
+        >
+          <UIcon :name="isDark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-3" />
+        </button>
         <!--
           Sized to be found. At sixteen pixels this read as punctuation after the
           title rather than as the way into the only documentation the tool has.
         -->
         <button
           type="button"
-          class="flex size-5 items-center justify-center rounded-full border border-zinc-800 font-mono text-[11px] leading-none text-zinc-500 transition-colors hover:border-blue-500/60 hover:bg-blue-500/10 hover:text-blue-300"
+          class="flex size-5 items-center justify-center rounded-full border border-muted font-mono text-[11px] leading-none text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
           aria-label="Keyboard shortcuts"
           title="Keyboard shortcuts (?)"
           @click="emit('shortcuts')"
@@ -222,13 +290,13 @@ const CONTAINERS = [
       clip, so the panel states what is being edited instead of leaving it to be
       inferred from the fields.
     -->
-    <div v-if="selectedLayer" class="flex shrink-0 border-b border-zinc-900">
+    <div v-if="selectedLayer" class="flex shrink-0 border-b border-default">
       <button
         v-for="tab in TABS"
         :key="tab.value"
         type="button"
         class="relative min-w-0 flex-1 px-3 py-2 font-mono text-[10px] transition-colors"
-        :class="activeTab === tab.value ? 'text-zinc-100' : 'text-zinc-600 hover:text-zinc-300'"
+        :class="activeTab === tab.value ? 'text-highlighted' : 'text-dimmed/70 hover:text-toned'"
         @click="activeTab = tab.value"
       >
         <span class="flex items-center justify-center gap-1.5">
@@ -237,7 +305,7 @@ const CONTAINERS = [
         </span>
         <span
           class="absolute inset-x-0 bottom-0 h-px transition-colors"
-          :class="activeTab === tab.value ? 'bg-blue-400' : 'bg-transparent'"
+          :class="activeTab === tab.value ? 'bg-primary-500' : 'bg-transparent'"
         />
       </button>
     </div>
@@ -260,7 +328,7 @@ const CONTAINERS = [
         under it asked for a number without saying what the number decided.
       -->
       <LabSection title="Viewport">
-        <p class="mb-2 font-mono text-[10px] leading-relaxed text-zinc-500">
+        <p class="mb-2 font-mono text-[10px] leading-relaxed text-dimmed">
           The window your component is laid out in before it is filmed. Narrow it
           to shoot the layout a phone gets.
         </p>
@@ -276,7 +344,7 @@ const CONTAINERS = [
         <div class="grid grid-cols-1 gap-1 @min-[300px]:grid-cols-2">
           <button
             type="button"
-            class="border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            class="border border-muted py-[5px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
             title="Trim the viewport height to what the component actually occupies, so the camera has no dead frame to compose around."
             @click="emit('fitStage')"
           >
@@ -284,7 +352,7 @@ const CONTAINERS = [
           </button>
           <button
             type="button"
-            class="border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+            class="border border-muted py-[5px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
             title="Restart the staged animation from its first frame."
             @click="emit('replay')"
           >
@@ -308,7 +376,7 @@ const CONTAINERS = [
         -->
         <button
           type="button"
-          class="mb-2 w-full border border-zinc-800 py-[5px] font-mono text-[10px] text-zinc-400 transition-colors hover:border-zinc-600 hover:text-zinc-200"
+          class="mb-2 w-full border border-muted py-[5px] font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
           title="Back to a square-on, edge-to-edge framing. The grade is left alone."
           @click="emit('fit')"
         >
@@ -327,7 +395,7 @@ const CONTAINERS = [
           Moves on the shot rather than on a layer: dolly travels, slide pans,
           spin rolls, fade takes the frame to black.
         -->
-        <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-zinc-500">
+        <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
           Moves
         </div>
         <LabEffects
@@ -346,8 +414,8 @@ const CONTAINERS = [
             type="button"
             class="shrink-0 border p-[5px] transition-colors"
             :class="picking
-              ? 'border-blue-500/60 text-blue-300'
-              : 'border-zinc-800 text-zinc-500 hover:border-zinc-600 hover:text-zinc-300'"
+              ? 'border-primary-500/60 text-primary'
+              : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
             title="Pick the focal plane by clicking the frame"
             @click="picking = !picking"
           >
@@ -359,7 +427,7 @@ const CONTAINERS = [
         <LabNumber v-model="settings.blurRadius" label="Max blur" v-bind="range('blurRadius')" />
         <LabNumber v-model="settings.dofSamples" label="Bokeh samples" v-bind="range('dofSamples')" />
 
-        <p v-if="!hasDepth" class="mt-2 font-mono text-[10px] leading-relaxed text-amber-500/70">
+        <p v-if="!hasDepth" class="mt-2 font-mono text-[10px] leading-relaxed text-warning">
           The plate faces the camera square-on, so every point of it is the same
           distance away and there is nothing to focus through. Add pitch or yaw.
         </p>
@@ -384,11 +452,11 @@ const CONTAINERS = [
         <LabToggle v-model="settings.tonemap" label="Filmic tonemap" />
 
         <div class="mt-2 flex items-center justify-between gap-3">
-          <span class="font-mono text-[11px] text-zinc-500">Background</span>
+          <span class="font-mono text-[11px] text-dimmed">Background</span>
           <input
             v-model="settings.background"
             type="color"
-            class="h-[22px] w-[104px] cursor-pointer border border-zinc-800 bg-transparent"
+            class="h-[22px] w-[104px] cursor-pointer border border-muted bg-transparent"
           >
         </div>
       </LabSection>
@@ -433,14 +501,14 @@ const CONTAINERS = [
           an old link that matches no preset would otherwise never say its own
           frame size out loud.
         -->
-        <p class="mt-2 font-mono text-[10px] leading-relaxed text-zinc-600">
+        <p class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ frameCount }} frames ·
           {{ segmentSeconds }}s of animation → {{ outputSeconds }}s of video
         </p>
       </LabSection>
     </div>
 
-    <footer class="border-t border-zinc-900 p-3 @min-[280px]:p-4">
+    <footer class="border-t border-default p-3 @min-[280px]:p-4">
       <div v-if="busy" class="mb-2">
         <!--
           scaleX rather than an animated width. A width transition is a layout
@@ -449,17 +517,17 @@ const CONTAINERS = [
           slip backwards. A transform is composited and set outright, so it only
           ever moves forward, at exactly the rate progress does.
         -->
-        <div class="h-[3px] w-full overflow-hidden bg-zinc-900">
+        <div class="h-[3px] w-full overflow-hidden bg-elevated">
           <div
-            class="h-full origin-left bg-blue-500"
+            class="h-full origin-left bg-primary-500"
             :style="{ transform: `scaleX(${progress})` }"
           />
         </div>
         <div class="mt-2 flex items-center justify-between">
-          <span class="font-mono text-[10px] text-zinc-500">{{ Math.round(progress * 100) }}%</span>
+          <span class="font-mono text-[10px] text-dimmed">{{ Math.round(progress * 100) }}%</span>
           <button
             type="button"
-            class="font-mono text-[10px] text-zinc-500 hover:text-red-400 transition-colors"
+            class="font-mono text-[10px] text-dimmed hover:text-error transition-colors"
             @click="emit('cancel')"
           >
             cancel
@@ -470,21 +538,21 @@ const CONTAINERS = [
       <div v-else class="flex gap-1">
         <button
           type="button"
-          class="flex-1 border border-blue-500/50 bg-blue-500/10 py-[7px] font-mono text-[10px] text-blue-300 hover:bg-blue-500/20 transition-colors"
+          class="flex-1 border border-primary-500/50 bg-primary-500/10 py-[7px] font-mono text-[10px] text-primary hover:bg-primary-500/20 transition-colors"
           @click="emit('exportVideo')"
         >
           export {{ settings.container }}
         </button>
         <button
           type="button"
-          class="border border-zinc-800 px-3 py-[7px] font-mono text-[10px] text-zinc-400 hover:border-zinc-600 hover:text-zinc-200 transition-colors"
+          class="border border-muted px-3 py-[7px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
           @click="emit('exportPng')"
         >
           png
         </button>
       </div>
 
-      <p class="mt-3 font-mono text-[9px] leading-relaxed text-zinc-700">
+      <p class="mt-3 font-mono text-[9px] leading-relaxed text-dimmed/55">
         stage {{ captureMs.toFixed(0) }}ms<span v-if="!highPrecision"> · 8-bit targets, bloom will be flatter</span>
       </p>
     </footer>

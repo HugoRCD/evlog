@@ -175,13 +175,6 @@ export class LabRenderer {
    * vignetted or grained along with the footage — it is applied to the picture,
    * not part of it.
    */
-  /**
-   * Overlays go last, straight onto the canvas.
-   *
-   * After the grade rather than before it, so an overlay is not tone-mapped,
-   * vignetted or grained along with the footage — it is applied to the picture,
-   * not part of it.
-   */
   private renderOverlays(overlays: OverlayQuad[]) {
     if (!overlays.length) return
     const { renderer } = this
@@ -284,7 +277,10 @@ export class LabRenderer {
 
     const hit: Vec3 = [dir[0] * t, dir[1] * t, dir[2] * t]
     const local: Vec3 = [hit[0] - centre[0], hit[1] - centre[1], hit[2] - centre[2]]
-    const halfWidth = PLANE_HALF_HEIGHT * this.sourceAspect
+    // `stageAspect`, not a `sourceAspect` this class never had: undefined made
+    // `halfWidth` NaN, every comparison against it false, and the bounds test a
+    // no-op — so a click that missed the plate still racked the focus onto it.
+    const halfWidth = PLANE_HALF_HEIGHT * this.stageAspect
     if (Math.abs(dot(local, right)) > halfWidth || Math.abs(dot(local, up)) > PLANE_HALF_HEIGHT) return null
 
     return Math.min(1, Math.max(0, (-hit[2] - near) / span))

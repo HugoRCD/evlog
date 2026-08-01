@@ -215,15 +215,15 @@ function reset() {
   <div class="group py-0.5">
     <div
       v-if="editing"
-      class="flex h-6.5 items-center gap-2 border border-zinc-600 bg-zinc-900/60 px-2"
+      class="flex h-6.5 items-center gap-2 border border-accented bg-elevated/60 px-2"
     >
-      <span class="shrink-0 font-mono text-[11px] leading-none text-zinc-500">{{ label }}</span>
+      <span class="shrink-0 font-mono text-[11px] leading-none text-dimmed">{{ label }}</span>
       <input
         ref="input"
         v-model="draft"
         type="text"
         inputmode="decimal"
-        class="min-w-0 flex-1 bg-transparent text-right font-mono text-[11px] leading-none text-zinc-100 outline-none"
+        class="min-w-0 flex-1 bg-transparent text-right font-mono text-[11px] leading-none text-highlighted outline-none"
         @blur="applyDraft"
         @keydown.enter.prevent="applyDraft"
         @keydown="onKeydown"
@@ -233,10 +233,10 @@ function reset() {
     <div
       v-else
       ref="track"
-      class="relative h-6.5 select-none overflow-hidden border bg-zinc-900/40 transition-colors"
+      class="relative h-6.5 select-none overflow-hidden border bg-elevated/40 transition-colors"
       :class="[
-        fine ? 'cursor-col-resize border-blue-500/70' : 'cursor-ew-resize',
-        fine ? '' : dragging ? 'border-zinc-600' : 'border-zinc-800/80 hover:border-zinc-700',
+        fine ? 'cursor-col-resize border-primary-500/70' : 'cursor-ew-resize',
+        fine ? '' : dragging ? 'border-accented' : 'border-muted/80 hover:border-accented/60',
       ]"
       :title="hint ? `${label} — ${hint}\n\nDrag to set · shift for fine · double-click to type · right-click resets` : undefined"
       @pointerenter="hovering = true"
@@ -250,13 +250,13 @@ function reset() {
     >
       <div
         class="pointer-events-none absolute inset-y-0 left-0 transition-colors"
-        :class="fine ? 'bg-blue-500/25' : 'bg-zinc-700/40'"
+        :class="fine ? 'bg-primary-500/25' : 'bg-accented/40'"
         :style="{ width: `${fraction * 100}%` }"
       />
       <!-- The exact position: a hairline reads precisely where a filled bar alone does not. -->
       <div
         class="pointer-events-none absolute inset-y-0 w-px"
-        :class="fine ? 'bg-blue-300' : 'bg-zinc-400/70'"
+        :class="fine ? 'bg-primary' : 'bg-accented'"
         :style="{ left: `${fraction * 100}%` }"
       />
       <!--
@@ -273,7 +273,7 @@ function reset() {
         <span
           v-for="index in 21"
           :key="index"
-          class="w-px origin-bottom bg-blue-400/50 transition-transform duration-200"
+          class="w-px origin-bottom bg-primary-500/50 transition-transform duration-200"
           :class="[(index - 1) % 5 === 0 ? 'h-full' : 'h-1/2', fine ? 'scale-y-100' : 'scale-y-0']"
           :style="{ transitionDelay: `${Math.abs(index - 11) * 8}ms` }"
         />
@@ -281,7 +281,7 @@ function reset() {
 
       <div
         v-if="defaultFraction !== null"
-        class="pointer-events-none absolute bottom-0 h-0.75 w-px bg-zinc-600"
+        class="pointer-events-none absolute bottom-0 h-0.75 w-px bg-accented"
         :style="{ left: `${defaultFraction * 100}%` }"
       />
 
@@ -289,16 +289,16 @@ function reset() {
         <!-- The label gives way to the mode: while fine is on, that is the more useful fact. -->
         <span
           v-if="fine"
-          class="shrink-0 font-mono text-[10px] leading-none text-blue-300"
+          class="shrink-0 font-mono text-[10px] leading-none text-primary/85"
         >⇧ fine · ⅕</span>
-        <span v-else class="truncate font-mono text-[11px] leading-none text-zinc-400 group-hover:text-zinc-300">
+        <span v-else class="truncate font-mono text-[11px] leading-none text-muted group-hover:text-toned">
           {{ label }}
         </span>
         <span
           class="shrink-0 font-mono text-[11px] leading-none tabular-nums"
-          :class="fine ? 'text-blue-200' : 'text-zinc-200'"
+          :class="fine ? 'text-primary' : 'text-default'"
         >
-          {{ display }}<span v-if="unit" :class="fine ? 'text-blue-400/70' : 'text-zinc-500'">{{ unit }}</span>
+          {{ display }}<span v-if="unit" :class="fine ? 'text-primary/60' : 'text-dimmed'">{{ unit }}</span>
         </span>
       </div>
     </div>
