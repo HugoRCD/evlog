@@ -28,8 +28,9 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 | 5 | `apps/docs/content/4.integrate/adapters/{category}/{NN}.{name}.md` | Create adapter doc page in `cloud`, `hybrid`, or `self-hosted` |
 | 6 | `apps/docs/content/4.integrate/adapters/01.overview.md` | Add adapter to overview (links, card, env vars) |
 | 7 | `skills/review-logging-patterns/SKILL.md` | Add adapter row in the Drain Adapters table |
+| 8 | `.changeset/{name}-adapter.md` | Add a minor changeset for the new adapter |
 
-**Important**: Do NOT consider the task complete until all 7 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 8 touchpoints have been addressed.
 
 ## Naming Conventions
 
@@ -140,11 +141,24 @@ In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to us
 
 Follow the pattern of the existing rows (Axiom, OTLP, PostHog, Sentry, Better Stack).
 
+## Step 8: Changeset
+
+Create `.changeset/{name}-adapter.md`:
+
+```markdown
+---
+"evlog": minor
+---
+
+Add the {Name} adapter for sending wide events to {Name}
+```
+
 ## Verification
 
-After completing all steps, run:
+After a clean install, prepare generated workspace types from the repo root before running the package checks:
 
 ```bash
+pnpm run dev:prepare
 cd packages/evlog
 pnpm run lint
 pnpm run typecheck

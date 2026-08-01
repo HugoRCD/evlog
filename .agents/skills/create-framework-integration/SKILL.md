@@ -464,7 +464,7 @@ Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide
 
 ## Step 15 & 16: PR Scopes
 
-Add the framework name as a valid scope in **both** files for future PRs. The semantic PR check reads its scope list from the base branch, so the integration PR must either use an unscoped title (as recommended above) or follow a preceding PR that registers the scope.
+Add the framework name as a valid scope in **both** files for future PRs, keeping both scope lists alphabetically sorted. The semantic PR check reads its scope list from the base branch, so the integration PR must either use an unscoped title (as recommended above) or follow a preceding PR that registers the scope.
 
 **`.github/workflows/semantic-pull-request.yml`** — add `{framework}` to the `scopes` list:
 
