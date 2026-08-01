@@ -266,6 +266,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "isStreamingResponse",
     "mergeEventField",
     "normalizeNumber",
+    "pickBaseEvlogOptions",
     "resolveAdapterConfig",
     "resolveMiddlewarePluginRunner",
     "runEnrichAndDrain",

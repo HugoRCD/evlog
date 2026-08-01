@@ -1,6 +1,7 @@
 import type { EnvironmentContext, LoggerConfig, SamplingConfig } from '../types'
 import type { DevTerminalInput } from './dev-terminal'
 import type { BaseEvlogOptions } from './middleware'
+import { pickBaseEvlogOptions } from './middleware'
 
 /**
  * Single-config shape accepted everywhere evlog is bootstrapped: at
@@ -85,15 +86,5 @@ export function toLoggerConfig(config: EvlogConfig): LoggerConfig {
 
 /** Project an {@link EvlogConfig} onto the surface accepted by framework middleware. */
 export function toMiddlewareOptions<T extends BaseEvlogOptions>(config: EvlogConfig): T {
-  const out: BaseEvlogOptions = {}
-  if (config.include) out.include = config.include
-  if (config.exclude) out.exclude = config.exclude
-  if (config.routes) out.routes = config.routes
-  if (config.drain) out.drain = config.drain
-  if (config.enrich) out.enrich = config.enrich
-  if (config.keep) out.keep = config.keep
-  if (config.redact !== undefined) out.redact = config.redact
-  if (config.plugins) out.plugins = config.plugins
-  if (config.waitUntil) out.waitUntil = config.waitUntil
-  return out as T
+  return pickBaseEvlogOptions(config) as T
 }
