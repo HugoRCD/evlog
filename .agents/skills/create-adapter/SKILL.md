@@ -25,12 +25,11 @@ The exact wording may vary depending on the adapter (e.g., `feat: add OTLP adapt
 | 2 | `packages/evlog/tsdown.config.ts` | Add build entry |
 | 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` entries |
 | 4 | `packages/evlog/test/adapters/{name}.test.ts` | Create tests |
-| 5 | `apps/docs/content/4.adapters/{n}.{name}.md` | Create adapter doc page (before `custom.md`) |
-| 6 | `apps/docs/content/4.adapters/1.overview.md` | Add adapter to overview (links, card, env vars) |
+| 5 | `apps/docs/content/4.integrate/adapters/{category}/{NN}.{name}.md` | Create adapter doc page in `cloud`, `hybrid`, or `self-hosted` |
+| 6 | `apps/docs/content/4.integrate/adapters/01.overview.md` | Add adapter to overview (links, card, env vars) |
 | 7 | `skills/review-logging-patterns/SKILL.md` | Add adapter row in the Drain Adapters table |
-| 8 | Renumber `custom.md` | Ensure `custom.md` stays last after the new adapter |
 
-**Important**: Do NOT consider the task complete until all 8 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 7 touchpoints have been addressed.
 
 ## Naming Conventions
 
@@ -117,15 +116,15 @@ Required test categories:
 
 ## Step 5: Adapter Documentation Page
 
-Create `apps/docs/content/4.adapters/{n}.{name}.md` where `{n}` is the next number before `custom.md` (custom should always be last).
+Create `apps/docs/content/4.integrate/adapters/{category}/{NN}.{name}.md`, choosing the matching `cloud`, `hybrid`, or `self-hosted` category and the next number in that directory.
 
-Use the existing Axiom adapter page (`apps/docs/content/4.adapters/2.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
+Use the existing Axiom adapter page (`apps/docs/content/4.integrate/adapters/cloud/01.axiom.md`) as a reference for frontmatter structure, tone, and sections. Key sections: intro, quick setup, configuration (env vars table + priority), advanced usage, querying in the target service, troubleshooting, direct API usage, next steps.
 
 **Important: multi-framework examples.** The Quick Start section must include a `::code-group` with tabs for all supported frameworks (Nuxt/Nitro, Hono, Express, Fastify, Elysia, NestJS, Standalone). Do not only show Nitro examples. See any existing adapter page for the pattern.
 
 ## Step 6: Update Adapters Overview Page
 
-Edit `apps/docs/content/4.adapters/1.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
+Edit `apps/docs/content/4.integrate/adapters/01.overview.md` to add the new adapter in **three** places (follow the pattern of existing adapters):
 
 1. **Frontmatter `links` array** — add a link entry with icon and path
 2. **`::card-group` section** — add a card block before the Custom card
@@ -140,10 +139,6 @@ In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to us
 ```
 
 Follow the pattern of the existing rows (Axiom, OTLP, PostHog, Sentry, Better Stack).
-
-## Step 8: Renumber `custom.md`
-
-If the new adapter's number conflicts with `custom.md`, renumber `custom.md` to be the last entry. For example, if the new adapter is `5.{name}.md`, rename `5.custom.md` to `6.custom.md`.
 
 ## Verification
 

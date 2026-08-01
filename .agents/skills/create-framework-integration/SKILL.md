@@ -19,7 +19,7 @@ Manifest mode covers ~80% of integrations and reduces glue from 50–80 lines to
 Recommended format for the pull request title:
 
 ```
-feat({framework}): add {Framework} middleware integration
+feat: add {Framework} middleware integration
 ```
 
 ## Touchpoints Checklist
@@ -464,7 +464,7 @@ Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide
 
 ## Step 15 & 16: PR Scopes
 
-Add the framework name as a valid scope in **both** files so PR title validation passes:
+Add the framework name as a valid scope in **both** files for future PRs. The semantic PR check reads its scope list from the base branch, so the integration PR must either use an unscoped title (as recommended above) or follow a preceding PR that registers the scope.
 
 **`.github/workflows/semantic-pull-request.yml`** — add `{framework}` to the `scopes` list:
 
