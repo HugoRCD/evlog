@@ -8,7 +8,7 @@
   "schemaVersion": 39,
   "refresh": "10s",
   "time": {
-    "from": "now-6h",
+    "from": "now-30m",
     "to": "now"
   },
   "panels": [
@@ -29,7 +29,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT count() AS events FROM evlog_events WHERE $__timeFilter(timestamp)",
+          "rawSql": "SELECT count() AS events FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
           "format": 1,
           "queryType": "sql"
         }
@@ -59,7 +59,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT countIf(level = 'error') AS errors FROM evlog_events WHERE $__timeFilter(timestamp)",
+          "rawSql": "SELECT countIf(level = 'error') AS errors FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
           "format": 1,
           "queryType": "sql"
         }
@@ -107,7 +107,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT uniqExact(service) AS services FROM evlog_events WHERE $__timeFilter(timestamp)",
+          "rawSql": "SELECT uniqExact(service) AS services FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
           "format": 1,
           "queryType": "sql"
         }
@@ -137,7 +137,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT uniqExact(path) AS routes FROM evlog_events WHERE $__timeFilter(timestamp) AND path != ''",
+          "rawSql": "SELECT uniqExact(path) AS routes FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) AND path != ''",
           "format": 1,
           "queryType": "sql"
         }
@@ -167,7 +167,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT $__timeInterval(timestamp) AS time, level, count() AS n FROM evlog_events WHERE $__timeFilter(timestamp) GROUP BY time, level ORDER BY time",
+          "rawSql": "SELECT $__timeInterval(timestamp) AS time, level, count() AS n FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) GROUP BY time, level ORDER BY time",
           "format": 1,
           "queryType": "sql"
         }
@@ -201,11 +201,19 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT path, count() AS hits FROM evlog_events WHERE $__timeFilter(timestamp) AND path != '' GROUP BY path ORDER BY hits DESC LIMIT 10",
+          "rawSql": "SELECT path, count() AS hits FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) AND path != '' GROUP BY path ORDER BY hits DESC LIMIT 10",
           "format": 1,
           "queryType": "sql"
         }
-      ]
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "legend": {
+          "showLegend": false
+        }
+      }
     },
     {
       "type": "table",
@@ -225,7 +233,7 @@
             "type": "grafana-clickhouse-datasource",
             "uid": "evlog-clickhouse"
           },
-          "rawSql": "SELECT timestamp, level, service, method, path, status, duration, request_id, error_name, error_message, data FROM evlog_events WHERE $__timeFilter(timestamp) ORDER BY timestamp DESC LIMIT 100",
+          "rawSql": "SELECT timestamp, level, service, method, path, status, duration, request_id, error_name, error_message, data FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) ORDER BY timestamp DESC LIMIT 100",
           "format": 1,
           "queryType": "sql"
         }
@@ -237,5 +245,32 @@
         }
       }
     }
-  ]
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "evlog-clickhouse"
+        },
+        "rawSql": "SELECT DISTINCT service FROM evlog_events ORDER BY service",
+        "query": "SELECT DISTINCT service FROM evlog_events ORDER BY service",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": [
+            "evlog-sandbox"
+          ],
+          "value": [
+            "evlog-sandbox"
+          ],
+          "selected": true
+        }
+      }
+    ]
+  }
 }

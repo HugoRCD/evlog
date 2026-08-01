@@ -127,14 +127,20 @@ export const redirects: Record<string, RouteRedirect> = {
   '/examples/react-router': r('/integrate/frameworks/react-router'),
 
   // Adapters / Cloud → Integrate / Adapters / Cloud
+  // OTLP and HyperDX moved out of `cloud/` — both self-host as readily as they
+  // run managed, so they now sit under `hybrid/` alongside Loki and ClickHouse.
+  // These two URLs were live and indexed, so they redirect rather than 404.
+  '/integrate/adapters/cloud/otlp': r('/integrate/adapters/hybrid/otlp'),
+  '/integrate/adapters/cloud/hyperdx': r('/integrate/adapters/hybrid/hyperdx'),
+
   '/adapters/overview': r('/integrate/adapters/overview'),
   '/adapters/cloud/axiom': r('/integrate/adapters/cloud/axiom'),
-  '/adapters/cloud/otlp': r('/integrate/adapters/cloud/otlp'),
+  '/adapters/cloud/otlp': r('/integrate/adapters/hybrid/otlp'),
   '/adapters/cloud/posthog': r('/integrate/adapters/cloud/posthog'),
   '/adapters/cloud/sentry': r('/integrate/adapters/cloud/sentry'),
   '/adapters/cloud/better-stack': r('/integrate/adapters/cloud/better-stack'),
   '/adapters/cloud/datadog': r('/integrate/adapters/cloud/datadog'),
-  '/adapters/cloud/hyperdx': r('/integrate/adapters/cloud/hyperdx'),
+  '/adapters/cloud/hyperdx': r('/integrate/adapters/hybrid/hyperdx'),
   '/adapters/self-hosted/fs': r('/integrate/adapters/self-hosted/fs'),
   '/adapters/self-hosted/nuxthub': r('/integrate/adapters/self-hosted/nuxthub'),
 
@@ -146,12 +152,12 @@ export const redirects: Record<string, RouteRedirect> = {
 
   // Stale aliases that already redirected via nuxt.config.ts
   '/adapters/axiom': r('/integrate/adapters/cloud/axiom'),
-  '/adapters/otlp': r('/integrate/adapters/cloud/otlp'),
+  '/adapters/otlp': r('/integrate/adapters/hybrid/otlp'),
   '/adapters/posthog': r('/integrate/adapters/cloud/posthog'),
   '/adapters/sentry': r('/integrate/adapters/cloud/sentry'),
   '/adapters/better-stack': r('/integrate/adapters/cloud/better-stack'),
   '/adapters/datadog': r('/integrate/adapters/cloud/datadog'),
-  '/adapters/hyperdx': r('/integrate/adapters/cloud/hyperdx'),
+  '/adapters/hyperdx': r('/integrate/adapters/hybrid/hyperdx'),
   '/adapters/fs': r('/integrate/adapters/self-hosted/fs'),
   '/adapters/nuxthub': r('/integrate/adapters/self-hosted/nuxthub'),
   '/adapters/nuxthub/overview': r('/integrate/adapters/self-hosted/nuxthub'),

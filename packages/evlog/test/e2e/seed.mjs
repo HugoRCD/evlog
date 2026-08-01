@@ -15,6 +15,8 @@ import { initLogger, createRequestLogger } from 'evlog'
 const LOKI = process.env.LOKI_ENDPOINT ?? 'http://localhost:3100'
 const CLICKHOUSE = process.env.CLICKHOUSE_ENDPOINT ?? 'http://localhost:8123'
 const COUNT = Number(process.env.SEED_COUNT ?? 40)
+/** Total wall-clock the run is spread over, so the timeseries is not one spike. */
+const SPREAD_MS = Number(process.env.SEED_SPREAD_MS ?? 120_000)
 
 const loki = createLokiDrain({ endpoint: LOKI })
 const clickhouse = createClickHouseDrain({ endpoint: CLICKHOUSE })
@@ -61,6 +63,9 @@ async function emitRequest(index) {
     db: { queries: 1 + Math.floor(Math.random() * 6) },
   })
 
+  // Actually spend time, so `duration` is a real measurement rather than 0ms.
+  await new Promise(r => setTimeout(r, 5 + Math.floor(Math.random() * 60)))
+
   // ~12% errors, ~8% slow, rest healthy — enough variety to make dashboards useful.
   const roll = Math.random()
   if (roll < 0.12) {
@@ -77,6 +82,8 @@ async function emitRequest(index) {
   }
 
   if (roll < 0.20) {
+    // A slow request: an extra beat on the clock makes p95 panels meaningful.
+    await new Promise(r => setTimeout(r, 400 + Math.floor(Math.random() * 900)))
     log.set({ cache: { hit: false }, slowQuery: true })
     log.emit({ status: 200 })
     return 200
@@ -87,16 +94,47 @@ async function emitRequest(index) {
   return 200
 }
 
-console.log(`Seeding ${COUNT} wide events`)
+/**
+ * Drains swallow their errors by design — a failing destination must never break
+ * a request. That makes a silent "Done" the default when the sandbox is down, so
+ * check the backends are actually reachable before claiming anything was seeded.
+ */
+async function preflight() {
+  const checks = [
+    ['Loki', `${LOKI}/ready`],
+    ['ClickHouse', `${CLICKHOUSE}/ping`],
+  ]
+  const down = []
+  for (const [name, url] of checks) {
+    try {
+      const res = await fetch(url, { signal: AbortSignal.timeout(3000) })
+      if (!res.ok) down.push(`${name} (HTTP ${res.status})`)
+    } catch {
+      down.push(`${name} (unreachable at ${url})`)
+    }
+  }
+  if (down.length > 0) {
+    console.error(`\nCannot seed — backend not reachable: ${down.join(', ')}`)
+    console.error('Start the sandbox first:  pnpm run sandbox:up\n')
+    process.exit(1)
+  }
+}
+
+await preflight()
+
+console.log(`Seeding ${COUNT} wide events over ${Math.round(SPREAD_MS / 1000)}s`)
 console.log(`  Loki       ${LOKI}`)
 console.log(`  ClickHouse ${CLICKHOUSE}\n`)
 
 const statuses = []
+const gap = Math.max(0, Math.floor(SPREAD_MS / COUNT))
 for (let i = 0; i < COUNT; i++) {
   statuses.push(await emitRequest(i))
-  // Spread events over time so the Grafana graph is not a single spike.
-  await new Promise(r => setTimeout(r, 40))
+  process.stdout.write(`\r  ${i + 1}/${COUNT}`)
+  // Spread the run out so the Grafana timeseries has a shape, not one spike.
+  await new Promise(r => setTimeout(r, gap))
 }
+process.stdout.write('\r')
 
 // Drains are fire-and-forget from emit(); give them a beat to flush.
 await new Promise(r => setTimeout(r, 1500))
