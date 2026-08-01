@@ -15,14 +15,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 60
     steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          persist-credentials: false
+      - uses: ./.github/actions/setup
       - name: Prepare
         run: pnpm run dev:prepare
       - name: Build package
@@ -31,7 +27,7 @@ jobs:
         run: pnpm --filter evlog run mutate
       - name: Upload Stryker report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: stryker-report
           path: packages/evlog/reports/mutation
