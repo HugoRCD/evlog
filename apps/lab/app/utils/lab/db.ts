@@ -96,7 +96,7 @@ export async function put<T>(store: string, value: T): Promise<void> {
   await request(store, 'readwrite', target => target.put(value))
 }
 
-export async function get<T>(store: string, key: string): Promise<T | undefined> {
+export function get<T>(store: string, key: string): Promise<T | undefined> {
   return request<T | undefined>(store, 'readonly', target => target.get(key))
 }
 

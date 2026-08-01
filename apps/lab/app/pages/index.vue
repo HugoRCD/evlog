@@ -1997,7 +1997,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       v-model="projectsOpen"
       :projects
       :active-id="activeProjectId"
-      :suggested-name="suggestedName"
+      :suggested-name
       :busy="projectBusy"
       :storage
       :persisted="storagePersisted"
