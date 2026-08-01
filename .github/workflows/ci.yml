@@ -113,23 +113,8 @@ jobs:
 
       # --continue so one broken example reports every other one too, instead of
       # cancelling them and hiding whether they are healthy.
-      #
-      # Two exclusions, both dependency-resolution problems rather than broken
-      # examples, and both needing a lockfile change this workflow PR should not
-      # carry:
-      #
-      # tanstack-start aliases `nitro` to `nitro-nightly@latest`, and
-      # shamefullyHoist puts a different nitro at the workspace root, which wins
-      # over the nightly's own copy and does not export `nitro/runtime/meta`.
-      #
-      # eve fails to type check because three copies of @types/react resolve at
-      # once, so React.Key from one is not assignable to Key from another.
       - name: Build affected examples
-        run: |
-          pnpm exec turbo run build --affected --continue \
-            --filter='./examples/*' \
-            --filter='!evlog-tanstack-start-example' \
-            --filter='!evlog-eve-example'
+        run: pnpm exec turbo run build --affected --continue --filter='./examples/*'
 
   publish:
     name: Publish preview package
