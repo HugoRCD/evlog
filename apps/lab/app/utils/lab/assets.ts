@@ -91,7 +91,7 @@ export async function putAssetWithId(id: string, blob: Blob, name: string): Prom
   await put<AssetRecord>(ASSETS, { id, blob, name, type: blob.type, bytes: blob.size })
 }
 
-export async function getAsset(id: string): Promise<AssetRecord | undefined> {
+export function getAsset(id: string): Promise<AssetRecord | undefined> {
   return get<AssetRecord>(ASSETS, id)
 }
 
