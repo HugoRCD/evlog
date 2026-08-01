@@ -1,5 +1,12 @@
 # @evlog/cli
 
+## 0.3.1
+
+### Patch Changes
+
+- Updated dependencies [[`f39ab30`](https://github.com/HugoRCD/evlog/commit/f39ab30d90af608acb1527a766d4823460dc99bd), [`899464a`](https://github.com/HugoRCD/evlog/commit/899464a6c4a2dcf0a2816ddd39eb74203c4d4a82), [`d7f482a`](https://github.com/HugoRCD/evlog/commit/d7f482aa41ad696db21ba07ffaaa355bf7fd0b56), [`f5d7474`](https://github.com/HugoRCD/evlog/commit/f5d7474232379a3346f2dfa8e23335b4a9bfa44a), [`12852d3`](https://github.com/HugoRCD/evlog/commit/12852d31ad10e990091c6cb1740d201fb9fc95ac), [`ecc3ea6`](https://github.com/HugoRCD/evlog/commit/ecc3ea60db28d7513c515958f127af6a1ec6a0d5), [`f662848`](https://github.com/HugoRCD/evlog/commit/f6628484226c11456611543f0930ef9ad6c9c857), [`4e12ebb`](https://github.com/HugoRCD/evlog/commit/4e12ebbbc33a04d8cc77c7bf09edce418466d804), [`2c20be7`](https://github.com/HugoRCD/evlog/commit/2c20be7620e4eeea1bb31cfbca91af66e60e849e), [`35431c2`](https://github.com/HugoRCD/evlog/commit/35431c2685a10b0448e22fd416a9b37e626ec1e0), [`9e3bd96`](https://github.com/HugoRCD/evlog/commit/9e3bd96d401890ff24001da742848b14ce65a4b7), [`1b0edb8`](https://github.com/HugoRCD/evlog/commit/1b0edb80b080b3c03fc2f60e848191fac2a6a2f7), [`c5e85b0`](https://github.com/HugoRCD/evlog/commit/c5e85b0b121a60b69699b4f6f2fe5831dee62f19), [`5d99391`](https://github.com/HugoRCD/evlog/commit/5d99391638a13bb7ea3a8b98f3ac71e07b9b72cb), [`374abfd`](https://github.com/HugoRCD/evlog/commit/374abfdd01522a7e74d26ecfc8f20c2ae8571e1a), [`2540aa5`](https://github.com/HugoRCD/evlog/commit/2540aa5eb526f9cd25a637cde1bc7115575a280e)]:
+  - evlog@2.23.0
+
 ## 0.3.0
 
 ### Minor Changes
