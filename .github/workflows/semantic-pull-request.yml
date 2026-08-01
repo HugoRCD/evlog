@@ -27,6 +27,7 @@ jobs:
             bench
             better-auth
             better-stack
+            clickhouse
             cli
             core
             datadog
@@ -40,6 +41,7 @@ jobs:
             fs
             hono
             hyperdx
+            loki
             nestjs
             next
             nitro
