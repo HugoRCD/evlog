@@ -135,6 +135,15 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "sendToHyperDX",
     "toHyperDXOTLPConfig",
   ],
+  "./loki": [
+    "buildLokiPayload",
+    "createLokiDrain",
+    "resolveLokiPushUrl",
+    "sendBatchToLoki",
+    "sendToLoki",
+    "toLokiLabels",
+    "toLokiTimestamp",
+  ],
   "./memory": [
     "clearMemoryLogs",
     "createMemoryDrain",
