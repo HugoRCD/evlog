@@ -13,19 +13,15 @@ permissions:
   contents: read
 
 concurrency:
-  # Cancel superseded pushes on a PR, but let every push to main finish: each
-  # one is the input to a release.
   group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.number || github.run_id }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 
 env:
   TURBO_TELEMETRY_DISABLED: 1
-  # Fork PRs get no OIDC token, so they use the local cache instead of failing
-  # to reach the remote one.
+  # Fork PRs get no OIDC token, so they fall back to the local cache
   IS_INTERNAL: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
   TURBO_CACHE: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'remote:rw' || 'local:rw' }}
-  # Without a base, turbo cannot resolve the git range and silently treats
-  # every package as affected.
+  # Without this, turbo silently treats every package as affected
   TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
@@ -39,7 +35,7 @@ jobs:
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          fetch-depth: 0 # --affected needs history to diff against the base
+          fetch-depth: 0 # --affected needs history
           persist-credentials: false
 
       - parallel:
@@ -52,8 +48,6 @@ jobs:
           - name: Set up pnpm and Node
             uses: ./.github/actions/setup
 
-      # turbo runs both tasks concurrently and knows their dependency graph, so
-      # this stays one command rather than two parallel steps.
       - name: Lint & typecheck
         run: pnpm exec turbo run lint typecheck --affected
 
@@ -80,8 +74,7 @@ jobs:
           - name: Set up pnpm and Node
             uses: ./.github/actions/setup
 
-      # evlog is excluded here because its suite runs once below under coverage,
-      # which also enforces the thresholds in vitest.config.ts.
+      # evlog runs once below, under coverage, which enforces its thresholds
       - name: Test workspace
         run: pnpm exec turbo run test --affected --filter='!evlog'
 
@@ -111,27 +104,15 @@ jobs:
           - name: Set up pnpm and Node
             uses: ./.github/actions/setup
 
-      # --continue so one broken example reports every other one too, instead of
-      # cancelling them and hiding whether they are healthy.
-      #
-      # eve is excluded. Three copies of @types/react resolve at once
-      # (19.2.14/.15/.17), and React.Key from one is not assignable to Key from
-      # another, so every JSX element in it fails to type check. The fix is a
-      # workspace override, but any change to the resolution graph currently
-      # forces a full re-resolve that breaks apps/playground with "Could not
-      # resolve @nuxt/icon (specified as a dependency of @nuxt/ui)". Untangling
-      # that is a dependency problem, not a workflow one.
+      # --continue: one broken example must not cancel the others
       - name: Build affected examples
-        run: |
-          pnpm exec turbo run build --affected --continue \
-            --filter='./examples/*' --filter='!evlog-eve-example'
+        run: pnpm exec turbo run build --affected --continue --filter='./examples/*'
 
   publish:
     name: Publish preview package
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    # Deliberately not gated on the other jobs: a preview build is most useful
-    # while the PR is still red.
+    # Not gated on the other jobs: a preview is most useful while the PR is red
     if: github.event_name != 'push' || github.ref == 'refs/heads/main'
     permissions:
       contents: read
@@ -159,8 +140,7 @@ jobs:
       - name: Publish
         run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/telemetry' './packages/cli'
 
-  # Single required check for branch protection: the job names above can change
-  # without anyone having to update the protection rules.
+  # Single required check, so branch protection survives job renames
   ci:
     name: ci
     runs-on: ubuntu-slim
