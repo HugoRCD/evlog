@@ -93,6 +93,8 @@ export type {
   LogLevel,
   ParsedError,
   RedactConfig,
+  RedactReplacement,
+  RedactReplacementContext,
   RegisteredAuditCatalogs,
   RegisteredErrorCatalogs,
   RequestLogger,
