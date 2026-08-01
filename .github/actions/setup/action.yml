@@ -1,0 +1,48 @@
+name: Setup
+description: Sets up pnpm and Node, then installs workspace dependencies.
+
+inputs:
+  install:
+    description: Set to 'false' to skip the install step entirely.
+    required: false
+    default: 'true'
+  filters:
+    description: >
+      pnpm filters restricting what gets installed, e.g. "--filter=evlog...".
+      Empty installs the whole workspace.
+    required: false
+    default: ''
+  node-version:
+    description: Overrides the version in .node-version.
+    required: false
+    default: ''
+  registry-url:
+    description: npm registry to authenticate against, for publishing jobs.
+    required: false
+    default: ''
+
+runs:
+  using: composite
+  steps:
+    - uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v6.0.9
+
+    - uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38 # v6.5.0
+      with:
+        # node-version wins when set, otherwise .node-version is the source of truth
+        node-version-file: .node-version
+        node-version: ${{ inputs.node-version }}
+        registry-url: ${{ inputs.registry-url }}
+        cache: pnpm
+
+    - name: Install dependencies
+      id: install
+      if: inputs.install == 'true'
+      # The npm registry flakes often enough to be worth one automatic retry.
+      continue-on-error: true
+      shell: bash
+      run: pnpm install --frozen-lockfile ${{ inputs.filters }}
+
+    - name: Install dependencies (retry)
+      if: inputs.install == 'true' && steps.install.outcome == 'failure'
+      shell: bash
+      run: pnpm install --frozen-lockfile ${{ inputs.filters }}

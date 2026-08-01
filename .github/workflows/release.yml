@@ -19,19 +19,15 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v6
+      # changesets/action commits the version bump and pushes the release PR
+      # branch, so this job keeps its checkout credentials.
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
 
-      - run: corepack enable
-
-      - uses: actions/setup-node@v6
+      - uses: ./.github/actions/setup
         with:
-          node-version: 22
           registry-url: https://registry.npmjs.org
-
-      - name: Install dependencies
-        run: pnpm install
 
       - name: Prepare
         run: pnpm dev:prepare
