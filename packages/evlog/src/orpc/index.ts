@@ -8,6 +8,7 @@ import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'oRPC handler. Wrap your handler with `withEvlog()` from evlog/orpc.',
+  'evlog:orpc',
 )
 
 /** Options accepted by {@link withEvlog} for oRPC request instrumentation. */
@@ -145,10 +146,6 @@ export function withEvlog<THandler extends OrpcFetchHandlerLike>(
   })
 }
 
-function isEvlogError(error: unknown): error is EvlogError {
-  return error instanceof EvlogError || (error instanceof Error && error.name === 'EvlogError')
-}
-
 /**
  * Procedure-level middleware. Three responsibilities:
  *
@@ -195,7 +192,7 @@ export function evlog<TContext extends Partial<EvlogOrpcContext> & Context = Evl
       return await next()
     } catch (error) {
       if (log) log.error(error as Error)
-      if (isEvlogError(error)) {
+      if (EvlogError.isEvlogError(error)) {
         throw toOrpcError(error)
       }
       throw error

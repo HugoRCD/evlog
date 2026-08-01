@@ -9,6 +9,7 @@ import { EvlogError } from '../error'
 
 const { storage, useLogger } = createLoggerStorage(
   'handle context. Make sure evlog() handle is added to your hooks.server.ts.',
+  'evlog:sveltekit',
 )
 
 void registerDiskPrettyErrorSnippetReader()
@@ -172,7 +173,7 @@ export function evlog(options: EvlogSvelteKitOptions = {}): SvelteKitHandle {
         await finish({ error: error instanceof Error ? error : new Error(String(error)) })
 
         // Return structured JSON for EvlogError (like NextJS withEvlog / Nuxt errorHandler)
-        if (error instanceof EvlogError) {
+        if (EvlogError.isEvlogError(error)) {
           const status = error.status ?? 500
           const body = serializeEvlogErrorResponse(error, event.url.pathname)
           return new Response(JSON.stringify(body), {

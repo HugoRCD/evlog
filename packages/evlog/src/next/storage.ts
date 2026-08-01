@@ -1,7 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { AuditableLogger } from '../audit'
+import { getSharedStorage } from '../shared/globalRegistry'
 
-export const evlogStorage = new AsyncLocalStorage<AuditableLogger>()
+/** @internal Every registered instance is a real ALS; the registry only widens the type. */
+export const evlogStorage = getSharedStorage(
+  'evlog:next',
+  () => new AsyncLocalStorage<AuditableLogger>(),
+) as AsyncLocalStorage<AuditableLogger>
 
 /**
  * Get the current request-scoped logger.

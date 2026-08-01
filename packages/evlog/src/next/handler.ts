@@ -299,7 +299,7 @@ export function createWithEvlog(options: NextEvlogOptions) {
         await emitRequestEvent(logger, { method, path, requestId }, headers, errorStatus)
 
         // Return structured JSON response for EvlogErrors (like H3 does for Nuxt)
-        if (isRequest && error instanceof EvlogError) {
+        if (isRequest && EvlogError.isEvlogError(error)) {
           return Response.json(error.toJSON(), { status: error.status }) as Awaited<TReturn>
         }
 

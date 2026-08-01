@@ -7,6 +7,7 @@ import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure app.use(evlog()) is registered before your routes.',
+  'evlog:express',
 )
 
 export type EvlogExpressOptions = BaseEvlogOptions

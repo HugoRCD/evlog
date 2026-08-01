@@ -4,14 +4,17 @@ import type { AuditableLogger } from '../audit'
 import {
   bindAsyncLocalStorage,
   clearAsyncLocalStorage,
-  patchAsyncLocalStorageEnterWith,
+  createSharedEnterWithStorage,
 } from '../shared/asyncStorageScope'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 
-const storage = new AsyncLocalStorage<AuditableLogger>()
-patchAsyncLocalStorageEnterWith(storage)
+/** @internal Every registered instance is a real ALS; the registry only widens the type. */
+const storage = createSharedEnterWithStorage(
+  'evlog:elysia',
+  () => new AsyncLocalStorage<AuditableLogger>(),
+) as AsyncLocalStorage<AuditableLogger>
 
 const activeLoggers = new WeakSet<AuditableLogger>()
 

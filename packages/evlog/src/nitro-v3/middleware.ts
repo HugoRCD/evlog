@@ -37,7 +37,7 @@ export async function evlogErrorHandler(
   try {
     return (await Promise.resolve(next())) as RequestServerResult<any, any, any>
   } catch (error: unknown) {
-    if (error instanceof EvlogError || (error && typeof error === 'object' && (error as Error).name === 'EvlogError')) {
+    if (EvlogError.isEvlogError(error)) {
       const evlogError = error as EvlogError
 
       try {
