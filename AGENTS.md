@@ -46,7 +46,8 @@ packages/evlog/            Main package
 - `README.md` at root is a **symlink** to `packages/evlog/README.md` — edit the source directly.
 - `evlog/toolkit` is the public entrypoint for `src/shared/`. Never use `evlog/shared`.
 - `evlog/browser` is deprecated — use `evlog/http` instead.
-- Hono does **not** export `useLogger()`. Logger access is `c.get('log')`.
+- Every framework integration exposes the **same contract**: `evlog()` middleware, `useLogger()`, `log.fork()`, and the full `BaseEvlogOptions` surface. Framework-native accessors (`c.get('log')`, `req.log`, `event.locals.log`, `context.get(loggerContext)`) stay alongside it — they are the idiomatic path inside handlers, `useLogger()` is for the layers underneath. When adding an integration, provide both.
+- `useLogger()` is backed by `AsyncLocalStorage`. On Cloudflare Workers that needs the `nodejs_compat` / `nodejs_als` flag, so `evlog/workers` deliberately has no `useLogger()` and passes the logger as the handler's fourth argument instead.
 - New export? Update both `packages/evlog/package.json` exports and `packages/evlog/tsdown.config.ts`.
 - Creating a new adapter, enricher, or framework integration? Read the matching skill at `.agents/skills/` **before starting**:
   - `.agents/skills/create-adapter/SKILL.md`

@@ -122,6 +122,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
   ],
   "./hono": [
     "evlog",
+    "useLogger",
   ],
   "./http": [
     "createHttpDrain",
