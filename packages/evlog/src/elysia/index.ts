@@ -7,6 +7,7 @@ import {
   createSharedEnterWithStorage,
 } from '../shared/asyncStorageScope'
 import { defineFrameworkIntegration } from '../shared/integration'
+import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { attachForkToLogger } from '../shared/fork'
 
@@ -87,6 +88,12 @@ interface RequestState {
   logger: AuditableLogger
 }
 
+/** Release the request logger once its wide event has been emitted. */
+function releaseLogger(logger: AuditableLogger): void {
+  activeLoggers.delete(logger)
+  clearAsyncLocalStorage(storage)
+}
+
 /**
  * Create an evlog plugin for Elysia.
  *
@@ -128,22 +135,37 @@ export function evlog(options: EvlogElysiaOptions = {}) {
     .derive({ as: 'global' }, ({ request }) => {
       return { log: requestState.get(request)?.logger as AuditableLogger }
     })
+    // Claim streaming responses here: `onAfterResponse` fires once the response
+    // is handed off, which for an SSE / chunked body is long before the stream
+    // finishes. Wrapping the body defers the emit until it actually closes, so
+    // context set mid-stream still lands on the wide event (#321).
+    .mapResponse({ as: 'global' }, (ctx) => {
+      const { request } = ctx
+      const state = requestState.get(request)
+      if (!state || state.skipped || emitted.has(request)) return
+      const value = (ctx as { responseValue?: unknown; response?: unknown }).responseValue
+        ?? (ctx as { response?: unknown }).response
+      if (!(value instanceof Response) || !shouldDeferEmitForResponse(value)) return
+
+      emitted.add(request)
+      return bindStreamingResponseLifecycle(value, async (meta) => {
+        await state.finish({ status: meta.status, error: meta.error })
+        releaseLogger(state.logger)
+      })
+    })
     .onAfterResponse({ as: 'global' }, async ({ request, set }) => {
       const state = requestState.get(request)
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
       await state.finish({ status: set.status as number || 200 })
-      activeLoggers.delete(state.logger)
-      clearAsyncLocalStorage(storage)
+      releaseLogger(state.logger)
     })
     .onError({ as: 'global' }, async ({ request, error }) => {
       const state = requestState.get(request)
       if (!state || state.skipped || emitted.has(request)) return
       emitted.add(request)
       const err = error instanceof Error ? error : new Error(String(error))
-      state.logger.error(err)
       await state.finish({ error: err })
-      activeLoggers.delete(state.logger)
-      clearAsyncLocalStorage(storage)
+      releaseLogger(state.logger)
     })
 }
