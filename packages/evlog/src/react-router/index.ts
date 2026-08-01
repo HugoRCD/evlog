@@ -7,6 +7,7 @@ import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure the evlog middleware is added to your route.',
+  'evlog:react-router',
 )
 
 /**

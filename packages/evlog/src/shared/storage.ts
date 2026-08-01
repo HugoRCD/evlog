@@ -1,5 +1,6 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import type { AuditableLogger } from '../audit'
+import { getSharedStorage } from './globalRegistry'
 
 /**
  * Create a request-scoped `AsyncLocalStorage` and matching `useLogger`
@@ -14,9 +15,14 @@ import type { AuditableLogger } from '../audit'
  * @param contextHint - Appended to the error message when `useLogger()` is
  *   called outside of a request, e.g. `"middleware context. Make sure
  *   app.use(evlog()) is registered before your routes."`.
+ * @param id - Stable identifier for the shared storage slot. Copies of evlog
+ *   duplicated by the package manager resolve the same instance for a given
+ *   `id`, so a request opened by one copy is visible to the other. Defaults to
+ *   `contextHint`; third-party callers should pass a namespaced id.
  */
-export function createLoggerStorage(contextHint: string) {
-  const storage = new AsyncLocalStorage<AuditableLogger>()
+export function createLoggerStorage(contextHint: string, id: string = contextHint) {
+  /** @internal Every registered instance is a real ALS; the registry only widens the type. */
+  const storage = getSharedStorage(id, () => new AsyncLocalStorage<AuditableLogger>()) as AsyncLocalStorage<AuditableLogger>
 
   function useLogger<T extends object = Record<string, unknown>>(): AuditableLogger<T> {
     const logger = storage.getStore()

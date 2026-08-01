@@ -10,6 +10,7 @@ import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure EvlogModule.forRoot() is imported in your AppModule.',
+  'evlog:nestjs',
 )
 
 export type EvlogNestJSOptions = BaseEvlogOptions

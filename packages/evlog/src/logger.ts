@@ -1,12 +1,12 @@
 import type { AuditableLogger, AuditInput, AuditMethod } from './audit'
-import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RedactConfig, RequestLogger, RequestLoggerOptions, SamplingConfig, TailSamplingContext, WideEvent } from './types'
+import type { DrainContext, EnvironmentContext, FieldContext, Log, LogLevel, LoggerConfig, RequestLogger, RequestLoggerOptions, TailSamplingContext, WideEvent } from './types'
 import { buildAuditFields, consumeAuditForceKeep, finalizeAudit } from './audit'
 import { markGloballyRedacted, redactEvent, resolveRedactConfig } from './redact'
 import type { PluginRunner } from './shared/plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
 import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } from './shared/pretty-error'
-import type { ResolvedPrettyError } from './shared/dev-terminal'
 import { resolveDevTerminal } from './shared/dev-terminal'
+import { globalConfig } from './shared/globalRegistry'
 import { EvlogError } from './error'
 import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
 
@@ -79,39 +79,22 @@ export function markWideEventDrainStarted(event: WideEvent | null): void {
  */
 export { mergeInto as mergeWideEventFields }
 
-let globalEnv: EnvironmentContext = {
-  service: 'app',
-  environment: 'development',
-}
-
-let globalPretty = isDev()
-let globalPrettyError: ResolvedPrettyError = {
-  snippet: isDev(),
-  stackDepth: 2,
-  compact: isDev(),
-  detail: 'full',
-}
-let globalSampling: SamplingConfig = {}
-let globalStringify = true
-let globalDrain: ((ctx: DrainContext) => void | Promise<void>) | undefined
-let globalRedact: RedactConfig | undefined
-let globalEnabled = true
-let globalSilent = false
-/** Minimum level for the global `log` API only (`ownsEvent === false`). Default: all levels. */
-let globalMinLevel: LogLevel = 'debug'
-let _locked = false
-let _loggerInitialized = false
-let globalPluginRunner: PluginRunner = getEmptyPluginRunner()
+/**
+ * Process-wide configuration, shared with every other copy of evlog the package
+ * manager may have installed (see `shared/globalRegistry.ts`). The reference is
+ * stable, so reads stay a plain property access on the hot path.
+ */
+const state = globalConfig
 
 /**
  * Initialize the logger with configuration.
  * Call this once at application startup.
  */
 export function initLogger(config: LoggerConfig = {}): void {
-  globalEnabled = config.enabled ?? true
+  state.enabled = config.enabled ?? true
   const detected = detectEnvironment()
 
-  globalEnv = {
+  state.env = {
     service: config.env?.service ?? detected.service ?? 'app',
     environment: config.env?.environment ?? detected.environment ?? 'development',
     version: config.env?.version ?? detected.version,
@@ -119,28 +102,28 @@ export function initLogger(config: LoggerConfig = {}): void {
     region: config.env?.region ?? detected.region,
   }
 
-  globalPretty = config.pretty ?? isDev()
-  globalPrettyError = resolveDevTerminal(config).prettyError
-  globalSampling = config.sampling ?? {}
-  globalStringify = config.stringify ?? true
-  globalDrain = config.drain
-  globalRedact = resolveRedactConfig(config.redact ?? !isDev())
-  globalSilent = config.silent ?? false
-  globalMinLevel = config.minLevel ?? 'debug'
-  globalPluginRunner = config.plugins?.length
+  state.pretty = config.pretty ?? isDev()
+  state.prettyError = resolveDevTerminal(config).prettyError
+  state.sampling = config.sampling ?? {}
+  state.stringify = config.stringify ?? true
+  state.drain = config.drain
+  state.redact = resolveRedactConfig(config.redact ?? !isDev())
+  state.silent = config.silent ?? false
+  state.minLevel = config.minLevel ?? 'debug'
+  state.pluginRunner = config.plugins?.length
     ? createPluginRunner(config.plugins)
     : getEmptyPluginRunner()
 
-  if (globalPluginRunner.plugins.length > 0) {
-    void globalPluginRunner.runSetup({ env: { ...globalEnv } })
+  if (state.pluginRunner.plugins.length > 0) {
+    void state.pluginRunner.runSetup({ env: { ...state.env } })
   }
 
-  const hasAnyDrain = !!globalDrain || globalPluginRunner.hasDrain
-  if (globalSilent && !hasAnyDrain && !config._suppressDrainWarning) {
+  const hasAnyDrain = !!state.drain || state.pluginRunner.hasDrain
+  if (state.silent && !hasAnyDrain && !config._suppressDrainWarning) {
     console.warn('[evlog] silent mode is enabled but no drain is configured. Events will be built and sampled but not output anywhere. Set a drain via initLogger({ drain }) or a framework hook (evlog:drain).')
   }
 
-  _loggerInitialized = true
+  state.initialized = true
 }
 
 /**
@@ -149,14 +132,14 @@ export function initLogger(config: LoggerConfig = {}): void {
  * the middleware-level options.
  */
 export function getGlobalPluginRunner(): PluginRunner {
-  return globalPluginRunner
+  return state.pluginRunner
 }
 
 /**
  * Check if logging is globally enabled.
  */
 export function isEnabled(): boolean {
-  return globalEnabled
+  return state.enabled
 }
 
 /**
@@ -165,21 +148,21 @@ export function isEnabled(): boolean {
  * Prevents configureHandler() from overwriting the drain config.
  */
 export function lockLogger(): void {
-  _locked = true
+  state.locked = true
 }
 
 /**
  * @internal Check if the logger has been locked by instrumentation.
  */
 export function isLoggerLocked(): boolean {
-  return _locked
+  return state.locked
 }
 
 /**
  * @internal Whether {@link initLogger} has completed at least once.
  */
 export function isLoggerInitialized(): boolean {
-  return _loggerInitialized
+  return state.initialized
 }
 
 /**
@@ -188,7 +171,7 @@ export function isLoggerInitialized(): boolean {
  * when no middleware-level drain is provided.
  */
 export function getGlobalDrain(): ((ctx: DrainContext) => void | Promise<void>) | undefined {
-  return globalDrain
+  return state.drain
 }
 
 /**
@@ -196,7 +179,7 @@ export function getGlobalDrain(): ((ctx: DrainContext) => void | Promise<void>) 
  * Error level defaults to 100% (always logged) unless explicitly configured otherwise.
  */
 function shouldSample(level: LogLevel): boolean {
-  const { rates } = globalSampling
+  const { rates } = state.sampling
   if (!rates) {
     return true // No sampling configured, log everything
   }
@@ -218,7 +201,7 @@ function shouldSample(level: LogLevel): boolean {
  * Returns true if ANY condition matches (OR logic).
  */
 export function shouldKeep(ctx: TailSamplingContext): boolean {
-  const { keep } = globalSampling
+  const { keep } = state.sampling
   if (!keep?.length) return false
 
   return keep.some((condition) => {
@@ -247,10 +230,10 @@ function emitWideEvent(
   options: EmitWideEventOptions = {},
 ): WideEvent | null {
   const { deferDrain = false, ownsEvent = false, waitUntil } = options
-  if (!globalEnabled) return null
+  if (!state.enabled) return null
 
   if (!ownsEvent) {
-    if (!isLevelEnabled(level, globalMinLevel)) {
+    if (!isLevelEnabled(level, state.minLevel)) {
       return null
     }
     if (!shouldSample(level)) {
@@ -262,32 +245,32 @@ function emitWideEvent(
   if (ownsEvent) {
     event.timestamp = isoNow()
     event.level = level
-    if (event.service === undefined) event.service = globalEnv.service
-    if (event.environment === undefined) event.environment = globalEnv.environment
-    if (globalEnv.version !== undefined && event.version === undefined) event.version = globalEnv.version
-    if (globalEnv.commitHash !== undefined && event.commitHash === undefined) event.commitHash = globalEnv.commitHash
-    if (globalEnv.region !== undefined && event.region === undefined) event.region = globalEnv.region
+    if (event.service === undefined) event.service = state.env.service
+    if (event.environment === undefined) event.environment = state.env.environment
+    if (state.env.version !== undefined && event.version === undefined) event.version = state.env.version
+    if (state.env.commitHash !== undefined && event.commitHash === undefined) event.commitHash = state.env.commitHash
+    if (state.env.region !== undefined && event.region === undefined) event.region = state.env.region
     formatted = event as WideEvent
   } else {
     formatted = {
       timestamp: isoNow(),
       level,
-      ...globalEnv,
+      ...state.env,
       ...event,
     }
   }
 
   finalizeAudit(formatted)
 
-  if (globalRedact) {
-    formatted = redactEvent(formatted, globalRedact) as WideEvent
+  if (state.redact) {
+    formatted = redactEvent(formatted, state.redact) as WideEvent
     markGloballyRedacted(formatted)
   }
 
-  if (!globalSilent) {
-    if (globalPretty) {
+  if (!state.silent) {
+    if (state.pretty) {
       prettyPrintWideEvent(formatted)
-    } else if (globalStringify) {
+    } else if (state.stringify) {
       console[getConsoleMethod(level)](JSON.stringify(formatted))
     } else {
       console[getConsoleMethod(level)](formatted)
@@ -296,19 +279,19 @@ function emitWideEvent(
 
   if (!deferDrain) {
     const drainPromises: Array<Promise<unknown>> = []
-    if (globalDrain) {
+    if (state.drain) {
       drainPromises.push(
         (async () => {
           try {
-            await globalDrain!({ event: formatted })
+            await state.drain!({ event: formatted })
           } catch (err) {
             console.error('[evlog] drain failed:', err)
           }
         })(),
       )
     }
-    if (globalPluginRunner.hasDrain) {
-      drainPromises.push(globalPluginRunner.runDrain({ event: formatted }))
+    if (state.pluginRunner.hasDrain) {
+      drainPromises.push(state.pluginRunner.runDrain({ event: formatted }))
     }
     if (drainPromises.length > 0 && waitUntil) {
       waitUntil(Promise.all(drainPromises))
@@ -319,10 +302,10 @@ function emitWideEvent(
 }
 
 function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
-  if (!globalEnabled) return
+  if (!state.enabled) return
 
-  if (globalPretty && !globalSilent) {
-    if (!isLevelEnabled(level, globalMinLevel)) {
+  if (state.pretty && !state.silent) {
+    if (!isLevelEnabled(level, state.minLevel)) {
       return
     }
     if (!shouldSample(level)) {
@@ -660,7 +643,7 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
   const restEntries = Object.entries(rest).filter(([_, v]) => v !== undefined)
   const aiEntries = aiData ? buildAIEntries(aiData) : []
   const errorEntries = errorData !== undefined
-    ? buildErrorEntries(errorData, globalPrettyError)
+    ? buildErrorEntries(errorData, state.prettyError)
     : []
   const contextEntries: TreeEntry[] = [
     ...restEntries.map(([key, value]) => ({ key, value: formatValue(value) })),
@@ -796,7 +779,7 @@ interface CreateLoggerInternalOptions {
  * ```
  */
 export function createLogger<T extends object = Record<string, unknown>>(initialContext: Record<string, unknown> = {}, internalOptions?: CreateLoggerInternalOptions): AuditableLogger<T> {
-  if (!globalEnabled) return noopLogger as unknown as AuditableLogger<T>
+  if (!state.enabled) return noopLogger as unknown as AuditableLogger<T>
 
   const deferDrain = internalOptions?._deferDrain ?? false
   const waitUntil = internalOptions?.waitUntil
@@ -892,7 +875,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         if (k in err) errorObj[k] = errRecord[k]
       }
 
-      if (err instanceof EvlogError) {
+      if (EvlogError.isEvlogError(err)) {
         if (err.code) errorObj.code = err.code
         if (err.why) errorObj.why = err.why
         if (err.fix) errorObj.fix = err.fix
@@ -953,7 +936,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         forceKeep = true
       } else if (auditForceKeep) {
         forceKeep = true
-      } else if (globalSampling.keep?.length) {
+      } else if (state.sampling.keep?.length) {
         const status = (overrides as Record<string, unknown> | undefined)?.status ?? context.status
         forceKeep = shouldKeep({
           status: status as number | undefined,
@@ -1037,7 +1020,7 @@ export function createRequestLogger<T extends object = Record<string, unknown>>(
  * Get the current environment context.
  */
 export function getEnvironment(): EnvironmentContext {
-  return { ...globalEnv }
+  return { ...state.env }
 }
 
 // eslint-disable-next-line @typescript-eslint/naming-convention

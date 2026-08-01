@@ -9,7 +9,7 @@ import { createMiddlewareLogger } from '../shared/middleware'
 import {
   bindAsyncLocalStorage,
   clearAsyncLocalStorage,
-  patchAsyncLocalStorageEnterWith,
+  createSharedEnterWithStorage,
 } from '../shared/asyncStorageScope'
 
 const DEFAULT_MAX_SESSIONS = 256
@@ -213,8 +213,10 @@ function ensureInit(options: EvlogEveOptions): void {
   setEveInitialized(true)
 }
 
-const turnLoggerStorage = new AsyncLocalStorage<AuditableLogger>()
-patchAsyncLocalStorageEnterWith(turnLoggerStorage)
+const turnLoggerStorage = createSharedEnterWithStorage(
+  'evlog:eve-turn',
+  () => new AsyncLocalStorage<AuditableLogger>(),
+)
 const activeTurnLoggers = new WeakSet<AuditableLogger>()
 
 function bindTurnLogger(logger: AuditableLogger): void {

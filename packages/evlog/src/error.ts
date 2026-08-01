@@ -5,6 +5,13 @@ import { colors, isServer } from './utils'
 const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
 
 /**
+ * Prototype brand read by {@link EvlogError.isEvlogError}. `instanceof` compares
+ * class identity, which differs between duplicate installs of evlog — a
+ * registry-shared symbol does not.
+ */
+const evlogErrorBrand = Symbol.for('evlog.error.brand')
+
+/**
  * Structured error with context for better debugging
  *
  * @example
@@ -21,6 +28,18 @@ const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
  * ```
  */
 export class EvlogError extends Error {
+
+  /**
+   * Whether `error` is an `EvlogError`, including one thrown by a different
+   * copy of evlog. Prefer this to `instanceof`: package managers routinely
+   * install more than one physical copy (see #462), and `instanceof` then
+   * silently reports `false`, downgrading a structured error to a bare 500.
+   */
+  static isEvlogError(error: unknown): error is EvlogError {
+    return typeof error === 'object'
+      && error !== null
+      && (error as Record<symbol, unknown>)[evlogErrorBrand] === true
+  }
 
   /** Stable, machine-readable identifier (e.g. `'PAYMENT_DECLINED'`). */
   readonly code?: string
@@ -139,6 +158,11 @@ export class EvlogError extends Error {
   }
 
 }
+
+Object.defineProperty(EvlogError.prototype, evlogErrorBrand, {
+  value: true,
+  enumerable: false,
+})
 
 /**
  * Create a structured error with context for debugging and user-facing messages.
