@@ -559,6 +559,12 @@ describe('defineEvlog / toLoggerConfig / toMiddlewareOptions', () => {
     expect(mw.enrich).toBe(enrich)
     expect(mw.plugins).toEqual([{ name: 'p' }])
   })
+
+  it('toMiddlewareOptions forwards waitUntil', () => {
+    const waitUntil = vi.fn()
+    const mw = toMiddlewareOptions(defineEvlog({ waitUntil }))
+    expect(mw.waitUntil).toBe(waitUntil)
+  })
 })
 
 describe('defineFrameworkIntegration', () => {

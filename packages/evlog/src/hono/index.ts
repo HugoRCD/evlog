@@ -33,6 +33,18 @@ const integration = defineFrameworkIntegration<Context>({
   attachLogger: (c, logger) => {
     c.set('log', logger)
   },
+  extractWaitUntil: (c) => {
+    // Hono's `executionCtx` getter throws when the adapter has none (Node,
+    // Bun, Deno). Only Workers / Vercel Edge provide one.
+    try {
+      const { executionCtx } = c
+      return typeof executionCtx?.waitUntil === 'function'
+        ? executionCtx.waitUntil.bind(executionCtx)
+        : undefined
+    } catch {
+      return undefined
+    }
+  },
 })
 
 /**
