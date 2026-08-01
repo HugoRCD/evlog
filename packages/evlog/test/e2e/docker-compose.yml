@@ -1,0 +1,70 @@
+# Local observability sandbox: the backends the self-hostable adapters target,
+# plus a Grafana already wired to Loki so you can *see* your wide events.
+#
+#   pnpm run sandbox:up      # start everything
+#   pnpm run sandbox:seed    # emit realistic wide events into both backends
+#   pnpm run sandbox:down    # stop and wipe
+#
+# Once seeded:
+#   Grafana     http://localhost:3001/d/evlog-wide-events  (dashboard, no login)
+#   ClickHouse  same Grafana — the ClickHouse datasource is provisioned too
+#
+# The e2e suites reuse the same stack; they read LOKI_ENDPOINT /
+# CLICKHOUSE_ENDPOINT and skip themselves when unset.
+services:
+  loki:
+    image: grafana/loki:3.3.2
+    container_name: evlog-e2e-loki
+    ports:
+      - '3100:3100'
+    command: -config.file=/etc/loki/local-config.yaml
+    healthcheck:
+      # `wget` ships in the Loki image; /ready flips once the ingester accepts writes.
+      test: [CMD-SHELL, wget -q --spider http://localhost:3100/ready || exit 1]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:24.8-alpine
+    container_name: evlog-e2e-clickhouse
+    ports:
+      - '8123:8123'
+    environment:
+      CLICKHOUSE_SKIP_USER_SETUP: '1'
+    volumes:
+      # Creates evlog_events on first boot, so the suite has a table to insert into.
+      - ./clickhouse-init.sql:/docker-entrypoint-initdb.d/evlog.sql:ro
+    healthcheck:
+      # busybox wget resolves localhost to ::1 inside this image and is refused;
+      # the bundled client talks to the server over its native protocol.
+      test: [CMD-SHELL, clickhouse-client --query 'SELECT 1' || exit 1]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+      start_period: 10s
+
+  grafana:
+    image: grafana/grafana:11.4.0
+    container_name: evlog-e2e-grafana
+    ports:
+      # 3001 to stay clear of the docs site and most dev servers on 3000.
+      - '3001:3000'
+    environment:
+      GF_AUTH_ANONYMOUS_ENABLED: 'true'
+      GF_AUTH_ANONYMOUS_ORG_ROLE: Admin
+      GF_AUTH_DISABLE_LOGIN_FORM: 'true'
+      GF_FEATURE_TOGGLES_ENABLE: traceToMetrics
+      # Official ClickHouse datasource, so both backends are browsable in the
+      # same UI instead of ClickHouse's bare-bones /play page.
+      GF_INSTALL_PLUGINS: grafana-clickhouse-datasource
+    volumes:
+      - ./grafana:/etc/grafana/provisioning/datasources:ro
+      - ./grafana:/etc/grafana/provisioning/dashboards:ro
+      - ./grafana-dashboards:/etc/grafana/provisioning/dashboards-data:ro
+    depends_on:
+      loki:
+        condition: service_healthy
+      clickhouse:
+        condition: service_healthy

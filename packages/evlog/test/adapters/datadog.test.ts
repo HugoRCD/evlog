@@ -4,6 +4,7 @@ import {
   formatDatadogMessageLine,
   resolveDatadogIntakeUrl,
   resolveDatadogLogStatus,
+  resolveDatadogTraceContext,
   sanitizeWideEventForDatadog,
   sendBatchToDatadog,
   sendToDatadog,
@@ -125,6 +126,32 @@ describe('datadog adapter', () => {
     })
   })
 
+  describe('resolveDatadogTraceContext', () => {
+    it('maps traceId and spanId to Datadog reserved names', () => {
+      expect(resolveDatadogTraceContext(createTestEvent({
+        traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+        spanId: '00f067aa0ba902b7',
+      }))).toEqual({
+        trace_id: '4bf92f3577b34da6a3ce929d0e0e4736',
+        span_id: '00f067aa0ba902b7',
+      })
+    })
+
+    it('keeps whichever id is present on its own', () => {
+      expect(resolveDatadogTraceContext(createTestEvent({ traceId: 'abc' }))).toEqual({ trace_id: 'abc' })
+      expect(resolveDatadogTraceContext(createTestEvent({ spanId: 'def' }))).toEqual({ span_id: 'def' })
+    })
+
+    it('returns undefined without trace context', () => {
+      expect(resolveDatadogTraceContext(createTestEvent())).toBeUndefined()
+    })
+
+    it('ignores empty and non-string ids', () => {
+      expect(resolveDatadogTraceContext(createTestEvent({ traceId: '', spanId: '' }))).toBeUndefined()
+      expect(resolveDatadogTraceContext(createTestEvent({ traceId: 123, spanId: null }))).toBeUndefined()
+    })
+  })
+
   describe('formatDatadogMessageLine', () => {
     it('includes level, method, path, and status code', () => {
       const line = formatDatadogMessageLine(
@@ -157,6 +184,28 @@ describe('datadog adapter', () => {
         path: '/api/hello',
         userId: 'u1',
       })
+    })
+
+    it('lifts trace context to a root dd block while keeping the nested copy', () => {
+      const event = createTestEvent({
+        traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+        spanId: '00f067aa0ba902b7',
+      })
+      const row = toDatadogLog(event)
+
+      expect(row.dd).toEqual({
+        trace_id: '4bf92f3577b34da6a3ce929d0e0e4736',
+        span_id: '00f067aa0ba902b7',
+      })
+      expect(row.evlog).toMatchObject({
+        traceId: '4bf92f3577b34da6a3ce929d0e0e4736',
+        spanId: '00f067aa0ba902b7',
+      })
+    })
+
+    it('omits dd when the event carries no trace context', () => {
+      const row = toDatadogLog(createTestEvent({ path: '/api/hello' }))
+      expect(row).not.toHaveProperty('dd')
     })
 
     it('adds version to tags when present', () => {

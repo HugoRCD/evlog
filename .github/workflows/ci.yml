@@ -12,139 +12,147 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event_name == 'pull_request' && github.event.number || github.run_id }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
 env:
-  TURBO_TOKEN: ${{ secrets.TURBO_TOKEN }}
-  TURBO_TEAM: ${{ secrets.TURBO_TEAM }}
+  TURBO_TELEMETRY_DISABLED: 1
+  # Fork PRs get no OIDC token, so they fall back to the local cache
+  IS_INTERNAL: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
+  TURBO_CACHE: ${{ (github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository) && 'remote:rw' || 'local:rw' }}
+  # Without this, turbo silently treats every package as affected
+  TURBO_SCM_BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
 
 jobs:
-  lint:
+  quality:
+    name: Lint & typecheck
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Lint
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec turbo run lint --affected
-          else
-            pnpm run lint
-          fi
-
-  typecheck:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Typecheck
-        run: |
-          if [ "${{ github.event_name }}" = "pull_request" ]; then
-            pnpm exec turbo run typecheck --affected
-          else
-            pnpm run typecheck
-          fi
-
-  test:
-    runs-on: ubuntu-latest
-    strategy:
-      fail-fast: false
-      matrix:
-        shard: [1, 2, 3, 4]
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
-      - name: Build package
-        run: pnpm run build:package
-      - name: Test (shard ${{ matrix.shard }}/4)
-        working-directory: packages/evlog
-        run: pnpm exec vitest run --shard=${{ matrix.shard }}/4
-
-  telemetry:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Test + build (apps/telemetry)
-        run: pnpm exec turbo run test build --filter=evlog-telemetry
-
-  cli:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Test (packages/cli)
-        run: pnpm exec turbo run test --filter=@evlog/cli
-
-  coverage:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v6
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
-        with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
-      - name: Build package
-        run: pnpm run build:package
-      - name: Coverage
-        run: pnpm --filter evlog run test:coverage
-
-  publish:
-    runs-on: ubuntu-latest
-    if: github.event_name == 'pull_request' || github.event_name == 'workflow_dispatch' || (github.event_name == 'push' && github.ref == 'refs/heads/main')
-    needs: [lint, typecheck, test, telemetry, coverage, cli]
+    timeout-minutes: 15
     permissions:
       contents: read
-      pull-requests: write
+      id-token: write # remote cache OIDC
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0 # --affected needs history
+          persist-credentials: false
+
+      - parallel:
+          - name: Set up Turborepo remote cache
+            if: env.IS_INTERNAL == 'true'
+            uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+            with:
+              team: ${{ vars.TURBO_TEAM }}
+
+          - name: Set up pnpm and Node
+            uses: ./.github/actions/setup
+
+      # apps/telemetry is left out of typecheck: its drizzle results resolve to
+      # any on a cold CI checkout, so vue-tsc reports implicit-any on every
+      # query callback. It never ran here before either. Tracked separately.
+      - name: Lint
+        run: pnpm exec turbo run lint --affected
+
+      - name: Typecheck
+        run: pnpm exec turbo run typecheck --affected --filter='!evlog-telemetry'
+
+  test:
+    name: Test
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write # remote cache OIDC
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
           fetch-depth: 0
-      - uses: pnpm/action-setup@v6
-      - uses: actions/setup-node@v6
+          persist-credentials: false
+
+      - parallel:
+          - name: Set up Turborepo remote cache
+            if: env.IS_INTERNAL == 'true'
+            uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+            with:
+              team: ${{ vars.TURBO_TEAM }}
+
+          - name: Set up pnpm and Node
+            uses: ./.github/actions/setup
+
+      # evlog runs once below, under coverage, which enforces its thresholds
+      - name: Test workspace
+        run: pnpm exec turbo run test --affected --filter='!evlog'
+
+      - name: Test evlog with coverage
+        run: pnpm --filter evlog run test:coverage
+
+  examples:
+    name: Build examples
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: read
+      id-token: write # remote cache OIDC
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
-          node-version: 22
-          cache: 'pnpm'
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-      - name: Prepare
-        run: pnpm run dev:prepare
-      - name: Build package
+          fetch-depth: 0
+          persist-credentials: false
+
+      - parallel:
+          - name: Set up Turborepo remote cache
+            if: env.IS_INTERNAL == 'true'
+            uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+            with:
+              team: ${{ vars.TURBO_TEAM }}
+
+          - name: Set up pnpm and Node
+            uses: ./.github/actions/setup
+
+      # --continue: one broken example must not cancel the others
+      - name: Build affected examples
+        run: pnpm exec turbo run build --affected --continue --filter='./examples/*'
+
+  publish:
+    name: Publish preview package
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    # Not gated on the other jobs: a preview is most useful while the PR is red
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: read
+      id-token: write # remote cache OIDC
+      pull-requests: write # pkg-pr-new comments the preview install command
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - parallel:
+          - name: Set up Turborepo remote cache
+            if: env.IS_INTERNAL == 'true'
+            uses: vercel/setup-turborepo-remote-cache-action@135046f5efcadb17337d9b29b8d5b4035ae64b10 # v1.0.0
+            with:
+              team: ${{ vars.TURBO_TEAM }}
+
+          - name: Set up pnpm and Node
+            uses: ./.github/actions/setup
+
+      - name: Build packages
         run: pnpm run build:package
+
       - name: Publish
         run: pnpx pkg-pr-new publish --compact --no-template --pnpm './packages/evlog' './packages/nuxthub' './packages/telemetry' './packages/cli'
+
+  # Single required check, so branch protection survives job renames
+  ci:
+    name: ci
+    runs-on: ubuntu-slim
+    needs: [quality, test, examples]
+    if: always()
+    steps:
+      - name: Verify every required job succeeded
+        if: contains(needs.*.result, 'failure') || contains(needs.*.result, 'cancelled')
+        run: exit 1

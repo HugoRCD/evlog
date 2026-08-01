@@ -1,9 +1,9 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 import { toOtlpAttributeValue } from '../shared/event'
-import { httpPost } from '../shared/http'
 import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from '../shared/severity'
 
 export interface OTLPConfig {
@@ -247,18 +247,24 @@ export function createOTLPDrain(overrides?: Partial<OTLPConfig>) {
       }
       return config as OTLPConfig
     },
-    encode: (events, config) => {
-      if (events.length === 0) return null
-      return {
-        url: `${config.endpoint.replace(/\/$/, '')}/v1/logs`,
-        headers: {
-          'Content-Type': 'application/json',
-          ...config.headers,
-        },
-        body: JSON.stringify(buildOTLPPayload(events, config)),
-      }
-    },
+    label: 'OTLP',
+    encode: (events, config) => (events.length === 0 ? null : encodeOTLPRequest(events, config)),
   })
+}
+
+/**
+ * Encode a batch of wide events into the OTLP/HTTP logs request. Shared by
+ * {@link createOTLPDrain} and {@link sendBatchToOTLP}.
+ */
+function encodeOTLPRequest(events: WideEvent[], config: OTLPConfig): HttpDrainRequest {
+  return {
+    url: `${config.endpoint.replace(/\/$/, '')}/v1/logs`,
+    headers: {
+      'Content-Type': 'application/json',
+      ...config.headers,
+    },
+    body: JSON.stringify(buildOTLPPayload(events, config)),
+  }
 }
 
 function buildOTLPPayload(events: WideEvent[], config: OTLPConfig): ExportLogsServiceRequest {
@@ -308,22 +314,10 @@ export async function sendToOTLP(event: WideEvent, config: OTLPConfig): Promise<
  */
 export async function sendBatchToOTLP(events: WideEvent[], config: OTLPConfig): Promise<void> {
   if (events.length === 0) return
-
-  const url = `${config.endpoint.replace(/\/$/, '')}/v1/logs`
-  const payload = buildOTLPPayload(events, config)
-
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/json',
-    ...config.headers,
-  }
-
-  await httpPost({
-    url,
-    headers,
-    body: JSON.stringify(payload),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  await sendEncodedDrainRequest(encodeOTLPRequest(events, config), {
     label: 'OTLP',
     source: 'otlp',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }

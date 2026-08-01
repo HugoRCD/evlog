@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { redactEvent, normalizeRedactConfig, resolveRedactConfig, builtinPatterns } from '../../src/redact'
+import { redactEvent, normalizeRedactConfig, resolveRedactConfig, builtinPatterns, hasFunctionRedactPolicy } from '../../src/redact'
 import type { RedactConfig } from '../../src/types'
 import { createLogger, initLogger } from '../../src/logger'
 import { defined } from '../helpers/defined'
@@ -583,5 +583,233 @@ describe('normalizeRedactConfig', () => {
     })
     expect(config?._maskers).toHaveLength(2)
     expect(config?.paths).toEqual(['user.ssn'])
+  })
+})
+
+describe('redactEvent - function replacement', () => {
+  it('derives the replacement from a path-matched value', () => {
+    const event = redactEvent(
+      { user: { email: 'alice@example.com' } },
+      { builtins: false, paths: ['user.email'], replacement: matched => `len:${String(matched).length}` },
+    )
+    expect((event.user as Record<string, unknown>).email).toBe('len:17')
+  })
+
+  it('passes the dot path and leaf key for path matches', () => {
+    const seen: Array<{ path: string, key: string }> = []
+    redactEvent(
+      { user: { email: 'a@b.co' }, items: [{ token: 'x' }] },
+      {
+        builtins: false,
+        paths: ['user.email', 'token'],
+        replacement: (_matched, ctx) => {
+          seen.push({ path: ctx.path, key: ctx.key })
+          return '[x]'
+        },
+      },
+    )
+    expect(seen).toEqual([
+      { path: 'user.email', key: 'email' },
+      { path: 'items.0.token', key: 'token' },
+    ])
+  })
+
+  it('receives the whole subtree when a path matches an object', () => {
+    let matched: unknown
+    redactEvent(
+      { payment: { card: { number: '4111', expiry: '12/26' } } },
+      {
+        builtins: false,
+        paths: ['payment.card'],
+        replacement: (value) => {
+          matched = value
+          return '[card]'
+        },
+      },
+    )
+    expect(matched).toEqual({ number: '4111', expiry: '12/26' })
+  })
+
+  it('derives the replacement from a pattern match, with capture groups', () => {
+    const event = redactEvent(
+      { path: '/public/claim/eyJhbGciOiJIUzI1NiJ9' },
+      {
+        builtins: false,
+        patterns: [/\/public\/claim\/([A-Za-z0-9._-]{12,})/g],
+        replacement: (_match, ctx) => `/public/claim/[tok:${defined(ctx.groups?.[0], 'group').slice(0, 6)}]`,
+      },
+    )
+    expect(event.path).toBe('/public/claim/[tok:eyJhbG]')
+  })
+
+  it('exposes capture groups alongside named groups', () => {
+    let groups: Array<string | undefined> | undefined
+    redactEvent(
+      { path: '/u/42' },
+      {
+        builtins: false,
+        patterns: [/\/u\/(?<id>\d+)/g],
+        replacement: (_match, ctx) => {
+          ({ groups } = ctx)
+          return '/u/[id]'
+        },
+      },
+    )
+    expect(groups).toEqual(['42'])
+  })
+
+  it('passes the path of the string field a pattern matched', () => {
+    let path: string | undefined
+    redactEvent(
+      { request: { headers: { authorization: 'token abcdef' } } },
+      {
+        builtins: false,
+        patterns: [/abcdef/g],
+        replacement: (_match, ctx) => {
+          ({ path } = ctx)
+          return '[x]'
+        },
+      },
+    )
+    expect(path).toBe('request.headers.authorization')
+  })
+
+  it('falls back to [REDACTED] when the replacement throws', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const event = redactEvent(
+      { token: 'secret-value' },
+      {
+        builtins: false,
+        paths: ['token'],
+        replacement: () => {
+          throw new Error('bad policy')
+        },
+      },
+    )
+    expect(event.token).toBe('[REDACTED]')
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('falls back to [REDACTED] when the replacement returns a non-string', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const event = redactEvent(
+      { token: 'secret-value' },
+      { builtins: false, paths: ['token'], replacement: (() => 42) as unknown as RedactConfig['replacement'] },
+    )
+    expect(event.token).toBe('[REDACTED]')
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+
+  it('never leaks the raw value when a pattern replacement throws', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const event = redactEvent(
+      { path: '/claim/supersecrettoken' },
+      {
+        builtins: false,
+        patterns: [/supersecrettoken/g],
+        replacement: () => {
+          throw new Error('bad policy')
+        },
+      },
+    )
+    expect(event.path).toBe('/claim/[REDACTED]')
+    expect(error).toHaveBeenCalled()
+    error.mockRestore()
+  })
+})
+
+describe('redactEvent - transform', () => {
+  it('mutates the event in place without touching the source', () => {
+    const source: Record<string, unknown> = { tenant: 'regulated', query: 'name=alice' }
+    const event = redactEvent(source, {
+      builtins: false,
+      transform: (e) => {
+        if (e.tenant === 'regulated') delete e.query
+      },
+    })
+    expect(event).not.toHaveProperty('query')
+    expect(source.query).toBe('name=alice')
+  })
+
+  it('sees raw values, before the declarative stages run', () => {
+    let seen: unknown
+    redactEvent(
+      { user: { email: 'alice@example.com' } },
+      {
+        builtins: false,
+        paths: ['user.email'],
+        transform: (e) => {
+          seen = (e.user as Record<string, unknown>).email
+        },
+      },
+    )
+    expect(seen).toBe('alice@example.com')
+  })
+
+  it('still applies the declarative stages to what it leaves behind', () => {
+    const config = defined(resolveRedactConfig({ builtins: ['email'] }), 'redact config')
+    const event = redactEvent({ note: 'ping alice@example.com' }, {
+      ...config,
+      transform: (e) => {
+        e.extra = 'ping bob@example.com'
+      },
+    })
+    // A field the hook adds is masked by the built-ins that run after it.
+    expect(event.note).toBe('ping a***@***.com')
+    expect(event.extra).toBe('ping b***@***.com')
+  })
+
+  it('reports a throwing transform and keeps redacting', () => {
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const event = redactEvent(
+      { password: 'hunter2' },
+      {
+        builtins: false,
+        paths: ['password'],
+        transform: () => {
+          throw new Error('bad hook')
+        },
+      },
+    )
+    expect(event.password).toBe('[REDACTED]')
+    expect(error).toHaveBeenCalledWith('[evlog] redact transform failed:', expect.any(Error))
+    error.mockRestore()
+  })
+})
+
+describe('function-valued redact policy across the config bridge', () => {
+  it('passes a live function replacement through normalizeRedactConfig', () => {
+    const replacement = () => '[x]'
+    const config = normalizeRedactConfig({ paths: ['token'], replacement })
+    expect(config?.replacement).toBe(replacement)
+  })
+
+  it('passes a live transform through normalizeRedactConfig', () => {
+    const transform = () => {}
+    const config = normalizeRedactConfig({ transform })
+    expect(config?.transform).toBe(transform)
+  })
+
+  it('detects function-valued policy so config bridges can warn', () => {
+    expect(hasFunctionRedactPolicy({ replacement: () => '[x]' })).toBe(true)
+    expect(hasFunctionRedactPolicy({ transform: () => {} })).toBe(true)
+    expect(hasFunctionRedactPolicy({ paths: ['token'], replacement: '***' })).toBe(false)
+    expect(hasFunctionRedactPolicy(true)).toBe(false)
+    expect(hasFunctionRedactPolicy(undefined)).toBe(false)
+  })
+
+  it('drops function policy when the config is JSON-serialized, as the bridges do', () => {
+    const serialized = JSON.parse(JSON.stringify({
+      paths: ['token'],
+      replacement: () => '[x]',
+      transform: () => {},
+    })) as Record<string, unknown>
+
+    // The warning is the only signal left at this point — hence hasFunctionRedactPolicy
+    // being called before serialization, not after.
+    expect(hasFunctionRedactPolicy(serialized)).toBe(false)
+    expect(normalizeRedactConfig(serialized)?.replacement).toBeUndefined()
   })
 })

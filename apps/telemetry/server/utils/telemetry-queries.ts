@@ -194,11 +194,48 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
   }
 }
 
+/**
+ * Cheapest possible "has anything changed?" probe — two `max()` lookups the
+ * planner answers from the primary key and the `event_timestamp` index
+ * without touching the heap.
+ *
+ * This is what the dashboard polls on its fast cadence. Recomputing the full
+ * stats aggregation on every tick costs ~800ms of database CPU on a 30-day
+ * window; this costs a fraction of a millisecond, so the UI can check often
+ * and only pay for the real queries when an event actually landed.
+ *
+ * Deliberately unfiltered: a new run for a tool the viewer filtered out
+ * triggers one wasted (and server-cached) refresh, which is far cheaper than
+ * making the probe itself filter-aware.
+ */
+export async function getRunsCursor(): Promise<RunsCursor> {
+  if (await shouldUseMockData()) {
+    return { latestId: 0, latestAt: null }
+  }
+
+  const [row] = await db.select({
+    latestId: sql<number | null>`max(${schema.runs.id})`,
+    latestAt: sql<string | null>`max(${schema.runs.eventTimestamp})`,
+  }).from(schema.runs)
+
+  return {
+    latestId: Number(row?.latestId ?? 0),
+    latestAt: toIsoTimestamp(row?.latestAt),
+  }
+}
+
 export interface RunsPageOptions {
   sort: RunSortKey
   order: SortOrder
   page: number
   pageSize: number
+  /**
+   * Whether to also run the `count(*)` over the whole filtered range. Only
+   * the paginated table needs it; the live feed asks for 8 rows and shows no
+   * pagination, so it would otherwise pay for a full range scan on every
+   * single poll just to throw the number away.
+   */
+  withTotal?: boolean
 }
 
 /**
@@ -212,6 +249,7 @@ export async function getRunsPageForFilter(filter: RunsFilter, options: RunsPage
 
   const where = buildRunsWhere(filter)
   const sortColumn = RUN_SORT_COLUMNS[options.sort]
+  const withTotal = options.withTotal ?? true
 
   const [rows, [{ total } = { total: 0 }]] = await Promise.all([
     db.select({
@@ -232,7 +270,9 @@ export async function getRunsPageForFilter(filter: RunsFilter, options: RunsPage
       .limit(options.pageSize)
       .offset((options.page - 1) * options.pageSize),
 
-    db.select({ total: count() }).from(schema.runs).where(where),
+    withTotal
+      ? db.select({ total: count() }).from(schema.runs).where(where)
+      : Promise.resolve([{ total: 0 }]),
   ])
 
   return {

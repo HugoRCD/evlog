@@ -205,7 +205,80 @@ describe('initLogger + redact integration', () => {
       cause: expect.any(DOMException),
     })
   })
+
+  it('applies a computed replacement to the console sink', () => {
+    const infoSpy = vi.spyOn(console, 'info')
+
+    initLogger({
+      pretty: false,
+      stringify: true,
+      redact: {
+        builtins: false,
+        patterns: [/\/public\/claim\/([A-Za-z0-9._-]{12,})/g],
+        replacement: (_match, ctx) => `/public/claim/[tok:${fingerprint(defined(ctx.groups?.[0], 'token'))}]`,
+      },
+    })
+
+    const logger = createLogger({ path: '/public/claim/eyJhbGciOiJIUzI1NiJ9' })
+    logger.emit()
+
+    const output = defined(infoSpy.mock.calls[0]?.[0], 'console output') as string
+    expect(output).toContain('/public/claim/[tok:')
+    expect(output).not.toContain('eyJhbGciOiJIUzI1NiJ9')
+  })
+
+  it('runs transform before the console write', () => {
+    const infoSpy = vi.spyOn(console, 'info')
+
+    initLogger({
+      pretty: false,
+      stringify: true,
+      redact: {
+        builtins: false,
+        transform: (event) => {
+          if (event.tenant === 'regulated') delete event.query
+        },
+      },
+    })
+
+    const logger = createLogger({ tenant: 'regulated', query: 'name=alice' })
+    const event = defined(logger.emit(), 'emitted event')
+
+    expect(event).not.toHaveProperty('query')
+    expect(defined(infoSpy.mock.calls[0]?.[0], 'console output') as string).not.toContain('name=alice')
+  })
+
+  it('keeps logging when a transform throws', () => {
+    const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const infoSpy = vi.spyOn(console, 'info')
+
+    initLogger({
+      pretty: false,
+      stringify: true,
+      redact: {
+        paths: ['password'],
+        transform: () => {
+          throw new Error('bad hook')
+        },
+      },
+    })
+
+    const logger = createLogger({ password: 'hunter2', route: '/checkout' })
+    const event = defined(logger.emit(), 'emitted event')
+
+    expect(event.password).toBe('[REDACTED]')
+    expect(event.route).toBe('/checkout')
+    expect(errorSpy).toHaveBeenCalled()
+    expect(infoSpy).toHaveBeenCalled()
+  })
 })
+
+/** Stand-in for a real keyed hash — the point is that it is derived and stable. */
+function fingerprint(value: string): string {
+  let hash = 0
+  for (let i = 0; i < value.length; i++) hash = (hash * 31 + value.charCodeAt(i)) | 0
+  return (hash >>> 0).toString(16).slice(0, 6)
+}
 
 describe('default redaction behavior', () => {
   const originalNodeEnv = process.env.NODE_ENV

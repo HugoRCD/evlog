@@ -24,7 +24,8 @@ Score what your app can tell you when something goes wrong. Diagnose your instal
 Try without installing:
 
 ```bash
-npx @evlog/cli map
+npx @evlog/cli init          # interactive setup — pick a destination, review the plan
+npx @evlog/cli map           # score what is still dark
 npx @evlog/cli map --json --no-write
 ```
 
@@ -40,11 +41,21 @@ pnpm evlog doctor
 
 | Command | What it does |
 | --- | --- |
+| `evlog init` | Interactive setup: install, register the framework integration, wire a drain |
+| `evlog init --yes` | Non-interactive — defaults for everything (also implied by `--json`, no TTY, or `CI`) |
+| `evlog init --drain <id>` | Development sink: `fs` (default) or `none` |
+| `evlog init --prod-drain <a,b>` | `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx` — several fan out |
+| `evlog init --extras <a,b>` | `enrichers`, `pipeline`, `sampling`, `error-catalog`, `audit-catalog`, `ai`, `better-auth`, `vite` |
+| `evlog init --apps <a,b>` | Workspace packages to set up, from a monorepo root |
+| `evlog init --dry-run` | Print the plan without touching a file |
+| `evlog init --service <name>` | Service name on every wide event (default: package name, unscoped) |
+| `evlog init --no-install` | Print the install command instead of running it |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |
 | `evlog map --framework <name>` | Override framework detection (`nuxt`, `nitro`, `next`, `tanstack-start`) |
 | `evlog map --min-score <n>` | Exit 1 if the global score is below `n` |
+| `evlog map --baseline [ref]` | Exit 1 on a regression against the committed `evlog.map.json` (path, or `git:<ref>`) |
 | `evlog map --no-write` | Skip writing `evlog.map.json` to the project root |
 | `evlog map --verbose` | Show per-file parse warnings |
 | `evlog map --cwd <dir>` | Scan another app in the workspace |
@@ -96,11 +107,15 @@ With `--json`, the payload is the **only** thing written to stdout — everythin
 }
 ```
 
+With `--baseline`, the payload gains a `baseline` key holding the comparison (`regressions`, `fixed`, `added`, `removed`, `delta`).
+
 Breaking either shape requires a `schemaVersion` bump. In `routes[]`, `checks` holds the requirements that move the score and `suggestions` holds the opportunities that never do — separate keys so a suggestion can't be mistaken for a failure.
 
 ## Telemetry
 
-The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents. Delivered to evlog's own dashboard (`apps/telemetry` in this repo); override with `EVLOG_TELEMETRY_ENDPOINT` to point at your own instance. Opt out anytime:
+The CLI records **one anonymous wide event per command** via [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) (tool name `evlog-cli`): command name, duration, outcome, sanitized flags. No arguments, paths, or file contents.
+
+`evlog init` also records **which options you picked** — the framework, the destinations, the extras, the sampling preset, and counts (files written, manual steps left). Every value is an id from the CLI's own catalog, enforced by an allowlist, so a free-text answer can never be sent: your service name, your package name and anything read out of your source stay on your machine. Delivered to evlog's own dashboard (`apps/telemetry` in this repo); override with `EVLOG_TELEMETRY_ENDPOINT` to point at your own instance. Opt out anytime:
 
 ```bash
 evlog telemetry disable   # or DO_NOT_TRACK=1 / EVLOG_TELEMETRY=0

@@ -20,6 +20,11 @@ allowBuilds:
   maplibre-gl: false
 
 overrides:
+  # A second @types/react copy makes React.Key incompatible with itself in
+  # examples/eve; a second rolldown splits @nuxt/icon into two peer variants
+  # that shamefullyHoist then refuses to hoist, breaking apps/playground.
+  '@types/react': 19.2.17
+  tsdown@0.22.8>rolldown: 1.2.0
   minimark: 0.2.0
   '@nuxtjs/mcp-toolkit': ^0.18.0
   # eve 0.12 requires AI SDK 7 when resolved from the example package tree.

@@ -1,0 +1,276 @@
+{
+  "title": "evlog \u2014 wide events",
+  "uid": "evlog-wide-events",
+  "tags": [
+    "evlog"
+  ],
+  "timezone": "browser",
+  "schemaVersion": 39,
+  "refresh": "10s",
+  "time": {
+    "from": "now-30m",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "type": "stat",
+      "title": "Events",
+      "id": 1,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 0,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT count() AS events FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Errors",
+      "id": 2,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 6,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT countIf(level = 'error') AS errors FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "thresholds": {
+            "mode": "absolute",
+            "steps": [
+              {
+                "color": "green",
+                "value": null
+              },
+              {
+                "color": "red",
+                "value": 1
+              }
+            ]
+          }
+        },
+        "overrides": []
+      },
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Services",
+      "id": 3,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 12,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT uniqExact(service) AS services FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service)",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "stat",
+      "title": "Routes",
+      "id": 4,
+      "gridPos": {
+        "h": 4,
+        "w": 6,
+        "x": 18,
+        "y": 0
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT uniqExact(path) AS routes FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) AND path != ''",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "options": {
+        "reduceOptions": {
+          "calcs": [
+            "lastNotNull"
+          ]
+        }
+      }
+    },
+    {
+      "type": "timeseries",
+      "title": "Events by level",
+      "id": 5,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 0,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT $__timeInterval(timestamp) AS time, level, count() AS n FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) GROUP BY time, level ORDER BY time",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "custom": {
+            "drawStyle": "bars",
+            "stacking": {
+              "mode": "normal"
+            }
+          }
+        },
+        "overrides": []
+      }
+    },
+    {
+      "type": "barchart",
+      "title": "Top routes",
+      "id": 6,
+      "gridPos": {
+        "h": 8,
+        "w": 12,
+        "x": 12,
+        "y": 4
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT path, count() AS hits FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) AND path != '' GROUP BY path ORDER BY hits DESC LIMIT 10",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "options": {
+        "orientation": "horizontal",
+        "xTickLabelRotation": 0,
+        "showValue": "always",
+        "legend": {
+          "showLegend": false
+        }
+      }
+    },
+    {
+      "type": "table",
+      "title": "Recent wide events",
+      "id": 7,
+      "gridPos": {
+        "h": 11,
+        "w": 24,
+        "x": 0,
+        "y": 12
+      },
+      "description": "The typed columns. Full event JSON lives in `data` \u2014 click a row to expand.",
+      "targets": [
+        {
+          "refId": "A",
+          "datasource": {
+            "type": "grafana-clickhouse-datasource",
+            "uid": "evlog-clickhouse"
+          },
+          "rawSql": "SELECT timestamp, level, service, method, path, status, duration, request_id, error_name, error_message, data FROM evlog_events WHERE $__timeFilter(timestamp) AND service IN ($service) ORDER BY timestamp DESC LIMIT 100",
+          "format": 1,
+          "queryType": "sql"
+        }
+      ],
+      "options": {
+        "cellHeight": "sm",
+        "footer": {
+          "show": false
+        }
+      }
+    }
+  ],
+  "templating": {
+    "list": [
+      {
+        "name": "service",
+        "label": "Service",
+        "type": "query",
+        "datasource": {
+          "type": "grafana-clickhouse-datasource",
+          "uid": "evlog-clickhouse"
+        },
+        "rawSql": "SELECT DISTINCT service FROM evlog_events ORDER BY service",
+        "query": "SELECT DISTINCT service FROM evlog_events ORDER BY service",
+        "refresh": 1,
+        "includeAll": true,
+        "multi": true,
+        "current": {
+          "text": [
+            "evlog-sandbox"
+          ],
+          "value": [
+            "evlog-sandbox"
+          ],
+          "selected": true
+        }
+      }
+    ]
+  }
+}

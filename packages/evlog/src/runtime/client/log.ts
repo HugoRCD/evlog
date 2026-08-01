@@ -109,8 +109,38 @@ function emitTaggedLog(level: LogLevel, tag: string, message: string): void {
   }
 }
 
+const ERROR_FIELDS = ['code', 'status', 'statusText', 'statusCode', 'statusMessage', 'data', 'internal', 'why', 'fix', 'link'] as const
+
+/**
+ * `name`, `message` and `stack` live on the prototype, so spreading an Error
+ * into an event yields nothing. Mirrors the shape the server logger stores.
+ */
+function serializeError(error: Error, seen = new Set<unknown>()): Record<string, unknown> {
+  const serialized: Record<string, unknown> = {
+    name: error.name,
+    message: error.message,
+    stack: error.stack,
+  }
+
+  const record = error as unknown as Record<string, unknown>
+  for (const key of ERROR_FIELDS) {
+    if (key in error) serialized[key] = record[key]
+  }
+
+  if ('cause' in error) {
+    seen.add(error)
+    const { cause } = error
+    // A nested Error would JSON.stringify to {}, dropping its message entirely.
+    serialized.cause = cause instanceof Error && !seen.has(cause)
+      ? serializeError(cause, seen)
+      : cause
+  }
+
+  return serialized
+}
+
 function createLogMethod(level: LogLevel) {
-  return function logMethod(tagOrEvent: string | Record<string, unknown>, message?: string): void {
+  return function logMethod(tagOrEvent: string | Error | Record<string, unknown>, message?: string): void {
     // Call-time check: avoid relying on import.meta.client (can be false in some mixed bundles).
     if (!isBrowser()) {
       return
@@ -118,6 +148,8 @@ function createLogMethod(level: LogLevel) {
 
     if (typeof tagOrEvent === 'string' && message !== undefined) {
       emitTaggedLog(level, tagOrEvent, message)
+    } else if (tagOrEvent instanceof Error) {
+      emitLog(level, { error: serializeError(tagOrEvent) })
     } else if (typeof tagOrEvent === 'object') {
       emitLog(level, tagOrEvent)
     } else {

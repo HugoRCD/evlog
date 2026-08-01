@@ -56,7 +56,7 @@ function barTone(value: number): string {
 }
 
 const timers: ReturnType<typeof setTimeout>[] = []
-let ticker: ReturnType<typeof setInterval> | undefined
+let frame: number | undefined
 let observer: IntersectionObserver | undefined
 
 function snapToEnd() {
@@ -66,14 +66,17 @@ function snapToEnd() {
   raised.value = true
 }
 
+const COUNT_UP_MS = 900
+
+/** On the frame clock: a 24ms interval lands between frames and stutters. */
 function countUp() {
-  ticker = setInterval(() => {
-    score.value += 2
-    if (score.value >= FINAL_SCORE) {
-      score.value = FINAL_SCORE
-      clearInterval(ticker)
-    }
-  }, 24)
+  const startedAt = performance.now()
+  const step = (now: number) => {
+    const progress = Math.min((now - startedAt) / COUNT_UP_MS, 1)
+    score.value = Math.round(FINAL_SCORE * progress)
+    if (progress < 1) frame = requestAnimationFrame(step)
+  }
+  frame = requestAnimationFrame(step)
 }
 
 function start() {
@@ -118,7 +121,7 @@ onMounted(() => {
 onBeforeUnmount(() => {
   observer?.disconnect()
   timers.forEach(clearTimeout)
-  if (ticker) clearInterval(ticker)
+  if (frame !== undefined) cancelAnimationFrame(frame)
 })
 </script>
 
@@ -139,7 +142,7 @@ onBeforeUnmount(() => {
           <h2 class="section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-2xl blur-xs animate-pulse pointer-events-none">
+          <div aria-hidden="true" class="title-glow section-title max-w-2xl">
             <slot name="title" mdc-unwrap="p" /><span class="text-primary">.</span>
           </div>
         </div>
@@ -182,8 +185,9 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="p-5 sm:p-6 flex-1 space-y-5">
-            <div class="flex items-end gap-5">
-              <div class="shrink-0">
+            <!-- Same width and gap as the coverage labels, so both start on one vertical. -->
+            <div class="flex items-end gap-3">
+              <div class="w-32 shrink-0">
                 <p class="font-mono text-[10px] uppercase tracking-wide text-dimmed">
                   score
                 </p>
@@ -195,13 +199,14 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="flex-1 flex h-14 items-end gap-px" aria-hidden="true">
+                <!-- Scaled, not resized: `height` on 29 flex siblings re-runs layout every frame. -->
                 <div
                   v-for="(value, i) in skyline"
                   :key="i"
-                  class="flex-1 transition-all ease-out"
+                  class="flex-1 h-full origin-bottom transition-transform ease-out"
                   :class="barTone(value)"
                   :style="{
-                    height: started ? `${value}%` : '4%',
+                    transform: `scaleY(${started ? value / 100 : 0.04})`,
                     transitionDuration: prefersReducedMotion ? '0ms' : '500ms',
                     transitionDelay: prefersReducedMotion ? '0ms' : `${i * 22}ms`,
                   }"
@@ -215,13 +220,13 @@ onBeforeUnmount(() => {
                 :key="area.label"
                 class="flex items-center gap-3 font-mono text-[11px]"
               >
-                <span class="w-28 shrink-0 truncate text-muted">{{ area.label }}</span>
+                <span class="w-32 shrink-0 truncate text-muted">{{ area.label }}</span>
                 <div class="relative h-1.5 flex-1 bg-elevated">
                   <div
-                    class="absolute inset-y-0 left-0 transition-all ease-out"
+                    class="absolute inset-0 origin-left transition-transform ease-out"
                     :class="barTone(area.score)"
                     :style="{
-                      width: started ? `${area.score}%` : '0%',
+                      transform: `scaleX(${started ? area.score / 100 : 0})`,
                       transitionDuration: prefersReducedMotion ? '0ms' : '700ms',
                       transitionDelay: prefersReducedMotion ? '0ms' : `${900 + i * 140}ms`,
                     }"

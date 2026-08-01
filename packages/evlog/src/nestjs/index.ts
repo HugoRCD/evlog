@@ -2,14 +2,14 @@ import type { ServerResponse } from 'node:http'
 import type { Request } from 'express'
 import type { DynamicModule, MiddlewareConsumer, NestModule } from '@nestjs/common'
 import type { AuditableLogger } from '../audit'
-import { createMiddlewareLogger, type BaseEvlogOptions } from '../shared/middleware'
-import { attachForkToLogger } from '../shared/fork'
-import { extractSafeNodeHeaders } from '../shared/headers'
+import { defineFrameworkIntegration } from '../shared/integration'
+import type { BaseEvlogOptions } from '../shared/middleware'
 import { bindNodeResponseLifecycle } from '../shared/nodeResponse'
 import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure EvlogModule.forRoot() is imported in your AppModule.',
+  'evlog:nestjs',
 )
 
 export type EvlogNestJSOptions = BaseEvlogOptions
@@ -37,32 +37,32 @@ declare module 'express-serve-static-core' {
   }
 }
 
+const integration = defineFrameworkIntegration<Request>({
+  name: 'nestjs',
+  extractRequest: (req) => ({
+    method: req.method || 'GET',
+    path: new URL(req.originalUrl || req.url || '/', 'http://localhost').pathname,
+    headers: req.headers,
+    requestId: typeof req.headers['x-request-id'] === 'string' ? req.headers['x-request-id'] : undefined,
+  }),
+  attachLogger: (req, logger) => {
+    req.log = logger
+  },
+  storage,
+})
+
 function createEvlogMiddleware(getOptions: () => EvlogNestJSOptions) {
   return (req: Request, res: ServerResponse, next: () => void) => {
-    const options = getOptions()
-    const headers = extractSafeNodeHeaders(req.headers)
-    const url = new URL(req.originalUrl || req.url || '/', 'http://localhost')
-
-    const middlewareOpts = {
-      method: req.method || 'GET',
-      path: url.pathname,
-      requestId: headers['x-request-id'] || crypto.randomUUID(),
-      headers,
-      ...options,
-    }
-    const { logger, finish, skipped } = createMiddlewareLogger(middlewareOpts)
+    const { logger, finish, skipped, runWith } = integration.start(req, getOptions())
 
     if (skipped) {
       next()
       return
     }
 
-    attachForkToLogger(storage, logger, middlewareOpts)
-    req.log = logger
-
     bindNodeResponseLifecycle(res, logger, finish)
 
-    storage.run(logger, () => next())
+    void runWith(() => next())
   }
 }
 

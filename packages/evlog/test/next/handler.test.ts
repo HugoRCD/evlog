@@ -545,4 +545,64 @@ describe('withEvlog', () => {
     expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
     expect(drainMock.mock.calls[0]?.[0]?.event?.ai).toEqual({ calls: 1, totalTokens: 42 })
   })
+
+  describe('shared middleware pipeline', () => {
+    it('applies plugins (previously ignored in Next)', async () => {
+      const pluginDrain = vi.fn()
+      const pluginEnrich = vi.fn((ctx) => {
+        ctx.event.viaPlugin = true
+      })
+      const withEvlog = createWithEvlog({
+        pretty: false,
+        plugins: [{ name: 'test-plugin', enrich: pluginEnrich, drain: pluginDrain }],
+      })
+
+      const handler = withEvlog((_: Request) => new Response('ok'))
+      await handler(new Request('http://localhost/api/test', { method: 'GET' }))
+
+      await vi.waitFor(() => {
+        expect(pluginDrain).toHaveBeenCalledTimes(1)
+      })
+      expect(pluginEnrich).toHaveBeenCalledTimes(1)
+      expect(pluginDrain.mock.calls[0][0].event.viaPlugin).toBe(true)
+    })
+
+    it('exposes duration to the keep callback', async () => {
+      const seen: Array<number | undefined> = []
+      const withEvlog = createWithEvlog({
+        pretty: false,
+        keep: (ctx) => {
+          seen.push(ctx.duration)
+        },
+        drain: vi.fn(),
+      })
+
+      const handler = withEvlog((_: Request) => new Response('ok'))
+      await handler(new Request('http://localhost/api/test', { method: 'GET' }))
+
+      expect(seen).toHaveLength(1)
+      expect(typeof seen[0]).toBe('number')
+    })
+
+    // `shouldKeep()` matches on `ctx.duration`, which Next's old hand-rolled
+    // tail context never carried — so a duration-based keep rule could not fire.
+    it('honors global sampling.keep conditions', async () => {
+      const drainMock = vi.fn()
+      const withEvlog = createWithEvlog({
+        pretty: false,
+        sampling: {
+          rates: { info: 0 }, // head sampling drops everything
+          keep: [{ duration: 0 }], // tail sampling keeps it back
+        },
+        drain: drainMock,
+      })
+
+      const handler = withEvlog((_: Request) => new Response('ok'))
+      await handler(new Request('http://localhost/api/test', { method: 'GET' }))
+
+      await vi.waitFor(() => {
+        expect(drainMock).toHaveBeenCalledTimes(1)
+      })
+    })
+  })
 })

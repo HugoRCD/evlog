@@ -1,4 +1,5 @@
 import doctor from './doctor'
+import init from './init'
 import map from './map'
 import telemetry from './telemetry'
 
@@ -14,6 +15,7 @@ import telemetry from './telemetry'
  * grows when the surface expands (audit, map, push, …).
  */
 export const subCommands = {
+  init,
   doctor,
   map,
   telemetry,

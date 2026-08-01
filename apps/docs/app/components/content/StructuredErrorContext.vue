@@ -1,5 +1,4 @@
 <script setup lang="ts">
-import { Motion } from 'motion-v'
 import type { TimedEvent } from '~/composables/useTimedSequence'
 
 interface ErrorField {
@@ -125,13 +124,7 @@ const reachedRendered = computed(() => phase.value === 'rendered')
 </script>
 
 <template>
-  <Motion
-    :initial="prefersReducedMotion ? { opacity: 1 } : { opacity: 0, y: 16 }"
-    :while-in-view="{ opacity: 1, y: 0 }"
-    :transition="{ duration: 0.5 }"
-    :in-view-options="{ once: true, amount: 0.2 }"
-    class="not-prose my-8"
-  >
+  <div class="not-prose my-8">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2.5">
         <UIcon name="i-lucide-shield-alert" class="size-3.5 text-primary" />
@@ -259,5 +252,5 @@ err.fix     <span class="text-dimmed">→</span> <span class="text-rose-400/80">
         </div>
       </div>
     </div>
-  </Motion>
+  </div>
 </template>

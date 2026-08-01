@@ -1,6 +1,6 @@
 {
   "name": "@evlog/cli",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "The official command line for evlog",
   "author": "HugoRCD <contact@hrcd.fr>",
   "homepage": "https://evlog.dev",
@@ -55,6 +55,7 @@
     "typecheck": "echo 'Typecheck handled by build'"
   },
   "dependencies": {
+    "@clack/prompts": "^1.7.0",
     "@evlog/telemetry": "workspace:*",
     "citty": "^0.2.2",
     "evlog": "workspace:*",

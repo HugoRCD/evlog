@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 
 export interface DatadogConfig {
   /** Datadog API key with Logs intake permission */
@@ -99,11 +99,33 @@ export function resolveDatadogLogStatus(event: WideEvent): 'error' | 'warn' | 'i
 }
 
 /**
+ * Lift `event.traceId` / `event.spanId` into Datadog’s reserved **`dd`** block.
+ *
+ * Datadog’s log-to-trace correlation only reads `dd.trace_id` / `dd.span_id` at the **root** of the
+ * log payload — the copies nested under `evlog` are searchable but never correlate. Populated by
+ * `createTraceContextEnricher` (part of `createDefaultEnrichers()`), so this works out of the box.
+ *
+ * Returns `undefined` when neither id is a non-empty string, so the key stays absent for anyone
+ * not running trace context.
+ */
+export function resolveDatadogTraceContext(event: WideEvent): Record<string, string> | undefined {
+  const dd: Record<string, string> = {}
+  if (typeof event.traceId === 'string' && event.traceId.length > 0) {
+    dd.trace_id = event.traceId
+  }
+  if (typeof event.spanId === 'string' && event.spanId.length > 0) {
+    dd.span_id = event.spanId
+  }
+  return Object.keys(dd).length > 0 ? dd : undefined
+}
+
+/**
  * Map an evlog wide event to a [Datadog Logs API v2](https://docs.datadoghq.com/api/latest/logs/) log object.
  *
  * Shape:
  * - **`message`** — short line for the list view (`formatDatadogMessageLine`)
  * - **`evlog`** — full sanitized wide event (HTTP codes as `httpStatusCode`); use facets like `@evlog.path`
+ * - **`dd`** — `{ trace_id, span_id }` when the event carries trace context, for log-to-trace correlation
  * - **`status`**, **`service`**, **`ddsource`**, **`ddtags`**, **`timestamp`** — Datadog standard fields
  */
 export function toDatadogLog(event: WideEvent): Record<string, unknown> {
@@ -114,6 +136,8 @@ export function toDatadogLog(event: WideEvent): Record<string, unknown> {
     tags.push(`version:${String(versionTag)}`)
   }
 
+  const dd = resolveDatadogTraceContext(event)
+
   return {
     message: formatDatadogMessageLine(event),
     evlog: sanitizeWideEventForDatadog(event),
@@ -121,6 +145,7 @@ export function toDatadogLog(event: WideEvent): Record<string, unknown> {
     status: resolveDatadogLogStatus(event),
     ddsource: 'evlog',
     ddtags: tags.join(','),
+    ...(dd ? { dd } : {}),
     ...(Number.isFinite(ms) ? { timestamp: ms } : {}),
   }
 }
@@ -166,15 +191,24 @@ export function createDatadogDrain(overrides?: Partial<DatadogConfig>) {
       }
       return config as DatadogConfig
     },
-    encode: (events, config) => ({
-      url: resolveDatadogIntakeUrl(config),
-      headers: {
-        'Content-Type': 'application/json',
-        'DD-API-KEY': config.apiKey,
-      },
-      body: JSON.stringify(events.map(toDatadogLog)),
-    }),
+    label: 'Datadog',
+    encode: encodeDatadogRequest,
   })
+}
+
+/**
+ * Encode a batch of wide events into the Datadog Logs intake request. Shared by
+ * {@link createDatadogDrain} and {@link sendBatchToDatadog}.
+ */
+function encodeDatadogRequest(events: WideEvent[], config: DatadogConfig): HttpDrainRequest {
+  return {
+    url: resolveDatadogIntakeUrl(config),
+    headers: {
+      'Content-Type': 'application/json',
+      'DD-API-KEY': config.apiKey,
+    },
+    body: JSON.stringify(events.map(toDatadogLog)),
+  }
 }
 
 /**
@@ -189,19 +223,10 @@ export async function sendToDatadog(event: WideEvent, config: DatadogConfig): Pr
  */
 export async function sendBatchToDatadog(events: WideEvent[], config: DatadogConfig): Promise<void> {
   if (events.length === 0) return
-
-  const url = resolveDatadogIntakeUrl(config)
-
-  await httpPost({
-    url,
-    headers: {
-      'Content-Type': 'application/json',
-      'DD-API-KEY': config.apiKey,
-    },
-    body: JSON.stringify(events.map(toDatadogLog)),
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  await sendEncodedDrainRequest(encodeDatadogRequest(events, config), {
     label: 'Datadog',
     source: 'datadog',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }

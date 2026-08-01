@@ -1,8 +1,8 @@
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
-import { httpPost } from '../shared/http'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 import { OTEL_SEVERITY_NUMBER } from '../shared/severity'
 
 export interface SentryConfig {
@@ -232,19 +232,26 @@ export function createSentryDrain(overrides?: Partial<SentryConfig>) {
       }
       return config as SentryConfig
     },
-    encode: (events, config) => {
-      const { url, authHeader } = getSentryEnvelopeUrl(config.dsn)
-      const logs = events.map(event => toSentryLog(event, config))
-      return {
-        url,
-        headers: {
-          'Content-Type': 'application/x-sentry-envelope',
-          'X-Sentry-Auth': authHeader,
-        },
-        body: buildEnvelopeBody(logs, config.dsn),
-      }
-    },
+    label: 'Sentry',
+    encode: encodeSentryRequest,
   })
+}
+
+/**
+ * Encode a batch of wide events into the Sentry envelope request. Shared by
+ * {@link createSentryDrain} and {@link sendBatchToSentry}.
+ */
+function encodeSentryRequest(events: WideEvent[], config: SentryConfig): HttpDrainRequest {
+  const { url, authHeader } = getSentryEnvelopeUrl(config.dsn)
+  const logs = events.map(event => toSentryLog(event, config))
+  return {
+    url,
+    headers: {
+      'Content-Type': 'application/x-sentry-envelope',
+      'X-Sentry-Auth': authHeader,
+    },
+    body: buildEnvelopeBody(logs, config.dsn),
+  }
 }
 
 /**
@@ -273,22 +280,10 @@ export async function sendToSentry(event: WideEvent, config: SentryConfig): Prom
  */
 export async function sendBatchToSentry(events: WideEvent[], config: SentryConfig): Promise<void> {
   if (events.length === 0) return
-
-  const { url, authHeader } = getSentryEnvelopeUrl(config.dsn)
-
-  const logs = events.map(event => toSentryLog(event, config))
-  const body = buildEnvelopeBody(logs, config.dsn)
-
-  await httpPost({
-    url,
-    headers: {
-      'Content-Type': 'application/x-sentry-envelope',
-      'X-Sentry-Auth': authHeader,
-    },
-    body,
-    timeout: config.timeout ?? 5000,
-    retries: config.retries,
+  await sendEncodedDrainRequest(encodeSentryRequest(events, config), {
     label: 'Sentry',
     source: 'sentry',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }

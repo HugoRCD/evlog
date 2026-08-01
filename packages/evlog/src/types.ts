@@ -92,6 +92,40 @@ export interface IngestPayload {
 }
 
 /**
+ * Context describing *what* is being redacted and *where*, passed to a
+ * function-valued {@link RedactConfig.replacement}.
+ */
+export interface RedactReplacementContext {
+  /** Dot-notation path of the field from the event root (e.g. `user.email`, `items.0.token`). */
+  path: string
+  /** Leaf key of the field (e.g. `email`). Empty for the event root. */
+  key: string
+  /**
+   * Capture groups of the matching `patterns` entry, in order.
+   * Only set when the replacement was triggered by `patterns`; `undefined` for `paths`.
+   */
+  groups?: Array<string | undefined>
+}
+
+/**
+ * Replacement used for `paths` and `patterns` redaction.
+ *
+ * A string is used verbatim. A function is called once per redacted value and
+ * must return the replacement synchronously — use it when the replacement has
+ * to be *derived* from the value (e.g. a stable fingerprint that keeps requests
+ * correlatable without exposing the credential).
+ *
+ * The function receives the matched value: the whole field value for `paths`
+ * (any type, since path redaction replaces entire subtrees), the matched
+ * substring for `patterns`. If it throws or returns a non-string, redaction
+ * falls back to `'[REDACTED]'` — a broken policy degrades to over-redaction,
+ * never to leaking the raw value.
+ */
+export type RedactReplacement =
+  | string
+  | ((matched: unknown, ctx: RedactReplacementContext) => string)
+
+/**
  * Auto-redaction configuration for PII protection.
  * Scrubs sensitive data from wide events before console output and draining.
  *
@@ -119,11 +153,52 @@ export interface RedactConfig {
    */
   builtins?: false | Array<'creditCard' | 'email' | 'ipv4' | 'phone' | 'jwt' | 'bearer' | 'iban'>
   /**
-   * Replacement string used for path- and custom pattern redaction.
+   * Replacement used for path- and custom pattern redaction.
    * Built-in patterns use smart partial masking instead (e.g. `****1111` for credit cards).
+   *
+   * Pass a function to compute the replacement from the matched value — see
+   * {@link RedactReplacement}.
+   *
    * @default '[REDACTED]'
+   *
+   * @example
+   * ```ts
+   * // Keep requests correlatable without exposing the credential
+   * initLogger({
+   *   redact: {
+   *     patterns: [/\/public\/claim\/([A-Za-z0-9._-]{12,})/g],
+   *     replacement: (_match, ctx) => `/public/claim/[tok:${fingerprint(ctx.groups?.[0] ?? '')}]`,
+   *   },
+   * })
+   * ```
    */
-  replacement?: string
+  replacement?: RedactReplacement
+  /**
+   * Escape hatch for policies that cannot be expressed declaratively —
+   * conditional on a sibling field, tenant-scoped, schema-driven, or
+   * allowlist-shaped rather than denylist-shaped.
+   *
+   * Runs **before** `paths`, `builtins`, and `patterns`, so it sees raw values
+   * and the declarative rules still apply to whatever it leaves behind. Mutate
+   * the event in place; it is already a private clone, so the caller's object is
+   * never touched. Must be synchronous — it runs on the emit path, before the
+   * console write.
+   *
+   * Errors are caught and reported the way drain failures are: the declarative
+   * stages still run and the event is still logged.
+   *
+   * @example
+   * ```ts
+   * initLogger({
+   *   redact: {
+   *     transform: (event) => {
+   *       if (event.tenant === 'regulated') delete event.query
+   *     },
+   *   },
+   * })
+   * ```
+   */
+  transform?: (event: WideEvent) => void
   /** @internal Resolved masker functions from built-in patterns. Not user-facing. */
   _maskers?: Array<[RegExp, (match: string) => string]>
   /** @internal Precompiled matchers for `paths`, built once by `resolveRedactConfig`. Not user-facing. */
@@ -797,8 +872,10 @@ export interface Log {
    * Log an error message or wide event
    * @example log.error('payment', 'Payment failed')
    * @example log.error({ action: 'payment', error: 'declined' })
+   * @example log.error(new Error('Payment declined'))
    */
   error(tag: string, message: string): void
+  error(error: Error): void
   error(event: Record<string, unknown>): void
 
   /**

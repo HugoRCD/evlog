@@ -1,0 +1,26 @@
+{
+  "name": "render-labs",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "dev": "nuxt dev",
+    "dev:prepare": "nuxt prepare",
+    "build": "nuxt build",
+    "brand:assets": "node scripts/generate-brand-assets.mjs",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "typecheck": "vue-tsc --noEmit"
+  },
+  "dependencies": {
+    "@nuxt/fonts": "0.14.0",
+    "@nuxt/ui": "^4.10.0",
+    "@vercel/analytics": "^2.0.1",
+    "motion-v": "^2.3.0",
+    "nuxt": "^4.4.4"
+  },
+  "devDependencies": {
+    "eslint": "^9.39.5",
+    "evlog-docs": "workspace:*",
+    "sharp": "^0.34.5"
+  }
+}

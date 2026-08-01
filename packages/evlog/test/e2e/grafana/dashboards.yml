@@ -1,0 +1,11 @@
+# Loads every dashboard JSON in the mounted folder at boot.
+apiVersion: 1
+providers:
+  - name: evlog
+    type: file
+    folder: evlog
+    updateIntervalSeconds: 30
+    allowUiUpdates: true
+    options:
+      path: /etc/grafana/provisioning/dashboards-data
+      foldersFromFilesStructure: false

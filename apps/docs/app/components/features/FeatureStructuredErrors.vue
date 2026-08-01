@@ -25,7 +25,7 @@ const pills = [
           <h2 class="section-title max-w-lg">
             Errors that explain why<span class="text-primary">.</span>
           </h2>
-          <div aria-hidden="true" class="absolute inset-0 section-title max-w-lg blur-xs animate-pulse">
+          <div aria-hidden="true" class="title-glow section-title max-w-lg">
             Errors that explain why<span class="text-primary">.</span>
           </div>
         </div>

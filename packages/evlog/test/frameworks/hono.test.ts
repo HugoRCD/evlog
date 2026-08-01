@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import { initLogger } from '../../src/logger'
-import { evlog, type EvlogVariables } from '../../src/hono/index'
+import { evlog, useLogger, type EvlogVariables } from '../../src/hono/index'
 import {
   assertDrainCalledWith,
   assertEnrichBeforeDrain,
@@ -175,6 +175,74 @@ describe('evlog/hono', () => {
 
     await app.request('/_internal/probe')
     expect(logValue).toBeUndefined()
+  })
+
+  describe('waitUntil', () => {
+    it('returns the response before a slow drain settles, via executionCtx.waitUntil', async () => {
+      // A drain that stays pending until we release it: if the response only
+      // resolved after the drain, this test would time out rather than pass.
+      let releaseDrain!: () => void
+      const drainDone = new Promise<void>((resolve) => {
+        releaseDrain = resolve
+      })
+      const drain = vi.fn().mockReturnValue(drainDone)
+
+      const pending: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => pending.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      const response = await app.request('/api/test', {}, {}, executionCtx)
+
+      // Response is done while the drain is still in flight.
+      expect(response.status).toBe(200)
+      expect(drain).toHaveBeenCalledTimes(1)
+      expect(pending).toHaveLength(1)
+
+      let settled = false
+      void Promise.all(pending).then(() => {
+        settled = true
+      })
+      await Promise.resolve()
+      expect(settled).toBe(false)
+
+      releaseDrain()
+      await Promise.all(pending)
+      expect(settled).toBe(true)
+
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('drains inline when the runtime has no executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test')
+
+      assertDrainCalledWith(drain, { path: '/api/test', method: 'GET', status: 200 })
+    })
+
+    it('per-request options.waitUntil takes precedence over executionCtx', async () => {
+      const { drain } = createPipelineSpies()
+      const fromOption: Promise<unknown>[] = []
+      const fromCtx: Promise<unknown>[] = []
+      const executionCtx = { waitUntil: (p: Promise<unknown>) => fromCtx.push(p), passThroughOnException: () => {} }
+
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain, waitUntil: (p) => fromOption.push(p) }))
+      app.get('/api/test', (c) => c.json({ ok: true }))
+
+      await app.request('/api/test', {}, {}, executionCtx)
+
+      expect(fromOption.length).toBeGreaterThan(0)
+      expect(fromCtx).toHaveLength(0)
+      await Promise.all(fromOption)
+    })
   })
 
   describe('drain / enrich / keep', () => {
@@ -387,6 +455,94 @@ describe('evlog/hono', () => {
 
       expect(warnSpy.mock.calls.some(([message]) => String(message).includes('Keys dropped: ai'))).toBe(false)
       expect(drain.mock.calls[0]?.[0]?.event?.ai).toEqual({ calls: 1, totalTokens: 42 })
+    })
+  })
+
+  describe('useLogger', () => {
+    it('returns the same logger as c.get("log")', async () => {
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog())
+
+      let fromContext: unknown
+      let fromUseLogger: unknown
+      app.get('/api/test', (c) => {
+        fromContext = c.get('log')
+        fromUseLogger = useLogger()
+        return c.json({ ok: true })
+      })
+
+      await app.request('/api/test')
+      expect(fromUseLogger).toBe(fromContext)
+    })
+
+    it('reaches nested async calls without threading the context', async () => {
+      const { drain } = createPipelineSpies()
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+
+      async function chargeCard() {
+        await Promise.resolve()
+        useLogger().set({ payment: { amount: 42 } })
+      }
+
+      app.get('/api/pay', async (c) => {
+        await chargeCard()
+        return c.json({ ok: true })
+      })
+
+      await app.request('/api/pay')
+      await waitForDrainCalls(drain)
+
+      const event = defined(findEventViaDrain(drain, e => e.path === '/api/pay'), 'payment event')
+      expect(event.payment).toEqual({ amount: 42 })
+    })
+
+    it('throws a helpful error outside a request', () => {
+      expect(() => useLogger()).toThrow('useLogger() was called outside of an evlog middleware context')
+    })
+
+    it('throws on a route filtered out by exclude', async () => {
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ exclude: ['/health'] }))
+
+      let thrown = false
+      app.get('/health', (c) => {
+        try {
+          useLogger()
+        } catch {
+          thrown = true
+        }
+        return c.json({ ok: true })
+      })
+
+      await app.request('/health')
+      expect(thrown).toBe(true)
+    })
+
+    // Attaching AsyncLocalStorage also enables `log.fork()` on Hono, which
+    // previously had no storage and so no fork.
+    it('exposes log.fork() for post-response work', async () => {
+      const { drain } = createPipelineSpies()
+      const app = new Hono<EvlogVariables>()
+      app.use(evlog({ drain }))
+
+      app.get('/api/test', (c) => {
+        const log = c.get('log')
+        expect(typeof log.fork).toBe('function')
+        log.fork!('cleanup', () => {
+          useLogger().set({ cleaned: true })
+        })
+        return c.json({ ok: true })
+      })
+
+      await app.request('/api/test')
+      await vi.waitFor(() => {
+        expect(findEventViaDrain(drain, e => e.operation === 'cleanup')).toBeDefined()
+      })
+
+      const child = defined(findEventViaDrain(drain, e => e.operation === 'cleanup'), 'forked event')
+      expect(child.cleaned).toBe(true)
+      expect(child._parentRequestId).toBeDefined()
     })
   })
 })

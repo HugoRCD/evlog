@@ -1,0 +1,24 @@
+# Auto-provisioned so Grafana is usable the moment it boots — no clicking.
+apiVersion: 1
+datasources:
+  - name: Loki
+    type: loki
+    access: proxy
+    url: http://loki:3100
+    isDefault: true
+    jsonData:
+      # Loki 3 needs this to expose structured metadata / newer query features.
+      timeout: 60
+      maxLines: 1000
+
+  - name: ClickHouse
+    type: grafana-clickhouse-datasource
+    uid: evlog-clickhouse
+    jsonData:
+      host: clickhouse
+      port: 8123
+      protocol: http
+      secure: false
+      username: default
+      defaultDatabase: default
+      defaultTable: evlog_events

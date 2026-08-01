@@ -7,6 +7,7 @@ import { createLoggerStorage } from '../shared/storage'
 
 const { storage, useLogger } = createLoggerStorage(
   'plugin context. Make sure app.register(evlog) is called before your routes.',
+  'evlog:fastify',
 )
 
 void registerDiskPrettyErrorSnippetReader()

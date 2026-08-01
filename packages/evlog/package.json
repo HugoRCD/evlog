@@ -101,6 +101,16 @@
       "import": "./dist/adapters/datadog.mjs",
       "default": "./dist/adapters/datadog.mjs"
     },
+    "./loki": {
+      "types": "./dist/adapters/loki.d.mts",
+      "import": "./dist/adapters/loki.mjs",
+      "default": "./dist/adapters/loki.mjs"
+    },
+    "./clickhouse": {
+      "types": "./dist/adapters/clickhouse.d.mts",
+      "import": "./dist/adapters/clickhouse.mjs",
+      "default": "./dist/adapters/clickhouse.mjs"
+    },
     "./fs": {
       "types": "./dist/adapters/fs.d.mts",
       "import": "./dist/adapters/fs.mjs",
@@ -281,6 +291,12 @@
       ],
       "datadog": [
         "./dist/adapters/datadog.d.mts"
+      ],
+      "loki": [
+        "./dist/adapters/loki.d.mts"
+      ],
+      "clickhouse": [
+        "./dist/adapters/clickhouse.d.mts"
       ],
       "fs": [
         "./dist/adapters/fs.d.mts"

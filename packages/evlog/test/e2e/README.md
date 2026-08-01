@@ -12,6 +12,8 @@ your users do.
 | `posthog.e2e.ts` | PostHog (OTLP + events API) | Smoke (write-only API) |
 | `sentry.e2e.ts` | Sentry envelope | Smoke (DSN is write-only) |
 | `better-stack.e2e.ts` | Better Stack | Smoke (source token is write-only) |
+| `loki.e2e.ts` | Grafana Loki | **Round-trip** via the query API — local container or Grafana Cloud |
+| `clickhouse.e2e.ts` | ClickHouse | **Round-trip** via `SELECT` — local container or ClickHouse Cloud |
 
 Every event is tagged with `e2e: true`, `e2e_run_id`, `e2e_branch`, `e2e_sha`,
 `e2e_test`, `e2e_correlation_id` so you can grep / clean it from the
@@ -22,6 +24,36 @@ destination at any time.
 ```bash
 pnpm run test:e2e
 ```
+
+### Without a cloud account — the local sandbox
+
+Loki and ClickHouse both run locally, so their suites need no credentials. The
+same stack doubles as a place to *look at* your wide events:
+
+```bash
+pnpm run sandbox:up      # loki + clickhouse + grafana (waits for health)
+pnpm run sandbox:seed    # 40 realistic wide events into both backends
+pnpm run sandbox:e2e     # run the suites against them
+pnpm run sandbox:down    # stop and wipe volumes
+```
+
+Then browse:
+
+| | URL | What |
+|---|---|---|
+| **Dashboard** | http://localhost:3001/d/evlog-wide-events | Counts, events by level, top routes, and a table of recent wide events |
+| **Explore** | http://localhost:3001/explore | Ad-hoc queries against either datasource |
+
+No login — Grafana runs anonymous-admin. **Both** datasources are provisioned:
+Loki (`{service="evlog-sandbox"}`) and ClickHouse (`SELECT … FROM evlog_events`),
+so you never need ClickHouse's bare `/play` page.
+
+`sandbox:seed` drives the real public API — `createRequestLogger()` through the
+actual drains — so what lands is exactly what an instrumented app produces:
+weighted routes, ~12% errors with structured `error.name` / `error.message`,
+user / plan / region context, cache hits.
+
+Suites whose endpoint is unset skip themselves, so a partial stack is fine.
 
 Tokens are read from the workspace `.env` (already gitignored). Suites whose
 required env vars are missing are skipped with a visible "skipped: missing X"
@@ -49,6 +81,8 @@ The workflow expects these repo secrets:
 - `POSTHOG_API_KEY`
 - `SENTRY_DSN`
 - `BETTER_STACK_SOURCE_TOKEN`
+- `LOKI_ENDPOINT` (+ `LOKI_USER` / `LOKI_API_KEY` for Grafana Cloud, or a service container for self-hosted)
+- `CLICKHOUSE_ENDPOINT` (+ `CLICKHOUSE_PASSWORD` for ClickHouse Cloud, or a service container for self-hosted)
 
 Set them with `gh secret set <NAME> --body '<value>'` or in the repo settings UI.
 

@@ -1,4 +1,4 @@
-import type { RedactConfig } from './types'
+import type { RedactConfig, RedactReplacement, RedactReplacementContext, WideEvent } from './types'
 import { globToRegExp } from './utils'
 
 const DEFAULT_REPLACEMENT = '[REDACTED]'
@@ -99,12 +99,41 @@ export function matchesRedactPath(fullPath: string, leafKey: string, matchers: R
 }
 
 /**
+ * Resolve a {@link RedactReplacement} for one matched value.
+ *
+ * A throwing or non-string-returning function falls back to the default
+ * replacement: a broken policy must degrade to over-redaction, never to
+ * emitting the raw value it was meant to scrub.
+ */
+function resolveReplacement(
+  replacement: RedactReplacement,
+  matched: unknown,
+  ctx: RedactReplacementContext,
+): string {
+  if (typeof replacement === 'string') return replacement
+
+  try {
+    const result = replacement(matched, ctx)
+    if (typeof result !== 'string') {
+      console.error(
+        `[evlog] redact replacement returned ${typeof result} for "${ctx.path}", expected string — using ${DEFAULT_REPLACEMENT}`,
+      )
+      return DEFAULT_REPLACEMENT
+    }
+    return result
+  } catch (err) {
+    console.error(`[evlog] redact replacement failed for "${ctx.path}":`, err)
+    return DEFAULT_REPLACEMENT
+  }
+}
+
+/**
  * Redact fields matching path globs recursively. Mutates `obj` in place (use on a clone).
  */
 export function redactPathsInTree(
   obj: unknown,
   matchers: RedactPathMatchers,
-  replacement: string,
+  replacement: RedactReplacement,
   prefix = '',
 ): void {
   if (obj === null || obj === undefined) return
@@ -124,7 +153,7 @@ export function redactPathsInTree(
     for (const key in record) {
       const fullPath = prefix ? `${prefix}.${key}` : key
       if (matchesRedactPath(fullPath, key, matchers)) {
-        record[key] = replacement
+        record[key] = resolveReplacement(replacement, record[key], { path: fullPath, key })
       } else {
         redactPathsInTree(record[key], matchers, replacement, fullPath)
       }
@@ -141,7 +170,7 @@ export function redactPathsInTree(
 export function redactValueByPaths(
   value: unknown,
   matchers: RedactPathMatchers,
-  replacement: string,
+  replacement: RedactReplacement,
   pointerPath = '',
 ): unknown {
   const segments = pointerPath.split('/').filter(Boolean)
@@ -149,7 +178,9 @@ export function redactValueByPaths(
   const leafKey = segments.at(-1) ?? ''
 
   if (value === null || typeof value !== 'object') {
-    if (dotPath && matchesRedactPath(dotPath, leafKey, matchers)) return replacement
+    if (dotPath && matchesRedactPath(dotPath, leafKey, matchers)) {
+      return resolveReplacement(replacement, value, { path: dotPath, key: leafKey })
+    }
     return value
   }
 
@@ -164,7 +195,7 @@ export function redactValueByPaths(
     const childPointer = pointerPath ? `${pointerPath}/${k}` : `/${k}`
     const childDot = dotPath ? `${dotPath}.${k}` : k
     out[k] = matchesRedactPath(childDot, k, matchers)
-      ? replacement
+      ? resolveReplacement(replacement, v, { path: childDot, key: k })
       : redactValueByPaths(v, matchers, replacement, childPointer)
   }
   return out
@@ -318,7 +349,8 @@ function cloneForRedaction(event: Record<string, unknown>): Record<string, unkno
 /**
  * Redact sensitive data from a wide event without mutating the input.
  *
- * Returns a deep clone with redaction applied. Three strategies run in order:
+ * Returns a deep clone with redaction applied. Strategies run in order:
+ * 0. **Transform**: user hook, sees raw values so it can derive replacements; the stages below still run after it.
  * 1. **Path-based**: dot-notation paths with optional globs (`password`, `**.password`, `*_token`, `user.*`) — full value replacement.
  * 2. **Masker-based**: built-in patterns with smart partial masking (e.g. `****1111`).
  * 3. **Pattern-based**: custom RegExp patterns on string values replaced with `replacement`.
@@ -330,6 +362,17 @@ function cloneForRedaction(event: Record<string, unknown>): Record<string, unkno
 export function redactEvent(event: Record<string, unknown>, config: RedactConfig): Record<string, unknown> {
   const clone = cloneForRedaction(event)
   const replacement = config.replacement ?? DEFAULT_REPLACEMENT
+
+  // Runs first so the hook sees raw values; declarative stages then still apply
+  // to whatever it leaves behind, so a hook that misses a field is not the last
+  // line of defence. Failures are reported and swallowed like drain failures.
+  if (config.transform) {
+    try {
+      config.transform(clone as WideEvent)
+    } catch (err) {
+      console.error('[evlog] redact transform failed:', err)
+    }
+  }
 
   // Configs resolved via resolveRedactConfig carry precompiled matchers; compile lazily for ad-hoc configs.
   const pathMatchers = config._pathMatchers ?? compileRedactPathMatchers(config.paths)
@@ -348,15 +391,17 @@ export function redactEvent(event: Record<string, unknown>, config: RedactConfig
   return clone
 }
 
-function redactPatterns(obj: unknown, patterns: RegExp[], replacement: string): void {
+function redactPatterns(obj: unknown, patterns: RegExp[], replacement: RedactReplacement, prefix = ''): void {
   if (obj === null || obj === undefined) return
 
   if (Array.isArray(obj)) {
     for (let i = 0; i < obj.length; i++) {
+      const key = String(i)
+      const fullPath = prefix ? `${prefix}.${key}` : key
       if (typeof obj[i] === 'string') {
-        obj[i] = applyPatterns(obj[i] as string, patterns, replacement)
+        obj[i] = applyPatterns(obj[i] as string, patterns, replacement, fullPath, key)
       } else if (typeof obj[i] === 'object') {
-        redactPatterns(obj[i], patterns, replacement)
+        redactPatterns(obj[i], patterns, replacement, fullPath)
       }
     }
     return
@@ -367,21 +412,47 @@ function redactPatterns(obj: unknown, patterns: RegExp[], replacement: string): 
     const record = obj
     for (const key in record) {
       const val = record[key]
+      const fullPath = prefix ? `${prefix}.${key}` : key
       if (typeof val === 'string') {
-        record[key] = applyPatterns(val, patterns, replacement)
+        record[key] = applyPatterns(val, patterns, replacement, fullPath, key)
       } else if (typeof val === 'object') {
-        redactPatterns(val, patterns, replacement)
+        redactPatterns(val, patterns, replacement, fullPath)
       }
     }
   }
 }
 
-function applyPatterns(value: string, patterns: RegExp[], replacement: string): string {
+// eslint-disable-next-line max-params
+function applyPatterns(
+  value: string,
+  patterns: RegExp[],
+  replacement: RedactReplacement,
+  path: string,
+  key: string,
+): string {
   let result = value
   for (const pattern of patterns) {
-    result = result.replace(pattern, replacement)
+    if (typeof replacement === 'string') {
+      result = result.replace(pattern, replacement)
+      continue
+    }
+    result = result.replace(pattern, (...args) => {
+      const match = args[0] as string
+      return resolveReplacement(replacement, match, { path, key, groups: captureGroups(args) })
+    })
   }
   return result
+}
+
+/**
+ * Extract the capture groups from a `String.prototype.replace` callback's args.
+ * Trailing args are `offset, string` — plus a named-groups object when the
+ * pattern declares any.
+ */
+function captureGroups(args: unknown[]): Array<string | undefined> {
+  const last = args.at(-1)
+  const trailing = typeof last === 'object' && last !== null ? 3 : 2
+  return args.slice(1, Math.max(1, args.length - trailing)) as Array<string | undefined>
 }
 
 function applyMaskersToTree(obj: unknown, maskers: Masker[]): void {
@@ -421,6 +492,27 @@ function applyMaskers(value: string, maskers: Masker[]): string {
 }
 
 /**
+ * Whether a `redact` option carries function-valued policy (`replacement` or
+ * `transform`).
+ *
+ * Build-time config bridges (`__EVLOG_CONFIG__`, `process.env.__EVLOG_CONFIG`)
+ * go through `JSON.stringify`, which drops functions without a word. Modules
+ * that serialize user config call this first so a policy declared in
+ * `nuxt.config.ts` fails loudly instead of silently not redacting — the same
+ * class of defect as #408 and #441.
+ */
+export function hasFunctionRedactPolicy(redact: unknown): boolean {
+  if (!redact || typeof redact !== 'object') return false
+  const config = redact as Record<string, unknown>
+  return typeof config.replacement === 'function' || typeof config.transform === 'function'
+}
+
+/** Message shared by every config bridge that serializes `redact` through JSON. */
+export const FUNCTION_REDACT_POLICY_WARNING
+  = '[evlog] redact.replacement / redact.transform is a function and cannot be serialized into the build config. '
+    + 'Declare it at runtime instead — initLogger({ redact: { ... } }) from a server plugin — or use a string replacement.'
+
+/**
  * Normalize a redact config that may have been deserialized from JSON
  * (e.g. via `process.env.__EVLOG_CONFIG`). Converts pattern strings
  * back to RegExp instances, then resolves built-in patterns.
@@ -435,8 +527,15 @@ export function normalizeRedactConfig(raw: boolean | Record<string, unknown> | u
     config.paths = raw.paths as string[]
   }
 
-  if (typeof raw.replacement === 'string') {
-    config.replacement = raw.replacement
+  // Function-valued policy survives only when the config object reached us live
+  // (e.g. Nitro's in-process runtimeConfig). Through the JSON bridges it is gone
+  // before this point — `hasFunctionRedactPolicy` warns at that boundary instead.
+  if (typeof raw.replacement === 'string' || typeof raw.replacement === 'function') {
+    config.replacement = raw.replacement as RedactReplacement
+  }
+
+  if (typeof raw.transform === 'function') {
+    config.transform = raw.transform as (event: WideEvent) => void
   }
 
   if (raw.builtins === false) {

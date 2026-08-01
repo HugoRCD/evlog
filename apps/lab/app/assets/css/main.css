@@ -1,0 +1,258 @@
+/*
+ * The lab's own chrome, and nothing about what it films.
+ *
+ * A stage source brings its stylesheet and its Tailwind scan path with it, both
+ * declared in `nuxt.config` and wired up by `modules/stages.ts`. They used to be
+ * two hard-coded paths into a sibling app, which meant this file decided what
+ * the lab was allowed to film.
+ */
+
+/*
+ * Two themes for the tool, one for the film.
+ *
+ * Every colour in the chrome resolves through this ladder, so a theme is seven
+ * variables rather than a `dark:` twin on four hundred class lists — and a
+ * control added tomorrow is themed by using the same names as the one beside it,
+ * with nothing to remember.
+ *
+ * The two halves are mirrors: `zinc-100` on black becomes `zinc-950` on white,
+ * `zinc-200` becomes `zinc-900`, and so on down to the faintest step. Mirroring
+ * rather than reaching for a light palette is what keeps a hint that whispers in
+ * one theme from shouting in the other — this panel leans hard on six steps of
+ * grey to say what is a title, what is a label and what is a footnote, and that
+ * ranking is the whole legibility of it.
+ *
+ * The steps below `dimmed` are missing from the set on purpose. `text-dimmed/70`
+ * and `text-dimmed/55` land on them from either side, because fading toward the
+ * background is the same gesture in both themes, and naming two more tokens
+ * would put two more things in the vocabulary to serve a handful of footnotes.
+ */
+
+/*
+ * Scoped to `.lab-chrome[data-theme]`, never to `:root` and never to `.dark`.
+ *
+ * The plate is rasterized from a live DOM node that has to keep the colours of
+ * the app it came from, so the stage sits outside this scope entirely (see
+ * `pages/index.vue`) and inherits the source stylesheet's values from `:root`.
+ *
+ * An attribute on the chrome rather than a class on `<html>` — which is what
+ * `useColorMode` would do — because `<html>` is where the source's tokens live.
+ * Shielding the stage by putting `dark` back on it does not work either: a class
+ * on the element beats a value inherited from `:root`, so the source's
+ * `--ui-bg: zinc-950` lost to Nuxt UI's default `.dark` block and every export
+ * came out a step lighter than the site. `app/composables/useLabTheme.ts` has
+ * the rest of that story.
+ *
+ * Two class-strength selectors, so this beats the source stylesheet's `:root`
+ * whatever order the two sheets end up in.
+ */
+.lab-chrome[data-theme='light'] {
+  --ui-bg: #fff;
+  --ui-bg-muted: var(--color-zinc-50);
+  --ui-bg-elevated: var(--color-zinc-100);
+  /* Not a surface: the fill of a slider, the knob of a switch, a tick on a
+     ruler. Marks drawn as boxes, which need to read against the surface rather
+     than sit one step off it. */
+  --ui-bg-accented: var(--color-zinc-400);
+  --ui-bg-inverted: var(--color-zinc-900);
+
+  --ui-text-highlighted: var(--color-zinc-950);
+  --ui-text: var(--color-zinc-900);
+  --ui-text-toned: var(--color-zinc-800);
+  --ui-text-muted: var(--color-zinc-700);
+  --ui-text-dimmed: var(--color-zinc-600);
+  --ui-text-inverted: #fff;
+
+  /*
+   * The one place the mirror is deliberately broken.
+   *
+   * Mirroring the greys gave `zinc-200` hairlines, and on white they vanished:
+   * the header, the section rules, the frame's own edge and the two splitters
+   * all disappeared, and the tool read as one undivided sheet. A dark theme gets
+   * its structure for free — anything at all above black is a line — while a
+   * light one has to draw it. So the borders step up rather than across, and the
+   * hover step goes further still so it is still a change.
+   */
+  --ui-border: var(--color-zinc-300);
+  --ui-border-muted: var(--color-zinc-300);
+  --ui-border-accented: var(--color-zinc-500);
+
+  /*
+   * Status colours move down a step for the same reason.
+   *
+   * Nuxt UI's light defaults are the 500s, which are tuned for a filled badge.
+   * Every use here is a line of text — "edited by hand", a capture failure — and
+   * amber-500 on white is a 2.1:1 sentence, which is a sentence nobody reads.
+   */
+  --ui-error: var(--ui-color-error-600);
+  --ui-warning: var(--ui-color-warning-600);
+  --ui-success: var(--ui-color-success-600);
+
+  /*
+   * The accent splits in two, and the split is the point.
+   *
+   * `primary-500` is evlog's blue as a material — a filled bar, a tint behind a
+   * selected card, the hairline round it. A material keeps its hex in both
+   * themes, the way a painted surface does.
+   *
+   * `primary` is the accent as ink, and ink has to stay readable on whatever it
+   * is written on: the brand blue against black is a 2.4:1 word nobody can read,
+   * which is why every accent label in this panel was a lighter blue to begin
+   * with. Redefining it here is what lets those labels stay one class.
+   *
+   * So: `text-primary` for a word, `bg-primary-500` for a thing. The exception
+   * proves it — the hairline marking the value on a slider track is `bg-primary`,
+   * because it is a mark that happens to be drawn as a box.
+   */
+  --ui-primary: var(--ui-color-primary-700);
+
+  /*
+   * Depth, which is the other thing a theme has to answer for.
+   *
+   * A dark tool separates layers by getting lighter; a light one has no lighter
+   * left and has to cast instead. Same three names, opposite physics — so a
+   * popover asks for `--lab-shadow-overlay` and gets a black halo on black or a
+   * soft drop on white without knowing which theme it is in.
+   *
+   * Tighter and far weaker here than in the dark. On white a shadow is the only
+   * thing doing the separating, so it reads at a tenth of the alpha the dark one
+   * needs; taking the dark values across gives a tool that looks bruised.
+   */
+  --lab-shadow-raised: 0 1px 2px rgb(9 9 11 / 0.05), 0 1px 1px rgb(9 9 11 / 0.04);
+  --lab-shadow-overlay: 0 8px 24px rgb(9 9 11 / 0.12), 0 2px 6px rgb(9 9 11 / 0.08);
+  --lab-shadow-sheet: 0 24px 64px rgb(9 9 11 / 0.18), 0 4px 12px rgb(9 9 11 / 0.08);
+
+  /*
+   * A scrim is not a surface, so it is not a surface token — but it is not a
+   * constant either. Eighty per cent black behind a white sheet is a hole in the
+   * screen; the light theme only needs enough to say the page behind is out of
+   * reach.
+   */
+  --lab-scrim: rgb(9 9 11 / 0.4);
+}
+
+.lab-chrome[data-theme='dark'] {
+  /* Black, not zinc-950: the frame is judged against it, and the hairlines that
+     separate the panels are zinc-900. Lifting the floor closes that gap. */
+  --ui-bg: #000;
+  --ui-bg-muted: var(--color-zinc-950);
+  --ui-bg-elevated: var(--color-zinc-900);
+  --ui-bg-accented: var(--color-zinc-600);
+  --ui-bg-inverted: var(--color-zinc-100);
+
+  --ui-text-highlighted: var(--color-zinc-100);
+  --ui-text: var(--color-zinc-200);
+  --ui-text-toned: var(--color-zinc-300);
+  --ui-text-muted: var(--color-zinc-400);
+  --ui-text-dimmed: var(--color-zinc-500);
+  --ui-text-inverted: var(--color-zinc-900);
+
+  --ui-border: var(--color-zinc-900);
+  --ui-border-muted: var(--color-zinc-800);
+  --ui-border-accented: var(--color-zinc-600);
+
+  --ui-primary: var(--ui-color-primary-300);
+
+  /*
+   * The inset hairline is doing as much work as the shadow.
+   *
+   * A black popover over a black panel casts a shadow nobody can see — there is
+   * no light left to take away. What reads instead is the top edge catching a
+   * little light, the way a raised object does. So each level is a drop shadow
+   * for the space under it and one white line for the edge itself.
+   */
+  --lab-shadow-raised: inset 0 1px 0 rgb(255 255 255 / 0.04), 0 2px 6px rgb(0 0 0 / 0.6);
+  --lab-shadow-overlay: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 12px 32px rgb(0 0 0 / 0.8), 0 2px 8px rgb(0 0 0 / 0.6);
+  --lab-shadow-sheet: inset 0 1px 0 rgb(255 255 255 / 0.06), 0 24px 64px rgb(0 0 0 / 0.85);
+
+  --lab-scrim: rgb(0 0 0 / 0.8);
+}
+
+/*
+ * The page behind the tool, for the sliver of it that is ever seen.
+ *
+ * The chrome is `fixed inset-0` and covers everything, but an overscroll bounce
+ * and the paint before the app mounts both show the document's own background.
+ *
+ * The document is permanently dark, for the stage's sake, so the light theme has
+ * to reach back up to `<html>` rather than inherit down from it.
+ */
+html {
+  background-color: #000;
+}
+
+html:has(.lab-chrome[data-theme='light']) {
+  background-color: #fff;
+}
+
+/*
+ * Interactive elements look interactive.
+ *
+ * Tailwind's preflight resets `button` to `cursor: default`, which is correct
+ * for the web at large and wrong for a tool: here a control that does not change
+ * the pointer reads as decoration, and half the panel stopped feeling clickable.
+ */
+button:not(:disabled),
+select:not(:disabled),
+summary,
+[role="switch"],
+input[type="color"]:not(:disabled),
+input[type="file"]:not(:disabled) {
+  cursor: pointer;
+}
+
+button:disabled,
+select:disabled {
+  cursor: not-allowed;
+}
+
+/*
+ * Typing is a different gesture from clicking.
+ *
+ * Numeric fields here are also drag targets, so they carry their own resize
+ * cursor and must not be caught by this; a plain text or number input, though,
+ * should say that a caret goes in it.
+ */
+input[type="text"]:not(:disabled),
+input[type="number"]:not(:disabled),
+textarea:not(:disabled) {
+  cursor: text;
+}
+
+/*
+ * The chrome is not a document.
+ *
+ * Selection was switched off control by control, which never held: a drag keeps
+ * going after it leaves the element it started on, so sweeping a slider still
+ * painted a blue streak across every label further along, and let go of it
+ * somewhere nobody had thought to exempt. In a tool the default belongs the
+ * other way round — nothing is selectable, and the places where selecting text
+ * is the point say so.
+ */
+body {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+input,
+textarea,
+[contenteditable],
+[data-selectable] {
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/*
+ * Keyboard focus stays visible, mouse focus does not.
+ *
+ * A ring around every button that was merely clicked is noise; a ring around
+ * the control you tabbed to is the only way to know where you are.
+ */
+:focus-visible {
+  outline: 1px solid var(--ui-primary);
+  outline-offset: 1px;
+}
+
+button:focus:not(:focus-visible) {
+  outline: none;
+}

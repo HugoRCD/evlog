@@ -1,0 +1,39 @@
+name: clean branch caches
+
+# Closed PRs leave per-branch cache entries behind, and the 10 GB repo quota
+# evicts least-recently-used, which would eventually evict main's cache.
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      pr_number:
+        description: Pull request number whose caches should be deleted
+        required: true
+        type: string
+
+permissions: {}
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-slim
+    timeout-minutes: 10
+    permissions:
+      actions: write # deletes this branch's cache entries
+    steps:
+      - name: Delete caches for this branch
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          REPO: ${{ github.repository }}
+          # workflow_dispatch carries no pull_request payload
+          PR: ${{ github.event.pull_request.number || inputs.pr_number }}
+        run: |
+          ids=$(gh api --paginate --method GET "repos/$REPO/actions/caches" \
+            -f ref="refs/pull/$PR/merge" -f per_page=100 --jq '.actions_caches[].id')
+
+          set +e # best effort, never fail the workflow
+          for id in $ids; do
+            gh api --method DELETE "repos/$REPO/actions/caches/$id"
+          done
+          echo "Done"

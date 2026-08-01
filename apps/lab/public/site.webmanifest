@@ -1,0 +1,18 @@
+{
+  "id": "/",
+  "name": "Render labs by evlog",
+  "short_name": "Render labs",
+  "description": "Compose and render shots in the browser. Stage live components, media and type, work them through a camera and lens pipeline — tilt, depth of field, bloom, grade — then render a still, a micro-animation or a full take at any resolution.",
+  "start_url": "/",
+  "scope": "/",
+  "display": "standalone",
+  "orientation": "landscape",
+  "theme_color": "#09090b",
+  "background_color": "#000000",
+  "categories": ["graphics", "productivity", "utilities"],
+  "icons": [
+    { "src": "/android-chrome-192x192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/android-chrome-512x512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/icon-maskable-512.png", "type": "image/png", "sizes": "512x512", "purpose": "maskable" }
+  ]
+}
