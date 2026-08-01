@@ -62,7 +62,7 @@ packages/evlog/            Main package
 - **Bump type:** `patch` for fixes, `minor` for features, `major` for breaking changes.
 - **Description:** write from the consumer's perspective — what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
 
-A PR without a changeset for a user-facing change will not be merged.
+A PR without a changeset for a user-facing change will not be merged. The `changeset` job in `.github/workflows/ci.yml` enforces this: it fails when a published package changed with no changeset in the PR. Changes confined to `apps/*` or `examples/*` — docs included — never trigger it. For the rare published-package change that genuinely needs no release note, add the `skip-changeset` label or run `pnpm changeset add --empty`.
 
 ### Commits & PR titles
 
