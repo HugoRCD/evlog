@@ -17,7 +17,7 @@ initLogger({
 
 `RedactConfig.transform` covers policies that cannot be expressed declaratively — conditional on a sibling field, tenant-scoped, or allowlist-shaped. It runs before the declarative stages, so it sees raw values and `paths` / `builtins` / `patterns` still apply to whatever it leaves behind.
 
-Both run where redaction already runs: after the event is built, before the console write and before any drain. Failures are caught and reported like drain failures — a function that throws falls back to `[REDACTED]` rather than emitting the raw value, and a throwing `transform` does not stop the event from being logged.
+Both run where redaction already runs: after the event is built, before the console write and before any drain. Failures are caught and reported like drain failures — a `replacement` function that throws falls back to `[REDACTED]` rather than emitting the raw value, and a throwing `transform` is skipped without stopping the event from being logged.
 
 Function-valued policy cannot survive the build-time config bridges, which serialize to JSON; the Nitro modules now warn instead of dropping it silently.
 
