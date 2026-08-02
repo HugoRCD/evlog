@@ -94,6 +94,8 @@ export interface ResolveInput {
   evlogInstalled: boolean
   /** `--install` (default true); irrelevant when evlog is already there. */
   install: boolean
+  /** `--agents` (default true) — write the AGENTS.md block and install the skills. */
+  agentGuide: boolean
   devDrain?: DrainId
   prodDrains?: DrainId[]
   extras?: ExtraId[]
@@ -124,6 +126,7 @@ export function resolveAnswers(input: ResolveInput): InitAnswers {
     enrichers: extras.includes('enrichers') ? input.enrichers ?? [...DEFAULT_ENRICHERS] : [],
     sampling: extras.includes('sampling') ? input.sampling ?? 'medium' : 'all',
     install: input.evlogInstalled ? false : input.install,
+    agentGuide: input.agentGuide,
   }
 }
 

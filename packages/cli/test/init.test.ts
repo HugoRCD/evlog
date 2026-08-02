@@ -2,12 +2,29 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { createContext } from '../src/core/context'
 import type { CliContext } from '../src/core/context'
 import { planWiring } from '../src/lib/init/frameworks'
 import { detectPackageManager, installCommand } from '../src/lib/init/pm'
 import { runInit } from '../src/lib/init/run'
+
+/** Only the spawn is faked; the rest of the skills module stays real. */
+const skills = vi.hoisted(() => ({
+  spawnResult: null as null | { ok: true } | { ok: false, error: string },
+  calls: 0,
+}))
+
+vi.mock('../src/lib/agents/skills', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/agents/skills')>()
+  return {
+    ...actual,
+    runSkills: (...args: Parameters<typeof actual.runSkills>) => {
+      skills.calls += 1
+      return skills.spawnResult ? Promise.resolve(skills.spawnResult) : actual.runSkills(...args)
+    },
+  }
+})
 
 const tempDirs: string[] = []
 
@@ -22,8 +39,17 @@ async function project(files: Record<string, string>): Promise<string> {
   return dir
 }
 
+/** An empty home, so globally installed skills cannot sway a run. */
 function fakeContext(cwd: string): CliContext {
-  return createContext({ cwd, env: {}, nodeVersion: 'v22.0.0', tty: false, color: false, columns: 80 })
+  return createContext({
+    cwd,
+    home: join(cwd, '__home'),
+    env: {},
+    nodeVersion: 'v22.0.0',
+    tty: false,
+    color: false,
+    columns: 80,
+  })
 }
 
 
@@ -42,6 +68,9 @@ function wiring(overrides: Partial<Parameters<typeof planWiring>[0]> = {}) {
 }
 
 afterEach(async () => {
+  vi.unstubAllGlobals()
+  skills.spawnResult = null
+  skills.calls = 0
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
@@ -168,7 +197,7 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    const result = await runInit(fakeContext(cwd), undefined, { dryRun: true, yes: true })
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: false, dryRun: true, yes: true })
 
     expect(result.answers.framework).toBe('nuxt')
     /* The scope is noise once every event carries the service name. */
@@ -184,9 +213,9 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    await runInit(fakeContext(cwd), undefined, { install: false, yes: true })
+    await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
     const afterFirst = await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')
-    const second = await runInit(fakeContext(cwd), undefined, { install: false, yes: true })
+    const second = await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
 
     expect(second.written).toHaveLength(0)
     expect(await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')).toBe(afterFirst)
@@ -198,7 +227,7 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    await runInit(fakeContext(cwd), undefined, { install: false, yes: true })
+    await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
 
     const plugin = await readFile(join(cwd, 'server/plugins/evlog-drain.ts'), 'utf8')
     expect(plugin).toContain('if (!import.meta.dev) return')
@@ -211,7 +240,7 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    await runInit(fakeContext(cwd), undefined, { install: false, devDrain: 'none', yes: true })
+    await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, devDrain: 'none', yes: true })
 
     expect(existsSync(join(cwd, 'server/plugins/evlog-drain.ts'))).toBe(false)
   })
@@ -223,9 +252,97 @@ describe('runInit', () => {
       'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
     })
 
-    const result = await runInit(fakeContext(cwd), undefined, { install: false, yes: true })
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
 
     expect(result.install).toMatchObject({ status: 'skipped', command: 'pnpm add evlog' })
+  })
+})
+
+describe('runInit — agent guidelines', () => {
+  async function nuxtProject(files: Record<string, string> = {}): Promise<string> {
+    return await project({
+      'package.json': '{"name":"shop","dependencies":{"nuxt":"^4.0.0"}}',
+      'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
+      ...files,
+    })
+  }
+
+  it('writes the guidelines alongside the wiring, in one plan', async () => {
+    /* The skills are already there, so the run never spawns anything — the
+       block is what `init` itself is responsible for. */
+    const cwd = await nuxtProject({ '.claude/skills/review-logging-patterns/SKILL.md': '# x\n' })
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    expect(result.agentGuide).toMatchObject({
+      status: 'already',
+      found: ['review-logging-patterns'],
+      dirs: ['.claude/skills'],
+    })
+    /* Reported, not silent: doing nothing quietly reads as a forgotten step. */
+    expect(result.already).toContain('evlog skills already installed · .claude/skills')
+    expect(result.written.map(action => action.relative)).toEqual(
+      expect.arrayContaining(['AGENTS.md', 'CLAUDE.md']),
+    )
+    /* The wiring and the guidelines land in the same plan, not two runs. */
+    expect(await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')).toContain('evlog/nuxt')
+    expect(await readFile(join(cwd, 'AGENTS.md'), 'utf8')).toContain('## Logging with evlog')
+  })
+
+  it('never writes skill files itself', async () => {
+    const cwd = await nuxtProject({ '.claude/skills/analyze-logs/SKILL.md': '# x\n' })
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    /* `npx skills add` owns them: a copy we wrote is one it could never update. */
+    expect(result.written.every(action => !action.relative.includes('skills'))).toBe(true)
+  })
+
+  it('does nothing at all under --no-agents', async () => {
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
+
+    expect(result.agentGuide).toBeNull()
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false)
+    expect(skills.calls).toBe(0)
+  })
+
+  it('installs the skills when none are on disk — the common case', async () => {
+    skills.spawnResult = { ok: true }
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    /* `pending` is the value the step starts at; leaving it there would mean
+       the skills execution never ran. */
+    expect(result.agentGuide).toMatchObject({ status: 'installed', found: [] })
+    expect(skills.calls).toBe(1)
+    /* The files land before the spawn, so a dead subprocess cannot cost them. */
+    expect(await readFile(join(cwd, 'AGENTS.md'), 'utf8')).toContain('## Logging with evlog')
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true)
+  })
+
+  it('keeps the wiring and the block when the skills install fails', async () => {
+    skills.spawnResult = { ok: false, error: 'npx: command not found' }
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    expect(result.agentGuide).toMatchObject({ status: 'failed', error: 'npx: command not found' })
+    expect(await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')).toContain('evlog/nuxt')
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(true)
+  })
+
+  it('previews the skills command under --dry-run without running it', async () => {
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, dryRun: true, yes: true })
+
+    expect(result.agentGuide?.status).toBe('pending')
+    expect(result.agentGuide?.command).toContain('npx --yes skills add')
+    expect(skills.calls).toBe(0)
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false)
   })
 })
 

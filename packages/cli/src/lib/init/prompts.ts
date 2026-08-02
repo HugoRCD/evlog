@@ -29,8 +29,6 @@ import {
 } from './catalog'
 import type { DrainId, EnricherId, ExtraGroup, ExtraId, OfferContext, SamplingProfile } from './catalog'
 import type { FileAction, ManualStep } from './frameworks'
-import type { PackageManager } from './pm'
-import { installCommand } from './pm'
 
 /** Every answer `init` needs, however it was obtained. */
 export interface InitAnswers {
@@ -45,6 +43,8 @@ export interface InitAnswers {
   sampling: SamplingProfile
   /** Run the package manager for a missing `evlog`. */
   install: boolean
+  /** Write the `AGENTS.md` block and install the published skills. */
+  agentGuide: boolean
 }
 
 /** Thrown when the user aborts a prompt — the command exits quietly, writing nothing. */
@@ -77,14 +77,15 @@ export interface PromptContext {
   evlogInstalled: boolean
   /** Whether `--install` is still on — `--no-install` is an answer, not a prompt. */
   installRequested: boolean
-  packageManager: PackageManager
+  /** Whether `--agents` is still on — `--no-agents` is an answer, not a prompt. */
+  agentGuideRequested: boolean
   /** Builds the offer list once the destinations are known. */
   offers: (prodDrains: DrainId[], framework: Framework) => OfferContext
 }
 
-export function openInteractive(ctx: CliContext, projectLabel: string): void {
+export function openInteractive(ctx: CliContext, command: string, projectLabel: string): void {
   const { paint } = createStyle(ctx)
-  intro(`${paint(['bold', 'cyan'], ' evlog init ')} ${paint('dim', projectLabel)}`)
+  intro(`${paint(['bold', 'cyan'], ` ${command} `)} ${paint('dim', projectLabel)}`)
 }
 
 /**
@@ -197,6 +198,15 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     }))
     : 'all'
 
+  /* Wiring evlog in and leaving the agent that writes the handlers unaware of
+     it is most of the way to nothing. */
+  const agentGuide = input.agentGuideRequested
+    ? required(await confirm({
+      message: 'Teach AI agents the evlog conventions? (AGENTS.md + skills)',
+      initialValue: true,
+    }))
+    : false
+
   // Not a question of its own: the plan lists the install and asks once.
   return {
     framework,
@@ -207,19 +217,23 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
     enrichers,
     sampling,
     install: !input.evlogInstalled && input.installRequested,
+    agentGuide,
   }
 }
 
-/** Nothing lands until the user has read what is about to land. */
+/**
+ * Nothing lands until the user has read what is about to land.
+ *
+ * @param runs - Commands this run will shell out to, listed before the writes.
+ */
 export function showPlan(
   actions: FileAction[],
   already: string[],
-  installing: boolean,
-  packageManager: PackageManager,
+  runs: string[] = [],
 ): boolean {
   const lines: string[] = []
 
-  if (installing) lines.push(`run  ${installCommand(packageManager)}`)
+  for (const run of runs) lines.push(`run  ${run}`)
   for (const action of actions) {
     lines.push(`${action.kind === 'create' ? 'create' : 'update'}  ${action.relative}`)
   }
@@ -237,10 +251,9 @@ export function showPlan(
 export async function confirmPlan(
   actions: FileAction[],
   already: string[],
-  installing: boolean,
-  packageManager: PackageManager,
+  runs: string[] = [],
 ): Promise<boolean> {
-  if (!showPlan(actions, already, installing, packageManager)) return false
+  if (!showPlan(actions, already, runs)) return false
 
   return required(await confirm({ message: 'Apply?', initialValue: true }))
 }
@@ -257,6 +270,65 @@ export function noteEnvironment(prodDrains: DrainId[]): void {
   note(
     variables.map(variable => `${variable.name.padEnd(width)}  ${variable.hint}`).join('\n'),
     'Set these before anything is received',
+  )
+}
+
+/** How the agent skills ended up, for a run that is drawing its own frame. */
+export interface SkillsNote {
+  status: 'pending' | 'already' | 'installed' | 'skipped' | 'failed'
+  /** `npx skills add …`, as the user would type it. */
+  command: string
+  /** Agent directories they were found in, when they were already there. */
+  dirs?: string[]
+  error?: string
+}
+
+/**
+ * A command the reader is meant to type.
+ *
+ * Label on the left, command on the right — the shape the outro already uses
+ * for `score  evlog map`. Inline in a sentence it reads as prose and the reader
+ * never registers there is something for them to run.
+ */
+function command(ctx: CliContext, label: string, line: string): string {
+  const { paint } = createStyle(ctx)
+  return `${paint('dim', label)}  ${paint('bold', line)}`
+}
+
+/**
+ * Say what happened to the skills.
+ *
+ * The interactive flow suppresses the written report, so without this the whole
+ * step is invisible — and "already installed" looks exactly like "did nothing"
+ * to somebody watching the terminal.
+ */
+export function noteSkills(ctx: CliContext, note: SkillsNote): void {
+  const { paint } = createStyle(ctx)
+
+  switch (note.status) {
+    case 'already':
+      clackLog.success(`evlog skills already installed${note.dirs?.length ? ` · ${paint('dim', note.dirs.join(', '))}` : ''}`)
+      clackLog.message(command(ctx, 'refresh', 'npx skills update'))
+      return
+    case 'installed':
+      clackLog.success('Installed the evlog skills')
+      return
+    case 'failed':
+      clackLog.error('Skills not installed')
+      if (note.error) clackLog.message(paint('dim', note.error))
+      clackLog.message(command(ctx, 'retry  ', note.command))
+      return
+    default:
+      clackLog.warn('Skills not installed')
+      clackLog.message(command(ctx, 'install', note.command))
+  }
+}
+
+/** Said before handing the terminal to the skills CLI, so it is not a surprise. */
+export function noteSkillsStarting(ctx: CliContext, line: string): void {
+  const { paint } = createStyle(ctx)
+  clackLog.step(
+    `${command(ctx, 'running', line)}\n${paint('dim', 'the skills CLI takes over from here')}`,
   )
 }
 
@@ -291,6 +363,16 @@ export function closeInteractive(
   }
   clackLog.message(`${paint('dim', 'score')}  evlog map`)
   outro(`${FRAMEWORK_LABELS[framework]} wired · ${DOCS_URL}${docsPath}`)
+}
+
+/** Closes the `evlog agents` session — without it the run just stops mid-frame. */
+export function closeAgents(ctx: CliContext, dryRun = false): void {
+  const { paint } = createStyle(ctx)
+  if (dryRun) {
+    outro(`${paint('yellow', 'Dry run')} — nothing was written. Drop --dry-run to apply.`)
+    return
+  }
+  outro(`Your agents know evlog · ${DOCS_URL}/cli/agents`)
 }
 
 export function closeCancelled(): void {

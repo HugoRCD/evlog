@@ -140,6 +140,32 @@ export const cliErrors = defineErrorCatalog('cli', {
     link: 'https://evlog.dev/cli/init',
     tags: ['init'],
   },
+  AGENTS_INVALID_SOURCE: {
+    status: 400,
+    message: ({ value }: { value: string }) =>
+      `Invalid --source "${value}" — expected an http(s) URL`,
+    why: 'The source is handed to npx, and on Windows that argument reaches a shell',
+    fix: 'Pass the origin the skills are published from, e.g. --source https://www.evlog.dev',
+    link: 'https://evlog.dev/cli/agents',
+    tags: ['agents', 'skills'],
+  },
+  AGENTS_INVALID_SKILL: {
+    status: 400,
+    message: ({ value }: { value: string }) =>
+      `Invalid --skills entry "${value}"`,
+    why: 'Skill names are lowercase and dashed, and the value is handed to npx',
+    fix: 'Run evlog agents without --skills to install every published skill',
+    link: 'https://evlog.dev/reference/agent-skills',
+    tags: ['agents', 'skills'],
+  },
+  AGENTS_UNREADABLE: {
+    status: 500,
+    message: ({ file }: { file: string }) => `Cannot read ${file}`,
+    why: 'The path exists but could not be read — it may be a directory, or permissions may deny it',
+    fix: 'Check the file and its permissions, then run the command again',
+    link: 'https://evlog.dev/cli/agents',
+    tags: ['agents'],
+  },
   MAP_BASELINE_NOT_FOUND: {
     status: 404,
     message: ({ source }: { source: string }) =>

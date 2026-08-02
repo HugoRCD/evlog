@@ -1,6 +1,7 @@
 import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
+import { skillsReportLines } from '../agents/report'
 import { findDestination, findEnricher, findExtra, findSamplingPreset } from './catalog'
 import { frameworkDocs } from './run'
 import type { InitResult } from './run'
@@ -81,6 +82,12 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
     /* Silently dropping an extra would leave the author believing they wired
        something they did not. */
     lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply here — skipped`)}`)
+  }
+
+  /* The block lands whatever happens here; saying nothing would leave the
+     author believing their agent has guidance it never received. */
+  if (result.agentGuide) {
+    lines.push(...skillsReportLines(ctx, result.agentGuide))
   }
 
   if (result.verified) {

@@ -1,10 +1,10 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.8"
+  version: "0.9"
 ---
 
 # Review logging patterns
@@ -24,6 +24,7 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 | Working on...           | Resource                                                           |
 | ----------------------- | ------------------------------------------------------------------ |
 | Setup (CLI)             | [`evlog init`](https://www.evlog.dev/cli/init) — wire evlog into the project |
+| Project conventions (CLI) | [`evlog agents`](https://www.evlog.dev/cli/agents) — write the evlog block into the project's AGENTS.md |
 | Coverage map (CLI)      | [`evlog map`](https://www.evlog.dev/cli/map) — score dark entry points |
 | CI gating (CLI)         | [`evlog map --min-score / --baseline`](https://www.evlog.dev/cli/ci) — gate regressions |
 | Wide events patterns    | [references/wide-events.md](references/wide-events.md)             |

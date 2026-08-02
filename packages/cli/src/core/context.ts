@@ -1,3 +1,5 @@
+import { homedir } from 'node:os'
+
 /**
  * Execution context passed to every command.
  * The only place allowed to read `process.*` — commands stay pure and testable.
@@ -8,6 +10,8 @@
 export interface CliContext {
   /** Working directory used to resolve the host project. */
   cwd: string
+  /** Home directory — where agents keep their global, cross-project files. */
+  home: string
   /** Environment snapshot — commands never touch `process.env` directly. */
   env: Record<string, string | undefined>
   /** Running Node.js version, e.g. `v22.1.0`. */
@@ -47,6 +51,7 @@ export function createContext(overrides: Partial<CliContext> = {}): CliContext {
   const tty = overrides.tty ?? isInteractive()
   return {
     cwd: overrides.cwd ?? process.cwd(),
+    home: overrides.home ?? homedir(),
     env,
     nodeVersion: overrides.nodeVersion ?? process.version,
     tty,

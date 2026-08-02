@@ -55,6 +55,12 @@ export function recordInitAnswers(result: InitResult): void {
     if (result.verified) fields.initDoctorFail = result.verified.fail
   }
 
+  fields.initAgentGuide = answers.agentGuide
+  if (result.agentGuide) {
+    fields.initAgentSkillsFound = result.agentGuide.found.length
+    fields.initAgentSkillsFailed = result.agentGuide.status === 'failed'
+  }
+
   /* The gap between "offered" and "taken" is what says whether an offer earns
      its place. Whether the scan found something, never what it found. */
   if (result.insight) {
@@ -81,6 +87,9 @@ export function initTelemetryFieldNames(): string[] {
     'initDoctorFail',
     'initHadRepeatedErrors',
     'initHadAuditGaps',
+    'initAgentGuide',
+    'initAgentSkillsFound',
+    'initAgentSkillsFailed',
     ...DESTINATIONS.map(destination => memberField('Prod', destination.id)),
     ...EXTRAS.map(extra => memberField('Extra', extra.id)),
     ...ENRICHERS.map(enricher => memberField('Enricher', enricher.id)),

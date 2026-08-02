@@ -2,6 +2,8 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { dirname } from 'node:path'
 import { runDoctor } from '../../commands/doctor'
 import type { CliContext } from '../../core/context'
+import { planAgents } from '../agents/plan'
+import { findInstalledSkills, runSkills, skillsCommand } from '../agents/skills'
 import type { CliDebug } from '../debug'
 import { createNoopCliDebug } from '../debug'
 import { detectFramework } from '../map/detect'
@@ -25,6 +27,8 @@ import {
   InitCancelled,
   noteEnvironment,
   noteManual,
+  noteSkills,
+  noteSkillsStarting,
   openInteractive,
   runVerification,
 } from './prompts'
@@ -55,6 +59,8 @@ export interface InitResult {
   insight: InsightSummary | null
   /** `evlog doctor` after the writes, when it ran. */
   verified: VerifySummary | null
+  /** The agent guidelines step, when it was asked for. */
+  agentGuide: AgentGuideSummary | null
   dryRun: boolean
   /** True when the run asked questions — the report stays quiet if so. */
   interactive: boolean
@@ -76,6 +82,21 @@ export interface VerifySummary {
   fail: number
 }
 
+export type SkillsStatus = 'pending' | 'already' | 'installed' | 'failed'
+
+/** What the agent guidelines step managed to do. */
+export interface AgentGuideSummary {
+  /** Skills already on disk when the run started, in any agent's directory. */
+  found: string[]
+  /** The agent directories they were found in. */
+  dirs: string[]
+  /** `npx skills add …`, as the user would type it. */
+  command: string
+  status: SkillsStatus
+  /** Why the skills CLI did not finish, when it did not. */
+  error?: string
+}
+
 export interface InitOptions {
   framework?: Framework
   service?: string
@@ -90,6 +111,8 @@ export interface InitOptions {
   install?: boolean
   /** Skip every question and take the defaults. */
   yes?: boolean
+  /** Write the AGENTS.md block and install the skills. Default: true. */
+  agentGuide?: boolean
   /** Force non-interactive regardless of the terminal (set by `--json`). */
   nonInteractive?: boolean
 }
@@ -165,6 +188,7 @@ export async function runInit(
     defaultService: defaultService(project),
     evlogInstalled,
     install: options.install !== false,
+    agentGuide: options.agentGuide !== false,
     devDrain: options.devDrain,
     prodDrains: options.prodDrains,
     extras: options.extras,
@@ -177,7 +201,7 @@ export async function runInit(
   let answers: InitAnswers
 
   if (interactive) {
-    openInteractive(ctx, project.packageName ?? project.packageDir)
+    openInteractive(ctx, 'evlog init', project.packageName ?? project.packageDir)
     try {
       answers = await askAnswers({
         ctx,
@@ -187,7 +211,7 @@ export async function runInit(
         defaultService: base.defaultService,
         evlogInstalled,
         installRequested: base.install,
-        packageManager,
+        agentGuideRequested: base.agentGuide,
         offers,
       })
     } catch (error) {
@@ -225,19 +249,59 @@ export async function runInit(
     r => ({ writes: r.actions.length, manual: r.manual.length }),
   )
 
-  const installing = !evlogInstalled && answers.install && !dryRun
+  /* Merged into the same plan rather than run afterwards, so the user reads one
+     list and confirms once. The skills are a separate step: `npx skills add`
+     owns them, and it runs alongside the package-manager install below. */
+  let agentGuide: AgentGuideSummary | null = null
+  if (answers.agentGuide) {
+    agentGuide = await log.step('agentGuide', () => {
+      const found = findInstalledSkills(project.packageDir, ctx.home)
+      const guide = planAgents({
+        root: project.packageDir,
+        projectName: project.packageName ?? 'This project',
+        framework: answers.framework,
+        hasSkills: true,
+      })
+      plan.actions.push(...guide.actions)
+      plan.already.push(...guide.already)
+      /* In the plan as well as the report: a step nobody sees considered is a
+         step the reader assumes was forgotten. */
+      if (found.names.length > 0) {
+        plan.already.push(`evlog skills already installed · ${found.dirs.join(', ')}`)
+      }
+
+      return {
+        found: found.names,
+        dirs: found.dirs,
+        command: skillsCommand({ interactive }).display,
+        status: 'pending' as SkillsStatus,
+      }
+    }, r => ({ found: r.found.length }))
+  }
+
+  /* What the run would shell out to, `--dry-run` included: a preview that hides
+     the commands is the one thing a preview exists to show. Execution stays
+     gated on `dryRun` separately, further down. */
+  const wouldInstall = !evlogInstalled && answers.install
+  /* Already-installed skills belong to `npx skills update`, not to us. */
+  const wouldAddSkills = agentGuide !== null && agentGuide.found.length === 0
+  const installing = wouldInstall && !dryRun
+  const runs = [
+    ...(wouldInstall ? [command] : []),
+    ...(wouldAddSkills ? [agentGuide!.command] : []),
+  ]
 
   if (interactive && dryRun) {
     /* `--dry-run` promises the plan. The confirm step is the only thing that
        renders it, and interactive runs suppress the written report — so
        without this the terminal shows the questions and then nothing. */
-    showPlan(plan.actions, plan.already, false, packageManager)
+    showPlan(plan.actions, plan.already, runs)
   }
 
   if (interactive && !dryRun) {
     let confirmed: boolean
     try {
-      confirmed = await confirmPlan(plan.actions, plan.already, installing, packageManager)
+      confirmed = await confirmPlan(plan.actions, plan.already, runs)
     } catch (error) {
       if (error instanceof InitCancelled) {
         closeCancelled()
@@ -275,6 +339,25 @@ export async function runInit(
     })
   }
 
+  if (agentGuide) {
+    if (agentGuide.found.length > 0) {
+      agentGuide.status = 'already'
+    } else if (dryRun) {
+      agentGuide.status = 'pending'
+    } else {
+      /* Runs after the writes: the block is the part we own, and it should be
+         on disk whatever a subprocess we do not control decides to do. */
+      if (interactive) noteSkillsStarting(ctx, agentGuide.command)
+      const outcome = await log.step(
+        'skills',
+        () => runSkills(skillsCommand({ interactive }), project.packageDir, interactive),
+        r => ({ installed: r.ok }),
+      )
+      agentGuide.status = outcome.ok ? 'installed' : 'failed'
+      if (!outcome.ok) agentGuide.error = outcome.error
+    }
+  }
+
   let verified: VerifySummary | null = null
   if (!dryRun) {
     const verify = async (): Promise<VerifySummary> => {
@@ -292,6 +375,7 @@ export async function runInit(
   }
 
   if (interactive) {
+    if (agentGuide) noteSkills(ctx, agentGuide)
     noteEnvironment(answers.prodDrains)
     noteManual(plan.manual)
     closeInteractive(ctx, answers.framework, frameworkDocs(answers.framework), dryRun)
@@ -316,6 +400,7 @@ export async function runInit(
       }
       : null,
     verified,
+    agentGuide,
     dryRun,
     interactive,
     cancelled: false,
@@ -344,6 +429,7 @@ function cancelledResult(input: {
     dropped: [],
     insight: null,
     verified: null,
+    agentGuide: null,
     dryRun: input.dryRun,
     /* Only an interactive run can be cancelled — there is nothing to answer
        when nobody was asked. */
