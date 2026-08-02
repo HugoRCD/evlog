@@ -7,6 +7,7 @@ import type { EvlogPlugin, PluginRunner } from './plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './plugin'
 import { shouldLog, getServiceForPath } from './routes'
 import { extendDeferredDrain } from './deferred-drain'
+import { hasWideEventPublisher, publishWideEvent } from './wideEventChannel'
 import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from './streamResponse'
 
 /**
@@ -179,6 +180,7 @@ export async function runEnrichAndDrain(
     }
   }
 
+  publishWideEvent(emittedEvent)
   markWideEventDrainStarted(emittedEvent)
 
   const drain = options.drain ?? getGlobalDrain()
@@ -320,7 +322,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
 
     if (
       emittedEvent
-      && (options.enrich || options.drain || pluginRunner.hasEnrich || pluginRunner.hasDrain || getGlobalDrain())
+      && (options.enrich || options.drain || pluginRunner.hasEnrich || pluginRunner.hasDrain || getGlobalDrain() || hasWideEventPublisher())
     ) {
       await runEnrichAndDrain(emittedEvent, options, requestInfo, resolvedStatus, pluginRunner)
     }

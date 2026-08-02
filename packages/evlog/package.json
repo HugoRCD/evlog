@@ -231,6 +231,11 @@
       "import": "./dist/client.mjs",
       "default": "./dist/client.mjs"
     },
+    "./diagnostics": {
+      "types": "./dist/diagnostics.d.mts",
+      "import": "./dist/diagnostics.mjs",
+      "default": "./dist/diagnostics.mjs"
+    },
     "./toolkit": {
       "types": "./dist/toolkit.d.mts",
       "import": "./dist/toolkit.mjs",
@@ -369,6 +374,9 @@
       ],
       "client": [
         "./dist/client.d.mts"
+      ],
+      "diagnostics": [
+        "./dist/diagnostics.d.mts"
       ],
       "toolkit": [
         "./dist/toolkit.d.mts"
