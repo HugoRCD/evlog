@@ -1,5 +1,52 @@
 # evlog
 
+## 2.24.0
+
+### Minor Changes
+
+- [#495](https://github.com/HugoRCD/evlog/pull/495) [`c739cf8`](https://github.com/HugoRCD/evlog/commit/c739cf87aa2dfbc72dd9d868b688fdf7bed5d8dd) Thanks [@HugoRCD](https://github.com/HugoRCD)! - feat: publish wide events on a `node:diagnostics_channel`
+
+  New opt-in entry point `evlog/diagnostics`. Call `enableDiagnosticsChannel()` once at startup and every emitted wide event is published on the `evlog.event` channel:
+
+  ```ts
+  // server/plugins/evlog-diagnostics.ts
+  import { enableDiagnosticsChannel } from "evlog/diagnostics";
+
+  export default defineNitroPlugin(async () => {
+    await enableDiagnosticsChannel();
+  });
+  ```
+
+  A consumer then subscribes by channel name alone, with no evlog import and no entry in `initLogger()`:
+
+  ```ts
+  import { subscribe } from "node:diagnostics_channel";
+
+  subscribe("evlog.event", ({ event }) =>
+    metrics.timing("http.request", event.durationMs),
+  );
+  ```
+
+  `subscribeToWideEvents()` is exported for consumers that already depend on evlog and want the payload typed.
+
+  Subscribers receive the same object drains receive — post-audit, post-redaction, post-enrich — and must treat it as read-only. They run synchronously and are not awaited: this is an observation side channel, not a transport. On Cloudflare, Workers forwards every channel message to a Tail Worker, so enabling it gets wide events out of an isolate with no drain and no `waitUntil`.
+
+  Off by default, and free when off — `node:diagnostics_channel` is loaded lazily so it never enters the main bundle graph, and with the channel enabled but unsubscribed the emit path benchmarks identically to having it disabled.
+
+- [#494](https://github.com/HugoRCD/evlog/pull/494) [`44705f7`](https://github.com/HugoRCD/evlog/commit/44705f7bd90ef2d903e9a10beea7a704c724e50e) Thanks [@HugoRCD](https://github.com/HugoRCD)! - feat(core): expose `durationMs` as a number on the wide event
+
+  Request loggers now write `durationMs` (a number, in milliseconds) next to the existing `duration` string. `duration` keeps its current shape — `"12ms"`, `"1.20s"` — and is still what the pretty terminal renders; `durationMs` is the one to query. Backends stop needing a parse step: ClickHouse can `avg()` and `quantile(0.95)()` on a real column, LogQL can do `| json | durationMs > 1000`, and facet-based UIs get a numeric field instead of a string.
+
+  The ClickHouse adapter's default `toClickHouseRow()` maps it to a new `duration_ms` column. Add it to an existing table before upgrading:
+
+  ```sql
+  ALTER TABLE evlog_events ADD COLUMN duration_ms Nullable(UInt32) AFTER duration;
+  ```
+
+  Durations are measured with a clamped elapsed helper, so a backward wall-clock step (NTP, manual change) during a request can no longer surface a negative `durationMs`, `duration`, or tail-sampling duration.
+
+  `BaseWideEvent` now declares both fields, so `event.durationMs` is typed `number | undefined` in enrichers and drains. Code that read `event.duration` as a number was already wrong at runtime and will now fail to type-check — switch it to `event.durationMs`.
+
 ## 2.23.0
 
 ### Minor Changes
