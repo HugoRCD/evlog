@@ -1,4 +1,4 @@
-import { and, eq, gte, isNull, lt, not } from 'drizzle-orm'
+import { and, eq, gte, isNull, lt, not, sql } from 'drizzle-orm'
 
 export interface RunsFilter {
   range: StatsRange
@@ -20,7 +20,9 @@ function buildSourceWhere(source: SourceRef) {
       return and(
         eq(schema.runs.envCi, true),
         source.id === UNKNOWN_PROVIDER
-          ? isNull(schema.runs.envProvider)
+          // Mirrors the `nullif(trim(...))` the aggregation groups by, so
+          // clicking the Unknown CI row selects the same rows it counted.
+          ? sql`coalesce(nullif(trim(${schema.runs.envProvider}), ''), '') = ''`
           : eq(schema.runs.envProvider, source.id),
       )
     case 'agent':

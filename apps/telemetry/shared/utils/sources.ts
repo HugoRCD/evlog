@@ -29,8 +29,14 @@ export interface SourceEnv {
 
 /** Classify one run's environment into its source. */
 export function classifySource(env: SourceEnv): SourceRef {
-  if (env.ci) return { kind: 'ci', id: env.provider ?? UNKNOWN_PROVIDER }
-  if (env.agent) return { kind: 'agent', id: env.agent }
+  // Blank is treated as absent throughout: real clients do report empty
+  // strings for a provider they couldn't identify, and an empty id renders as
+  // a row with an icon, a count, and no name at all.
+  const provider = env.provider?.trim()
+  const agent = env.agent?.trim()
+
+  if (env.ci) return { kind: 'ci', id: provider || UNKNOWN_PROVIDER }
+  if (agent) return { kind: 'agent', id: agent }
   return env.tty ? { kind: 'terminal', id: 'terminal' } : { kind: 'automation', id: 'automation' }
 }
 

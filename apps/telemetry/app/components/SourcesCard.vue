@@ -45,11 +45,14 @@ const rows = computed(() => props.sources.map(source => ({
   source,
   token: sourceToken(source),
   label: sourceLabel(source),
+  detail: sourceDetail(source),
   icon: sourceIcon(source),
   color: KIND_COLORS[source.kind],
   count: source.count,
   share: total.value > 0 ? source.count / total.value : 0,
 })))
+
+const busiest = computed(() => Math.max(0, ...props.sources.map(source => source.count)))
 
 const activeToken = computed(() => (props.active ? sourceToken(props.active) : undefined))
 
@@ -111,29 +114,27 @@ function shareLabel(share: number) {
           v-for="row in rows"
           :key="row.token"
           type="button"
-          class="relative overflow-hidden px-4 py-1.5 text-left transition-colors duration-[--duration-fast]"
+          class="flex items-center gap-3 px-4 py-1.5 text-left transition-colors duration-[--duration-fast]"
           :class="row.token === activeToken ? 'bg-elevated ring-tinted' : 'hover:bg-elevated/60'"
           :style="{ '--tint': row.color }"
           :aria-pressed="row.token === activeToken"
           @click="onSelect(row.source)"
         >
-          <!-- Ranking is already implied by the ordering, but a rail makes the
-               *gap* between ranks visible: two rows can both say 14% and still
-               sit very differently against the leader. Kept in the source's own
-               hue at a low alpha so it reads as measure, not decoration. -->
-          <span
-            class="breakdown-bar absolute inset-y-0 left-0 w-full opacity-[0.09]"
-            :style="{ transform: `scaleX(${row.share})`, backgroundColor: row.color }"
-          />
-          <span class="relative flex items-center justify-between gap-3">
-            <span class="flex min-w-0 items-center gap-2">
-              <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: row.color }" />
-              <UIcon :name="row.icon" class="size-3.5 shrink-0 text-dimmed" />
-              <span class="truncate text-[13px] text-toned">{{ row.label }}</span>
-            </span>
-            <span class="shrink-0 text-[11px] text-dimmed tabular-nums">
-              {{ row.count.toLocaleString() }} · {{ shareLabel(row.share) }}
-            </span>
+          <span class="flex min-w-0 flex-1 items-center gap-2">
+            <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: row.color }" />
+            <UIcon :name="row.icon" class="size-3.5 shrink-0 text-dimmed" />
+            <span class="truncate text-[13px] text-toned">{{ row.label }}</span>
+            <span v-if="row.detail" class="shrink-0 font-mono text-[10px] text-dimmed">{{ row.detail }}</span>
+          </span>
+
+          <!-- Ranking is implied by the ordering, but the gauge makes the *gap*
+               visible: two rows can both read 14% and still sit very differently
+               against the leader. In the source's own hue, so it ties back to
+               its segment on the composition bar. -->
+          <ProportionBar :value="row.count" :max="busiest" :color="row.color" />
+
+          <span class="w-20 shrink-0 text-right text-[11px] text-dimmed tabular-nums">
+            {{ row.count.toLocaleString() }} · {{ shareLabel(row.share) }}
           </span>
         </button>
       </div>

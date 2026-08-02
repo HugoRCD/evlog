@@ -29,6 +29,6 @@ const items = computed<BreakdownBarItem[]>(() => props.errorCodes.map(e => ({
       hint="Every run in the window succeeded."
     />
 
-    <BreakdownBars v-else :items bar-class="bg-error/[0.045]" />
+    <BreakdownBars v-else :items bar-color="var(--chart-error)" />
   </PanelCard>
 </template>

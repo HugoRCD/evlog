@@ -34,6 +34,18 @@ describe('classifySource', () => {
       .toEqual({ kind: 'ci', id: 'unknown' })
   })
 
+  it('treats a blank provider as no provider', () => {
+    // Real clients report empty strings, and an empty id renders as a row with
+    // an icon, a count, and no name at all.
+    expect(classifySource({ ci: true, provider: '', agent: null, tty: false }).id).toBe('unknown')
+    expect(classifySource({ ci: true, provider: '   ', agent: null, tty: false }).id).toBe('unknown')
+  })
+
+  it('treats a blank agent as no agent', () => {
+    expect(classifySource({ ...LOCAL, agent: '' })).toEqual({ kind: 'terminal', id: 'terminal' })
+    expect(classifySource({ ...LOCAL, agent: '  ', tty: false })).toEqual({ kind: 'automation', id: 'automation' })
+  })
+
   it('ignores tty once a source has been identified', () => {
     expect(classifySource({ ...LOCAL, agent: 'cursor', tty: false }).kind).toBe('agent')
     expect(classifySource({ ci: true, provider: 'vercel', agent: null, tty: true }).kind).toBe('ci')

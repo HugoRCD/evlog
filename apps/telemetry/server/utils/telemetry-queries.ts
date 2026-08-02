@@ -25,7 +25,7 @@ const SOURCE_KIND_EXPR = sql<SourceKind>`case
 end`
 
 const SOURCE_ID_EXPR = sql<string>`case
-  when ${schema.runs.envCi} then coalesce(${schema.runs.envProvider}, ${UNKNOWN_PROVIDER})
+  when ${schema.runs.envCi} then coalesce(nullif(trim(${schema.runs.envProvider}), ''), ${UNKNOWN_PROVIDER})
   when ${schema.runs.envAgent} is not null then ${schema.runs.envAgent}
   when ${schema.runs.envTty} then 'terminal'
   else 'automation'

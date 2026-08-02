@@ -10,16 +10,17 @@ export interface BreakdownBarItem {
 
 const props = withDefaults(defineProps<{
   items: BreakdownBarItem[]
-  /** Tailwind class for the bar fill. Default: the chart accent, well below the text. */
-  barClass?: string
+  /** Gauge fill. Defaults to the chart accent; error lists pass their own hue. */
+  barColor?: string
 }>(), {
-  barClass: 'bg-primary/10',
+  barColor: 'var(--chart-accent)',
 })
 
 const total = computed(() => props.items.reduce((sum, item) => sum + item.count, 0))
+const max = computed(() => Math.max(0, ...props.items.map(item => item.count)))
 
 function shareOf(count: number) {
-  return total.value > 0 ? count / total.value : 0
+  return total.value > 0 ? Math.round((count / total.value) * 100) : 0
 }
 </script>
 
@@ -28,23 +29,19 @@ function shareOf(count: number) {
     <div
       v-for="item in items"
       :key="item.key"
-      class="relative overflow-hidden px-4 py-1.5"
+      class="flex items-center gap-3 px-4 py-1.5 text-[13px]"
     >
-      <div
-        class="breakdown-bar absolute inset-y-0 left-0 w-full"
-        :class="barClass"
-        :style="{ transform: `scaleX(${shareOf(item.count)})` }"
-      />
-      <div class="relative flex items-center justify-between gap-3 text-[13px]">
-        <span class="flex min-w-0 items-center gap-2">
-          <UIcon v-if="item.icon" :name="item.icon" class="size-3.5 shrink-0 text-dimmed" />
-          <span class="truncate text-toned">{{ item.label }}</span>
-          <span v-if="item.hint" class="hidden truncate text-[11px] text-dimmed sm:inline">{{ item.hint }}</span>
-        </span>
-        <span class="shrink-0 text-[11px] text-dimmed tabular-nums">
-          {{ item.count.toLocaleString() }} · {{ Math.round(shareOf(item.count) * 100) }}%
-        </span>
-      </div>
+      <span class="flex min-w-0 flex-1 items-center gap-2">
+        <UIcon v-if="item.icon" :name="item.icon" class="size-3.5 shrink-0 text-dimmed" />
+        <span class="truncate text-toned">{{ item.label }}</span>
+        <span v-if="item.hint" class="hidden truncate text-[11px] text-dimmed sm:inline">{{ item.hint }}</span>
+      </span>
+
+      <ProportionBar :value="item.count" :max :color="barColor" />
+
+      <span class="w-20 shrink-0 text-right text-[11px] text-dimmed tabular-nums">
+        {{ item.count.toLocaleString() }} · {{ shareOf(item.count) }}%
+      </span>
     </div>
   </div>
 </template>
