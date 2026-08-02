@@ -98,8 +98,12 @@ describe('clickhouse adapter', () => {
     })
 
     it('nulls a duration_ms that Nullable(UInt32) would reject', () => {
+      const event = createTestEvent()
       for (const durationMs of [-1, 1.5, 4_294_967_296, Number.NaN, '12', null]) {
-        expect(toClickHouseRow(createTestEvent({ durationMs })).duration_ms, String(durationMs)).toBeNull()
+        expect(
+          toClickHouseRow({ ...event, durationMs } as unknown as WideEvent).duration_ms,
+          String(durationMs),
+        ).toBeNull()
       }
 
       expect(toClickHouseRow(createTestEvent({ durationMs: 0 })).duration_ms).toBe(0)
