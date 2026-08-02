@@ -29,6 +29,8 @@ Every framework integration must expose:
 feat({framework}): add {Framework} middleware integration
 ```
 
+**Scope timing caveat**: the semantic PR check reads its scope list from the **base branch**, so a brand-new scope can't validate the very PR that introduces it. Either register the scope in a small preceding PR, or use an unscoped title (`feat: add {Framework} middleware integration`) on the introducing PR.
+
 ## Touchpoints Checklist
 
 | # | File | Action |
@@ -347,13 +349,14 @@ feat({framework}): add {Framework} middleware integration (`evlog/{framework}`) 
 
 ## Step 13: PR Scopes
 
-Add `{framework}` to the `scopes` list in `.github/workflows/semantic-pull-request.yml` **and** to the Scopes section of `.github/pull_request_template.md`, in alphabetical order.
+Add `{framework}` to the `scopes` list in `.github/workflows/semantic-pull-request.yml` **and** to the Scopes section of `.github/pull_request_template.md`, in alphabetical order. Remember the timing caveat from the PR Title section: this registration only takes effect for PRs whose base branch already contains it.
 
 ## Verification
 
-From the repo root:
+After a clean install, run `pnpm run dev:prepare` from the repo root first, then:
 
 ```bash
+pnpm run dev:prepare
 cd packages/evlog
 pnpm run build    # required before test — api-surface snapshot is gated on dist/
 pnpm run test

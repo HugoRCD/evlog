@@ -15,6 +15,8 @@ feat({name}): add the {Name} drain adapter
 
 Recent examples: `feat(loki): add the Grafana Loki drain adapter`, `feat(clickhouse): add the ClickHouse drain adapter`. Use the adapter name as the conventional-commit scope — and register that scope (see touchpoint 11).
 
+**Scope timing caveat**: the semantic PR check reads its scope list from the **base branch**, so a brand-new scope can't validate the very PR that introduces it. Either register the scope in a small preceding PR (the Loki/ClickHouse pattern), or use an unscoped title (`feat: add the {Name} drain adapter`) on the introducing PR.
+
 ## Touchpoints Checklist
 
 | # | File | Action |
@@ -173,13 +175,14 @@ Create `.changeset/{name}-adapter.md` with a `minor` bump. Write it like a relea
 
 ## Step 10: PR Scopes
 
-Add `{name}` to the `scopes` list in `.github/workflows/semantic-pull-request.yml` **and** to the Scopes section of `.github/pull_request_template.md`, in alphabetical order.
+Add `{name}` to the `scopes` list in `.github/workflows/semantic-pull-request.yml` **and** to the Scopes section of `.github/pull_request_template.md`, in alphabetical order. Remember the timing caveat from the PR Title section: this registration only takes effect for PRs whose base branch already contains it.
 
 ## Verification
 
-After completing all steps, run:
+After a clean install, prepare generated workspace types from the repo root first, then run the package checks:
 
 ```bash
+pnpm run dev:prepare
 cd packages/evlog
 pnpm run lint
 pnpm run typecheck
