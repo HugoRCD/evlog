@@ -1,10 +1,10 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog map`) to score entry-point coverage on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse), sampling, enrichers, and AI SDK integration.
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.6"
+  version: "0.8"
 ---
 
 # Review logging patterns
@@ -23,7 +23,9 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 
 | Working on...           | Resource                                                           |
 | ----------------------- | ------------------------------------------------------------------ |
+| Setup (CLI)             | [`evlog init`](https://www.evlog.dev/cli/init) — wire evlog into the project |
 | Coverage map (CLI)      | [`evlog map`](https://www.evlog.dev/cli/map) — score dark entry points |
+| CI gating (CLI)         | [`evlog map --min-score / --baseline`](https://www.evlog.dev/cli/ci) — gate regressions |
 | Wide events patterns    | [references/wide-events.md](references/wide-events.md)             |
 | Error handling          | [references/structured-errors.md](references/structured-errors.md) |
 | Code review checklist   | [references/code-review.md](references/code-review.md)             |
@@ -51,15 +53,33 @@ Docs: https://www.evlog.dev/use-cases/audit/overview
 npm install evlog
 ```
 
-## Score coverage with the CLI (recommended)
+## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start)
 
-`@evlog/cli` is a **separate package** from `evlog` — early, but worth trying. It reads the project on disk (no traffic, no config) and scores every entry point for wide-event coverage. On Nuxt, Nitro, Next.js, and TanStack Start it is usually faster and more complete than grepping for `console.log`.
+`@evlog/cli` is a **separate package** from `evlog` — early, but worth trying. It reads the project on disk (no traffic, no config). On the four supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines — continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
-**Try without installing:**
+### 1. Setup: `evlog init`
+
+On a project that doesn't use evlog yet, prefer `init` over hand-writing the setup — it detects the framework, reads what the project already has, and generates config, drains, enrichers, and extras in one pass. It is fully scriptable for agents:
+
+```bash
+# preview everything without writing (always start here)
+npx @evlog/cli init --dry-run --yes
+
+# then apply — flags instead of prompts
+npx @evlog/cli init --yes \
+  --service my-app \
+  --drain fs \
+  --prodDrain axiom \
+  --extras enrichers,pipeline,sampling \
+  --sampling medium
+```
+
+Useful flags: `--framework` (override detection: `nuxt`, `nitro`, `next`, `tanstack-start`), `--prodDrain` (comma-separated: `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx`), `--extras` (`enrichers`, `pipeline`, `sampling`, `vite`, `error-catalog`, `audit-catalog`, `ai`, `better-auth`), `--enrichers`, `--sampling` (traffic tier: `all`, `low`, `medium`, `high`, `very-high`), `--apps` (monorepo: which workspace packages), `--no-install`. Review the `--dry-run` output with the user before applying. Docs: https://www.evlog.dev/cli/init
+
+### 2. Score: `evlog map`
 
 ```bash
 npx @evlog/cli map --no-write
-# or: pnpm dlx @evlog/cli map --no-write
 # agents: npx @evlog/cli map --json --no-write
 ```
 
@@ -67,12 +87,23 @@ What you get:
 
 - A project score and which entry points are still dark
 - **FIX FIRST** — the three most valuable places to fix
+- **GOING FURTHER** — opportunities (catalogs, audit coverage, AI logging, auth identity) that never cost points
 - Per-file inspect: `npx @evlog/cli map <file> --no-write` shows the shape the handler could take
 - Re-run after fixes and watch the score move
 
-If the user is open to it: work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.audit()`, `createError({ why, fix })`), then re-run with `--no-write`. Prefer `npx` / `dlx` for a one-shot; only suggest `pnpm add -D @evlog/cli` if they want it pinned for CI — **ask first, never install silently**. Omit `--no-write` only when the user wants `evlog.map.json` written.
+Work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.audit()`, `createError({ why, fix })`), then re-run with `--no-write`. Omit `--no-write` only when the user wants `evlog.map.json` written.
 
-If the CLI is unavailable, the framework has no map adapter yet, or the user declines — **continue with the manual checklist** below. The skill does not depend on the CLI.
+### 3. Lock it in CI: `--min-score` and `--baseline`
+
+After fixing, propose making the score durable — this is where the CLI earns its keep:
+
+```bash
+# in CI, after pnpm add -D @evlog/cli (project-local, pinned by the lockfile)
+pnpm exec evlog map --min-score 80   # absolute gate: exits 1 below the threshold
+pnpm exec evlog map --baseline       # ratchet: exits 1 if this PR made things worse
+```
+
+`--baseline` compares the fresh scan against the committed `evlog.map.json`, **per entry point and per requirement** — a refactor that instruments one route and breaks another fails even if the total score is unchanged. Disabling a passing check with a comment counts as a regression too. New uninstrumented routes are listed as `NEW AND DARK` without failing. Workflow: commit `evlog.map.json` once, add the `--baseline` run to CI (`pnpm add -D @evlog/cli` for a pinned version — ask first), and re-run `map` without `--baseline` to accept an intentional change. Docs: https://www.evlog.dev/cli/ci
 
 Early days: adapters and rules are still evolving; expect scores to move between releases. Docs: https://www.evlog.dev/cli/map · Rules: https://www.evlog.dev/cli/rules
 
@@ -497,7 +528,18 @@ app.get('/api/users', (c) => {
 })
 ```
 
-Access the logger via `c.get('log')` in handlers. No `useLogger()` — use `c.get('log')` and pass it down explicitly, or use Express/Fastify/Elysia if you need `useLogger()` across async boundaries.
+Access the logger via `c.get('log')` in handlers. Use `useLogger()` from `evlog/hono` in the layers underneath (services, repositories) where `c` is not in hand — both return the same logger:
+
+```typescript
+import { useLogger } from 'evlog/hono'
+
+async function findUsers() {
+  const log = useLogger()
+  log.set({ db: { query: 'SELECT * FROM users' } })
+}
+```
+
+On Cloudflare Workers, `useLogger()` needs the `nodejs_compat` (or `nodejs_als`) compatibility flag; `c.get('log')` works with or without it.
 
 Structured errors: throw `createError()`, then in `app.onError` use `parseError()` and pass `parsed.status as ContentfulStatusCode` to `c.json()` (Hono types the status argument as `ContentfulStatusCode`, not `number`).
 
@@ -744,26 +786,70 @@ const handler = withEvlog(new RPCHandler(router), {
 ### Cloudflare Workers
 
 ```typescript
-import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'
+import { initWorkersLogger, withEvlog } from 'evlog/workers'
 
 initWorkersLogger({ env: { service: 'edge-api' } })
 
-export default {
-  async fetch(request: Request) {
-    const log = createWorkersLogger(request)
+export default withEvlog(async (request, _env, _ctx, log) => {
+  log.set({ action: 'handle_request' })
+  return Response.json({ ok: true })
+})
+```
+
+`withEvlog` emits one wide event per request when the handler returns — no manual `log.emit()`. Async drains are registered with `waitUntil` so they survive the response; streaming responses defer the emit until the body completes. `requestId` comes from `x-request-id` (fallback `cf-ray`); `method`, `path`, `cf-ray`, `traceparent`, and the safe subset of `request.cf` are captured automatically. It accepts the same options (`drain`, `enrich`, `keep`, `include`, `exclude`, `routes`) as every other integration. For manual control (scheduled handlers, queues), `createWorkersLogger(request)` + `log.emit()` remains available. No ALS-based `useLogger()` on Workers — pass `log` explicitly.
+
+### AWS Lambda
+
+Lambda has no HTTP middleware lifecycle, so evlog behaves like standalone TypeScript — with one critical rule: **one logger per invocation**, never a shared module-level logger (Lambda reuses execution environments, so a shared instance leaks fields between invocations).
+
+```typescript
+import { initLogger, createLogger } from 'evlog'
+
+initLogger({ env: { service: 'my-fn' } })  // once at module load (cold start)
+
+export async function handler(event: SQSEvent) {
+  for (const record of event.Records) {
+    const log = createLogger({ messageId: record.messageId })
     try {
-      log.set({ route: 'health' })
-      const response = new Response('ok', { status: 200 })
-      log.emit({ status: response.status })
-      return response
+      log.set({ queue: { source: record.eventSourceARN } })
+      await processMessage(record)
     } catch (error) {
       log.error(error as Error)
-      log.emit({ status: 500 })
       throw error
+    } finally {
+      log.emit()
     }
-  },
+  }
 }
 ```
+
+### Astro
+
+```typescript
+// src/middleware.ts
+import { defineMiddleware } from 'astro:middleware'
+import { initLogger, createRequestLogger } from 'evlog'
+
+initLogger({ env: { service: 'my-astro-app' } })
+
+export const onRequest = defineMiddleware(async ({ request, locals }, next) => {
+  const url = new URL(request.url)
+  const log = createRequestLogger({ method: request.method, path: url.pathname })
+  locals.log = log
+
+  try {
+    const response = await next()
+    log.emit()
+    return response
+  } catch (error) {
+    log.error(error instanceof Error ? error : new Error(String(error)))
+    log.emit()
+    throw error
+  }
+})
+```
+
+Type `locals.log` in `src/env.d.ts` (`interface Locals { log: RequestLogger }`). Pair with the Vite plugin (below) for auto-imports and build-time DX.
 
 ### Vite Plugin (any Vite-based framework)
 
@@ -850,6 +936,8 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | Grafana Loki | `evlog/loki` | `LOKI_ENDPOINT`, optional `LOKI_API_KEY` + `LOKI_USER` (Grafana Cloud) or `LOKI_TENANT_ID` (multi-tenant) |
 | ClickHouse | `evlog/clickhouse` | `CLICKHOUSE_ENDPOINT`, optional `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` / `CLICKHOUSE_DATABASE` / `CLICKHOUSE_TABLE` |
 | File System | `evlog/fs` | None (local file system) |
+| Memory | `evlog/memory` | None (in-process ring buffer; optional `EVLOG_MEMORY_STORE`, `EVLOG_MEMORY_MAX_EVENTS`). Read back with `readMemoryLogs()` — ideal for dev-only log endpoints agents can query |
+| NuxtHub | `@evlog/nuxthub` (separate package, Nuxt module) | None — stores wide events in the NuxtHub database with retention-based cleanup (`evlog.nuxthub: { retentionDays, batchSize }`) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
 Use canonical env var names (e.g. `AXIOM_API_KEY`, `BETTER_STACK_API_KEY`) — the same names work in every framework.
@@ -892,7 +980,12 @@ See [references/drain-pipeline.md](references/drain-pipeline.md) for batching, r
 
 ## Enrichers
 
-Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()` — all from `evlog/enrichers`.
+Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()` — all from `evlog/enrichers`. Each accepts `{ overwrite?: boolean }` (default `false`). Use `createDefaultEnrichers()` to compose all four in one call:
+
+```typescript
+import { createDefaultEnrichers } from 'evlog/enrichers'
+app.use(evlog({ enrich: createDefaultEnrichers() }))
+```
 
 ```typescript
 // Nuxt/Nitro: server/plugins/evlog-enrich.ts
@@ -965,7 +1058,7 @@ Works in all frameworks: Nuxt (`evlog` config), Nitro (`evlog()` module options)
 
 ## AI SDK Integration
 
-Capture token usage, tool calls, model info, streaming metrics, tool execution timing, cost estimation, and embedding metadata from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >= 6.0.0` as a peer dependency.
+Capture token usage, tool calls, model info, streaming metrics, tool execution timing, cost estimation, and embedding metadata from the Vercel AI SDK into wide events. Import from `evlog/ai`. Requires `ai >=6.0.168 <8.0.0` as a peer dependency.
 
 ### Basic setup (middleware)
 
@@ -1043,6 +1136,20 @@ Anti-patterns to detect:
 | No AI observability | Add `createAILogger(log)` + `ai.wrap()` |
 | No tool execution timing | Add `createEvlogIntegration(ai)` to `telemetry.integrations` |
 | Manual cost calculation | Use `cost` option in `createAILogger()` |
+
+---
+
+## Related Capabilities (pointers)
+
+Recommend these when the review surfaces the matching need — each has full docs on evlog.dev:
+
+| Need spotted | evlog answer | Docs |
+|--------------|--------------|------|
+| Auth'd user identity missing from events (Better Auth apps) | `evlog/better-auth` — `identifyUser()`, `createAuthMiddleware()`, client identity sync | https://www.evlog.dev/use-cases/better-auth/overview |
+| Ad-hoc field names drifting across the codebase | Typed fields + error/audit catalogs (`evlog/catalog`) | https://www.evlog.dev/learn/typed-fields · https://www.evlog.dev/learn/catalogs |
+| Cross-cutting hooks (request start/finish, client logs, logger extension) | Plugins — `definePlugin` | https://www.evlog.dev/extend/plugins |
+| Tail logs live during dev / build a log viewer | `createStreamDrain` (`evlog/stream`, SSE) + `readFsLogs` / `tailFsLogs` (`evlog/fs`) | https://www.evlog.dev/extend/stream |
+| Agents need to query logs over HTTP in dev | Memory adapter + `readMemoryLogs()` behind a dev-only endpoint | https://www.evlog.dev/integrate/adapters/self-hosted/memory |
 
 ---
 

@@ -4,7 +4,7 @@ description: Analyze application logs from the .evlog/logs/ directory. Use when 
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.1"
+  version: "0.3"
 ---
 
 # Analyze application logs
@@ -44,11 +44,22 @@ apps/*/.evlog/logs/*.jsonl
 
 Files are named by date: `2026-03-14.jsonl`. Start with the most recent file.
 
+**Programmatic reading**: instead of hand-parsing, a small script can use the readers shipped with evlog — `readFsLogs()` and `tailFsLogs()` from `evlog/fs` are async generators that handle both formats, date ordering, and filtering. Prefer them when the project already has evlog installed and the analysis needs more than a quick grep.
+
+**Memory drain alternative**: some apps use the Memory adapter (`evlog/memory`) instead of (or alongside) the FS drain, exposing recent events through a dev-only HTTP endpoint via `readMemoryLogs()`. If `.evlog/logs/` is empty but the app wires `createMemoryDrain()`, query that endpoint instead.
+
 ## If no logs are found
 
 Before wiring a new drain, you can try `npx @evlog/cli doctor --json` — it checks whether `evlog` is installed and whether a local `.evlog/logs` sink already exists (read-only). Optional; skip if the CLI is unavailable.
 
-The file system drain may not be enabled. Guide the user to set it up:
+The file system drain may not be enabled. On Nuxt, Nitro, Next.js, or TanStack Start, the fastest path is the CLI — it detects the framework and wires the fs drain (its default dev sink) in one pass:
+
+```bash
+npx @evlog/cli init --dry-run --yes   # preview first
+npx @evlog/cli init --yes --drain fs  # apply
+```
+
+Ask before running it. On other frameworks (or if the user declines), guide the manual setup:
 
 ```typescript
 import { createFsDrain } from 'evlog/fs'

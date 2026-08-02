@@ -9,26 +9,29 @@ Add a new built-in enricher to evlog. Every enricher is built on the public tool
 
 ## PR Title
 
-Recommended format for the pull request title:
-
 ```
-feat: add {name} enricher
+feat(core): add the {name} enricher
 ```
 
-The exact wording may vary depending on the enricher (e.g., `feat: add user agent enricher`, `feat: add geo enricher`), but it should always follow the `feat:` conventional commit prefix.
+Enrichers live in the core package surface (`evlog/enrichers`), so use the `core` scope unless a dedicated scope exists.
 
 ## Touchpoints Checklist
 
 | # | File | Action |
 |---|------|--------|
 | 1 | `packages/evlog/src/enrichers/index.ts` | Add enricher source (one `defineEnricher` call) |
-| 2 | `packages/evlog/test/enrichers.test.ts` | Add tests |
-| 3 | `apps/docs/content/4.enrichers/2.built-in.md` | Add enricher to built-in docs |
-| 4 | `apps/docs/content/4.enrichers/1.overview.md` | Add enricher to overview cards |
-| 5 | `skills/review-logging-patterns/SKILL.md` | Add enricher to the Built-in line in the Enrichers section |
-| 6 | `README.md` + `packages/evlog/README.md` | Add enricher to README enrichers section |
+| 2 | Same file — `createDefaultEnrichers()` | Decide whether the enricher belongs in the default composition (see below) |
+| 3 | `packages/evlog/test/toolkit/enrichers.test.ts` | Add tests (one `describe` block per enricher) |
+| 4 | `apps/docs/content/5.use-cases/5.enrichers.md` | Add a section for the enricher + update the import list and, if applicable, the "All built-in enrichers" default composition text |
+| 5 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Add the enricher to the `Built-in:` line in the Enrichers section |
+| 6 | `packages/evlog/README.md` | Add the enricher to the Built-in Enrichers section (root `README.md` is a symlink to it) |
+| 7 | `.changeset/{name}-enricher.md` | Create changeset (`minor`) |
 
-**Important**: Do NOT consider the task complete until all 6 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 7 touchpoints have been addressed.
+
+### Should it join `createDefaultEnrichers()`?
+
+`createDefaultEnrichers()` composes user agent, geo, request size, and trace context via `composeEnrichers` (from `../shared/compose`). Add the new enricher to the composition only if it is universally applicable and reads nothing but the request (headers/env) — anything requiring service-specific setup or extra cost stays opt-in. Changing the default composition is a behavior change for every existing `createDefaultEnrichers()` user: call it out explicitly in the changeset.
 
 ## Naming Conventions
 
@@ -48,36 +51,37 @@ The contract is `defineEnricher<T>({ name, field, compute }, options?)`. You onl
 
 `defineEnricher` handles the rest:
 
-- merging via `mergeEventField` (respecting `options.overwrite`)
+- merging via `mergeEventField` (respecting `options.overwrite`, default `false`)
 - error isolation (throws are caught and logged, never propagated)
 - skipping when `compute` returns `undefined`
 
 Key rules:
 
 - **Use the toolkit helpers**: `getHeader()` for case-insensitive header lookup, `normalizeNumber()` for numeric strings — both from `../shared/headers` (re-exported by `evlog/toolkit`).
-- **Single event field** — each enricher writes one top-level field on `ctx.event`.
-- **Factory pattern** — `create{Name}Enricher(options?: EnricherOptions)` always returns the result of `defineEnricher(...)`.
+- **Single event field** — each enricher writes one top-level field on `ctx.event`. If the enricher must additionally pin top-level fields (like `createTraceContextEnricher` does for `event.traceId` / `event.spanId`), wrap the `defineEnricher` result in a closure — see that enricher for the pattern.
+- **Factory pattern** — `create{Name}Enricher(options: EnricherOptions = {})` returns the result of `defineEnricher(...)` — directly in the normal case, or through the thin closure wrapper when the enricher also pins top-level fields (see the single-event-field rule above).
 - **No side effects** — never throw, never log; rely on `defineEnricher`'s built-in error handling if something goes wrong.
+- **Export the Info type** — `{Name}Info` describing the field shape, exported alongside the factory.
 
 ## Step 2: Tests
 
-Add tests to `packages/evlog/test/enrichers.test.ts`.
+Add tests to `packages/evlog/test/toolkit/enrichers.test.ts`, following the existing structure (one `describe` block per enricher) and `packages/evlog/test/README.md` conventions.
 
 Required test categories:
 
 1. **Sets field from headers** — verify the enricher populates the event field correctly
-2. **Skips when header missing** — verify no field is set when the required header is absent
+2. **Skips when source data missing** — verify no field is set when the required header/input is absent
 3. **Preserves existing data** — verify `overwrite: false` (default) doesn't replace user-provided fields
 4. **Overwrites when requested** — verify `overwrite: true` replaces existing fields
 5. **Handles edge cases** — empty strings, malformed values, case-insensitive header names
+6. **Default composition** — if the enricher joined `createDefaultEnrichers()`, extend that composition's tests
 
-Follow the existing test structure in `enrichers.test.ts` — each enricher has its own `describe` block.
+## Step 3: Update the Enrichers Docs Page
 
-## Step 3: Update Built-in Docs
+Edit `apps/docs/content/5.use-cases/5.enrichers.md`:
 
-Edit `apps/docs/content/4.enrichers/2.built-in.md` to add a new section for the enricher.
-
-Each enricher section follows this structure:
+1. Add the enricher to the import list at the top
+2. Add a `## {DISPLAY}` section following the structure of the existing ones:
 
 ```markdown
 ## {DISPLAY}
@@ -109,17 +113,21 @@ interface {Name}Info {
 \`\`\`
 ```
 
-## Step 4: Update Overview Page
+3. If the enricher joined the default composition, update the "All built-in enrichers" section text listing what `createDefaultEnrichers()` composes.
 
-Edit `apps/docs/content/4.enrichers/1.overview.md` to add a card for the new enricher in the `::card-group` section (before the Custom card).
+Custom-enricher authoring docs live separately at `apps/docs/content/6.extend/5.custom-enrichers.md` — no change needed there unless the toolkit contract itself changed.
 
-## Step 5: Update `skills/review-logging-patterns/SKILL.md`
+## Step 4: Update the Public Skill
 
-In `skills/review-logging-patterns/SKILL.md`, find the **Enrichers** section and add the new enricher to the `Built-in:` line.
+In `apps/docs/skills/review-logging-patterns/SKILL.md` (published on evlog.dev), find the **Enrichers** section and add the new enricher to the `Built-in:` line.
 
-## Step 6: Update README
+## Step 5: Update README
 
-Add the enricher to the enrichers section in `packages/evlog/README.md` (the root `README.md` is a symlink to it).
+Add the enricher to the **Built-in Enrichers** section in `packages/evlog/README.md` (the root `README.md` is a symlink to it).
+
+## Step 6: Changeset
+
+Create `.changeset/{name}-enricher.md` with a `minor` bump describing what the enricher sets and when to use it. Mention explicitly if the default composition changed.
 
 ## Verification
 

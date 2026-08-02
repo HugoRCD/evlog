@@ -1,26 +1,35 @@
 ---
 name: create-evlog-framework-integration
-description: Create a new evlog framework integration to add automatic wide-event logging to an HTTP framework. Use when adding middleware/plugin support for a framework (e.g., Hono, Elysia, Fastify, Express, NestJS) to the evlog package. Covers source code, build config, package exports, tests, example app, and all documentation.
+description: Create a new evlog framework integration to add automatic wide-event logging to an HTTP framework. Use when adding middleware/plugin support for a framework (e.g., Koa, H3 standalone, Deno Fresh, etc.) to the evlog package. Covers source code, build config, package exports, tests, example app, and all documentation.
 ---
 
 # Create evlog Framework Integration
 
-Add a new framework integration to evlog. The recommended path is the **manifest mode** built on `defineFrameworkIntegration` from `evlog/toolkit` — for any framework with a request/response middleware shape (Hono, Express, Elysia, Fastify, …). For frameworks with a fundamentally different lifecycle (NestJS interceptors, SvelteKit handle hooks, Next.js App Router) you'll fall back to the lower-level `createMiddlewareLogger`.
+Add a new framework integration to evlog. The recommended path is the **manifest mode** built on `defineFrameworkIntegration` from `evlog/toolkit` — for any framework with a request/response middleware shape. For frameworks with a fundamentally different lifecycle you'll fall back to the lower-level `createMiddlewareLogger`.
 
 ## Two paths
 
-- **Manifest mode** (preferred, ~30 lines of glue) — call `defineFrameworkIntegration({ name, extractRequest, attachLogger, storage? })` once at module level, then write a tiny middleware that calls `integration.start(ctx, options)` and runs the framework's `next()` inside `runWith`. Reference implementations: `packages/evlog/src/{hono,express,elysia,fastify}/index.ts`.
-- **Custom mode** — use `createMiddlewareLogger` directly when the framework's lifecycle doesn't fit a standard middleware (NestJS, Next.js, SvelteKit). All current built-ins for those frameworks live under `packages/evlog/src/{nestjs,next,sveltekit}/`.
+- **Manifest mode** (preferred, ~30–80 lines of glue) — call `defineFrameworkIntegration({ name, extractRequest, attachLogger, storage? })` once at module level, then write a tiny middleware that calls `integration.start(ctx, options)` and runs the framework's `next()` inside `runWith`. Reference implementations — all of `packages/evlog/src/{hono,express,fastify,elysia,nestjs,orpc,react-router,sveltekit,workers}/index.ts` use it.
+- **Custom mode** — use `createMiddlewareLogger` directly when the framework's lifecycle doesn't fit a standard middleware. Current custom-mode integrations: Next.js (`src/next/`), Nitro v2/v3 (`src/nitro/`, `src/nitro-v3/`), Eve (`src/eve/`).
 
-Manifest mode covers ~80% of integrations and reduces glue from 50–80 lines to ~30. Use custom mode only when you can't extract a request synchronously at the start of the lifecycle.
+Manifest mode now covers all classic HTTP frameworks. Use custom mode only when you can't extract a request synchronously at the start of the lifecycle (server actions, module-level hooks, agent turns).
+
+## Required API surface (from AGENTS.md)
+
+Every framework integration must expose:
+
+1. `evlog()` middleware/plugin accepting the full `BaseEvlogOptions` (`drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `plugins`)
+2. `useLogger()` (ALS-backed) — Workers is the one sanctioned exception (ALS needs a compat flag there; `defineWorkerFetch` attaches the logger instead)
+3. `log.fork()` support (automatic when `storage` is provided to the manifest)
+4. The framework-native accessor (`c.get('log')`, `req.log`, `event.locals.log`, …)
 
 ## PR Title
 
-Recommended format for the pull request title:
+```
+feat({framework}): add {Framework} middleware integration
+```
 
-```
-feat: add {Framework} middleware integration
-```
+**Scope timing caveat**: the semantic PR check reads its scope list from the **base branch**, so a brand-new scope can't validate the very PR that introduces it. Either register the scope in a small preceding PR, or use an unscoped title (`feat: add {Framework} middleware integration`) on the introducing PR.
 
 ## Touchpoints Checklist
 
@@ -28,88 +37,73 @@ feat: add {Framework} middleware integration
 |---|------|--------|
 | 1 | `packages/evlog/src/{framework}/index.ts` | Create integration source |
 | 2 | `packages/evlog/tsdown.config.ts` | Add build entry + external |
-| 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` + peer dep + keyword |
-| 4 | `packages/evlog/test/{framework}.test.ts` | Create tests |
-| 5 | `apps/docs/content/2.frameworks/{NN}.{framework}.md` | Create framework docs page |
-| 6 | `apps/docs/content/2.frameworks/00.overview.md` | Add card + table row |
-| 7 | `apps/docs/content/1.getting-started/2.installation.md` | Add card in "Choose Your Framework" |
-| 8 | `apps/docs/content/0.landing.md` | Add framework code snippet |
-| 9 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
-| 10 | `skills/review-logging-patterns/SKILL.md` | Add framework setup section + update frontmatter description |
-| 11 | `packages/evlog/README.md` | Add framework section + add row to Framework Support table |
-| 12 | `examples/{framework}/` | Create example app with test UI |
-| 13 | `package.json` (root) | Add `example:{framework}` script |
+| 3 | `packages/evlog/package.json` | Add `exports` + `typesVersions` + optional peer dep + keyword |
+| 4 | `packages/evlog/test/frameworks/{framework}.test.ts` | Create tests (real request driver + `describeStandardHttpMatrix`) |
+| 5 | `packages/evlog/test/toolkit/__snapshots__/api-surface.test.ts.snap` | Regenerated by `pnpm run build` + `pnpm test` |
+| 6 | `apps/docs/content/4.integrate/frameworks/{NN}.{framework}.md` | Create framework docs page |
+| 7 | `apps/docs/content/4.integrate/frameworks/00.overview.md` | Add table row + card |
+| 8 | `apps/docs/content/1.start/3.installation.md` | Add card in "Choose Your Framework" |
+| 9 | `apps/docs/content/0.landing.md` | Add framework code snippet slot |
+| 10 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
+| 11 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Add framework setup section + update frontmatter description |
+| 12 | `packages/evlog/README.md` | Add framework section + row in the Framework Support table |
+| 13 | `examples/{framework}/` | Create example app with test UI (auto-discovered by `pnpm example {framework}` — no root script needed) |
 | 14 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
-| 15 | `.github/workflows/semantic-pull-request.yml` | Add `{framework}` scope |
-| 16 | `.github/pull_request_template.md` | Add `{framework}` scope |
+| 15 | `.github/workflows/semantic-pull-request.yml` + `.github/pull_request_template.md` | Register `{framework}` as a PR scope in both files |
 
-**Important**: Do NOT consider the task complete until all 16 touchpoints have been addressed.
+**Important**: Do NOT consider the task complete until all 15 touchpoints have been addressed.
 
 ## Naming Conventions
 
-Use these placeholders consistently:
-
 | Placeholder | Example (Hono) | Usage |
 |-------------|----------------|-------|
-| `{framework}` | `hono` | Directory names, import paths, file names |
+| `{framework}` | `hono` | Directory names, import paths, file names, PR scope |
 | `{Framework}` | `Hono` | PascalCase in type/interface names |
 
 ## Shared Utilities
 
-All integrations share the same core utilities. **Never reimplement logic that exists in shared/**. These are also publicly available as `evlog/toolkit` for community-built integrations (see [Custom Integration docs](https://evlog.dev/frameworks/custom-integration)).
+All integrations share the same core utilities. **Never reimplement logic that exists in shared/**. These are also publicly available as `evlog/toolkit` for community-built integrations (see [Custom Integration docs](https://evlog.dev/extend/custom-framework)).
 
 | Utility | Location | Purpose |
 |---------|----------|---------|
 | `defineFrameworkIntegration` | `../shared/integration` | Manifest factory — extract request, create logger, attach, run with ALS |
 | `createMiddlewareLogger` | `../shared/middleware` | Lower-level lifecycle (custom mode): logger creation, route filtering, tail sampling, emit, enrich, drain |
-| `extractSafeHeaders` | `../shared/headers` | Convert Web API `Headers` → filtered `Record<string, string>` (Hono, Elysia, etc.) |
-| `extractSafeNodeHeaders` | `../shared/headers` | Convert Node.js `IncomingHttpHeaders` → filtered `Record<string, string>` (Express, Fastify, NestJS) |
 | `BaseEvlogOptions` | `../shared/middleware` | Base user-facing options type with `drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `plugins` |
-| `MiddlewareLoggerOptions` | `../shared/middleware` | Internal options type extending `BaseEvlogOptions` with `method`, `path`, `requestId`, `headers` |
-| `createLoggerStorage` | `../shared/storage` (`evlog/toolkit` or `evlog/toolkit/storage`) | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()`. Prefer `evlog/toolkit/storage` on Workers / edge. |
+| `createLoggerStorage` | `../shared/storage` (`evlog/toolkit/storage`) | Factory returning `{ storage, useLogger }` for `AsyncLocalStorage`-backed `useLogger()`. Prefer `evlog/toolkit/storage` on Workers / edge |
+| `shouldDeferEmitForResponse` | `../shared/streamResponse` | Defer the wide event until a streaming body closes (see Hono/Elysia) |
 
 `defineFrameworkIntegration` automatically:
 
-- normalizes both Web `Headers` and Node `IncomingHttpHeaders` (so you don't need to pick the right `extractSafeHeaders*`)
+- normalizes both Web `Headers` and Node `IncomingHttpHeaders` (so you don't need to pick a header extractor)
 - generates a `requestId` when none is present
 - calls `createMiddlewareLogger` and surfaces its `{ logger, finish, skipped, middlewareOptions }`
 - attaches `log.fork()` automatically when `storage` is provided
 - exposes `runWith(fn)` to run downstream handlers inside the integration's ALS
+- forwards `waitUntil` when the runtime provides one (Workers, Hono on Workers)
 
-### Test Helpers
+## Step 1: Integration Source
 
-| Utility | Location | Purpose |
-|---------|----------|---------|
-| `createPipelineSpies()` | `test/helpers/framework` | Creates mock drain/enrich/keep callbacks |
-| `assertDrainCalledWith()` | `test/helpers/framework` | Validates drain was called with expected event shape |
-| `assertEnrichBeforeDrain()` | `test/helpers/framework` | Validates enrich runs before drain |
-| `assertSensitiveHeadersFiltered()` | `test/helpers/framework` | Validates sensitive headers are excluded |
-| `assertWideEventShape()` | `test/helpers/framework` | Validates standard wide event fields |
-
-## Step 1: Integration Source — built on `defineFrameworkIntegration`
-
-Create `packages/evlog/src/{framework}/index.ts`. In manifest mode the file is typically **30–50 lines** of framework glue — all pipeline logic (enrich, drain, keep, header filtering, ALS, fork) is handled by `defineFrameworkIntegration` + `createMiddlewareLogger`.
+Create `packages/evlog/src/{framework}/index.ts`.
 
 ### Template Structure (manifest mode)
 
 ```typescript
-import type { RequestLogger } from '../types'
+import type { AuditableLogger } from '../audit'
 import { defineFrameworkIntegration } from '../shared/integration'
 import type { BaseEvlogOptions } from '../shared/middleware'
 import { createLoggerStorage } from '../shared/storage'
 
-// Only needed when the framework wants `useLogger()` ALS-style access.
-// Hono/Elysia attach the logger to the framework's own context instead.
 const { storage, useLogger } = createLoggerStorage(
   'middleware context. Make sure the evlog middleware is registered before your routes.',
+  'evlog:{framework}',
 )
 
 export type Evlog{Framework}Options = BaseEvlogOptions
 export { useLogger }
 
 // Type augmentation for typed logger access (framework-specific):
-// - Express: declare module 'express-serve-static-core' { interface Request { log: RequestLogger } }
-// - Hono: export type EvlogVariables = { Variables: { log: RequestLogger } }
+// - Express: declare module 'express-serve-static-core' { interface Request { log: AuditableLogger } }
+// - Hono:    export type EvlogVariables = { Variables: { log: AuditableLogger } }
 
 const integration = defineFrameworkIntegration<{Framework}Context>({
   name: '{framework}',
@@ -123,9 +117,8 @@ const integration = defineFrameworkIntegration<{Framework}Context>({
     // Store in framework-idiomatic location:
     // - Hono:    c.set('log', logger)
     // - Express: req.log = logger
-    // - Fastify: (req as any).log = logger
   },
-  storage, // optional — only when using ALS-based useLogger()
+  storage,
 })
 
 export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddleware {
@@ -148,42 +141,33 @@ export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddlewar
 
 ### Reference Implementations
 
-- **Hono** (~50 lines): `packages/evlog/src/hono/index.ts` — `c.set('log', logger)`, no ALS storage
-- **Express** (~50 lines): `packages/evlog/src/express/index.ts` — `req.log`, ALS storage, `res.on('finish')` for terminal status
-- **Fastify** (~70 lines): `packages/evlog/src/fastify/index.ts` — Fastify hooks (`onRequest` / `onResponse` / `onError`), ALS storage
-- **Elysia** (~80 lines): `packages/evlog/src/elysia/index.ts` — manifest extracts request, custom storage handling for `enterWith`-style ALS
+- **Hono**: `src/hono/index.ts` — `c.set('log', logger)` + ALS `useLogger()`, streaming deferral via `shouldDeferEmitForResponse`, `waitUntil` detection
+- **Express**: `src/express/index.ts` — `req.log`, ALS storage, `res.on('finish')` for terminal status
+- **Fastify**: `src/fastify/index.ts` — Fastify hooks (`onRequest` / `onResponse` / `onError`), `fastify-plugin` wrapper
+- **Elysia**: `src/elysia/index.ts` — plugin with `.derive({ as: 'global' })`, `storage.enterWith`-style ALS, streaming deferral
+- **NestJS**: `src/nestjs/index.ts` — `EvlogModule.forRoot()` / `forRootAsync()` on top of the manifest
+- **oRPC**: `src/orpc/index.ts` — `evlog()` procedure middleware + `withEvlog(handler)` wrapper
+- **React Router**: `src/react-router/index.ts` — `loggerContext = createContext<AuditableLogger>()`
+- **SvelteKit**: `src/sveltekit/index.ts` — `evlog()` handle + `evlogHandleError()` + `createEvlogHooks()`
+- **Workers**: `src/workers/index.ts` — `defineWorkerFetch` / `withEvlog`, no ALS `useLogger()` (compat-flag constraint)
 
 ### Key Architecture Rules
 
-1. **Prefer `defineFrameworkIntegration`** for any standard middleware shape — it handles header normalization, request-id generation, ALS, and fork attachment.
-2. **Header normalization is automatic** — pass either Web `Headers` or Node `IncomingHttpHeaders` from `extractRequest`; the manifest picks the right extractor.
-3. **`storage` triggers ALS + fork** — when you provide a `storage`, `defineFrameworkIntegration` automatically attaches `log.fork()` and `runWith` runs the handler inside `storage.run`.
-4. **Status / error reporting stays framework-side** — call `finish({ status })` on success and `finish({ error })` on failure. `finish` is what runs emit + enrich + drain + plugin hooks.
-5. **Re-throw errors** after `finish({ error })` so the framework's own error handler still runs.
-6. **Export options interface** as `BaseEvlogOptions` (or a framework-specific extension) for feature parity.
+1. **Prefer `defineFrameworkIntegration`** — it handles header normalization, request-id generation, ALS, fork attachment, and `waitUntil`.
+2. **Status / error reporting stays framework-side** — call `finish({ status })` on success and `finish({ error })` on failure. `finish` runs emit + enrich + drain + plugin hooks.
+3. **Re-throw errors** after `finish({ error })` so the framework's own error handler still runs.
+4. **Streaming responses** — if the framework can return streaming bodies, defer the emit until the stream closes (`shouldDeferEmitForResponse`; see Hono and Elysia).
+5. **Framework SDK is an optional peer dependency** — never bundle it.
+6. **Never duplicate pipeline logic** — `runEnrichAndDrain` is internal to `createMiddlewareLogger`/`finish`.
 7. **Export type helpers** for typed context access (e.g., `EvlogVariables` for Hono).
-8. **Framework SDK is a peer dependency** — never bundle it.
-9. **Never duplicate pipeline logic** — `runEnrichAndDrain` is internal to `createMiddlewareLogger`/`finish`.
 
 ### When to fall back to custom mode
 
 Use `createMiddlewareLogger` directly (skipping `defineFrameworkIntegration`) when:
 
-- The framework's middleware doesn't have a clear "request entry / response exit" pair (NestJS observable interceptor, Next.js App Router server actions).
-- You need to defer the logger creation across multiple lifecycle phases (SvelteKit `handle` hook + load functions).
-- The framework's status is not knowable until after the response stream completes and you need bespoke wiring.
-
-### Framework-Specific Patterns
-
-**Hono**: Use `MiddlewareHandler` return type, `c.set('log', logger)`, `c.res.status` for status, `c.req.raw.headers` for headers.
-
-**Express**: Standard `(req, res, next)` middleware, `res.on('finish')` for response end, `storage.run(logger, () => next())` for `useLogger()`. Type augmentation targets `express-serve-static-core` (NOT `express`). Error handler uses `ErrorRequestHandler` type.
-
-**Elysia**: Return `new Elysia({ name: 'evlog' })` plugin, use `.derive({ as: 'global' })` to create logger and attach `log` to context, `onAfterHandle` for success path, `onError` for error path. Use `storage.enterWith(logger)` in `derive` for `useLogger()` support. Note: `onAfterResponse` is fire-and-forget and may not complete before `app.handle()` returns in tests — use `onAfterHandle` instead.
-
-**Fastify**: Use `fastify-plugin` wrapper, `fastify.decorateRequest('log', null)`, `onRequest`/`onResponse` hooks.
-
-**NestJS**: `NestInterceptor` with `intercept()`, `tap()`/`catchError()` on observable, `forRoot()` dynamic module.
+- The middleware doesn't have a clear "request entry / response exit" pair (Next.js App Router server actions, Eve agent turns).
+- Logger creation spans multiple lifecycle phases owned by a module system (Nitro plugins + hooks).
+- The status is not knowable until after the response stream completes and the framework gives you no hook for it.
 
 ## Step 2: Build Config
 
@@ -193,20 +177,11 @@ Add a build entry in `packages/evlog/tsdown.config.ts`:
 '{framework}/index': 'src/{framework}/index.ts',
 ```
 
-Place it after the existing framework entries (workers, next, hono, express).
-
-Also add the framework SDK to the `external` array:
-
-```typescript
-external: [
-  // ... existing externals
-  '{framework-package}',  // e.g., 'elysia', 'fastify', 'express'
-],
-```
+Also add the framework SDK to the `external` array (e.g., `'elysia'`, `'fastify'`).
 
 ## Step 3: Package Exports
 
-In `packages/evlog/package.json`, add four entries:
+In `packages/evlog/package.json`:
 
 **In `exports`** (after the last framework entry):
 
@@ -217,70 +192,37 @@ In `packages/evlog/package.json`, add four entries:
 }
 ```
 
-**In `typesVersions["*"]`**:
+**In `typesVersions["*"]`**: `"{framework}": ["./dist/{framework}/index.d.mts"]`
 
-```json
-"{framework}": [
-  "./dist/{framework}/index.d.mts"
-]
-```
+**In `peerDependencies`** (version range) + **`peerDependenciesMeta`** (`"optional": true`), and add the framework name to `keywords`.
 
-**In `peerDependencies`** (with version range):
-
-```json
-"{framework-package}": "^{latest-major}.0.0"
-```
-
-**In `peerDependenciesMeta`** (mark as optional):
-
-```json
-"{framework-package}": {
-  "optional": true
-}
-```
-
-**In `keywords`** — add the framework name to the keywords array.
+Exports without matching `tsdown.config.ts` entries fail `test/toolkit/api-surface.test.ts`.
 
 ## Step 4: Tests
 
-Create `packages/evlog/test/{framework}.test.ts`.
+Create `packages/evlog/test/frameworks/{framework}.test.ts`. Read `packages/evlog/test/README.md` first — especially the **Framework runtime fidelity** table.
 
-**Import shared test helpers** from `./helpers/framework`:
+Two non-negotiables:
 
-```typescript
-import {
-  assertDrainCalledWith,
-  assertEnrichBeforeDrain,
-  assertSensitiveHeadersFiltered,
-  createPipelineSpies,
-} from './helpers/framework'
-```
+1. **Real request driver.** Use the framework's own driver: supertest (Express/NestJS), `app.request()` (Hono), `app.inject()` (Fastify), `app.handle(new Request(...))` (Elysia). If no Node-friendly driver exists, call the user-facing contract directly with realistic input shapes (see the SvelteKit and React Router tests). Never extract internals to test a substitute.
+2. **Wire the shared matrix.** Call `describeStandardHttpMatrix({ name, mount })` from `test/helpers/frameworkMatrix.ts` — it covers the standard sweep (event emission, `x-request-id`, route service) for every HTTP framework.
 
-Required test categories:
+On top of the matrix, cover the framework-specific surface:
 
-1. **Middleware creates logger** — verify `c.get('log')` or `req.log` returns a `RequestLogger`
-2. **Auto-emit on response** — verify event includes status, method, path, duration
-3. **Error handling** — verify errors are captured and event has error level + error details
-4. **Route filtering** — verify skipped routes don't create a logger
-5. **Request ID forwarding** — verify `x-request-id` header is used when present
-6. **Context accumulation** — verify `logger.set()` data appears in emitted event
-7. **Drain callback** — use `assertDrainCalledWith()` helper
-8. **Enrich callback** — use `assertEnrichBeforeDrain()` helper
-9. **Keep callback** — verify tail sampling callback receives context and can force-keep logs
-10. **Sensitive header filtering** — use `assertSensitiveHeadersFiltered()` helper
-11. **Drain/enrich error resilience** — verify errors in drain/enrich do not break the request
-12. **Skipped routes skip drain/enrich** — verify drain/enrich are not called for excluded routes
-13. **useLogger() returns same logger** — verify `useLogger() === req.log` (or framework equivalent)
-14. **useLogger() throws outside context** — verify error thrown when called without middleware
-15. **useLogger() works across async** — verify logger accessible in async service functions
+1. Framework-native accessor returns the logger (`c.get('log')`, `req.log`, …)
+2. Error handling — errors captured, event has error level + details, error re-thrown
+3. Route filtering — skipped routes don't create a logger, skip drain/enrich
+4. Context accumulation — `logger.set()` data appears in the emitted event
+5. Drain / enrich / keep callbacks (use `createPipelineSpies()`, `assertHttpEventEmitted`, `waitForDrainCalls`, `findEventViaDrain` from `test/helpers/framework.ts`)
+6. Drain/enrich error resilience — errors there never break the request
+7. `useLogger()` — same logger as the native accessor, works across async boundaries, throws outside context
+8. Streaming (if applicable) — event deferred until the body closes
 
-Use the framework's test utilities when available (e.g., Hono's `app.request()`, Express's `supertest`, Fastify's `inject()`).
+Use fake timers for anything time-based; `defined()` instead of `!`.
 
 ## Step 5: Framework Docs Page
 
-Create `apps/docs/content/2.frameworks/{NN}.{framework}.md` with a comprehensive, self-contained guide.
-
-Use zero-padded numbering (`{NN}`) to maintain correct sidebar ordering. Check existing files to determine the next number.
+Create `apps/docs/content/4.integrate/frameworks/{NN}.{framework}.md` with a comprehensive, self-contained guide. Check existing files for the next zero-padded number.
 
 **Frontmatter**:
 
@@ -304,33 +246,28 @@ links:
 
 1. **Quick Start** — install + register middleware (copy-paste minimum setup)
 2. **Wide Events** — progressive `log.set()` usage
-3. **useLogger()** — accessing logger from services without passing req
+3. **useLogger()** — accessing logger from services without passing the request
 4. **Error Handling** — `createError()` + `parseError()` + framework error handler
 5. **Drain & Enrichers** — middleware options with inline example
 6. **Pipeline (Batching & Retry)** — `createDrainPipeline` example
 7. **Tail Sampling** — `keep` callback
 8. **Route Filtering** — `include` / `exclude` / `routes`
-9. **Client-Side Logging** — HTTP drain (`evlog/http`) (only if framework has a client-side story)
-10. **Run Locally** — clone + `pnpm run example:{framework}`
+9. **Client-Side Logging** — HTTP drain (`evlog/http`) (only if the framework has a client-side story)
+10. **Run Locally** — clone + `pnpm example {framework}`
 11. **Card group** linking to GitHub source
 
 ## Step 6: Overview & Installation Cards
 
-**In `apps/docs/content/2.frameworks/00.overview.md`**:
+**In `apps/docs/content/4.integrate/frameworks/00.overview.md`**:
 
-1. Add a row to the **Overview table** with framework name, import, type, logger access, and status
-2. Add a `:::card` in the appropriate section (Full-Stack or Server Frameworks) with `color: neutral`
+1. Add a row to the **Overview table**: framework name, import, type, logger access, status
+2. Add a card in the appropriate section, and a row in the **API cheat sheet** if the bootstrap/access pattern is new
 
-**In `apps/docs/content/1.getting-started/2.installation.md`**:
+**In `apps/docs/content/1.start/3.installation.md`**: add a card in the "Choose Your Framework" `::card-group`, in the same order as the frameworks overview.
 
-1. Add a `:::card` in the "Choose Your Framework" `::card-group` with `color: neutral`
-2. Place it in the correct order relative to existing frameworks (Nuxt, Next.js, SvelteKit, Nitro, TanStack Start, NestJS, Express, Hono, Fastify, Elysia, CF Workers)
+## Step 7: Landing Page
 
-## Step 7: Landing Page (unchanged)
-
-Add a code snippet in `apps/docs/content/0.landing.md` for the framework.
-
-Find the `FeatureFrameworks` MDC component usage (the section with `#nuxt`, `#nextjs`, `#hono`, `#express`, etc.) and add a new slot:
+In `apps/docs/content/0.landing.md`, find the `FeatureFrameworks` MDC section (slots `#nuxt`, `#nextjs`, `#hono`, …) and add a new slot:
 
 ```markdown
   #{framework}
@@ -339,46 +276,35 @@ Find the `FeatureFrameworks` MDC component usage (the section with `#nuxt`, `#ne
   ```
 ```
 
-Place the snippet in the correct order relative to existing frameworks.
-
 ## Step 8: FeatureFrameworks Component
 
 Update `apps/docs/app/components/features/FeatureFrameworks.vue`:
 
-1. Add the framework to the `frameworks` array with its icon and the **next available tab index**
-2. Add a `<div v-show="activeTab === {N}">` with `<slot name="{framework}" />` in the template
-3. **Increment tab indices** for any frameworks that come after the new one
+1. Add the framework to the `frameworks` array with its icon and the next available `tab` index
+2. Add a `<div v-if="activeTab === {N}">` with `<slot name="{framework}" />` in the template
 
-Icons use Simple Icons format: `i-simple-icons-{name}` (e.g., `i-simple-icons-express`, `i-simple-icons-hono`).
+Icons use Simple Icons format: `i-simple-icons-{name}`.
 
-## Step 9: Update `skills/review-logging-patterns/SKILL.md`
+## Step 9: Update the Public Skill
 
-In `skills/review-logging-patterns/SKILL.md` (the public skill distributed to users):
+In `apps/docs/skills/review-logging-patterns/SKILL.md` (published on evlog.dev):
 
-1. Add `### {Framework}` in the **"Framework Setup"** section, after the last existing framework entry and before "Cloudflare Workers"
-2. Include:
-   - Import + `initLogger` + middleware/plugin setup
-   - Logger access in route handlers (`req.log`, `c.get('log')`, or `{ log }` destructuring)
-   - `useLogger()` snippet with a short service function example
-   - Full pipeline example showing `drain`, `enrich`, and `keep` options
+1. Add `### {Framework}` in the **"Framework Setup"** section, in the same order as the docs
+2. Include: import + `initLogger` + middleware setup; native logger access; `useLogger()` snippet; full pipeline example (`drain`, `enrich`, `keep`)
 3. Update the `description:` line in the YAML frontmatter to mention the new framework name
 
-## Step 10: Update `packages/evlog/README.md`
+## Step 10: Update README
 
-In the root `packages/evlog/README.md`:
+In `packages/evlog/README.md` (root `README.md` is a symlink):
 
-1. Add a `## {Framework}` section after the Elysia section (before `## Browser`), with a minimal setup snippet and a link to the example app
-2. Add a row to the **"Framework Support"** table:
+1. Add a `## {Framework}` section near the other framework sections with a minimal setup snippet and a link to the example app
+2. Add a row to the **Framework Support** table
 
-```markdown
-| **{Framework}** | `{registration pattern}` with `import { evlog } from 'evlog/{framework}'` ([example](./examples/{framework})) |
-```
-
-Keep the snippet short — just init, register/use middleware, and one route handler showing logger access. No need to repeat drain/enrich/keep here.
+Keep the snippet short — init, register middleware, one route handler showing logger access.
 
 ## Step 11: Example App
 
-Create `examples/{framework}/` with a runnable app that demonstrates all evlog features.
+Create `examples/{framework}/` with a runnable app demonstrating all evlog features. It is auto-discovered by the root runner: `pnpm example {framework}` (which loads the root `.env` via dotenv — no root `package.json` change needed).
 
 The app must include:
 
@@ -389,68 +315,27 @@ The app must include:
 5. **Error handler** — framework's error handler with `parseError()` + manual `log.error()`
 6. **Test UI** — served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses
 
-**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`). The `POSTHOG_API_KEY` env var is already set in the root `.env`. This ensures every example tests a real external drain adapter.
+**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`) — `POSTHOG_API_KEY` is set in the root `.env` (maintainer's key, not committed), so every example exercises a real external drain. Without the env var the drain resolves to `null` and skips — someone cloning the repo sends nothing anywhere unless they opt in with their own key. Enable pretty printing for readable local output.
 
-Pretty printing should be enabled so the output is readable when testing locally.
-
-**Type the `enrich` callback parameter explicitly** — use `type EnrichContext` from `evlog` to avoid implicit `any`:
-
-```typescript
-import { type EnrichContext } from 'evlog'
-
-app.use(evlog({
-  enrich: (ctx: EnrichContext) => {
-    ctx.event.runtime = 'node'
-  },
-}))
-```
+**Type the `enrich` callback parameter explicitly** — `(ctx: EnrichContext) => ...` with `type EnrichContext` imported from `evlog`.
 
 ### Test UI
 
-Every example must serve a test UI at `GET /` — a self-contained HTML page (no external deps) that lets the user click routes and see responses without curl.
-
-The UI must:
-- List all available routes with method badge + path + description
-- Send the request on click and display the JSON response with syntax highlighting
-- Show status code (color-coded 2xx/4xx/5xx) and response time
-- Use a dark theme with monospace font
-- Be a single `.ts` file (`src/ui.ts`) exporting a `testUI()` function returning an HTML string
-- The root `/` route must be registered **before** the evlog middleware so it doesn't get logged
-
-Reference: `examples/hono/src/ui.ts` for the canonical pattern. Copy and adapt for each framework.
+Reference: `examples/hono/src/ui.ts` — a single `src/ui.ts` exporting `testUI()` returning a self-contained dark-theme HTML string (route list with method badges, click-to-fetch, JSON display, status colors, response time). Register the `/` route **before** the evlog middleware so it isn't logged.
 
 ### Required files
 
 | File | Purpose |
 |------|---------|
 | `src/index.ts` | App with all features demonstrated |
-| `src/ui.ts` | Test UI — `testUI()` returning self-contained HTML |
-| `package.json` | `dev` and `start` scripts |
+| `src/ui.ts` | Test UI |
+| `package.json` | `dev` and `start` scripts (`bun --watch src/index.ts` / `bun src/index.ts`) |
 | `tsconfig.json` | TypeScript config (if needed) |
 | `README.md` | How to run + link to the UI |
 
-### Package scripts
+There is also `examples/community-framework-skeleton/` showing the community-facing (toolkit-only) variant — keep it in mind if the new integration changes the toolkit contract.
 
-```json
-{
-  "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun src/index.ts"
-  }
-}
-```
-
-## Step 12: Root Package Script
-
-Add a root-level script in the monorepo `package.json`:
-
-```json
-"example:{framework}": "dotenv -- turbo run dev --filter=evlog-{framework}-example"
-```
-
-The `dotenv --` prefix loads the root `.env` file (containing `POSTHOG_API_KEY` and other adapter keys) into the process before turbo starts. Turborepo does not load `.env` files — `dotenv-cli` handles this at the root level so individual examples need no env configuration.
-
-## Step 13: Changeset
+## Step 12: Changeset
 
 Create `.changeset/{framework}-integration.md`:
 
@@ -459,41 +344,28 @@ Create `.changeset/{framework}-integration.md`:
 "evlog": minor
 ---
 
-Add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
+feat({framework}): add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
 ```
 
-## Step 15 & 16: PR Scopes
+## Step 13: PR Scopes
 
-Add the framework name as a valid scope in **both** files for future PRs, keeping both scope lists alphabetically sorted. The semantic PR check reads its scope list from the base branch, so the integration PR must either use an unscoped title (as recommended above) or follow a preceding PR that registers the scope.
-
-**`.github/workflows/semantic-pull-request.yml`** — add `{framework}` to the `scopes` list:
-
-```yaml
-scopes: |
-  # ... existing scopes
-  {framework}
-```
-
-**`.github/pull_request_template.md`** — add `{framework}` to the Scopes section:
-
-```markdown
-- {framework} ({Framework} integration)
-```
+Add `{framework}` to the `scopes` list in `.github/workflows/semantic-pull-request.yml` **and** to the Scopes section of `.github/pull_request_template.md`, in alphabetical order. Remember the timing caveat from the PR Title section: this registration only takes effect for PRs whose base branch already contains it.
 
 ## Verification
 
-After completing all steps, run from the repo root:
+After a clean install, run `pnpm run dev:prepare` from the repo root first, then:
 
 ```bash
+pnpm run dev:prepare
 cd packages/evlog
-pnpm run build    # Verify build succeeds with new entry
-pnpm run test     # Verify unit tests pass
-pnpm run lint     # Verify no lint errors
+pnpm run build    # required before test — api-surface snapshot is gated on dist/
+pnpm run test
+pnpm run lint
 ```
 
 Then type-check the example:
 
 ```bash
 cd examples/{framework}
-npx tsc --noEmit  # Verify no TS errors in the example
+pnpm exec tsc --noEmit
 ```

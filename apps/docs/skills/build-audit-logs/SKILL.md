@@ -22,7 +22,7 @@ When you already know the system is wired and just need to remember the API:
 | Standalone job / script / CLI (no request) | `audit({ action, actor, target, outcome })` |
 | Auto-record success / failure / denied for a function | `withAudit({ action, target }, fn)` |
 | Recording a state change | add `changes: auditDiff(before, after)` |
-| Centralised typed action vocabulary | `defineAuditAction('invoice.refund', { target: 'invoice' })` |
+| Centralised typed action vocabulary | `defineAuditCatalog('billing', { INVOICE_REFUND: { target: 'invoice' } })` — or `defineAuditAction('invoice.refund', { target: 'invoice' })` for one-offs |
 | Asserting audits in tests | `mockAudit()` — `assertAudit()` or `toIncludeAuditOf()` |
 
 `AuditFields` schema (always provide `action`, `actor`, `outcome`; `target` strongly recommended; the rest is filled in for you):
@@ -119,6 +119,8 @@ If the app is multi-tenant, **tenant isolation on every audit event is non-negot
 auditEnricher({ tenantId: ctx => resolveTenant(ctx) })
 ```
 
+If the app uses Better Auth, `auditEnricher` can also bridge the authenticated session into `audit.context` — see the Better Auth integration (`evlog/better-auth`, https://www.evlog.dev/use-cases/better-auth/overview) for wiring `identifyUser` alongside the audit pipeline.
+
 Then either (a) partition the audit dataset by `audit.context.tenantId`, or (b) one sink per tenant if hard isolation is required. Never query audits without a tenant filter.
 
 ### 4. Retention
@@ -182,23 +184,37 @@ For Hono, Express, Next.js, or standalone scripts / workers, see [`references/fr
 
 ### Step 2 — Define the action vocabulary
 
-Audits get queried and alerted on by `audit.action`. A typo is a missing alert, so centralise the list:
+Audits get queried and alerted on by `audit.action`. A typo is a missing alert, so centralise the list. For a bounded context with several actions, prefer a catalog — one prefix, typed keys, autocomplete on the wire format `${prefix}.${KEY}`:
+
+```ts
+// app/audit/billing.ts
+import { defineAuditCatalog } from 'evlog'
+
+export const billingAudit = defineAuditCatalog('billing', {
+  INVOICE_REFUND: { target: 'invoice' },
+  PLAN_CHANGE:    { target: 'subscription' },
+})
+```
+
+At the call site: `log.audit(billingAudit.INVOICE_REFUND({ actor, target, outcome: 'success' }))`.
+
+Add the opt-in `declare module 'evlog' { interface RegisteredAuditCatalogs { billing: typeof billingAudit } }` augmentation to get autocomplete everywhere. For one-off actions that don't fit a catalog, `defineAuditAction` still works:
 
 ```ts
 // app/audit/actions.ts
 import { defineAuditAction } from 'evlog'
 
 export const InvoiceRefund = defineAuditAction('invoice.refund', { target: 'invoice' })
-export const UserUpdate    = defineAuditAction('user.update',    { target: 'user' })
 export const ApiKeyRevoke  = defineAuditAction('apiKey.revoke',  { target: 'apiKey' })
-export const RolePromote   = defineAuditAction('role.promote',   { target: 'user' })
 ```
+
+Catalog conventions and scaling recipes (folder per domain, npm packages per bounded context): https://www.evlog.dev/learn/catalogs
 
 Naming conventions:
 
 - `noun.verb` (`invoice.refund`, not `refundInvoice`).
 - Past tense if the audit is logged after the fact (`invoice.refunded`); present tense when wrapped by `withAudit()` (which resolves the outcome itself).
-- Lowercase, dot-delimited, no spaces.
+- Lowercase, dot-delimited, no spaces — for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND` — that's intentional, don't lowercase the keys.
 
 ### Step 3 — Instrument call sites
 
@@ -446,6 +462,6 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 ## Reference
 
 - Per-framework wiring (Hono, Express, Next.js, standalone): [`references/framework-wiring.md`](references/framework-wiring.md)
-- Docs: [Audit logs overview](https://www.evlog.dev/use-cases/audit/overview) — source at [`apps/docs/content/5.use-cases/4.audit/`](../../../apps/docs/content/5.use-cases/4.audit/)
-- Source: [`packages/evlog/src/audit.ts`](../../../packages/evlog/src/audit.ts)
-- Tests: [`packages/evlog/test/core/audit.test.ts`](../../../packages/evlog/test/core/audit.test.ts)
+- Docs: [Audit logs overview](https://www.evlog.dev/use-cases/audit/overview) — source at [`apps/docs/content/5.use-cases/4.audit/`](../../../../apps/docs/content/5.use-cases/4.audit/)
+- Source: [`packages/evlog/src/audit.ts`](../../../../packages/evlog/src/audit.ts)
+- Tests: [`packages/evlog/test/core/audit.test.ts`](../../../../packages/evlog/test/core/audit.test.ts)

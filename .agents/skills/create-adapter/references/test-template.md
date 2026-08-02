@@ -1,178 +1,156 @@
 # Test Template
 
-Complete test template for `packages/evlog/test/adapters/{name}.test.ts`.
+Complete test template for `packages/evlog/test/adapters/{name}.test.ts`, following `packages/evlog/test/README.md` conventions. `loki.test.ts` and `clickhouse.test.ts` are the most recent reference implementations.
 
-Replace `{Name}`, `{name}` with the actual service name.
+Replace `{Name}`, `{name}`, `{NAME}` with the actual service name.
+
+Rules from the test README that apply here:
+
+- Use `mockFetch()` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `../helpers/fetch` — don't hand-roll fetch spies in adapter tests (a few older files still do; follow the helpers, not them).
+- Delete every env var the adapter reads in `afterEach` — leaked env vars make later tests order-dependent.
+- Test exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) in their own `describe` blocks — but only the ones the adapter actually exports. If the adapter has no converter (service accepts arbitrary JSON), drop the `to{Name}Event` import and its `describe` block entirely.
+- No `!` non-null assertions — use `defined()` from `../helpers/defined` if narrowing is needed.
+- Register the adapter in `encode-parity.test.ts` so the drain and `sendBatchTo{Name}` are pinned to the same encoder (not every existing adapter is registered there yet; new ones should be).
 
 ```typescript
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { WideEvent } from '../../src/types'
-import { sendBatchTo{Name}, sendTo{Name} } from '../../src/adapters/{name}'
+import { getFetchCall, getFetchHeaders, getFetchJson, mockFetch } from '../helpers/fetch'
+import {
+  create{Name}Drain,
+  sendBatchTo{Name},
+  sendTo{Name},
+  to{Name}Event,
+} from '../../src/adapters/{name}'
+
+function createTestEvent(overrides?: Partial<WideEvent>): WideEvent {
+  return {
+    timestamp: '2024-01-01T12:00:00.000Z',
+    level: 'info',
+    service: 'api',
+    environment: 'production',
+    ...overrides,
+  }
+}
 
 describe('{name} adapter', () => {
   let fetchSpy: ReturnType<typeof vi.spyOn>
 
-  // --- Setup: mock globalThis.fetch to return 200 ---
   beforeEach(() => {
-    fetchSpy = vi.spyOn(globalThis, 'fetch').mockResolvedValue(
-      new Response(null, { status: 200 }),
-    )
+    fetchSpy = mockFetch(new Response(null, { status: 200 }))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
   })
 
   afterEach(() => {
     vi.restoreAllMocks()
+    delete process.env.NUXT_{NAME}_API_KEY
+    delete process.env.NUXT_{NAME}_ENDPOINT
+    delete process.env.{NAME}_API_KEY
+    delete process.env.{NAME}_ENDPOINT
   })
 
-  // --- Test event factory ---
-  const createTestEvent = (overrides?: Partial<WideEvent>): WideEvent => ({
-    timestamp: '2024-01-01T12:00:00.000Z',
-    level: 'info',
-    service: 'test-service',
-    environment: 'test',
-    ...overrides,
-  })
-
-  // --- 1. URL Construction ---
-  describe('sendTo{Name}', () => {
-    it('sends event to correct URL', async () => {
-      const event = createTestEvent()
-
-      await sendTo{Name}(event, {
-        apiKey: 'test-key',
+  // --- 1. Pure helpers ---------------------------------------------------
+  describe('to{Name}Event', () => {
+    it('maps a wide event to the service shape', () => {
+      const event = createTestEvent({ path: '/api/users' })
+      expect(to{Name}Event(event)).toEqual({
+        timestamp: '2024-01-01T12:00:00.000Z',
+        level: 'info',
+        data: { service: 'api', environment: 'production', path: '/api/users' },
       })
+    })
+  })
 
-      expect(fetchSpy).toHaveBeenCalledTimes(1)
-      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      // Verify the default endpoint URL
+  // --- 2. Direct send: URL, headers, body ---------------------------------
+  describe('sendTo{Name}', () => {
+    it('sends to the default endpoint', async () => {
+      await sendTo{Name}(createTestEvent(), { apiKey: 'test-key' })
+
+      const { url } = getFetchCall(fetchSpy)
       expect(url).toBe('https://api.{name}.com/v1/ingest')
     })
 
-    it('uses custom endpoint when provided', async () => {
-      const event = createTestEvent()
-
-      await sendTo{Name}(event, {
+    it('uses a custom endpoint and tolerates trailing slashes', async () => {
+      await sendTo{Name}(createTestEvent(), {
         apiKey: 'test-key',
-        endpoint: 'https://custom.{name}.com',
+        endpoint: 'https://custom.{name}.com/',
       })
 
-      const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const { url } = getFetchCall(fetchSpy)
       expect(url).toBe('https://custom.{name}.com/v1/ingest')
     })
 
-    // --- 2. Headers ---
-    it('sets correct Authorization header', async () => {
-      const event = createTestEvent()
+    it('sets auth and content-type headers', async () => {
+      await sendTo{Name}(createTestEvent(), { apiKey: 'my-secret-key' })
 
-      await sendTo{Name}(event, {
-        apiKey: 'my-secret-key',
-      })
-
-      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(options.headers).toEqual(expect.objectContaining({
-        'Authorization': 'Bearer my-secret-key',
-      }))
+      const headers = getFetchHeaders(fetchSpy)
+      expect(headers.Authorization).toBe('Bearer my-secret-key')
+      expect(headers['Content-Type']).toBe('application/json')
     })
 
-    it('sets Content-Type to application/json', async () => {
-      const event = createTestEvent()
+    it('sends the event in the service format', async () => {
+      await sendTo{Name}(createTestEvent({ action: 'test-action' }), { apiKey: 'test-key' })
 
-      await sendTo{Name}(event, {
-        apiKey: 'test-key',
-      })
-
-      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(options.headers).toEqual(expect.objectContaining({
-        'Content-Type': 'application/json',
-      }))
-    })
-
-    // Add service-specific header tests here
-    // Example: orgId, project header, region header, etc.
-
-    // --- 3. Request Body ---
-    it('sends event in correct format', async () => {
-      const event = createTestEvent({ action: 'test-action', userId: '123' })
-
-      await sendTo{Name}(event, {
-        apiKey: 'test-key',
-      })
-
-      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      const body = JSON.parse(options.body as string)
-      // Verify the body matches the expected format
-      // Adapt this to match the service's expected payload structure
+      const body = getFetchJson(fetchSpy)
+      // Adapt to the service's expected payload structure
       expect(body).toBeInstanceOf(Array)
       expect(body).toHaveLength(1)
     })
-
-    // --- 4. Error Handling (only the direct helper throws — the drain
-    //      itself swallows errors via `defineHttpDrain` so the request
-    //      pipeline is never interrupted; that contract is covered by
-    //      `test/toolkit.test.ts`).
-    it('throws error on non-OK response', async () => {
-      fetchSpy.mockResolvedValueOnce(
-        new Response('Bad Request', { status: 400, statusText: 'Bad Request' }),
-      )
-
-      const event = createTestEvent()
-
-      await expect(sendTo{Name}(event, {
-        apiKey: 'test-key',
-      })).rejects.toThrow('{Name} API error: 400 Bad Request')
-    })
   })
 
-  // --- 5. Batch Operations ---
+  // --- 3. Batch operations -------------------------------------------------
   describe('sendBatchTo{Name}', () => {
-    it('sends multiple events in a single request', async () => {
+    it('sends multiple events in one request', async () => {
       const events = [
         createTestEvent({ requestId: '1' }),
         createTestEvent({ requestId: '2' }),
         createTestEvent({ requestId: '3' }),
       ]
 
-      await sendBatchTo{Name}(events, {
-        apiKey: 'test-key',
-      })
+      await sendBatchTo{Name}(events, { apiKey: 'test-key' })
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
-      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      const body = JSON.parse(options.body as string)
-      expect(body).toHaveLength(3)
+      expect(getFetchJson(fetchSpy)).toHaveLength(3)
     })
 
-    it('skips fetch when events array is empty', async () => {
-      await sendBatchTo{Name}([], {
-        apiKey: 'test-key',
-      })
-
+    it('skips fetch when the batch is empty', async () => {
+      await sendBatchTo{Name}([], { apiKey: 'test-key' })
       expect(fetchSpy).not.toHaveBeenCalled()
     })
   })
 
-  // --- 6. Timeout Handling ---
-  describe('timeout handling', () => {
-    it('uses default timeout of 5000ms', async () => {
-      const event = createTestEvent()
-      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+  // --- 4. Drain factory: config resolution + skip behavior ------------------
+  describe('create{Name}Drain', () => {
+    it('resolves config from env vars', async () => {
+      process.env.{NAME}_API_KEY = 'env-key'
+      const drain = create{Name}Drain()
 
-      await sendTo{Name}(event, {
-        apiKey: 'test-key',
-      })
+      await drain({ event: createTestEvent() })
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 5000)
+      const headers = getFetchHeaders(fetchSpy)
+      expect(headers.Authorization).toBe('Bearer env-key')
     })
 
-    it('uses custom timeout when provided', async () => {
-      const event = createTestEvent()
-      const setTimeoutSpy = vi.spyOn(globalThis, 'setTimeout')
+    // "Skips" means: no request, no throw. The adapter still console.errors the
+    // missing key (suppressed by the beforeEach spy) so misconfiguration is visible.
+    it('skips the request when apiKey is missing', async () => {
+      const drain = create{Name}Drain()
 
-      await sendTo{Name}(event, {
-        apiKey: 'test-key',
-        timeout: 10000,
-      })
+      await drain({ event: createTestEvent() })
 
-      expect(setTimeoutSpy).toHaveBeenCalledWith(expect.any(Function), 10000)
+      expect(fetchSpy).not.toHaveBeenCalled()
+    })
+
+    it('accepts an array of drain contexts', async () => {
+      const drain = create{Name}Drain({ apiKey: 'test-key' })
+
+      await drain([
+        { event: createTestEvent({ requestId: '1' }) },
+        { event: createTestEvent({ requestId: '2' }) },
+      ])
+
+      expect(fetchSpy).toHaveBeenCalledTimes(1)
+      expect(getFetchJson(fetchSpy)).toHaveLength(2)
     })
   })
 })
@@ -180,9 +158,14 @@ describe('{name} adapter', () => {
 
 ## Customization Notes
 
-- **URL assertions**: Update the expected URLs to match the actual service API.
-- **Auth headers**: If the service uses a custom auth header (e.g., `X-API-Key` instead of `Authorization: Bearer`), update the header assertions.
-- **Body format**: Adapt body assertions to match the service's expected payload. Some services wrap events in an object (PostHog: `{ api_key, batch }`), others accept raw arrays (Axiom).
-- **Empty batch**: The template asserts `fetchSpy` is NOT called for empty arrays. If your adapter sends empty arrays (like Axiom does), change this to match.
-- **Event transformation**: If you export a `to{Name}Event()` converter, add dedicated tests for it (see `otlp.test.ts` for `toOTLPLogRecord` tests as a reference).
-- **Service-specific tests**: Add tests for any service-specific features (e.g., Axiom's `orgId` header, OTLP's severity mapping, PostHog's `distinct_id`).
+- **URL assertions**: Update expected URLs to the actual service API, including the path-already-present case if the encoder tolerates it (see `resolveLokiPushUrl`).
+- **Auth headers**: Match the service (`X-API-Key`, HTTP Basic, `X-ClickHouse-User`, …).
+- **Body format**: Wrapper objects (PostHog `{ api_key, batch }`), raw arrays (Axiom), NDJSON (ClickHouse) — assert the real structure, not just "is an array".
+- **Deprecated aliases**: If the adapter supports one (`token` → `apiKey`), add a test that the alias still resolves and that the canonical name wins when both are set.
+- **Error swallowing**: The drain itself never throws — that contract lives in `defineHttpDrain` and is covered by `test/toolkit/toolkit.test.ts`; don't re-test it per adapter. Only direct helpers surface errors.
+- **Service-specific helpers**: Every exported helper (`buildLokiPayload`, `toClickHouseRow`, severity mappers…) gets its own `describe` with edge cases (empty input, malformed timestamps, cardinality guards).
+
+## Beyond unit tests
+
+- **Encode parity**: add the adapter to `test/adapters/encode-parity.test.ts`.
+- **E2E**: create `test/e2e/{name}.e2e.ts` gated on the adapter's env vars; extend `test/e2e/docker-compose.yml` + `seed.mjs` when the service is self-hostable.
