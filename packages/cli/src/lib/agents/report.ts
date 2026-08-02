@@ -33,7 +33,12 @@ export function skillsReportLines(ctx: CliContext, skills: SkillsLines): string[
         command('refresh', 'npx skills update'),
       ]
     case 'installed':
-      return [`${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`]
+      return [
+        `${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`,
+        /* A non-interactive run never saw the command go by, and this is the
+           only record of what was spawned on its behalf. */
+        command('ran    ', skills.command),
+      ]
     case 'failed':
       return [
         `${paint('red', '✗')} ${paint('dim', 'skills not installed')}`,

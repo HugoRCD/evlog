@@ -57,7 +57,8 @@ pnpm evlog doctor
 | `evlog agents --no-skills` | Still write `AGENTS.md` and `CLAUDE.md`; skip only the skills — nothing is spawned |
 | `evlog agents --global` | Install the skills for every project instead of just this one |
 | `evlog agents --source <url>` | Where the skills are published — a plain http(s) origin (default: `https://www.evlog.dev`) |
-| `evlog agents --dry-run` | Print the plan without touching a file |
+| `evlog agents --dry-run` | Print the plan without touching a file or spawning anything |
+| `evlog agents --yes` | Apply without confirming (also implied by `--json`, no TTY, or `CI`) |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |

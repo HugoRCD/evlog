@@ -7,6 +7,7 @@ import { createContext } from '../src/core/context'
 import type { CliContext } from '../src/core/context'
 import { MARKER_END, MARKER_START, renderBlock, upsertBlock, upsertClaudePointer } from '../src/lib/agents/block'
 import { planAgents } from '../src/lib/agents/plan'
+import { formatAgentsReport } from '../src/lib/agents/report'
 import { agentsTelemetryFieldNames, runAgents } from '../src/lib/agents/run'
 import { EVLOG_SKILLS, findInstalledSkills, skillsCommand } from '../src/lib/agents/skills'
 
@@ -380,6 +381,17 @@ describe('runAgents', () => {
     const contents = await readFile(join(root, 'AGENTS.md'), 'utf8')
     expect(contents).not.toContain('review-logging-patterns')
     expect(contents).toContain('https://evlog.dev/learn/wide-events')
+  })
+
+  it('records the command it ran, for a run nobody watched', async () => {
+    /* Non-interactively the command never goes by on screen, so the report is
+       the only record of what was spawned — which the trust model promises. */
+    skills.spawnResult = { ok: true }
+    const root = await project({ 'package.json': '{"name":"shop"}' })
+
+    const result = await runAgents(fakeContext(root), undefined, {})
+
+    expect(formatAgentsReport(fakeContext(root), result)).toContain(result.skills.command)
   })
 
   it('marks a successful install without spawning twice', async () => {
