@@ -98,8 +98,9 @@ Work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.
 After fixing, propose making the score durable — this is where the CLI earns its keep:
 
 ```bash
-evlog map --min-score 80   # absolute gate: exits 1 below the threshold
-evlog map --baseline       # ratchet: exits 1 if this PR made things worse
+# in CI, after pnpm add -D @evlog/cli (project-local, pinned by the lockfile)
+pnpm exec evlog map --min-score 80   # absolute gate: exits 1 below the threshold
+pnpm exec evlog map --baseline       # ratchet: exits 1 if this PR made things worse
 ```
 
 `--baseline` compares the fresh scan against the committed `evlog.map.json`, **per entry point and per requirement** — a refactor that instruments one route and breaks another fails even if the total score is unchanged. Disabling a passing check with a comment counts as a regression too. New uninstrumented routes are listed as `NEW AND DARK` without failing. Workflow: commit `evlog.map.json` once, add the `--baseline` run to CI (`pnpm add -D @evlog/cli` for a pinned version — ask first), and re-run `map` without `--baseline` to accept an intentional change. Docs: https://www.evlog.dev/cli/ci
@@ -982,7 +983,6 @@ See [references/drain-pipeline.md](references/drain-pipeline.md) for batching, r
 Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()` — all from `evlog/enrichers`. Each accepts `{ overwrite?: boolean }` (default `false`). Use `createDefaultEnrichers()` to compose all four in one call:
 
 ```typescript
-// Any framework: one callback composing all built-ins
 import { createDefaultEnrichers } from 'evlog/enrichers'
 app.use(evlog({ enrich: createDefaultEnrichers() }))
 ```

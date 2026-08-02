@@ -8,7 +8,7 @@ Rules from the test README that apply here:
 
 - Use `mockFetch()` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `../helpers/fetch` — don't hand-roll fetch spies in adapter tests (a few older files still do; follow the helpers, not them).
 - Delete every env var the adapter reads in `afterEach` — leaked env vars make later tests order-dependent.
-- Test exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) in their own `describe` blocks.
+- Test exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) in their own `describe` blocks — but only the ones the adapter actually exports. If the adapter has no converter (service accepts arbitrary JSON), drop the `to{Name}Event` import and its `describe` block entirely.
 - No `!` non-null assertions — use `defined()` from `../helpers/defined` if narrowing is needed.
 - Register the adapter in `encode-parity.test.ts` so the drain and `sendBatchTo{Name}` are pinned to the same encoder (not every existing adapter is registered there yet; new ones should be).
 
@@ -43,6 +43,8 @@ describe('{name} adapter', () => {
 
   afterEach(() => {
     vi.restoreAllMocks()
+    delete process.env.NUXT_{NAME}_API_KEY
+    delete process.env.NUXT_{NAME}_ENDPOINT
     delete process.env.{NAME}_API_KEY
     delete process.env.{NAME}_ENDPOINT
   })
@@ -129,7 +131,9 @@ describe('{name} adapter', () => {
       expect(headers.Authorization).toBe('Bearer env-key')
     })
 
-    it('skips silently when apiKey is missing', async () => {
+    // "Skips" means: no request, no throw. The adapter still console.errors the
+    // missing key (suppressed by the beforeEach spy) so misconfiguration is visible.
+    it('skips the request when apiKey is missing', async () => {
       const drain = create{Name}Drain()
 
       await drain({ event: createTestEvent() })

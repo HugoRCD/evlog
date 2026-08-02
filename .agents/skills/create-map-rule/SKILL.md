@@ -50,7 +50,7 @@ Current requirements: `wide-event` (40), `audit` (25), `structured-errors` (20),
 
 ## Step 1: Rule Source
 
-One file, one exported const. The shape (`BaseRule` in `rules/types.ts`):
+One file, one exported const satisfying `MapRule` (from `rules/types.ts`; requirements and opportunities are its two variants):
 
 ```typescript
 export const {camelId}Rule = {
@@ -114,7 +114,7 @@ Run: `pnpm --filter @evlog/cli exec vitest run test/map/rules.test.ts`
 
 ## Step 5–6: Docs
 
-In `apps/docs/content/3.cli/3.rules.md`: add the row (column title, id, weight/fires-when, expects) and a `### {title} — {question}` section following the existing ones — what it checks, what passes, what fails, the suggested shape. Requirements with a weight also touch the scoring narrative in `4.scoring.md`.
+Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/`. Then in `apps/docs/content/3.cli/3.rules.md`: add the row (column title, id, weight/fires-when, expects) and a `### {title} — {question}` section following the existing ones — what it checks, what passes, what fails, the suggested shape. Requirements with a weight also touch the scoring narrative in `4.scoring.md`.
 
 ## Step 7: Published Skill
 

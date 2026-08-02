@@ -194,9 +194,9 @@ export const billingAudit = defineAuditCatalog('billing', {
   INVOICE_REFUND: { target: 'invoice' },
   PLAN_CHANGE:    { target: 'subscription' },
 })
-
-// call site: log.audit(billingAudit.INVOICE_REFUND({ actor, target, outcome: 'success' }))
 ```
+
+At the call site: `log.audit(billingAudit.INVOICE_REFUND({ actor, target, outcome: 'success' }))`.
 
 Add the opt-in `declare module 'evlog' { interface RegisteredAuditCatalogs { billing: typeof billingAudit } }` augmentation to get autocomplete everywhere. For one-off actions that don't fit a catalog, `defineAuditAction` still works:
 
@@ -214,7 +214,7 @@ Naming conventions:
 
 - `noun.verb` (`invoice.refund`, not `refundInvoice`).
 - Past tense if the audit is logged after the fact (`invoice.refunded`); present tense when wrapped by `withAudit()` (which resolves the outcome itself).
-- Lowercase, dot-delimited, no spaces.
+- Lowercase, dot-delimited, no spaces — for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND` — that's intentional, don't lowercase the keys.
 
 ### Step 3 — Instrument call sites
 

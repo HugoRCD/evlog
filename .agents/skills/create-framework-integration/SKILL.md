@@ -315,7 +315,7 @@ The app must include:
 5. **Error handler** — framework's error handler with `parseError()` + manual `log.error()`
 6. **Test UI** — served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses
 
-**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`) — `POSTHOG_API_KEY` is set in the root `.env`, so every example exercises a real external drain. Enable pretty printing for readable local output.
+**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`) — `POSTHOG_API_KEY` is set in the root `.env` (maintainer's key, not committed), so every example exercises a real external drain. Without the env var the drain resolves to `null` and skips — someone cloning the repo sends nothing anywhere unless they opt in with their own key. Enable pretty printing for readable local output.
 
 **Type the `enrich` callback parameter explicitly** — `(ctx: EnrichContext) => ...` with `type EnrichContext` imported from `evlog`.
 
@@ -344,7 +344,7 @@ Create `.changeset/{framework}-integration.md`:
 "evlog": minor
 ---
 
-feat({framework}): add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, useLogger(), drain, enrich, and tail sampling support
+feat({framework}): add {Framework} middleware integration (`evlog/{framework}`) with automatic wide-event logging, drain, enrich, and tail sampling support
 ```
 
 ## Step 13: PR Scopes
@@ -367,5 +367,5 @@ Then type-check the example:
 
 ```bash
 cd examples/{framework}
-npx tsc --noEmit
+pnpm exec tsc --noEmit
 ```

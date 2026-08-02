@@ -143,6 +143,8 @@ See the Loki and ClickHouse setups as references.
 
 ## Step 6: Adapter Documentation Page
 
+Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/` (steps 6–8).
+
 Adapter docs live in three categories under `apps/docs/content/4.integrate/adapters/`:
 
 | Category | Directory | Examples |

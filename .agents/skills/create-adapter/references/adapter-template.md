@@ -36,9 +36,12 @@ const {NAME}_FIELDS: ConfigField<{Name}Config>[] = [
   { key: 'retries' },
 ]
 
-// --- 2. Event Transformation (optional) ----------------------------------
+// --- 2. Event Transformation (CONDITIONAL — delete this whole section when
+// the service accepts arbitrary JSON) ------------------------------------
 // If the service needs a specific shape, export a converter so it's testable
-// independently. Otherwise pass `events` straight through in the encoder.
+// independently. If you delete it, the encoder body becomes
+// `JSON.stringify(events)` and the converter tests in test-template.md are
+// dropped too — don't keep a pass-through converter for symmetry.
 
 export interface {Name}Event {
   timestamp: string
@@ -97,6 +100,8 @@ export function create{Name}Drain(overrides?: Partial<{Name}Config>) {
     resolve: async () => {
       const config = await resolveAdapterConfig<{Name}Config>('{name}', {NAME}_FIELDS, overrides)
       if (!config.apiKey) {
+        // Returning null skips the batch: no request, no throw — but the miss
+        // is logged so a misconfigured deploy is visible in the console.
         console.error(`[evlog/{name}] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'])} env var or pass apiKey to create{Name}Drain()`)
         return null
       }
