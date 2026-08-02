@@ -58,6 +58,7 @@ describe('clickhouse adapter', () => {
         path: '/api/users',
         status: 200,
         duration: '12ms',
+        durationMs: 12,
       }))
       expect(row).toMatchObject({
         timestamp: '2024-01-01 12:00:00.000',
@@ -69,6 +70,7 @@ describe('clickhouse adapter', () => {
         path: '/api/users',
         status: 200,
         duration: '12ms',
+        duration_ms: 12,
       })
     })
 
@@ -92,6 +94,7 @@ describe('clickhouse adapter', () => {
       expect(row.method).toBe('')
       expect(row.error_name).toBe('')
       expect(row.status).toBeNull()
+      expect(row.duration_ms).toBeNull()
     })
 
     it('ignores a non-numeric status', () => {

@@ -445,6 +445,17 @@ describe('createRequestLogger', () => {
     })
   })
 
+  it('includes durationMs as a number alongside the formatted duration', async () => {
+    await withFakeTimers(() => {
+      const logger = createRequestLogger({})
+      vi.advanceTimersByTime(1500)
+      const event = logger.emit()
+
+      expect(event?.durationMs).toBe(1500)
+      expect(event?.duration).toBe('1.50s')
+    })
+  })
+
   it('allows overrides on emit()', () => {
     const logger = createRequestLogger({})
     logger.set({ original: true })

@@ -61,6 +61,7 @@ Output:
   "method": "POST",
   "path": "/api/checkout",
   "duration": "1.2s",
+  "durationMs": 1204,
   "user": { "id": "123", "plan": "premium" },
   "cart": { "items": 3, "total": 9999 },
   "error": { "message": "Card declined", "step": "payment" }
@@ -167,6 +168,7 @@ The wide event emitted at the end contains **everything**:
   "method": "POST",
   "path": "/api/checkout",
   "duration": "1.2s",
+  "durationMs": 1204,
   "user": { "id": "user_123", "plan": "premium" },
   "cart": { "items": 3, "total": 9999 },
   "payment": { "id": "pay_xyz", "method": "card" },
@@ -270,6 +272,7 @@ Output when the export completes:
   "method": "POST",
   "path": "/api/documents/doc_123/export",
   "duration": "2.4s",
+  "durationMs": 2412,
   "document": { "id": "doc_123", "title": "Q4 Report", "pages": 24 },
   "export": { "format": "pdf", "size": 1240000, "pages": 24 },
   "status": 200

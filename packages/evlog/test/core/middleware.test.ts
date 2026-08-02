@@ -205,6 +205,7 @@ describe('createMiddlewareLogger', () => {
 
     expect(event.duration).toBeDefined()
     expect(typeof event.duration).toBe('string')
+    expect(typeof event.durationMs).toBe('number')
   })
 
   it('finish() with warn level when logger has warnings', async () => {

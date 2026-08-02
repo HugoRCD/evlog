@@ -85,7 +85,7 @@ export function toClickHouseDateTime(timestamp: string): string {
  * target a different schema.
  */
 export function toClickHouseRow(event: WideEvent): Record<string, unknown> {
-  const { error, status } = event as Record<string, unknown>
+  const { durationMs, error, status } = event as Record<string, unknown>
   const errorRecord = typeof error === 'object' && error !== null ? error as Record<string, unknown> : undefined
 
   return {
@@ -100,6 +100,7 @@ export function toClickHouseRow(event: WideEvent): Record<string, unknown> {
     path: readString(event, 'path') ?? '',
     status: typeof status === 'number' ? status : null,
     duration: readString(event, 'duration') ?? '',
+    duration_ms: typeof durationMs === 'number' ? durationMs : null,
     error_name: typeof errorRecord?.name === 'string' ? errorRecord.name : '',
     error_message: typeof errorRecord?.message === 'string' ? errorRecord.message : '',
     data: JSON.stringify(event),

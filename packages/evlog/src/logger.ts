@@ -641,6 +641,7 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     }
     delete rest.duration
   }
+  delete rest.durationMs
 
   writeLine(parts.join(''), ...styles)
 
@@ -973,6 +974,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
           if (key !== '_forceKeep') context[key] = obj[key]
         }
       }
+      context.durationMs = durationMs
       context.duration = formatDuration(durationMs)
 
       const wide = emitWideEvent(level, context, { deferDrain, ownsEvent: true, waitUntil })

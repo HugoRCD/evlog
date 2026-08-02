@@ -13,6 +13,7 @@ CREATE TABLE IF NOT EXISTS evlog_events
   path          String,
   status        Nullable(UInt16),
   duration      String,
+  duration_ms   Nullable(UInt32),
   error_name    String,
   error_message String,
   data          String

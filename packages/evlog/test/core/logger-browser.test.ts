@@ -93,6 +93,15 @@ describe('browser pretty printing', () => {
     expect(styles.some((s: string) => s.includes('#6b7280'))).toBe(true)
   })
 
+  it('does not render durationMs as a tree field', () => {
+    const logger = createRequestLogger({ method: 'GET', path: '/api/test' })
+    logger.emit()
+
+    for (const call of logSpy.mock.calls) {
+      expect(String(call[0])).not.toContain('durationMs')
+    }
+  })
+
   it('escapes % in dynamic values to prevent format string injection', () => {
     log.info('test', '100% complete %c injected %s')
 
