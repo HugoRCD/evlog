@@ -1,4 +1,4 @@
-import { channel, subscribe, unsubscribe } from 'node:diagnostics_channel'
+import { channel } from 'node:diagnostics_channel'
 import type { WideEvent } from '../types'
 
 /**
@@ -15,8 +15,18 @@ export function createChannelPublisher(name: string): (event: WideEvent) => void
   }
 }
 
-/** Subscribe to `name`, returning an unsubscribe. @internal */
+/**
+ * Subscribe to `name`, returning an unsubscribe.
+ *
+ * Uses the channel instance methods rather than the module-level
+ * `subscribe()` / `unsubscribe()`, which only exist from Node 18.7 — below the
+ * `>=18.0.0` this package declares.
+ *
+ * @internal
+ */
 export function subscribeToChannel(name: string, onMessage: (message: unknown) => void): () => void {
-  subscribe(name, onMessage)
-  return () => unsubscribe(name, onMessage)
+  const eventChannel = channel(name)
+
+  eventChannel.subscribe(onMessage)
+  return () => eventChannel.unsubscribe(onMessage)
 }
