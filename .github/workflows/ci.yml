@@ -84,6 +84,14 @@ jobs:
       - name: Test workspace
         run: pnpm exec turbo run test --affected --filter='!evlog'
 
+      # The coverage step bypasses turbo, so it inherits no dist/ from the
+      # affected graph — on a docs-only change nothing is affected and the
+      # dist-dependent tests (auto-import types, api-surface) would run
+      # against a missing build. Prepare it explicitly; the remote cache
+      # makes this a restore, not a rebuild, when src is untouched.
+      - name: Prepare evlog dist
+        run: pnpm exec turbo run dev:prepare --filter=evlog
+
       - name: Test evlog with coverage
         run: pnpm --filter evlog run test:coverage
 
