@@ -9,6 +9,23 @@ import { planWiring } from '../src/lib/init/frameworks'
 import { detectPackageManager, installCommand } from '../src/lib/init/pm'
 import { runInit } from '../src/lib/init/run'
 
+/** Only the spawn is faked; the rest of the skills module stays real. */
+const skills = vi.hoisted(() => ({
+  spawnResult: null as null | { ok: true } | { ok: false, error: string },
+  calls: 0,
+}))
+
+vi.mock('../src/lib/agents/skills', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/agents/skills')>()
+  return {
+    ...actual,
+    runSkills: (...args: Parameters<typeof actual.runSkills>) => {
+      skills.calls += 1
+      return skills.spawnResult ? Promise.resolve(skills.spawnResult) : actual.runSkills(...args)
+    },
+  }
+})
+
 const tempDirs: string[] = []
 
 async function project(files: Record<string, string>): Promise<string> {
@@ -52,6 +69,8 @@ function wiring(overrides: Partial<Parameters<typeof planWiring>[0]> = {}) {
 
 afterEach(async () => {
   vi.unstubAllGlobals()
+  skills.spawnResult = null
+  skills.calls = 0
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
@@ -285,6 +304,44 @@ describe('runInit — agent guidelines', () => {
     const result = await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
 
     expect(result.agentGuide).toBeNull()
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false)
+    expect(skills.calls).toBe(0)
+  })
+
+  it('installs the skills when none are on disk — the common case', async () => {
+    skills.spawnResult = { ok: true }
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    /* `pending` is the value the step starts at; leaving it there would mean
+       the skills execution never ran. */
+    expect(result.agentGuide).toMatchObject({ status: 'installed', found: [] })
+    expect(skills.calls).toBe(1)
+    /* The files land before the spawn, so a dead subprocess cannot cost them. */
+    expect(await readFile(join(cwd, 'AGENTS.md'), 'utf8')).toContain('## Logging with evlog')
+    expect(existsSync(join(cwd, 'CLAUDE.md'))).toBe(true)
+  })
+
+  it('keeps the wiring and the block when the skills install fails', async () => {
+    skills.spawnResult = { ok: false, error: 'npx: command not found' }
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, yes: true })
+
+    expect(result.agentGuide).toMatchObject({ status: 'failed', error: 'npx: command not found' })
+    expect(await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')).toContain('evlog/nuxt')
+    expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(true)
+  })
+
+  it('previews the skills command under --dry-run without running it', async () => {
+    const cwd = await nuxtProject()
+
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, dryRun: true, yes: true })
+
+    expect(result.agentGuide?.status).toBe('pending')
+    expect(result.agentGuide?.command).toContain('npx skills add')
+    expect(skills.calls).toBe(0)
     expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false)
   })
 })

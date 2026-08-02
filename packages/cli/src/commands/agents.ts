@@ -1,12 +1,9 @@
-import { EvlogError } from 'evlog'
 import { EXIT_FAIL } from '../core/output'
 import { formatAgentsReport } from '../lib/agents/report'
 import { runAgents } from '../lib/agents/run'
 import type { AgentsOptions, AgentsResult } from '../lib/agents/run'
-import { defineEvlogCommand } from '../lib/command'
-import type { CliDebug } from '../lib/debug'
+import { defineEvlogCommand, failWith } from '../lib/command'
 import { canPrompt } from '../lib/init/prompts'
-import type { CliUi } from '../lib/ui'
 
 function parseSkillsArg(value: unknown): { skills: string[], noSkills: boolean } {
   if (value === false) return { skills: [], noSkills: true }
@@ -60,7 +57,7 @@ export default defineEvlogCommand('agents', {
     try {
       result = await runAgents(ctx, log, options)
     } catch (error) {
-      return fail(error, { args, log, ui })
+      return failWith(error, { args, log, ui })
     }
 
     ui.done({
@@ -85,22 +82,4 @@ function toJson(result: AgentsResult): Record<string, unknown> {
     dryRun: result.dryRun,
     cancelled: result.cancelled,
   }
-}
-
-/** Render a catalog error and exit 1; rethrow anything unexpected. */
-function fail(
-  error: unknown,
-  io: { args: { json?: boolean }, log: CliDebug, ui: CliUi },
-): void {
-  if (!(error instanceof EvlogError)) throw error
-  io.log.finding(
-    { code: error.code ?? 'cli.COMMAND_FAILED', why: error.why, fix: error.fix, link: error.link },
-    { status: 'fail' },
-  )
-  io.ui.done({
-    jsonMode: io.args.json,
-    json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
-    human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
-  })
-  io.ui.exit(EXIT_FAIL)
 }

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
-import { join, relative } from 'node:path'
+import { basename, join, relative } from 'node:path'
+import { cliErrors } from '../errors'
 import type { FileAction } from '../init/frameworks'
 import type { Framework } from '../map/types'
 import { renderAgentsFile, renderBlock, upsertBlock, upsertClaudePointer } from './block'
@@ -29,8 +30,20 @@ function action(root: string, path: string, contents: string): FileAction {
   }
 }
 
+/**
+ * Read a file we may be about to rewrite, or `null` when it is not there.
+ *
+ * An existing path that cannot be read — a directory named `AGENTS.md`, or one
+ * the user has no permission on — would otherwise surface as a raw stack trace,
+ * since only catalog errors get a `why` and a `fix`.
+ */
 function read(path: string): string | null {
-  return existsSync(path) ? readFileSync(path, 'utf8') : null
+  if (!existsSync(path)) return null
+  try {
+    return readFileSync(path, 'utf8')
+  } catch {
+    throw cliErrors.AGENTS_UNREADABLE({ file: basename(path) })
+  }
 }
 
 /**

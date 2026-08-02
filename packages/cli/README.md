@@ -51,10 +51,10 @@ pnpm evlog doctor
 | `evlog init --dry-run` | Print the plan without touching a file |
 | `evlog init --service <name>` | Service name on every wide event (default: package name, unscoped) |
 | `evlog init --no-install` | Print the install command instead of running it |
-| `evlog init --no-agents` | Skip the AGENTS.md block and the skills |
+| `evlog init --no-agents` | Skip all of it — no `AGENTS.md`, no `CLAUDE.md`, no skills |
 | `evlog agents` | Write the evlog conventions into `AGENTS.md`, point `CLAUDE.md` at it, install the skills via `npx skills add` |
 | `evlog agents --skills <a,b>` | Install only these skills (default: every published one) |
-| `evlog agents --no-skills` | Write the `AGENTS.md` block alone — nothing is spawned |
+| `evlog agents --no-skills` | Still write `AGENTS.md` and `CLAUDE.md`; skip only the skills — nothing is spawned |
 | `evlog agents --global` | Install the skills for every project instead of just this one |
 | `evlog agents --source <url>` | Where the skills are published (default: `https://www.evlog.dev`) |
 | `evlog agents --dry-run` | Print the plan without touching a file |

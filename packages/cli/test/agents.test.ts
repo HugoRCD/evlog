@@ -2,13 +2,35 @@ import { existsSync } from 'node:fs'
 import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { afterEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createContext } from '../src/core/context'
 import type { CliContext } from '../src/core/context'
 import { MARKER_END, MARKER_START, renderBlock, upsertBlock, upsertClaudePointer } from '../src/lib/agents/block'
 import { planAgents } from '../src/lib/agents/plan'
 import { agentsTelemetryFieldNames, runAgents } from '../src/lib/agents/run'
 import { EVLOG_SKILLS, findInstalledSkills, skillsCommand } from '../src/lib/agents/skills'
+
+/**
+ * Only the spawn is faked; everything else in the module stays real.
+ *
+ * Set `spawnResult` to drive the one branch a test cannot reach for real —
+ * actually shelling out to `npx` in a unit test is neither fast nor honest.
+ */
+const skills = vi.hoisted(() => ({
+  spawnResult: null as null | { ok: true } | { ok: false, error: string },
+  calls: 0,
+}))
+
+vi.mock('../src/lib/agents/skills', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('../src/lib/agents/skills')>()
+  return {
+    ...actual,
+    runSkills: (...args: Parameters<typeof actual.runSkills>) => {
+      skills.calls += 1
+      return skills.spawnResult ? Promise.resolve(skills.spawnResult) : actual.runSkills(...args)
+    },
+  }
+})
 
 const tempDirs: string[] = []
 
@@ -34,6 +56,8 @@ function fakeContext(cwd: string, home = join(cwd, '__home')): CliContext {
 afterEach(async () => {
   vi.unstubAllGlobals()
   vi.restoreAllMocks()
+  skills.spawnResult = null
+  skills.calls = 0
   await Promise.all(tempDirs.splice(0).map(dir => rm(dir, { recursive: true, force: true })))
 })
 
@@ -103,7 +127,13 @@ describe('upsertClaudePointer', () => {
 })
 
 describe('findInstalledSkills', () => {
-  const NO_HOME = join(tmpdir(), 'evlog-cli-agents-no-home')
+  /* Owned by the suite rather than a fixed temp path: a stray
+     `evlog-cli-agents-no-home/.claude/skills/<name>` on the build machine would
+     otherwise silently change what these assertions mean. */
+  let NO_HOME: string
+  beforeEach(async () => {
+    NO_HOME = await project()
+  })
 
   it('finds a skill in any agent directory', async () => {
     const root = await project({ '.claude/skills/review-logging-patterns/SKILL.md': '# x\n' })
@@ -172,6 +202,27 @@ describe('skillsCommand', () => {
 
   it('runs npx rather than depending on the package', () => {
     expect(skillsCommand({ interactive: true }).bin).toBe('npx')
+  })
+
+  it('rejects a source that is not an http(s) URL', () => {
+    /* On Windows the spawn needs a shell to find npx, so `&` in this value
+       would start a second command. Checked once, before anything is spawned. */
+    for (const source of ['https://evlog.dev && calc', 'file:///etc/passwd', 'not a url', '']) {
+      expect(() => skillsCommand({ interactive: true, source }), source)
+        .toThrowError(expect.objectContaining({ code: 'cli.AGENTS_INVALID_SOURCE' }))
+    }
+  })
+
+  it('rejects a skill name that is not a plain identifier', () => {
+    for (const skill of ['analyze logs', 'a&&b', '../escape', 'UPPER']) {
+      expect(() => skillsCommand({ interactive: true, skills: [skill] }), skill)
+        .toThrowError(expect.objectContaining({ code: 'cli.AGENTS_INVALID_SKILL' }))
+    }
+  })
+
+  it('accepts a self-hosted origin', () => {
+    expect(skillsCommand({ interactive: true, source: 'http://localhost:3000' }).display)
+      .toBe('npx skills add http://localhost:3000')
   })
 })
 
@@ -286,6 +337,41 @@ describe('runAgents', () => {
     expect(result.written.length).toBeGreaterThan(0)
     expect(result.skills.status).toBe('skipped')
     expect(existsSync(join(root, 'AGENTS.md'))).toBe(false)
+  })
+
+  it('reports a failed install and keeps the block', async () => {
+    skills.spawnResult = { ok: false, error: 'npx: command not found' }
+    const root = await project({ 'package.json': '{"name":"shop"}' })
+
+    const result = await runAgents(fakeContext(root), undefined, {})
+
+    expect(result.skills).toMatchObject({ status: 'failed', error: 'npx: command not found' })
+    /* The block never needed the network, so it stands. */
+    expect(await readFile(join(root, 'AGENTS.md'), 'utf8')).toContain('One wide event per operation')
+  })
+
+  it('does not leave the block promising a skill the failed install never wrote', async () => {
+    /* The block is written before the install so it survives a dead subprocess,
+       which means on failure it names a skill that is now known to be absent. */
+    skills.spawnResult = { ok: false, error: 'network unreachable' }
+    const root = await project({ 'package.json': '{"name":"shop"}' })
+
+    await runAgents(fakeContext(root), undefined, {})
+
+    const contents = await readFile(join(root, 'AGENTS.md'), 'utf8')
+    expect(contents).not.toContain('review-logging-patterns')
+    expect(contents).toContain('https://evlog.dev/learn/wide-events')
+  })
+
+  it('marks a successful install without spawning twice', async () => {
+    skills.spawnResult = { ok: true }
+    const root = await project({ 'package.json': '{"name":"shop"}' })
+
+    const result = await runAgents(fakeContext(root), undefined, {})
+
+    expect(result.skills.status).toBe('installed')
+    expect(skills.calls).toBe(1)
+    expect(await readFile(join(root, 'AGENTS.md'), 'utf8')).toContain('review-logging-patterns')
   })
 
   it('still writes the block when no framework could be detected', async () => {

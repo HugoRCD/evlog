@@ -187,6 +187,24 @@ export async function runAgents(
       : { status: 'failed', command: command.display, found: [], dirs: [], error: outcome.error }
   }
 
+  /* The block was written before the install, so it could stand whatever the
+     subprocess did — which means it promises a skill that is now known not to
+     exist. Rewrite it rather than leave an agent chasing a missing file. */
+  if (skills.status === 'failed' && !dryRun) {
+    const corrected = planAgents({
+      root: project.packageDir,
+      projectName: project.packageName ?? 'This project',
+      framework,
+      hasSkills: false,
+    })
+    await log.step('rewriteBlock', async () => {
+      for (const action of corrected.actions) {
+        await writeFile(action.path, action.contents, 'utf8')
+      }
+      return corrected.actions.length
+    })
+  }
+
   if (interactive) {
     noteSkills(ctx, skills)
     closeAgents(ctx, dryRun)
@@ -238,8 +256,8 @@ function cancelled(input: {
  * Which skills exist is already public; how many files a given project rewrote
  * is not interesting enough to justify sending anything shaped like a path.
  */
-function recordAgentsRun(result: AgentsResult): void {
-  telemetry.set({
+function agentsTelemetryFields(result: AgentsResult): Record<string, boolean | number> {
+  return {
     agentsSkillsFound: result.skills.found.length,
     agentsSkillsInstalled: result.skills.status === 'installed',
     agentsSkillsFailed: result.skills.status === 'failed',
@@ -249,20 +267,29 @@ function recordAgentsRun(result: AgentsResult): void {
     agentsDryRun: result.dryRun,
     agentsInteractive: result.interactive,
     agentsCancelled: result.cancelled,
-  })
+  }
 }
 
-/** Every field {@link recordAgentsRun} can emit — used to document the disclosure. */
+function recordAgentsRun(result: AgentsResult): void {
+  telemetry.set(agentsTelemetryFields(result))
+}
+
+/**
+ * Every field {@link recordAgentsRun} can emit — used to document the disclosure.
+ *
+ * Read off the payload rather than listed again: a field added to one and not
+ * the other would leave the disclosure quietly incomplete, and what this CLI
+ * transmits is exactly the thing that must not drift.
+ */
 export function agentsTelemetryFieldNames(): string[] {
-  return [
-    'agentsSkillsFound',
-    'agentsSkillsInstalled',
-    'agentsSkillsFailed',
-    'agentsFilesWritten',
-    'agentsAlready',
-    'agentsDetected',
-    'agentsDryRun',
-    'agentsInteractive',
-    'agentsCancelled',
-  ]
+  return Object.keys(agentsTelemetryFields({
+    project: { cwd: '', root: '', packageDir: '', packageName: null },
+    framework: null,
+    skills: { status: 'skipped', command: '', found: [], dirs: [] },
+    written: [],
+    already: [],
+    dryRun: false,
+    interactive: false,
+    cancelled: false,
+  }))
 }

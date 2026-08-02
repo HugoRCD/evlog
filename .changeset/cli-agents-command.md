@@ -8,6 +8,8 @@ The agent skills are installed by shelling out to `npx skills add https://www.ev
 
 `evlog init` now offers the same step as its last question — the `AGENTS.md` and `CLAUDE.md` writes are planned alongside the wiring so there is still one plan and one confirmation, and the skills run next to the package-manager install. `--no-agents` skips it. The block never needs the network, so a skills failure is reported without costing the rest of the run.
 
+`--source` must be an `http:`/`https:` URL and `--skills` entries must be lowercase dashed names, both rejected with a catalog error before anything is spawned — on Windows the spawn needs a shell to resolve `npx`, so those values would otherwise reach a `cmd.exe` command line. If the skills install fails, the `AGENTS.md` block is rewritten without the pointer to a skill that is now known not to be on disk.
+
 Both flows report the skills step whether or not it did anything — in the plan, in the written report, and through clack in an interactive run — so "already installed" is never confusable with "forgot to do it".
 
 `CliContext` gains a `home` field, so the search for installed skills reads the home directory through the context like every other `process.*` value rather than calling `os.homedir()` directly.

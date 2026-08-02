@@ -3,6 +3,51 @@ import type { CliContext } from '../../core/context'
 import { DOCS_URL, createStyle } from '../../core/output'
 import type { AgentsResult } from './run'
 
+/** The subset of a skills outcome the report needs — `init` reports one too. */
+export interface SkillsLines {
+  status: 'pending' | 'already' | 'installed' | 'skipped' | 'failed'
+  command: string
+  dirs?: string[]
+  error?: string
+}
+
+/**
+ * How the skills step went, as report lines.
+ *
+ * Shared with the `init` report rather than written twice: it is the same four
+ * outcomes with the same wording, and two copies of a user-facing string are
+ * two copies that drift. A command to type is a label plus the command, never a
+ * sentence with the command inside it — inline, the reader never registers
+ * there is something to run.
+ */
+export function skillsReportLines(ctx: CliContext, skills: SkillsLines): string[] {
+  const { paint } = createStyle(ctx)
+  const command = (label: string, line: string): string =>
+    `  ${paint('dim', label)}  ${paint('bold', line)}`
+
+  switch (skills.status) {
+    case 'already':
+      return [
+        `${paint('green', '✓')} ${paint('dim', `evlog skills already installed${skills.dirs?.length ? ` · ${skills.dirs.join(', ')}` : ''}`)}`,
+        /* The skills CLI owns their lifecycle, so the refresh command is theirs. */
+        command('refresh', 'npx skills update'),
+      ]
+    case 'installed':
+      return [`${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`]
+    case 'failed':
+      return [
+        `${paint('red', '✗')} ${paint('dim', 'skills not installed')}`,
+        ...(skills.error ? [`   ${paint('dim', skills.error)}`] : []),
+        command('retry  ', skills.command),
+      ]
+    default:
+      return [
+        `${paint('yellow', '·')} ${paint('dim', 'skills not installed')}`,
+        command('install', skills.command),
+      ]
+  }
+}
+
 /**
  * What `evlog agents` did, for a run that asked nothing.
  *
@@ -33,23 +78,7 @@ export function formatAgentsReport(ctx: CliContext, result: AgentsResult): strin
     lines.push(paint('dim', `· ${note}`))
   }
 
-  /* A command to type is a label plus the command, never a sentence with the
-     command inside it — inline, the reader never registers there is one. */
-  const { skills } = result
-  if (skills.status === 'already') {
-    lines.push(`${paint('green', '✓')} ${paint('dim', `skills already installed · ${skills.dirs.join(', ')}`)}`)
-    /* The skills CLI owns their lifecycle, so the refresh command is theirs. */
-    lines.push(`  ${paint('dim', 'refresh')}  ${paint('bold', 'npx skills update')}`)
-  } else if (skills.status === 'installed') {
-    lines.push(`${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`)
-  } else if (skills.status === 'skipped') {
-    lines.push(`${paint('yellow', '·')} ${paint('dim', 'skills not installed')}`)
-    lines.push(`  ${paint('dim', 'install')}  ${paint('bold', skills.command)}`)
-  } else {
-    lines.push(`${paint('red', '✗')} ${paint('dim', 'skills not installed')}`)
-    if (skills.error) lines.push(`   ${paint('dim', skills.error)}`)
-    lines.push(`  ${paint('dim', 'retry  ')}  ${paint('bold', skills.command)}`)
-  }
+  lines.push(...skillsReportLines(ctx, result.skills))
 
   lines.push('')
   lines.push(gradientRule(ctx, HEADER_GRADIENT_WIDTH))

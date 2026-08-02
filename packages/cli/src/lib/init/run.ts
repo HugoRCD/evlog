@@ -279,12 +279,16 @@ export async function runInit(
     }, r => ({ found: r.found.length }))
   }
 
-  const installing = !evlogInstalled && answers.install && !dryRun
+  /* What the run would shell out to, `--dry-run` included: a preview that hides
+     the commands is the one thing a preview exists to show. Execution stays
+     gated on `dryRun` separately, further down. */
+  const wouldInstall = !evlogInstalled && answers.install
   /* Already-installed skills belong to `npx skills update`, not to us. */
-  const addingSkills = agentGuide !== null && agentGuide.found.length === 0 && !dryRun
+  const wouldAddSkills = agentGuide !== null && agentGuide.found.length === 0
+  const installing = wouldInstall && !dryRun
   const runs = [
-    ...(installing ? [command] : []),
-    ...(addingSkills ? [agentGuide!.command] : []),
+    ...(wouldInstall ? [command] : []),
+    ...(wouldAddSkills ? [agentGuide!.command] : []),
   ]
 
   if (interactive && dryRun) {

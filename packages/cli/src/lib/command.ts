@@ -1,9 +1,10 @@
 import type { ArgsDef, CommandDef, CommandContext, CommandMeta, ParsedArgs } from 'citty'
 import { defineCommand } from 'citty'
+import { EvlogError } from 'evlog'
 import { createContext } from '../core/context'
 import type { CliContext } from '../core/context'
 import { formatCommandHeader, wantsHeader } from '../core/brand'
-import { writeHuman } from '../core/output'
+import { EXIT_FAIL, writeHuman } from '../core/output'
 import { withCliDebug } from './debug'
 import type { CliDebug, DebugArgs } from './debug'
 import { createUi } from './ui'
@@ -113,6 +114,30 @@ export function defineEvlogCommand<T extends ArgsDef = ArgsDef>(
       })
     },
   } as CommandDef<T & typeof COMMON_ARGS>)
+}
+
+/**
+ * Render a catalog error and exit 1; rethrow anything unexpected.
+ *
+ * Shared because every command that writes needs the same three things from a
+ * failure — the finding on the debug event, the `why` / `fix` for the reader,
+ * and a non-zero exit — and three copies of that would drift.
+ */
+export function failWith(
+  error: unknown,
+  io: { args: { json?: boolean }, log: CliDebug, ui: CliUi },
+): void {
+  if (!(error instanceof EvlogError)) throw error
+  io.log.finding(
+    { code: error.code ?? 'cli.COMMAND_FAILED', why: error.why, fix: error.fix, link: error.link },
+    { status: 'fail' },
+  )
+  io.ui.done({
+    jsonMode: io.args.json,
+    json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
+    human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
+  })
+  io.ui.exit(EXIT_FAIL)
 }
 
 /**

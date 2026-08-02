@@ -1,6 +1,7 @@
 import { spawn } from 'node:child_process'
 import { existsSync } from 'node:fs'
 import { join } from 'node:path'
+import { cliErrors } from '../errors'
 
 /**
  * The published evlog skills, installed by delegating to `npx skills`.
@@ -75,6 +76,31 @@ export interface SkillsCommand {
   args: string[]
 }
 
+/** Skill directory names, per the Agent Skills spec. */
+const SKILL_NAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
+
+/**
+ * Reject anything that is not an http(s) URL.
+ *
+ * On Windows {@link runSkills} needs a shell to find `npx`, which means this
+ * value reaches a `cmd.exe` command line where `&` and `|` separate commands.
+ * Nobody types that against themselves, but a `--source` fed from CI config or
+ * an interpolated variable is a different question, so the shape is checked
+ * once here rather than trusted all the way down.
+ */
+function checkSource(value: string): string {
+  let url: URL
+  try {
+    url = new URL(value)
+  } catch {
+    throw cliErrors.AGENTS_INVALID_SOURCE({ value })
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw cliErrors.AGENTS_INVALID_SOURCE({ value })
+  }
+  return value
+}
+
 /**
  * Build the `npx skills add` invocation.
  *
@@ -87,8 +113,13 @@ export function skillsCommand(options: {
   global?: boolean
   interactive: boolean
 }): SkillsCommand {
-  const args = ['--yes', 'skills', 'add', options.source ?? DEFAULT_SOURCE]
-  if (options.skills?.length) args.push('--skill', ...options.skills)
+  const args = ['--yes', 'skills', 'add', checkSource(options.source ?? DEFAULT_SOURCE)]
+  if (options.skills?.length) {
+    for (const skill of options.skills) {
+      if (!SKILL_NAME.test(skill)) throw cliErrors.AGENTS_INVALID_SKILL({ value: skill })
+    }
+    args.push('--skill', ...options.skills)
+  }
   if (options.global) args.push('--global')
   if (!options.interactive) args.push('--yes')
 

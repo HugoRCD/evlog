@@ -1,6 +1,7 @@
 import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
+import { skillsReportLines } from '../agents/report'
 import { findDestination, findEnricher, findExtra, findSamplingPreset } from './catalog'
 import { frameworkDocs } from './run'
 import type { InitResult } from './run'
@@ -83,23 +84,10 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
     lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply here — skipped`)}`)
   }
 
-  const guide = result.agentGuide
-  if (guide) {
-    /* The block lands whatever happens here; saying nothing would leave the
-       author believing their agent has guidance it never received. */
-    if (guide.status === 'already') {
-      lines.push(`${paint('green', '✓')} ${paint('dim', `evlog skills already installed · ${guide.dirs.join(', ')}`)}`)
-      lines.push(`  ${paint('dim', 'refresh')}  ${paint('bold', 'npx skills update')}`)
-    } else if (guide.status === 'installed') {
-      lines.push(`${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`)
-    } else if (guide.status === 'failed') {
-      lines.push(`${paint('red', '✗')} ${paint('dim', 'skills not installed')}`)
-      if (guide.error) lines.push(`   ${paint('dim', guide.error)}`)
-      lines.push(`  ${paint('dim', 'retry  ')}  ${paint('bold', guide.command)}`)
-    } else {
-      lines.push(`${paint('yellow', '·')} ${paint('dim', 'skills not installed')}`)
-      lines.push(`  ${paint('dim', 'install')}  ${paint('bold', guide.command)}`)
-    }
+  /* The block lands whatever happens here; saying nothing would leave the
+     author believing their agent has guidance it never received. */
+  if (result.agentGuide) {
+    lines.push(...skillsReportLines(ctx, result.agentGuide))
   }
 
   if (result.verified) {

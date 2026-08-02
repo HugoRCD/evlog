@@ -1,8 +1,5 @@
-import { EvlogError } from 'evlog'
 import { EXIT_FAIL } from '../core/output'
-import { defineEvlogCommand } from '../lib/command'
-import type { CliDebug } from '../lib/debug'
-import type { CliUi } from '../lib/ui'
+import { defineEvlogCommand, failWith } from '../lib/command'
 import { cliErrors } from '../lib/errors'
 import { askWorkspaceTargets, canPrompt, closeCancelled, InitCancelled } from '../lib/init/prompts'
 import { formatInitReport, formatWorkspaceHeading } from '../lib/init/report'
@@ -89,7 +86,7 @@ export default defineEvlogCommand('init', {
         nonInteractive: args.json === true,
       }
     } catch (error) {
-      return fail(error, { args, log, ui })
+      return failWith(error, { args, log, ui })
     }
 
     /* A monorepo root has no entry points of its own, so `init` there means
@@ -111,7 +108,7 @@ export default defineEvlogCommand('init', {
           entry => !targets.some(app => app.label === entry || app.name === entry),
         )
         if (unknown.length > 0) {
-          return fail(
+          return failWith(
             cliErrors.INIT_NO_APPS({ value: unknown.join(', '), known: targets.map(app => app.label).join(', ') }),
             { args, log, ui },
           )
@@ -139,7 +136,7 @@ export default defineEvlogCommand('init', {
       }
 
       if (selected.length === 0) {
-        return fail(
+        return failWith(
           cliErrors.INIT_NO_APPS({ value: 'nothing', known: targets.map(app => app.label).join(', ') }),
           { args, log, ui },
         )
@@ -160,7 +157,7 @@ export default defineEvlogCommand('init', {
             closeCancelled()
             break
           }
-          return fail(error, { args, log, ui })
+          return failWith(error, { args, log, ui })
         }
       }
 
@@ -176,7 +173,7 @@ export default defineEvlogCommand('init', {
     try {
       result = await runInit(ctx, log, options)
     } catch (error) {
-      return fail(error, { args, log, ui })
+      return failWith(error, { args, log, ui })
     }
 
     ui.done({
@@ -214,22 +211,4 @@ function toJson(result: InitResult): Record<string, unknown> {
     dryRun: result.dryRun,
     cancelled: result.cancelled,
   }
-}
-
-/** Render a catalog error and exit 1; rethrow anything unexpected. */
-function fail(
-  error: unknown,
-  io: { args: { json?: boolean }, log: CliDebug, ui: CliUi },
-): void {
-  if (!(error instanceof EvlogError)) throw error
-  io.log.finding(
-    { code: error.code ?? 'cli.COMMAND_FAILED', why: error.why, fix: error.fix, link: error.link },
-    { status: 'fail' },
-  )
-  io.ui.done({
-    jsonMode: io.args.json,
-    json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
-    human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
-  })
-  io.ui.exit(EXIT_FAIL)
 }
