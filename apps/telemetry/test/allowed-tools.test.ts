@@ -57,4 +57,13 @@ describe('the evlog-cli allowlist against the CLI itself', () => {
       expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
     }
   })
+
+  it('accepts every field evlog agents can set', async () => {
+    const { agentsTelemetryFieldNames } = await import('../../../packages/cli/src/lib/agents/run')
+    const allowed = new Set(DEFAULT_ALLOWED_CUSTOM_KEYS['evlog-cli'])
+
+    for (const name of agentsTelemetryFieldNames()) {
+      expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
+    }
+  })
 })

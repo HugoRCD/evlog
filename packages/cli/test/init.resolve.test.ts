@@ -66,6 +66,7 @@ describe('resolveAnswers', () => {
     defaultService: 'shop',
     evlogInstalled: false,
     install: true,
+    agentGuide: false,
     offers,
   }
 
@@ -78,6 +79,7 @@ describe('resolveAnswers', () => {
       extras: [],
       enrichers: [],
       sampling: 'all',
+      agentGuide: false,
       install: true,
     })
   })

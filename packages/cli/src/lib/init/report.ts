@@ -83,6 +83,25 @@ export function formatInitReport(ctx: CliContext, result: InitResult): string {
     lines.push(`${paint('yellow', '·')} ${paint('dim', `${id} does not apply here — skipped`)}`)
   }
 
+  const guide = result.agentGuide
+  if (guide) {
+    /* The block lands whatever happens here; saying nothing would leave the
+       author believing their agent has guidance it never received. */
+    if (guide.status === 'already') {
+      lines.push(`${paint('green', '✓')} ${paint('dim', `evlog skills already installed · ${guide.dirs.join(', ')}`)}`)
+      lines.push(`  ${paint('dim', 'refresh')}  ${paint('bold', 'npx skills update')}`)
+    } else if (guide.status === 'installed') {
+      lines.push(`${paint('green', '✓')} ${paint('dim', 'installed the evlog skills')}`)
+    } else if (guide.status === 'failed') {
+      lines.push(`${paint('red', '✗')} ${paint('dim', 'skills not installed')}`)
+      if (guide.error) lines.push(`   ${paint('dim', guide.error)}`)
+      lines.push(`  ${paint('dim', 'retry  ')}  ${paint('bold', guide.command)}`)
+    } else {
+      lines.push(`${paint('yellow', '·')} ${paint('dim', 'skills not installed')}`)
+      lines.push(`  ${paint('dim', 'install')}  ${paint('bold', guide.command)}`)
+    }
+  }
+
   if (result.verified) {
     const { ok, warn, fail } = result.verified
     const glyph = fail > 0 ? paint('red', '✗') : warn > 0 ? paint('yellow', '⚠') : paint('green', '✓')

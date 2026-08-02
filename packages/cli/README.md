@@ -25,6 +25,7 @@ Try without installing:
 
 ```bash
 npx @evlog/cli init          # interactive setup — pick a destination, review the plan
+npx @evlog/cli agents        # teach your AI agents the evlog conventions
 npx @evlog/cli map           # score what is still dark
 npx @evlog/cli map --json --no-write
 ```
@@ -50,6 +51,13 @@ pnpm evlog doctor
 | `evlog init --dry-run` | Print the plan without touching a file |
 | `evlog init --service <name>` | Service name on every wide event (default: package name, unscoped) |
 | `evlog init --no-install` | Print the install command instead of running it |
+| `evlog init --no-agents` | Skip the AGENTS.md block and the skills |
+| `evlog agents` | Write the evlog conventions into `AGENTS.md`, point `CLAUDE.md` at it, install the skills via `npx skills add` |
+| `evlog agents --skills <a,b>` | Install only these skills (default: every published one) |
+| `evlog agents --no-skills` | Write the `AGENTS.md` block alone — nothing is spawned |
+| `evlog agents --global` | Install the skills for every project instead of just this one |
+| `evlog agents --source <url>` | Where the skills are published (default: `https://www.evlog.dev`) |
+| `evlog agents --dry-run` | Print the plan without touching a file |
 | `evlog map` | Static observability score for the current app — Lighthouse for wide events |
 | `evlog map <route-or-file>` | Explain one entry point: why it was scanned, each verdict, the shape it could take |
 | `evlog map --all` | Every entry point as a check matrix, grouped by directory |

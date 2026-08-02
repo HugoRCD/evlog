@@ -53,6 +53,19 @@ export const DEFAULT_ALLOWED_CUSTOM_KEYS: Record<string, string[]> = {
     'initEnricherGeo',
     'initEnricherRequestSize',
     'initEnricherTraceContext',
+    'initAgentGuide',
+    'initAgentSkillsFound',
+    'initAgentSkillsFailed',
+    // evlog agents — how much of the guidance landed
+    'agentsSkillsFound',
+    'agentsSkillsInstalled',
+    'agentsSkillsFailed',
+    'agentsFilesWritten',
+    'agentsAlready',
+    'agentsDetected',
+    'agentsDryRun',
+    'agentsInteractive',
+    'agentsCancelled',
   ],
 }
 

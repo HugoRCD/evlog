@@ -64,6 +64,7 @@ export default defineEvlogCommand('init', {
     dryRun: { type: 'boolean', description: 'Show what would change without writing anything' },
     // citty negations: declared positive so `--no-install` works.
     install: { type: 'boolean', default: true, description: 'Install evlog when missing (--no-install to skip)' },
+    agents: { type: 'boolean', default: true, description: 'Write the AGENTS.md block and install the skills (--no-agents to skip)' },
   },
   async run({ args, cli, log, ui }) {
     const cwd = typeof args.cwd === 'string' && args.cwd.length > 0 ? args.cwd : undefined
@@ -81,6 +82,7 @@ export default defineEvlogCommand('init', {
         sampling: parseSamplingArg(args.sampling),
         dryRun: args.dryRun,
         install: args.install,
+        agentGuide: args.agents,
         yes: args.yes,
         /* JSON output and a prompt cannot share a terminal: the payload is the
            contract, and half a TUI on stderr in front of it helps nobody. */
@@ -208,6 +210,7 @@ function toJson(result: InitResult): Record<string, unknown> {
     dropped: result.dropped,
     insight: result.insight,
     verified: result.verified,
+    agentGuide: result.agentGuide,
     dryRun: result.dryRun,
     cancelled: result.cancelled,
   }

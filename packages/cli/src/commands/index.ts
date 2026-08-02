@@ -1,3 +1,4 @@
+import agents from './agents'
 import doctor from './doctor'
 import init from './init'
 import map from './map'
@@ -16,6 +17,7 @@ import telemetry from './telemetry'
  */
 export const subCommands = {
   init,
+  agents,
   doctor,
   map,
   telemetry,
