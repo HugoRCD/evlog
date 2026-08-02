@@ -97,6 +97,15 @@ describe('clickhouse adapter', () => {
       expect(row.duration_ms).toBeNull()
     })
 
+    it('nulls a duration_ms that Nullable(UInt32) would reject', () => {
+      for (const durationMs of [-1, 1.5, 4_294_967_296, Number.NaN, '12', null]) {
+        expect(toClickHouseRow(createTestEvent({ durationMs })).duration_ms, String(durationMs)).toBeNull()
+      }
+
+      expect(toClickHouseRow(createTestEvent({ durationMs: 0 })).duration_ms).toBe(0)
+      expect(toClickHouseRow(createTestEvent({ durationMs: 4_294_967_295 })).duration_ms).toBe(4_294_967_295)
+    })
+
     it('ignores a non-numeric status', () => {
       expect(toClickHouseRow(createTestEvent({ status: 'ok' })).status).toBeNull()
     })

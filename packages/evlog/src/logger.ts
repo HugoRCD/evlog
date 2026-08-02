@@ -8,7 +8,7 @@ import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } f
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { globalConfig } from './shared/globalRegistry'
 import { EvlogError } from './error'
-import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
+import { colors, cssColors, detectEnvironment, elapsedMs, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
 
 const nativeStdoutWrite =
   typeof process !== 'undefined' && typeof process.stdout?.write === 'function'
@@ -942,7 +942,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         return null
       }
 
-      const durationMs = Date.now() - startTime
+      const durationMs = elapsedMs(startTime)
       const level: LogLevel = manualLevel ?? (hasError ? 'error' : hasWarn ? 'warn' : 'info')
 
       let forceKeep = false

@@ -1,5 +1,16 @@
 import type { EnvironmentContext, LogLevel } from './types'
 
+/**
+ * Milliseconds elapsed since `startTime`, never negative.
+ *
+ * `Date.now()` is wall-clock: an NTP step or a manual clock change during a
+ * request can move it backwards. Clamping keeps the duration a valid
+ * non-negative measurement rather than leaking a negative number to drains.
+ */
+export function elapsedMs(startTime: number): number {
+  return Math.max(0, Date.now() - startTime)
+}
+
 export function formatDuration(ms: number): string {
   if (ms < 1000) {
     return `${Math.round(ms)}ms`

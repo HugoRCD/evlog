@@ -11,7 +11,7 @@ import { extendDeferredDrain } from '../nitro/deferred-drain'
 import { normalizeRedactConfig } from '../redact'
 import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shared/nitroConfigBridge'
 import type { EnrichContext, RequestLogger, TailSamplingContext, WideEvent } from '../types'
-import { filterSafeHeaders } from '../utils'
+import { elapsedMs, filterSafeHeaders } from '../utils'
 
 // Nitro v3 doesn't fully export hook types yet
 // https://github.com/nitrojs/nitro/blob/8882bc9e1dbf2d342e73097f22a2156f70f50575/src/types/runtime/nitro.ts#L48-L53
@@ -249,7 +249,7 @@ export default definePlugin(async (nitroApp) => {
       log.set({ status: responseStatus })
 
       const startTime = ctx._evlogStartTime as number | undefined
-      const durationMs = startTime ? Date.now() - startTime : undefined
+      const durationMs = startTime ? elapsedMs(startTime) : undefined
 
       const { pathname } = parseURL(event.req.url)
 
@@ -302,7 +302,7 @@ export default definePlugin(async (nitroApp) => {
 
       const { pathname } = parseURL(e.req.url)
       const startTime = ctx._evlogStartTime as number | undefined
-      const durationMs = startTime ? Date.now() - startTime : undefined
+      const durationMs = startTime ? elapsedMs(startTime) : undefined
 
       const tailCtx: TailSamplingContext = {
         status: errorStatus,

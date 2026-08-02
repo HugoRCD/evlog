@@ -12,4 +12,6 @@ The ClickHouse adapter's default `toClickHouseRow()` maps it to a new `duration_
 ALTER TABLE evlog_events ADD COLUMN duration_ms Nullable(UInt32) AFTER duration;
 ```
 
+Durations are measured with a clamped elapsed helper, so a backward wall-clock step (NTP, manual change) during a request can no longer surface a negative `durationMs`, `duration`, or tail-sampling duration.
+
 `BaseWideEvent` now declares both fields, so `event.durationMs` is typed `number | undefined` in enrichers and drains. Code that read `event.duration` as a number was already wrong at runtime and will now fail to type-check — switch it to `event.durationMs`.

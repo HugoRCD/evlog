@@ -66,6 +66,19 @@ function readString(event: WideEvent, key: string): string | undefined {
   return typeof value === 'string' ? value : undefined
 }
 
+const UINT32_MAX = 4_294_967_295
+
+/**
+ * Coerce a value to what `Nullable(UInt32)` accepts, or `null`.
+ *
+ * ClickHouse rejects the whole `JSONEachRow` batch on an out-of-range value, so
+ * one odd event would drop every event sent with it.
+ */
+function readUInt32(value: unknown): number | null {
+  if (typeof value !== 'number' || !Number.isInteger(value)) return null
+  return value >= 0 && value <= UINT32_MAX ? value : null
+}
+
 /**
  * Convert an ISO timestamp to ClickHouse's `DateTime64(3)` text format
  * (`YYYY-MM-DD HH:MM:SS.mmm`, UTC).
@@ -100,7 +113,7 @@ export function toClickHouseRow(event: WideEvent): Record<string, unknown> {
     path: readString(event, 'path') ?? '',
     status: typeof status === 'number' ? status : null,
     duration: readString(event, 'duration') ?? '',
-    duration_ms: typeof durationMs === 'number' ? durationMs : null,
+    duration_ms: readUInt32(durationMs),
     error_name: typeof errorRecord?.name === 'string' ? errorRecord.name : '',
     error_message: typeof errorRecord?.message === 'string' ? errorRecord.message : '',
     data: JSON.stringify(event),
