@@ -1,6 +1,6 @@
 # Adapter Source Template
 
-Complete TypeScript template for `packages/evlog/src/adapters/{name}.ts` using the public toolkit primitives `defineHttpDrain` + `resolveAdapterConfig`.
+Complete TypeScript template for `packages/evlog/src/adapters/{name}.ts` using the public toolkit primitives `defineHttpDrain` + `resolveAdapterConfig`. Modeled on the most recent adapters (`loki.ts`, `clickhouse.ts`).
 
 Replace `{Name}`, `{name}`, and `{NAME}` with the actual service name.
 
@@ -8,10 +8,12 @@ Replace `{Name}`, `{name}`, and `{NAME}` with the actual service name.
 import type { WideEvent } from '../types'
 import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
-import { defineHttpDrain } from '../shared/drain'
+import type { HttpDrainRequest } from '../shared/drain'
+import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 
 // --- 1. Config Interface -------------------------------------------------
-// Service-specific fields. Standard names: apiKey, endpoint, serviceName, timeout.
+// Service-specific fields. Standard names: apiKey, endpoint, serviceName,
+// timeout, retries.
 
 export interface {Name}Config {
   /** {Name} API key */
@@ -20,20 +22,23 @@ export interface {Name}Config {
   endpoint?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
+  /** Number of retry attempts on transient failures. Default: 2 */
+  retries?: number
   // Add service-specific fields here (dataset, project, region, etc.)
 }
 
-// Field manifest — drives both resolveAdapterConfig and runtime-config-aware
-// drain initialization.
-const FIELDS: ConfigField<{Name}Config>[] = [
+// Field manifest — drives resolveAdapterConfig (overrides → runtimeConfig.evlog.{name}
+// → runtimeConfig.{name} → env). NUXT_-prefixed keys first for silent Nuxt compat.
+const {NAME}_FIELDS: ConfigField<{Name}Config>[] = [
   { key: 'apiKey', env: ['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'] },
   { key: 'endpoint', env: ['NUXT_{NAME}_ENDPOINT', '{NAME}_ENDPOINT'] },
   { key: 'timeout' },
+  { key: 'retries' },
 ]
 
 // --- 2. Event Transformation (optional) ----------------------------------
-// If the service needs a specific shape, expose a converter so it's testable
-// independently. Otherwise pass `events` straight through in `encode`.
+// If the service needs a specific shape, export a converter so it's testable
+// independently. Otherwise pass `events` straight through in the encoder.
 
 export interface {Name}Event {
   timestamp: string
@@ -47,9 +52,13 @@ export function to{Name}Event(event: WideEvent): {Name}Event {
   return { timestamp, level, data: rest }
 }
 
-// --- 3. Encode helper (pure, easy to test) -------------------------------
-function build{Name}Payload(events: WideEvent[], config: {Name}Config) {
-  const endpoint = (config.endpoint ?? 'https://api.{name}.com').replace(/\/$/, '')
+// --- 3. Encoder (private, shared by drain and direct-send helpers) --------
+// Everything the request needs, no I/O. This single function is what keeps
+// createXDrain() and sendBatchToX() in lockstep — encode parity is pinned by
+// test/adapters/encode-parity.test.ts.
+
+function encode{Name}Request(events: WideEvent[], config: {Name}Config): HttpDrainRequest {
+  const endpoint = (config.endpoint ?? 'https://api.{name}.com').replace(/\/+$/, '')
   return {
     url: `${endpoint}/v1/ingest`,
     headers: {
@@ -60,40 +69,9 @@ function build{Name}Payload(events: WideEvent[], config: {Name}Config) {
   }
 }
 
-// --- 4. Direct send helpers ----------------------------------------------
-// Exported for direct use and testability.
-
-/** Send a single event to {Name}. */
-export async function sendTo{Name}(event: WideEvent, config: {Name}Config): Promise<void> {
-  await sendBatchTo{Name}([event], config)
-}
-
-/** Send a batch of events to {Name}. */
-export async function sendBatchTo{Name}(
-  events: WideEvent[],
-  config: {Name}Config,
-): Promise<void> {
-  if (events.length === 0) return
-
-  const { url, headers, body } = build{Name}Payload(events, config)
-  const controller = new AbortController()
-  const timeoutId = setTimeout(() => controller.abort(), config.timeout ?? 5000)
-
-  try {
-    const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal })
-    if (!response.ok) {
-      const text = await response.text().catch(() => 'Unknown error')
-      const safe = text.length > 200 ? `${text.slice(0, 200)}...[truncated]` : text
-      throw new Error(`{Name} API error: ${response.status} ${response.statusText} - ${safe}`)
-    }
-  } finally {
-    clearTimeout(timeoutId)
-  }
-}
-
-// --- 5. Factory built on `defineHttpDrain` ------------------------------
+// --- 4. Factory built on `defineHttpDrain` ------------------------------
 /**
- * Create a drain function for sending logs to {Name}.
+ * Create a drain that sends wide events to [{Name}](https://{name}.com/docs).
  *
  * Configuration priority (highest to lowest):
  * 1. Overrides passed to create{Name}Drain()
@@ -106,33 +84,59 @@ export async function sendBatchTo{Name}(
  * import { create{Name}Drain } from 'evlog/{name}'
  *
  * // Zero config — set {NAME}_API_KEY env var
- * defineEvlog({ drain: create{Name}Drain() })
+ * initLogger({ drain: create{Name}Drain() })
  *
  * // With overrides
- * defineEvlog({ drain: create{Name}Drain({ apiKey: 'my-key' }) })
+ * initLogger({ drain: create{Name}Drain({ apiKey: 'my-key' }) })
  * ```
  */
 export function create{Name}Drain(overrides?: Partial<{Name}Config>) {
   return defineHttpDrain<{Name}Config>({
     name: '{name}',
-    timeout: overrides?.timeout,
+    label: '{Name}',
     resolve: async () => {
-      const config = await resolveAdapterConfig<{Name}Config>('{name}', FIELDS, overrides)
+      const config = await resolveAdapterConfig<{Name}Config>('{name}', {NAME}_FIELDS, overrides)
       if (!config.apiKey) {
-        console.error(`[evlog/{name}] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'])} env var or pass to create{Name}Drain()`)
+        console.error(`[evlog/{name}] Missing apiKey. Set ${formatPublicEnvKeys(['NUXT_{NAME}_API_KEY', '{NAME}_API_KEY'])} env var or pass apiKey to create{Name}Drain()`)
         return null
       }
       return config as {Name}Config
     },
-    encode: (events, config) => build{Name}Payload(events, config),
+    encode: encode{Name}Request,
+  })
+}
+
+// --- 5. Direct send helpers ----------------------------------------------
+// Same encoder, same transport wrapper — never a separate fetch path.
+
+/** Send a single wide event to {Name}. */
+export async function sendTo{Name}(event: WideEvent, config: {Name}Config): Promise<void> {
+  await sendBatchTo{Name}([event], config)
+}
+
+/** Send a batch of wide events to {Name} in one request. */
+export async function sendBatchTo{Name}(events: WideEvent[], config: {Name}Config): Promise<void> {
+  if (events.length === 0) return
+  await sendEncodedDrainRequest(encode{Name}Request(events, config), {
+    label: '{Name}',
+    source: '{name}',
+    timeout: config.timeout,
+    retries: config.retries,
   })
 }
 ```
 
+## What `defineHttpDrain` / `sendEncodedDrainRequest` handle for you
+
+- Normalizing `DrainContext | DrainContext[]` and early-return on empty batches
+- Skipping silently when `resolve()` returns `null`
+- Transport via `httpPost` (`../shared/http`): timeout (default 5000ms), retries (default 2), evlog identity headers (`User-Agent: evlog/x.y.z`, `X-Evlog-Source`)
+- Error logging (`[evlog/{name}] Failed to send events:`) that never throws into the request pipeline
+
 ## Customization Notes
 
-- **Auth style**: Some services use `Authorization: Bearer`, others use a custom header like `X-API-Key`. Adjust `headers` in `build{Name}Payload`.
-- **Payload format**: Some services accept raw JSON arrays (Axiom), others need a wrapper object (PostHog `{ api_key, batch }`), others need a protocol-specific structure (OTLP). Adapt `build{Name}Payload`.
-- **Event transformation**: If the service expects a specific schema, implement `to{Name}Event()`. If it accepts arbitrary JSON, send `events` directly.
-- **Custom transport**: If the service truly cannot fit `defineHttpDrain` (e.g. binary envelopes, gRPC), fall back to `defineDrain` from `../shared/drain` and call `httpPost` (from `../shared/http`) explicitly.
-- **Deprecated aliases**: When renaming a config field (e.g. `token` → `apiKey`), keep both as `ConfigField` entries and fall through in `resolve()`. See `axiom.ts` and `better-stack.ts` for the pattern.
+- **Auth style**: Some services use `Authorization: Bearer`, others a custom header (`X-API-Key`, ClickHouse's `X-ClickHouse-User`/`X-ClickHouse-Key`) or HTTP Basic (Loki + Grafana Cloud). Adjust `encode{Name}Request` — and prefer headers over query params so credentials never land in server-side query logs.
+- **Payload format**: Raw JSON arrays (Axiom), wrapper objects (PostHog `{ api_key, batch }`), protocol structures (OTLP), NDJSON-style bodies (ClickHouse `JSONEachRow`). Adapt the encoder; export intermediate builders (`build{Name}Payload`) when the transformation is non-trivial.
+- **Non-HTTP transport**: If the service cannot fit `defineHttpDrain`, use `defineDrain<TConfig>({ name, resolve, send })` — see `fs.ts` and `memory.ts`.
+- **Deprecated aliases**: When renaming a config field (e.g. `token` → `apiKey`), keep both as `ConfigField` entries and map via `applyDeprecatedAlias(config, { adapter, from, to })` from `../shared/config`. See `axiom.ts` and `better-stack.ts`.
+- **Edge safety**: no `Buffer` (use `TextEncoder` + `btoa` for Basic auth — see `toBasicCredentials` in `loki.ts`), no Node-only imports. If a runtime genuinely can't be supported, return `null` from `resolve()` with a one-time warning (see `isEdgeRuntime()` in `fs.ts`).

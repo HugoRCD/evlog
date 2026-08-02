@@ -4,7 +4,7 @@ description: Analyze application logs from the .evlog/logs/ directory. Use when 
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.1"
+  version: "0.2"
 ---
 
 # Analyze application logs
@@ -43,6 +43,10 @@ apps/*/.evlog/logs/*.jsonl
 ```
 
 Files are named by date: `2026-03-14.jsonl`. Start with the most recent file.
+
+**Programmatic reading**: instead of hand-parsing, a small script can use the readers shipped with evlog — `readFsLogs()` and `tailFsLogs()` from `evlog/fs` are async generators that handle both formats, date ordering, and filtering. Prefer them when the project already has evlog installed and the analysis needs more than a quick grep.
+
+**Memory drain alternative**: some apps use the Memory adapter (`evlog/memory`) instead of (or alongside) the FS drain, exposing recent events through a dev-only HTTP endpoint via `readMemoryLogs()`. If `.evlog/logs/` is empty but the app wires `createMemoryDrain()`, query that endpoint instead.
 
 ## If no logs are found
 
