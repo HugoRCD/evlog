@@ -11,7 +11,23 @@ export function parseRange(value: unknown): StatsRange {
 
 /** Cutoff `Date` for a given range, e.g. `7d` → 7*24h ago from `now`. */
 export function rangeToCutoff(range: StatsRange, now = Date.now()): Date {
-  return new Date(now - RANGE_TO_HOURS[range] * 60 * 60 * 1000)
+  return new Date(now - rangeDurationMs(range))
+}
+
+/** Wall-clock length of a range in milliseconds. */
+export function rangeDurationMs(range: StatsRange): number {
+  return RANGE_TO_HOURS[range] * 60 * 60 * 1000
+}
+
+/**
+ * The window of equal length immediately before the current one — the
+ * baseline every KPI delta is measured against. Half-open (`[from, to)`) so a
+ * run sitting exactly on the boundary is counted in the current window only,
+ * never in both.
+ */
+export function previousWindow(range: StatsRange, now = Date.now()): { from: Date, to: Date } {
+  const to = rangeToCutoff(range, now)
+  return { from: new Date(to.getTime() - rangeDurationMs(range)), to }
 }
 
 /** Parse an optional non-empty string query param. */
@@ -44,11 +60,15 @@ export function parsePage(value: unknown): number {
   return Number.isFinite(n) && n >= 1 ? Math.floor(n) : 1
 }
 
-/** Shared `range`/`tool`/`environment` filter parsing for `runs.get.ts` and `stats.get.ts`. */
+/** Shared `range`/`tool`/`environment`/`source` filter parsing for `runs.get.ts` and `stats.get.ts`. */
 export function parseRunsFilter(query: Record<string, unknown>): RunsFilter {
+  const source = parseOptionalString(query.source)
   return {
     range: parseRange(query.range),
     tool: parseOptionalString(query.tool),
     environment: parseOptionalString(query.environment),
+    // An unparseable token degrades to "no source filter" rather than erroring —
+    // a stale or hand-edited link still opens on a usable dashboard.
+    source: source ? parseSourceToken(source) : undefined,
   }
 }

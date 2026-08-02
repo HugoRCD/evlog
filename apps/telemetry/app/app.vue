@@ -16,7 +16,7 @@ useHead({
 
 useSeoMeta({
   title: 'evlog telemetry',
-  description: 'A self-hostable analytics dashboard for evlog CLI telemetry: run totals, success/error rates, environments, top commands, and a raw events browser.',
+  description: 'A self-hostable analytics dashboard for evlog telemetry: run totals from CLIs, CI pipelines and agents, success/error rates, latency, version adoption, and a raw events browser.',
   ogTitle: 'evlog telemetry',
   ogDescription: 'A self-hostable analytics dashboard for evlog CLI telemetry: run totals, success/error rates, environments, top commands, and a raw events browser.',
   ogImage: '/og.png',

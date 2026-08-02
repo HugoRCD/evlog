@@ -10,7 +10,7 @@ const MAX_ITEMS = 8
 
 const visible = computed(() => props.runs.slice(0, MAX_ITEMS))
 
-// Rows that arrived on the latest poll flash then fade (`.live-flash`).
+// Rows that arrived on the latest poll flash then fade (`.live-flash-fresh`).
 const { isFresh } = useFreshIds(visible)
 
 // Ticks with each poll (visible changes) — good enough resolution for a feed.
@@ -25,29 +25,24 @@ function timeAgo(iso: string) {
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4', body: 'p-0 sm:p-0' }">
-    <template #header>
-      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <GlassIconTile icon="i-nucleo-bolt" />
-        Live feed
-      </h3>
-    </template>
-
-    <div v-if="visible.length === 0" class="py-6 text-center text-sm text-muted">
-      Waiting for events…
-    </div>
+  <PanelCard title="Live feed" subtitle="Newest runs as they land" flush>
+    <EmptyState
+      v-if="visible.length === 0"
+      message="Waiting for events…"
+      hint="New runs appear here the moment they're ingested."
+    />
 
     <TransitionGroup
       v-else
       tag="div"
       name="feed"
-      class="relative flex flex-col divide-y divide-default/60"
+      class="relative flex flex-col"
     >
       <button
         v-for="run in visible"
         :key="run.id"
         type="button"
-        class="flex w-full items-center gap-2.5 px-4 py-2 text-left text-sm transition-colors duration-150 hover:bg-elevated/50"
+        class="flex w-full items-center gap-2.5 px-4 py-[7px] text-left transition-colors duration-[--duration-fast] hover:bg-elevated/60"
         :class="{ 'live-flash-fresh': isFresh(run.id) }"
         @click="emit('rowClick', run)"
       >
@@ -55,11 +50,11 @@ function timeAgo(iso: string) {
           class="size-1.5 shrink-0 rounded-full"
           :class="run.outcome === 'success' ? 'bg-success' : 'bg-error'"
         />
-        <code class="min-w-0 flex-1 truncate text-xs text-highlighted">{{ run.command }}</code>
-        <span class="hidden shrink-0 text-[10px] uppercase tracking-wide text-dimmed sm:inline">{{ run.environment }}</span>
-        <span class="shrink-0 text-xs text-muted tabular-nums">{{ run.durationMs }}ms</span>
-        <span class="w-8 shrink-0 text-right text-xs text-dimmed tabular-nums">{{ timeAgo(run.timestamp) }}</span>
+        <span class="min-w-0 flex-1 truncate font-mono text-xs text-toned">{{ run.command }}</span>
+        <span class="hidden shrink-0 text-[11px] text-dimmed sm:inline">{{ run.environment }}</span>
+        <span class="shrink-0 text-[11px] text-dimmed tabular-nums">{{ formatDuration(run.durationMs) }}</span>
+        <span class="w-7 shrink-0 text-right text-[11px] text-dimmed tabular-nums">{{ timeAgo(run.timestamp) }}</span>
       </button>
     </TransitionGroup>
-  </UCard>
+  </PanelCard>
 </template>

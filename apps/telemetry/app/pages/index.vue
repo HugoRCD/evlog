@@ -14,6 +14,15 @@ const VALID_RANGES: StatsRange[] = ['24h', '7d', '30d']
 const VALID_SORTS: RunSortKey[] = ['timestamp', 'tool', 'command', 'environment', 'outcome', 'durationMs', 'machineId']
 const PAGE_SIZE = 25
 
+type Tab = 'overview' | 'performance' | 'adoption' | 'explorer'
+
+const TABS: { value: Tab, label: string, icon: string }[] = [
+  { value: 'overview', label: 'Overview', icon: 'i-nucleo-gauge' },
+  { value: 'performance', label: 'Performance', icon: 'i-nucleo-dial' },
+  { value: 'adoption', label: 'Adoption', icon: 'i-nucleo-rocket' },
+  { value: 'explorer', label: 'Explorer', icon: 'i-nucleo-layers' },
+]
+
 function queryString(key: string): string | undefined {
   const value = route.query[key]
   return typeof value === 'string' ? value : undefined
@@ -26,9 +35,13 @@ function queryNumber(key: string, fallback: number): number {
 
 // All filter/sort/pagination/detail state lives in the URL — shareable links,
 // working back/forward, and a reload always reproduces the same view.
+const tab = ref<Tab>(TABS.some(t => t.value === queryString('tab')) ? queryString('tab') as Tab : 'overview')
 const range = ref<StatsRange>((VALID_RANGES as string[]).includes(queryString('range') ?? '') ? queryString('range') as StatsRange : '7d')
 const tool = ref(queryString('tool') ?? ALL)
 const environment = ref(queryString('environment') ?? ALL)
+// Held as its URL token rather than a `SourceRef`, so the select, the URL and
+// the card's selected state all compare with `===`.
+const source = ref(queryString('source') ?? ALL)
 const sort = ref<RunSortKey>((VALID_SORTS as string[]).includes(queryString('sort') ?? '') ? queryString('sort') as RunSortKey : 'timestamp')
 const order = ref<SortOrder>(queryString('order') === 'asc' ? 'asc' : 'desc')
 const page = ref(queryNumber('page', 1))
@@ -36,9 +49,11 @@ const selectedRunId = ref<number | null>(queryNumber('run', 0) || null)
 
 const urlQuery = computed(() => {
   const query: Record<string, string> = {}
+  if (tab.value !== 'overview') query.tab = tab.value
   if (range.value !== '7d') query.range = range.value
   if (tool.value !== ALL) query.tool = tool.value
   if (environment.value !== ALL) query.environment = environment.value
+  if (source.value !== ALL) query.source = source.value
   if (sort.value !== 'timestamp') query.sort = sort.value
   if (order.value !== 'desc') query.order = order.value
   if (page.value !== 1) query.page = String(page.value)
@@ -49,7 +64,7 @@ const urlQuery = computed(() => {
 watch(urlQuery, query => router.replace({ query }), { flush: 'post' })
 
 // Any filter/sort change invalidates the current page — jump back to page 1.
-watch([range, tool, environment, sort, order], () => {
+watch([range, tool, environment, source, sort, order], () => {
   page.value = 1
 })
 
@@ -59,6 +74,7 @@ const hasActiveFilters = computed(() =>
   range.value !== '7d'
   || tool.value !== ALL
   || environment.value !== ALL
+  || source.value !== ALL
   || sort.value !== 'timestamp'
   || order.value !== 'desc',
 )
@@ -68,6 +84,7 @@ function resetFilters() {
   range.value = '7d'
   tool.value = ALL
   environment.value = ALL
+  source.value = ALL
   sort.value = 'timestamp'
   order.value = 'desc'
 }
@@ -82,6 +99,7 @@ const statsQuery = computed(() => ({
   range: range.value,
   tool: tool.value === ALL ? undefined : tool.value,
   environment: environment.value === ALL ? undefined : environment.value,
+  source: source.value === ALL ? undefined : source.value,
 }))
 
 const statsAsync = useFetch<StatsResponse>(
@@ -93,16 +111,37 @@ const runsQuery = computed(() => ({
   range: range.value,
   tool: tool.value === ALL ? undefined : tool.value,
   environment: environment.value === ALL ? undefined : environment.value,
+  source: source.value === ALL ? undefined : source.value,
   sort: sort.value,
   order: order.value,
   page: page.value,
   pageSize: PAGE_SIZE,
 }))
 
+// The runs page and the adoption aggregates are the two most expensive reads
+// in the app and each backs a single tab, so they're only fetched while that
+// tab is on screen. `immediate` follows the tab the page *loads* on, so a
+// deep link to `?tab=explorer` still server-renders with its data.
+const explorerActive = computed(() => tab.value === 'explorer')
+const adoptionActive = computed(() => tab.value === 'adoption')
+
 const runsAsync = useFetch<RunsResponse>(
   '/api/telemetry/runs',
-  { query: runsQuery, watch: [runsQuery] },
+  { query: runsQuery, watch: false, immediate: explorerActive.value },
 )
+
+const adoptionAsync = useFetch<AdoptionResponse>(
+  '/api/telemetry/adoption',
+  { query: statsQuery, watch: false, immediate: adoptionActive.value },
+)
+
+watch([explorerActive, runsQuery], () => {
+  if (explorerActive.value) runsAsync.refresh()
+})
+
+watch([adoptionActive, statsQuery], () => {
+  if (adoptionActive.value) adoptionAsync.refresh()
+})
 
 // Dedicated newest-first page for the live feed — independent from the main
 // table's sort/pagination so sorting by duration doesn't scramble the ticker.
@@ -112,6 +151,7 @@ const feedQuery = computed(() => ({
   range: range.value,
   tool: tool.value === ALL ? undefined : tool.value,
   environment: environment.value === ALL ? undefined : environment.value,
+  source: source.value === ALL ? undefined : source.value,
   sort: 'timestamp',
   order: 'desc',
   page: 1,
@@ -124,33 +164,110 @@ const feedAsync = useFetch<RunsResponse>(
   { query: feedQuery, watch: [feedQuery] },
 )
 
-// The three fetches above are deliberately started before this line and
-// awaited together: `await useFetch(...)` three times in a row would only
-// begin each request once the previous had come back, serialising three
-// database round trips into the server-rendered response.
-await Promise.all([statsAsync, runsAsync, feedAsync])
+// The fetches above are deliberately started before this line and awaited
+// together: `await useFetch(...)` several times in a row would only begin
+// each request once the previous had come back, serialising the database
+// round trips into the server-rendered response. The tab-scoped ones resolve
+// immediately when their tab isn't the one being loaded.
+await Promise.all([statsAsync, runsAsync, feedAsync, adoptionAsync])
 
 const { data: stats, error: statsError, refresh: refreshStats } = statsAsync
 const { data: runsData, error: runsError, status: runsStatus, refresh: refreshRuns } = runsAsync
 const { data: feedData, error: feedError, refresh: refreshFeed } = feedAsync
+const { data: adoption, status: adoptionStatus, refresh: refreshAdoption } = adoptionAsync
 
 const runs = computed(() => runsData.value?.runs ?? [])
 const runsTotal = computed(() => runsData.value?.total ?? 0)
 const feedRuns = computed(() => feedData.value?.runs ?? [])
 
-const toolOptions = computed(() => [
-  { label: 'All tools', value: ALL },
-  ...(stats.value?.tools.map(t => ({ label: t.tool, value: t.tool })) ?? []),
-])
+/**
+ * Filter options are read off the stats response, which is itself filtered —
+ * so the moment you pick a source, that response contains only that source and
+ * the list collapses to the one value you already chose. There is then no way
+ * back to the others without clearing the filter first.
+ *
+ * Each list is therefore remembered from the last response where its own
+ * dimension was unconstrained. Picking a tool still narrows environments and
+ * sources (those are genuinely the ones left), but never narrows the list you
+ * are choosing from.
+ */
+function useUnfilteredSlice<T>(
+  dimension: keyof AppliedFilter,
+  read: (response: StatsResponse) => T[],
+) {
+  const remembered = ref<T[]>([]) as Ref<T[]>
+
+  watchEffect(() => {
+    const response = stats.value
+    if (!response) return
+
+    // The test is on the *response's* filter, not on the current one. Clearing
+    // a filter updates the ref immediately while `data` still holds the
+    // previous, filtered response — reading that would repopulate the panel
+    // with the narrowed distribution, then correct itself when the real
+    // response lands. That double update is exactly the flicker you get on
+    // deselect.
+    const applied = response.filter[dimension] !== undefined
+
+    // Seeding on the first response matters for deep links: arriving on
+    // `?source=agent:cursor` means the dimension is never unconstrained, so
+    // without this the panel would open empty and stay that way.
+    if (!applied || remembered.value.length === 0) {
+      remembered.value = read(response)
+    }
+  })
+
+  return remembered
+}
+
+/**
+ * The Sources and Environments panels read from these rather than from the
+ * live response, for the same reason and one more: filtering to a source makes
+ * the response contain only that source, so the panel would collapse from
+ * eight rows to one. Everything below it jumps up and the scroll position goes
+ * with it.
+ *
+ * Showing the full distribution also makes the panel a better control — you
+ * can pivot straight from one source to another instead of having to clear the
+ * filter to see what the others were.
+ */
+const unfilteredSources = useUnfilteredSlice('source', s => s.sources)
+const unfilteredEnvironments = useUnfilteredSlice('environment', s => s.environments)
+const allTools = useUnfilteredSlice('tool', s => s.tools.map(t => ({ label: t.tool, value: t.tool })))
+
+const toolOptions = computed(() => [{ label: 'All tools', value: ALL }, ...allTools.value])
 const environmentOptions = computed(() => [
   { label: 'All environments', value: ALL },
-  ...(stats.value?.environments.map(e => ({ label: e.environment, value: e.environment })) ?? []),
+  ...unfilteredEnvironments.value.map(e => ({ label: e.environment, value: e.environment })),
 ])
+const sourceOptions = computed(() => [
+  { label: 'All sources', value: ALL },
+  ...unfilteredSources.value.map(item => ({
+    label: sourceLabel(item),
+    value: sourceToken(item),
+    icon: sourceIcon(item),
+  })),
+])
+
+/** The active source as a `SourceRef`, for `SourcesCard`'s selected row. */
+const activeSource = computed(() => (source.value === ALL ? undefined : parseSourceToken(source.value)))
+
+function onSourceSelect(next: SourceRef | undefined) {
+  source.value = next ? sourceToken(next) : ALL
+}
+
+/** Applies a value picked from a run's right-click menu to the page filters. */
+function onRowFilter({ field, value }: { field: 'tool' | 'environment', value: string }) {
+  if (field === 'tool') tool.value = value
+  else environment.value = value
+}
 
 function onSortChange({ sort: nextSort, order: nextOrder }: { sort: RunSortKey, order: SortOrder }) {
   sort.value = nextSort
   order.value = nextOrder
 }
+
+const paletteOpen = ref(false)
 
 const detailOpen = ref(false)
 const runDetail = ref<RunDetail | null>(null)
@@ -182,10 +299,28 @@ if (selectedRunId.value) {
 }
 
 const totals = computed(() => stats.value?.totals ?? { total: 0, success: 0, errors: 0, machines: 0, avgDurationMs: 0 })
+const previous = computed(() => stats.value?.previous ?? { total: 0, success: 0, errors: 0, machines: 0, avgDurationMs: 0, p95DurationMs: 0 })
+const timeline = computed(() => stats.value?.timeline ?? [])
+const granularity = computed(() => stats.value?.granularity ?? 'day')
 
-const successRate = computed(() => totals.value.total > 0 ? Math.round((totals.value.success / totals.value.total) * 100) : 0)
-const errorRate = computed(() => totals.value.total > 0 ? Math.round((totals.value.errors / totals.value.total) * 100) : 0)
+const successRate = computed(() => Math.round(percentageOf(totals.value.success, totals.value.total)))
+const errorRate = computed(() => Math.round(percentageOf(totals.value.errors, totals.value.total)))
 const p95DurationMs = computed(() => stats.value?.durations.p95 ?? 0)
+
+// Success/error rates are already percentages, so their cards move in
+// percentage *points* — a jump from 2% to 4% is "+2pt", not "+100%".
+const previousSuccessRate = computed(() => percentageOf(previous.value.success, previous.value.total))
+const previousErrorRate = computed(() => percentageOf(previous.value.errors, previous.value.total))
+
+/** Per-bucket series behind each KPI card's sparkline, all read off the one timeline. */
+const series = computed(() => ({
+  runs: timeline.value.map(point => point.success + point.errors),
+  successRate: timeline.value.map(point => percentageOf(point.success, point.success + point.errors)),
+  errorRate: timeline.value.map(point => percentageOf(point.errors, point.success + point.errors)),
+  machines: timeline.value.map(point => point.machines),
+  avgDuration: timeline.value.map(point => point.avgDurationMs),
+  p95Duration: timeline.value.map(point => point.p95DurationMs),
+}))
 
 // Live refresh, in two tiers.
 //
@@ -225,7 +360,13 @@ const { active: liveActive, lastError: liveError, toggle: toggleLive } = useLive
     lastCursorId = cursor.latestId
 
     const pending: Promise<unknown>[] = []
-    if (changed) pending.push(refreshRuns(), refreshFeed())
+    if (changed) {
+      pending.push(refreshFeed())
+      // Both are tab-scoped — refreshing a tab nobody is looking at would pay
+      // for its queries and throw the result away.
+      if (explorerActive.value) pending.push(refreshRuns())
+      if (adoptionActive.value) pending.push(refreshAdoption())
+    }
     if (changed || Date.now() - lastStatsAt >= STATS_HEARTBEAT_MS) pending.push(refreshStats())
     if (pending.length === 0) return
 
@@ -244,104 +385,284 @@ async function onLogout() {
 </script>
 
 <template>
-  <div class="mx-auto flex w-full max-w-[1600px] flex-col gap-6 px-4 py-6 sm:px-8 lg:px-12 lg:py-8">
-    <div class="flex flex-wrap items-center justify-between gap-4">
-      <h1 class="flex items-center gap-2">
-        <span class="relative flex items-center gap-0.5">
-          <span class="font-pixel text-3xl font-normal">evlog</span>
-          <span class="text-primary text-3xl">.</span>
-          <span aria-hidden="true" class="absolute inset-0 flex items-center gap-0.5 blur-xs animate-pulse motion-reduce:animate-none">
-            <span class="font-pixel text-3xl font-normal">evlog</span>
-            <span class="text-primary text-3xl">.</span>
-          </span>
+  <div class="mx-auto flex w-full max-w-[1440px] flex-col px-4 pb-16 sm:px-6 lg:px-8">
+    <header class="flex flex-wrap items-center justify-between gap-3 py-4">
+      <h1 class="flex items-center gap-2.5">
+        <span class="flex items-baseline gap-0.5">
+          <span class="font-pixel text-lg font-normal leading-none text-highlighted">evlog</span>
+          <span class="text-lg leading-none text-primary">.</span>
         </span>
-        <span aria-hidden="true" class="mx-1.5 h-7 w-px bg-border" />
-        <span class="font-pixel text-[10px] uppercase tracking-widest text-muted">telemetry</span>
+        <span aria-hidden="true" class="h-3.5 w-px bg-accented" />
+        <span class="text-[13px] text-muted">Telemetry</span>
       </h1>
 
-      <div class="flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-1.5">
         <LiveIndicator :live="liveActive" :has-error="!!liveError" :last-event-at="stats?.lastEventAt ?? null" @toggle="toggleLive" />
-        <USelect v-model="range" :items="rangeOptions" value-key="value" class="w-40" />
-        <USelect v-model="tool" :items="toolOptions" value-key="value" class="w-40" />
-        <USelect v-model="environment" :items="environmentOptions" value-key="value" class="w-44" />
-        <UButton v-if="hasActiveFilters" variant="ghost" color="neutral" icon="i-nucleo-refresh" @click="resetFilters">
-          Reset filters
+        <UButton
+          variant="outline"
+          color="neutral"
+          size="sm"
+          class="h-8 gap-2 text-muted"
+          @click="paletteOpen = true"
+        >
+          Search
+          <span class="flex items-center gap-0.5">
+            <UKbd value="meta" size="sm" />
+            <UKbd value="K" size="sm" />
+          </span>
         </UButton>
         <McpConnectButton />
-        <UColorModeButton />
-        <UButton v-if="authRequired" variant="ghost" color="neutral" icon="i-nucleo-log-out" @click="onLogout">
+        <UColorModeButton size="sm" class="h-8" />
+        <UButton
+          v-if="authRequired"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          icon="i-nucleo-log-out"
+          @click="onLogout"
+        >
           Sign out
         </UButton>
+      </div>
+    </header>
+
+    <div class="divider-y sticky top-0 z-10 -mx-4 flex flex-wrap items-center justify-between gap-3 bg-default/80 px-4 py-2 backdrop-blur-md sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+      <UTabs
+        v-model="tab"
+        :items="TABS"
+        :content="false"
+        activation-mode="manual"
+        color="neutral"
+        variant="link"
+        :ui="{ list: 'border-b-0', trigger: 'text-[13px]' }"
+      />
+
+      <div class="flex flex-wrap items-center gap-1.5">
+        <USelect
+          v-model="range"
+          :items="rangeOptions"
+          value-key="value"
+          size="sm"
+          variant="ghost"
+          class="w-32"
+        />
+        <USelect
+          v-model="tool"
+          :items="toolOptions"
+          value-key="value"
+          size="sm"
+          variant="ghost"
+          class="w-32"
+        />
+        <USelect
+          v-model="environment"
+          :items="environmentOptions"
+          value-key="value"
+          size="sm"
+          variant="ghost"
+          class="w-36"
+        />
+        <USelect
+          v-model="source"
+          :items="sourceOptions"
+          value-key="value"
+          size="sm"
+          variant="ghost"
+          class="w-36"
+        />
+        <UButton
+          v-if="hasActiveFilters"
+          variant="ghost"
+          color="neutral"
+          size="sm"
+          icon="i-nucleo-refresh"
+          aria-label="Reset filters"
+          @click="resetFilters"
+        />
       </div>
     </div>
 
     <div
       v-if="stats?.mock"
-      class="flex items-center gap-2 border-l-2 border-amber-500/40 bg-elevated/30 px-3 py-2 text-xs text-muted"
+      class="surface-raised mt-4 flex items-center gap-2 rounded-[--radius-lg] bg-muted px-3 py-2 text-xs text-muted"
     >
-      <UIcon name="i-nucleo-ufo" class="size-3.5 shrink-0 text-amber-500/60" />
+      <UIcon name="i-nucleo-ufo" class="size-3.5 shrink-0 text-dimmed" />
       <p>
-        Showing sample data — no runs recorded yet, these are generated events so you can explore the dashboard. It'll switch to real events automatically once the CLI starts posting.
+        Sample data — nothing has been ingested yet, so these are generated events. It switches to real ones the moment your first tool posts.
       </p>
     </div>
 
-    <div class="stagger-item grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
-      <StatCard label="Total runs" :value="totals.total" icon="i-nucleo-code-editor" />
-      <StatCard label="Success rate" :value="successRate" suffix="%" icon="i-nucleo-clipboard-check" />
-      <StatCard label="Error rate" :value="errorRate" suffix="%" icon="i-nucleo-triangle-warning" />
-      <StatCard label="Unique machines" :value="totals.machines" icon="i-nucleo-laptop-mobile" />
-      <StatCard label="Avg duration" :value="totals.avgDurationMs" suffix="ms" icon="i-nucleo-dial" />
-      <StatCard label="p95 duration" :value="p95DurationMs" suffix="ms" icon="i-nucleo-gauge" />
+    <div class="flex flex-col gap-4 pt-4">
+
+      <template v-if="tab === 'overview'">
+        <div class="stagger-item grid grid-cols-2 gap-4 sm:grid-cols-3 xl:grid-cols-6">
+          <StatCard
+            label="Total runs"
+            :value="totals.total"
+            icon="i-nucleo-code-editor"
+            :delta="relativeDelta(totals.total, previous.total)"
+            :series="series.runs"
+          />
+          <StatCard
+            label="Success rate"
+            :value="successRate"
+            suffix="%"
+            icon="i-nucleo-clipboard-check"
+            :delta="pointDelta(successRate, previousSuccessRate)"
+            delta-unit="points"
+            :series="series.successRate"
+          />
+          <StatCard
+            label="Error rate"
+            :value="errorRate"
+            suffix="%"
+            icon="i-nucleo-triangle-warning"
+            :delta="pointDelta(errorRate, previousErrorRate)"
+            delta-unit="points"
+            lower-is-better
+            :series="series.errorRate"
+          />
+          <StatCard
+            label="Unique machines"
+            :value="totals.machines"
+            icon="i-nucleo-laptop-mobile"
+            :delta="relativeDelta(totals.machines, previous.machines)"
+            :series="series.machines"
+          />
+          <StatCard
+            label="Avg duration"
+            :value="totals.avgDurationMs"
+            suffix="ms"
+            icon="i-nucleo-dial"
+            :delta="relativeDelta(totals.avgDurationMs, previous.avgDurationMs)"
+            lower-is-better
+            :series="series.avgDuration"
+          />
+          <StatCard
+            label="p95 duration"
+            :value="p95DurationMs"
+            suffix="ms"
+            icon="i-nucleo-gauge"
+            :delta="relativeDelta(p95DurationMs, previous.p95DurationMs)"
+            lower-is-better
+            :series="series.p95Duration"
+          />
+        </div>
+
+        <div class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div class="flex flex-col gap-4 lg:col-span-2">
+            <ActivityChart :timeline :granularity :previous-runs="stats?.previousRuns ?? []" />
+            <SourcesCard :sources="unfilteredSources" :active="activeSource" @select="onSourceSelect" />
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <LiveFeed :runs="feedRuns" @row-click="run => openRunDetail(run.id)" />
+            <EnvironmentBreakdown :environments="unfilteredEnvironments" />
+          </div>
+        </div>
+      </template>
+
+      <template v-else-if="tab === 'performance'">
+        <div class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div class="flex flex-col gap-4 lg:col-span-2">
+            <LatencyChart :timeline :granularity />
+            <ErrorRateChart :timeline :granularity />
+            <CommandsTable :commands="stats?.commands ?? []" />
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <DurationHistogram :durations="stats?.durations ?? { p50: 0, p95: 0, histogram: [] }" />
+            <ErrorCodesCard :error-codes="stats?.errorCodes ?? []" />
+          </div>
+        </div>
+      </template>
+
+      <template v-else-if="tab === 'adoption'">
+        <div v-if="adoptionStatus === 'pending' && !adoption" class="py-16 text-center text-sm text-muted">
+          Loading adoption data…
+        </div>
+
+        <!--
+          Two columns that flow independently rather than three rows of
+          equal-height cells. The charts on the left and the breakdown lists on
+          the right have wildly different natural heights, so a row-based grid
+          left a tall void under whichever side finished first.
+        -->
+        <div v-else class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
+          <div class="flex flex-col gap-4 lg:col-span-2">
+            <VersionAdoptionChart
+              :versions="adoption?.versions ?? []"
+              :points="adoption?.versionAdoption ?? []"
+              :granularity="adoption?.granularity ?? granularity"
+            />
+            <MachinesChart :machines="adoption?.machines ?? []" :granularity="adoption?.granularity ?? granularity" />
+            <ActivityPunchcard :cells="adoption?.punchcard ?? []" />
+          </div>
+
+          <div class="flex flex-col gap-4">
+            <VersionsCard
+              :node-versions="stats?.nodeVersions ?? []"
+              :tool-versions="stats?.toolVersions ?? []"
+              :os="stats?.os ?? []"
+            />
+            <FieldsCard
+              title="Flags"
+              subtitle="Flags reported with each run, and how often each value failed"
+              :fields="adoption?.flags ?? []"
+              empty-label="No flags in this range."
+            />
+            <FieldsCard
+              title="Custom fields"
+              subtitle="Values your tools set via telemetry.set(), and how often each one failed"
+              :fields="adoption?.custom ?? []"
+              empty-label="No custom fields in this range."
+            />
+          </div>
+        </div>
+      </template>
+
+      <template v-else>
+        <div class="stagger-item flex flex-col gap-4">
+          <RunsTable
+            :runs
+            :loading="runsStatus === 'pending'"
+            :sort
+            :order
+            @sort-change="onSortChange"
+            @row-click="run => openRunDetail(run.id)"
+            @filter="onRowFilter"
+          />
+          <UPagination
+            v-if="runsTotal > PAGE_SIZE"
+            v-model:page="page"
+            :total="runsTotal"
+            :items-per-page="PAGE_SIZE"
+            class="self-center"
+          />
+        </div>
+      </template>
+
     </div>
 
-    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-      <div class="lg:col-span-2">
-        <DailyActivityChart :daily="stats?.daily ?? []" :hourly="stats?.hourly ?? []" />
-      </div>
-      <LiveFeed :runs="feedRuns" @row-click="run => openRunDetail(run.id)" />
-    </div>
-
-    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-      <AgentsBreakdown :agents="stats?.agents ?? []" />
-      <EnvironmentBreakdown :environments="stats?.environments ?? []" />
-      <CiBreakdown :ci="stats?.ci ?? { ci: 0, local: 0, providers: [] }" />
-    </div>
-
-    <div class="stagger-item grid grid-cols-1 items-start gap-6 lg:grid-cols-3">
-      <div class="flex flex-col gap-6 lg:col-span-2">
-        <DurationHistogram :durations="stats?.durations ?? { p50: 0, p95: 0, histogram: [] }" />
-        <CommandsTable :commands="stats?.commands ?? []" />
-      </div>
-      <div class="flex flex-col gap-6">
-        <ErrorCodesCard :error-codes="stats?.errorCodes ?? []" />
-        <VersionsCard
-          :node-versions="stats?.nodeVersions ?? []"
-          :tool-versions="stats?.toolVersions ?? []"
-          :os="stats?.os ?? []"
-        />
-      </div>
-    </div>
-
-    <div class="stagger-item flex flex-col gap-4">
-      <RunsTable
-        :runs
-        :loading="runsStatus === 'pending'"
-        :sort
-        :order
-        @sort-change="onSortChange"
-        @row-click="run => openRunDetail(run.id)"
-      />
-      <UPagination
-        v-if="runsTotal > PAGE_SIZE"
-        v-model:page="page"
-        :total="runsTotal"
-        :items-per-page="PAGE_SIZE"
-        class="self-center"
-      />
-    </div>
+    <CommandPalette
+      v-model:open="paletteOpen"
+      :tabs="TABS"
+      :ranges="rangeOptions"
+      :tools="toolOptions"
+      :environments="environmentOptions"
+      :sources="sourceOptions"
+      :current="{ tab, range, tool, environment, source }"
+      @update:tab="tab = $event as Tab"
+      @update:range="range = $event as StatsRange"
+      @update:tool="tool = $event"
+      @update:environment="environment = $event"
+      @update:source="source = $event"
+      @reset="resetFilters"
+    />
 
     <USlideover
       v-model:open="detailOpen"
+      inset
       title="Run detail"
       :description="runDetail ? `${runDetail.tool} · ${runDetail.command}` : undefined"
       @update:open="(open: boolean) => { if (!open) closeRunDetail() }"

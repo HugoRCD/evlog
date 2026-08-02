@@ -1,3 +1,4 @@
+import type { PgColumn } from 'drizzle-orm/pg-core'
 import { and, asc, avg, count, countDistinct, desc, eq, isNotNull, sql } from 'drizzle-orm'
 
 /** Drivers return `timestamptz` from raw `sql` fragments as strings or Dates — normalize to ISO. */
@@ -5,6 +6,36 @@ function toIsoTimestamp(value: string | Date | null | undefined): string | null 
   if (value === null || value === undefined) return null
   const date = value instanceof Date ? value : new Date(value)
   return Number.isNaN(date.getTime()) ? null : date.toISOString()
+}
+
+/** `date_trunc` unit for a granularity — a literal from a closed set, never user input. */
+function truncUnit(granularity: TimelineGranularity) {
+  return sql.raw(`'${granularity}'`)
+}
+
+/**
+ * `classifySource()` expressed in SQL — the two must agree, or the mock
+ * dataset and the real one would disagree about what a source is.
+ */
+const SOURCE_KIND_EXPR = sql<SourceKind>`case
+  when ${schema.runs.envCi} then 'ci'
+  when ${schema.runs.envAgent} is not null then 'agent'
+  when ${schema.runs.envTty} then 'terminal'
+  else 'automation'
+end`
+
+const SOURCE_ID_EXPR = sql<string>`case
+  when ${schema.runs.envCi} then coalesce(nullif(trim(${schema.runs.envProvider}), ''), ${UNKNOWN_PROVIDER})
+  when ${schema.runs.envAgent} is not null then ${schema.runs.envAgent}
+  when ${schema.runs.envTty} then 'terminal'
+  else 'automation'
+end`
+
+/** Bucket key expression matching {@link timelineBucketKey}'s output, so SQL rows merge into the pre-filled timeline. */
+function bucketExpr(granularity: TimelineGranularity) {
+  return granularity === 'hour'
+    ? sql<string>`to_char(date_trunc('hour', ${schema.runs.eventTimestamp}), 'YYYY-MM-DD"T"HH24:00')`
+    : sql<string>`to_char(date_trunc('day', ${schema.runs.eventTimestamp}), 'YYYY-MM-DD')`
 }
 
 /**
@@ -18,9 +49,13 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
   }
 
   const where = buildRunsWhere(filter)
+  const granularity = timelineGranularity(filter.range)
+  const bucket = bucketExpr(granularity)
   const successCount = sql<number>`count(*) filter (where ${schema.runs.outcome} = 'success')`
   const errorCount = sql<number>`count(*) filter (where ${schema.runs.outcome} = 'error')`
   const runCount = sql<number>`count(*)`
+  const avgDuration = sql<number>`coalesce(${avg(schema.runs.durationMs)}, 0)`
+  const p95Duration = sql<number>`coalesce(percentile_cont(0.95) within group (order by ${schema.runs.durationMs}), 0)`
   // Thresholds shared with the mock dataset and the dashboard histogram —
   // `width_bucket` maps a duration to 0..N matching `DURATION_BUCKETS` indices.
   // Bounds are compile-time constants (never user input), inlined because
@@ -30,17 +65,27 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
   const bucketIndex = sql<number>`width_bucket(${schema.runs.durationMs}, ${sql.raw(`array[${bucketBounds.join(', ')}]`)})`
   const nodeMajorExpr = sql<string>`regexp_replace(split_part(${schema.runs.envNode}, '.', 1), '^v', '')`
 
-  const [totals, environments, tools, commands, daily, hourly, agents, ciTotals, providers, nodeVersions, toolVersions, osBreakdown, errorCodes, histogram] = await Promise.all([
+  const [totals, previous, environments, tools, commands, timeline, previousTimeline, sources, nodeVersions, toolVersions, osBreakdown, errorCodes, histogram] = await Promise.all([
     db.select({
       total: runCount,
       success: successCount,
       errors: errorCount,
       machines: countDistinct(schema.runs.machineId),
-      avgDurationMs: sql<number>`coalesce(${avg(schema.runs.durationMs)}, 0)`,
+      avgDurationMs: avgDuration,
       p50: sql<number>`coalesce(percentile_cont(0.5) within group (order by ${schema.runs.durationMs}), 0)`,
-      p95: sql<number>`coalesce(percentile_cont(0.95) within group (order by ${schema.runs.durationMs}), 0)`,
+      p95: p95Duration,
       lastEventAt: sql<string | null>`max(${schema.runs.eventTimestamp})`,
     }).from(schema.runs).where(where),
+
+    // Same shape one window back — the baseline for the KPI cards' deltas.
+    db.select({
+      total: runCount,
+      success: successCount,
+      errors: errorCount,
+      machines: countDistinct(schema.runs.machineId),
+      avgDurationMs: avgDuration,
+      p95DurationMs: p95Duration,
+    }).from(schema.runs).where(buildPreviousRunsWhere(filter)),
 
     db.select({ environment: schema.runs.environment, count: runCount })
       .from(schema.runs).where(where)
@@ -56,50 +101,38 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
       command: schema.runs.command,
       count: runCount,
       success: successCount,
-      avgDurationMs: sql<number>`coalesce(${avg(schema.runs.durationMs)}, 0)`,
+      avgDurationMs: avgDuration,
+      p95DurationMs: p95Duration,
     })
       .from(schema.runs).where(where)
       .groupBy(schema.runs.command)
       .orderBy(desc(runCount))
       .limit(10),
 
+    // One grouped pass backs both the activity chart and every KPI sparkline —
+    // the alternative is a separate per-bucket query per trended metric.
     db.select({
-      day: sql<string>`to_char(date_trunc('day', ${schema.runs.eventTimestamp}), 'YYYY-MM-DD')`,
+      bucket,
       success: successCount,
       errors: errorCount,
+      machines: countDistinct(schema.runs.machineId),
+      avgDurationMs: avgDuration,
+      p95DurationMs: p95Duration,
     })
       .from(schema.runs).where(where)
       .groupBy(sql`1`)
       .orderBy(sql`1 asc`),
 
-    // Hourly resolution only makes sense on the 24h view — skip the query otherwise.
-    filter.range === '24h'
-      ? db.select({
-        hour: sql<string>`to_char(date_trunc('hour', ${schema.runs.eventTimestamp}), 'YYYY-MM-DD"T"HH24:00')`,
-        success: successCount,
-        errors: errorCount,
-      })
-        .from(schema.runs).where(where)
-        .groupBy(sql`1`)
-        .orderBy(sql`1 asc`)
-      : Promise.resolve([]),
+    // Same buckets, one window back — drives the activity chart's ghost line.
+    db.select({ bucket, count: runCount })
+      .from(schema.runs).where(buildPreviousRunsWhere(filter))
+      .groupBy(sql`1`)
+      .orderBy(sql`1 asc`),
 
-    db.select({ agent: schema.runs.envAgent, count: runCount })
+    db.select({ kind: SOURCE_KIND_EXPR, id: SOURCE_ID_EXPR, count: runCount })
       .from(schema.runs).where(where)
-      .groupBy(schema.runs.envAgent)
+      .groupBy(sql`1, 2`)
       .orderBy(desc(runCount)),
-
-    db.select({
-      ci: sql<number>`count(*) filter (where ${schema.runs.envCi})`,
-      local: sql<number>`count(*) filter (where not ${schema.runs.envCi})`,
-    }).from(schema.runs).where(where),
-
-    db.select({ provider: schema.runs.envProvider, count: runCount })
-      .from(schema.runs)
-      .where(and(where, isNotNull(schema.runs.envProvider)))
-      .groupBy(schema.runs.envProvider)
-      .orderBy(desc(runCount))
-      .limit(8),
 
     db.select({ version: nodeMajorExpr, count: runCount })
       .from(schema.runs).where(where)
@@ -143,12 +176,22 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
 
   return {
     range: filter.range,
+    filter: describeFilter(filter),
+    granularity,
     totals: {
       total: Number(totals[0]?.total ?? 0),
       success: Number(totals[0]?.success ?? 0),
       errors: Number(totals[0]?.errors ?? 0),
       machines: Number(totals[0]?.machines ?? 0),
       avgDurationMs: Math.round(Number(totals[0]?.avgDurationMs ?? 0)),
+    },
+    previous: {
+      total: Number(previous[0]?.total ?? 0),
+      success: Number(previous[0]?.success ?? 0),
+      errors: Number(previous[0]?.errors ?? 0),
+      machines: Number(previous[0]?.machines ?? 0),
+      avgDurationMs: Math.round(Number(previous[0]?.avgDurationMs ?? 0)),
+      p95DurationMs: Math.round(Number(previous[0]?.p95DurationMs ?? 0)),
     },
     environments: environments.map(r => ({ environment: r.environment, count: Number(r.count) })),
     tools: tools.map(r => ({ tool: r.tool, count: Number(r.count) })),
@@ -157,25 +200,28 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
       count: Number(r.count),
       successRate: Number(r.count) > 0 ? Number(r.success) / Number(r.count) : 0,
       avgDurationMs: Math.round(Number(r.avgDurationMs)),
+      p95DurationMs: Math.round(Number(r.p95DurationMs)),
     })),
-    // Pre-fill every day/hour bucket in the range so the chart always plots a
-    // full, fixed-width timeline instead of shrinking to whichever days have events.
-    daily: fillDailyActivity(
-      dailyBucketKeys(dailyBucketCount(filter.range)),
-      daily.map(r => ({ day: r.day, success: Number(r.success), errors: Number(r.errors) })),
+    // Pre-fill every bucket in the range so the chart always plots a full,
+    // fixed-width timeline instead of shrinking to whichever buckets have events.
+    timeline: fillTimeline(
+      timelineBucketKeys(filter.range),
+      timeline.map(r => ({
+        bucket: r.bucket,
+        success: Number(r.success),
+        errors: Number(r.errors),
+        machines: Number(r.machines),
+        avgDurationMs: Math.round(Number(r.avgDurationMs)),
+        p95DurationMs: Math.round(Number(r.p95DurationMs)),
+      })),
+      emptyActivityPoint,
     ),
-    hourly: filter.range === '24h'
-      ? fillHourlyActivity(
-        hourlyBucketKeys(24),
-        hourly.map(r => ({ hour: r.hour, success: Number(r.success), errors: Number(r.errors) })),
-      )
-      : [],
-    agents: agents.map(r => ({ agent: r.agent, count: Number(r.count) })),
-    ci: {
-      ci: Number(ciTotals[0]?.ci ?? 0),
-      local: Number(ciTotals[0]?.local ?? 0),
-      providers: providers.map(r => ({ provider: r.provider!, count: Number(r.count) })),
-    },
+    previousRuns: fillTimeline(
+      previousTimelineBucketKeys(filter.range),
+      previousTimeline.map(r => ({ bucket: r.bucket, count: Number(r.count) })),
+      bucketKey => ({ bucket: bucketKey, count: 0 }),
+    ).map(point => point.count),
+    sources: sources.map(r => ({ kind: r.kind, id: r.id, count: Number(r.count) })),
     nodeVersions: nodeVersions.map(r => ({ version: r.version, count: Number(r.count) })),
     toolVersions: toolVersions.map(r => ({ version: r.version, count: Number(r.count) })),
     os: osBreakdown.map(r => ({ os: r.os, count: Number(r.count) })),
@@ -190,6 +236,121 @@ export async function getStatsForFilter(filter: RunsFilter): Promise<StatsRespon
       histogram: histogramCounts,
     },
     lastEventAt: toIsoTimestamp(totals[0]?.lastEventAt),
+    mock: false,
+  }
+}
+
+/** Echoes a filter back on the response, so a client can tell which one produced it. */
+function describeFilter(filter: RunsFilter): AppliedFilter {
+  return {
+    tool: filter.tool,
+    environment: filter.environment,
+    source: filter.source ? sourceToken(filter.source) : undefined,
+  }
+}
+
+/** Rows pulled per jsonb field breakdown before the top keys/values are picked in JS. */
+const FIELD_ROW_LIMIT = 200
+
+/**
+ * Adoption aggregates: version rollout over time, new vs returning machines,
+ * the weekday/hour punchcard, and the `flags`/`custom` jsonb breakdowns —
+ * mock-mode aware. Shared by `GET /api/telemetry/adoption` and the
+ * `telemetry-adoption` MCP tool.
+ *
+ * Kept out of {@link getStatsForFilter} because the two jsonb scans and the
+ * first-seen join are the most expensive queries in the app, and only one tab
+ * ever looks at them.
+ */
+export async function getAdoptionForFilter(filter: RunsFilter): Promise<AdoptionResponse> {
+  if (await shouldUseMockData()) {
+    return computeMockAdoption(filter)
+  }
+
+  const where = buildRunsWhere(filter)
+  const granularity = timelineGranularity(filter.range)
+  const bucket = bucketExpr(granularity)
+  const unit = truncUnit(granularity)
+  const runCount = sql<number>`count(*)`
+  const errorCount = sql<number>`count(*) filter (where ${schema.runs.outcome} = 'error')`
+
+  /**
+   * A machine counts as new the first time it is *ever* seen — so first-seen
+   * is computed over the whole table, unfiltered, and joined back in. Scoping
+   * it to the current window would label every machine as new on the oldest
+   * bucket of every range.
+   */
+  const firstSeen = db.$with('first_seen').as(
+    db.select({
+      machineId: schema.runs.machineId,
+      firstAt: sql<string>`min(${schema.runs.eventTimestamp})`.as('first_at'),
+    })
+      .from(schema.runs)
+      .where(isNotNull(schema.runs.machineId))
+      .groupBy(schema.runs.machineId),
+  )
+
+  /** `flags` and `custom` are `jsonb` objects — expand them to key/value rows and tally per pair. */
+  const fieldBreakdown = (column: PgColumn) =>
+    db.select({
+      key: sql<string>`kv.key`,
+      value: sql<string>`kv.value`,
+      count: runCount,
+      errors: errorCount,
+    })
+      .from(schema.runs)
+      .crossJoinLateral(sql`jsonb_each_text(${column}) as kv`)
+      .where(where)
+      .groupBy(sql`1, 2`)
+      .orderBy(desc(runCount))
+      .limit(FIELD_ROW_LIMIT)
+
+  const [versionRows, machineRows, punchcard, flagRows, customRows] = await Promise.all([
+    db.select({ bucket, version: schema.runs.toolVersion, count: runCount })
+      .from(schema.runs).where(where)
+      .groupBy(sql`1, 2`),
+
+    db.with(firstSeen).select({
+      bucket,
+      active: countDistinct(schema.runs.machineId),
+      new: sql<number>`count(distinct ${schema.runs.machineId}) filter (where date_trunc(${unit}, ${firstSeen.firstAt}) = date_trunc(${unit}, ${schema.runs.eventTimestamp}))`,
+    })
+      .from(schema.runs)
+      .innerJoin(firstSeen, eq(firstSeen.machineId, schema.runs.machineId))
+      .where(where)
+      .groupBy(sql`1`),
+
+    db.select({
+      weekday: sql<number>`extract(isodow from ${schema.runs.eventTimestamp})::int`,
+      hour: sql<number>`extract(hour from ${schema.runs.eventTimestamp})::int`,
+      count: runCount,
+    })
+      .from(schema.runs).where(where)
+      .groupBy(sql`1, 2`),
+
+    fieldBreakdown(schema.runs.flags),
+    fieldBreakdown(schema.runs.custom),
+  ])
+
+  const keys = timelineBucketKeys(filter.range)
+  const { versions, points } = toVersionAdoption(
+    versionRows.map(r => ({ bucket: r.bucket, version: r.version, count: Number(r.count) })),
+    keys,
+  )
+
+  return {
+    range: filter.range,
+    granularity,
+    versions,
+    versionAdoption: points,
+    machines: fillTimeline(
+      keys,
+      machineRows.map(r => ({ bucket: r.bucket, active: Number(r.active), new: Number(r.new) })),
+      bucketKey => ({ bucket: bucketKey, active: 0, new: 0 }),
+    ),
+    punchcard: punchcard.map(r => ({ weekday: Number(r.weekday), hour: Number(r.hour), count: Number(r.count) })),
+    flags: toFieldStats(flagRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) }))),
+    custom: toFieldStats(customRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) }))),
     mock: false,
   }
 }

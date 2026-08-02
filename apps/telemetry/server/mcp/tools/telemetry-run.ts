@@ -5,7 +5,7 @@ import { z } from 'zod'
  * `server/utils/telemetry-queries.ts`.
  */
 export default defineMcpTool({
-  description: 'Get the full detail of a single evlog CLI telemetry run by its numeric id — includes flags, custom fields, environment info (node version, CI provider, TTY, agent), and the idempotency key, on top of what the runs list already shows.',
+  description: 'Get the full detail of a single evlog telemetry run by its numeric id — includes flags, custom fields, environment info (node version, CI provider, TTY, agent), and the idempotency key, on top of what the runs list already shows.',
   annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
   inputSchema: {
     id: z.number().int().positive().describe('Numeric id of the run, as shown in the dashboard\'s raw events browser.'),

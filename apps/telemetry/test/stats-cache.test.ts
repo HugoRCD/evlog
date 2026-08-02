@@ -127,4 +127,25 @@ describe('getCachedStatsForFilter', () => {
     await getCachedStatsForFilter({ range: '7d', tool: 'tool-0' })
     expect(statsCalls).toBe(201)
   })
+
+  it('caches each source separately', async () => {
+    // Regression: `source` was added to the filter but not to the cache key, so
+    // every source was served the first one's numbers — indistinguishable from
+    // the filter silently doing nothing.
+    await getCachedStatsForFilter({ range: '7d', source: { kind: 'agent', id: 'claude-code' } })
+    await getCachedStatsForFilter({ range: '7d', source: { kind: 'ci', id: 'github_actions' } })
+    await getCachedStatsForFilter({ range: '7d', source: { kind: 'terminal', id: 'terminal' } })
+    await getCachedStatsForFilter({ range: '7d' })
+
+    expect(statsCalls).toBe(4)
+  })
+
+  it('keeps filters apart whose values would run together under a printable separator', async () => {
+    await getCachedStatsForFilter({ range: '7d', tool: 'a', environment: 'b c' })
+    await getCachedStatsForFilter({ range: '7d', tool: 'a b', environment: 'c' })
+
+    // Two distinct filters, so two distinct aggregations — one must never be
+    // served the other's numbers.
+    expect(statsCalls).toBe(2)
+  })
 })

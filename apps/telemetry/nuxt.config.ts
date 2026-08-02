@@ -23,7 +23,7 @@ export default defineNuxtConfig({
   // server/mcp/. Auth mirrors the dashboard's own password gate (server/mcp/index.ts).
   mcp: {
     name: 'evlog Telemetry',
-    description: 'Read-only access to evlog CLI telemetry: aggregate stats, the raw runs list, and full run detail.',
+    description: 'Read-only access to evlog telemetry: aggregate stats, the raw runs list, and full run detail.',
   },
 
   nitro: {
