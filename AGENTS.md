@@ -12,9 +12,10 @@ pnpm run build:package             # build the package
 pnpm run test                      # run tests (vitest)
 pnpm run lint                      # lint all packages
 pnpm run typecheck                 # type-check all packages
-pnpm run docs                      # start docs site (port 3000)
-cd packages/evlog && pnpm run release  # publish
+pnpm run docs                      # start docs site
 ```
+
+Publishing is automated: changesets + `.github/workflows/release.yml`. Never run `pnpm release` or `changeset publish` manually.
 
 > Use `corepack enable` once so the `packageManager` field in `package.json` pins the right pnpm version automatically.
 >
@@ -23,18 +24,25 @@ cd packages/evlog && pnpm run release  # publish
 ## Monorepo Structure
 
 ```
-apps/playground/           Dev environment for testing
-apps/docs/                 Docus documentation site
 packages/evlog/            Main package
   src/nuxt/                Nuxt module
-  src/nitro/               Nitro plugin (v2 + v3)
+  src/nitro/, src/nitro-v3/  Nitro plugin (v2 + v3)
   src/vite/                Vite plugin (evlog/vite)
   src/shared/              Toolkit — exposed as evlog/toolkit (NOT evlog/shared)
   src/ai/                  AI SDK integration (evlog/ai)
-  src/adapters/            Drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog)
+  src/adapters/            Drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, fs, memory)
   src/enrichers/           Built-in enrichers (UserAgent, Geo, RequestSize, TraceContext)
   src/runtime/             Runtime code (client/, server/, utils/)
+  src/<framework>/         One dir per framework integration (hono/, next/, sveltekit/, nestjs/, express/, fastify/, elysia/, orpc/, react-router/, workers/, eve/, better-auth/)
   test/                    Tests
+packages/cli/              @evlog/cli — log exploration CLI (`pnpm cli`)
+packages/nuxthub/          @evlog/nuxthub
+packages/telemetry/        @evlog/telemetry
+apps/playground/           Main dev environment (`pnpm dev`)
+apps/docs/                 Docus documentation site — has its own AGENTS.md
+apps/*                     Framework playgrounds (next, nitro, nitro-v2, nuxthub, lab, telemetry, ...) — `pnpm playground` to pick one
+examples/                  ~22 runnable examples, one per framework — includes the community-*-skeleton dirs used by the create-adapter/enricher/framework skills
+scripts/                   Repo tooling (run-app, cli-sandbox, release-notes)
 .agents/skills/            Internal skills for creating adapters, enrichers, and framework integrations
 ```
 
@@ -53,6 +61,16 @@ packages/evlog/            Main package
   - `.agents/skills/create-adapter/SKILL.md`
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
+- **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents — an adapter, enricher, integration, API surface, or workflow — update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
+
+### Code style — no slop
+
+- **No gratuitous defensive code.** Don't add try/catch, null checks, or input validation the surrounding file doesn't have — especially on paths already validated upstream. Match the file's level of paranoia.
+- **No silent fallbacks.** No empty `catch`, no `?? default` that masks a bug, no `as any` to silence TypeScript. If something can fail, let it fail loudly or handle it explicitly.
+- **Comments are rare and earn their place.** Only for constraints the code can't express (a protocol quirk, a deliberate perf trade-off). Never paraphrase the code, never narrate a change. When in doubt: no comment.
+- **This extends to all prose**: test names, error/log messages, changeset descriptions, PR bodies. Factual and plain — no emoji, no superlatives, no filler.
+- **No speculative code.** No unrequested options or parameters, no "just in case" branches, no keeping the old code path alongside the new one. Delete dead code; public API deprecations are a maintainer decision — ask first.
+- **Prefer deleting and simplifying over working around.** If the fix needs a workaround, question the design before adding the workaround.
 
 ### Changesets
 
@@ -63,7 +81,7 @@ packages/evlog/            Main package
 - **Bump type:** `patch` for fixes, `minor` for features, `major` for breaking changes.
 - **Description:** write from the consumer's perspective — what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
 
-A PR without a changeset for a user-facing change will not be merged. The `changeset` job in `.github/workflows/ci.yml` enforces this: it fails when a published package changed with no changeset in the PR. Changes confined to `apps/*` or `examples/*` — docs included — never trigger it. For the rare published-package change that genuinely needs no release note, add the `skip-changeset` label or run `pnpm changeset add --empty`.
+A PR without a changeset for a user-facing change will not be merged. Changes confined to `apps/*` or `examples/*` — docs included — never need one. For the rare published-package change that genuinely needs no release note, run `pnpm changeset add --empty`.
 
 ### Commits & PR titles
 
@@ -74,18 +92,9 @@ PR titles and commits follow [Conventional Commits](https://conventionalcommits.
 - **Use a scope only to point at one subsystem.** Adapters get their own scope (one per entrypoint, e.g. `axiom`, `datadog`, `fs`); framework integrations get the framework's name (`nuxt`, `next`, `hono`, ...); core internals (logger, pipeline, error, redact, catalog) go under `core`.
 - **When you add a new subsystem** (adapter, integration, top-level entrypoint), add its scope to **both** the workflow and the template in the same PR. Keep both lists alphabetically sorted.
 
-### Doc animation components (`apps/docs/app/components/content/`)
+### Docs app
 
-MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) follow a strict set of rules:
-
-- **Fixed outer size, always.** The component must occupy the same height and width from t=0 to the end of the loop. Layout below the animation must not shift while the user reads the page.
-- **Pre-allocate every slot.** Lines, rows, frames, buffer cells must all exist in the DOM from the start. Animate `opacity`, `color`, `transform` — never `max-height: 0 → N`, never conditional `v-if` on structural elements.
-- **Use `useTimedSequence`** from `~/composables/useTimedSequence` for the timeline. Honor `prefers-reduced-motion` by snapping to the final state.
-- **Wrap in `<Motion>` from `motion-v`** with `not-prose my-8` and an `IntersectionObserver` so the animation starts when scrolled into view.
-- **Header bar** with status pill + play/pause + restart buttons (mirror `DrainFanOut.vue`).
-- **Compact by default**: `text-[10px]` for body, `text-[9px]` for footers/labels, `leading-tight` or `leading-snug`, `py-1.5` / `py-2` headers/footers, `space-y-0.5` or none, `gap-1.5` or smaller. The doc page width (sidebar + TOC) is narrow; aim for a final height under ~280px.
-- Use `<div>` (not `<ol>/<li>`) for repeating slots — list elements collide with grid layout in Docus.
-- **No viewport-dependent layout shift.** Stick to a single column at any width or use `sm:` for the optional split — never `lg:` (the doc content area never reaches the `lg:` breakpoint).
+Working in `apps/docs/`? Read `apps/docs/AGENTS.md` first — it has the (strict) rules for MDC animation components.
 
 ## Testing
 
@@ -97,8 +106,10 @@ pnpm --filter evlog exec vitest run test/path/to/file  # single test file
 pnpm test:coverage                                     # with thresholds; :open for HTML
 pnpm api:snapshot                                      # diff public API surface; :update to accept
 pnpm mutate                                            # Stryker (slow; weekly cron in CI)
-pnpm test:e2e                                          # adapters vs real endpoints
+pnpm test:e2e                                          # adapters vs real endpoints (needs pnpm sandbox:up first — Docker Loki/ClickHouse; sandbox:down to clean up)
 ```
+
+> CI typecheck excludes `evlog-telemetry` (`--filter='!evlog-telemetry'`), so local `pnpm run typecheck` is stricter than CI — a local pass is the real bar.
 
 Rules:
 1. Every change has a matching test. Bug fixes require a *failing* regression test before the fix.
@@ -116,7 +127,8 @@ A task is complete when **all** of the following pass:
 4. New public APIs have JSDoc
 5. New exports are registered in `package.json#exports`, `package.json#typesVersions`, and `tsdown.config.ts`
 6. If adapter/enricher/integration: the matching `.agents/skills/create-*/SKILL.md` was followed
-7. A changeset is included for any user-facing change (`pnpm changeset`)
+7. Any skill (internal `.agents/skills/` or published `apps/docs/skills/`) documenting the changed behavior was updated in the same PR
+8. A changeset is included for any user-facing change (`pnpm changeset`)
 
 ## Boundaries
 
@@ -127,13 +139,14 @@ A task is complete when **all** of the following pass:
 - Add a changeset (`pnpm changeset`) for every user-facing change — features, bug fixes, breaking changes
 
 **Ask first:**
-- Adding new dependencies
+- Adding new dependencies — note `pnpm-workspace.yaml` sets `minimumReleaseAge: 2880`: a package published less than 48h ago fails to install unless added to `minimumReleaseAgeExclude`
 - Changing package exports or build config
 - Architectural decisions that affect multiple packages
 
 **Never:**
 - Commit secrets, `.env` files, or API keys
 - Skip tests or lint to "fix later"
+- Loosen an assertion, widen a type, or delete a test to make it pass — a failing test is a signal; fix the cause
 - Ship a feature, bug fix, or refactor without a matching test
 - Add HTML comments in Vue `<template>` blocks
 - Modify `node_modules/` or generated files
@@ -166,13 +179,13 @@ Default: anything that stays on the local clone is fine, anything that touches t
 - Unsure about architecture → read the relevant SKILL.md or ask
 - Unclear requirements → ask a clarifying question before making large speculative changes
 
-## Provide Feedback
+## Feedback & Self-Maintenance
 
-**You are expected to submit feedback.** Report DX friction, documentation gaps, or anything that made your task harder than it should be. When in doubt, report it — no feedback being submitted is itself a problem.
+**You are expected to submit feedback.** Report DX friction, documentation gaps, or anything that made your task harder than it should be — mid-work, not at the end. When in doubt, report it; no feedback being submitted is itself a problem.
 
-**Submit feedback mid-work.** Don't wait until the task is done or for the user to ask.
-
-**Update this file** when you encounter:
+**This file is living documentation — keep it true.** If you catch it contradicting the repo (a command that doesn't exist, a path that moved, a described workflow that isn't real), flag it immediately and propose the fix, even if it's unrelated to your task. Update it when you encounter:
 - A recurring mistake or easy-to-get-wrong pattern
 - Explicit guidance from the maintainer
 - A new convention that should be applied consistently
+
+Rules for updating: a correction is a few lines, not a rewrite — keep this file lean. App- or package-specific guidance goes in a nested `AGENTS.md` next to the code (see `apps/docs/AGENTS.md`), not here.
