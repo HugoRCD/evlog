@@ -1,8 +1,14 @@
 import { bench, describe } from 'vitest'
 import { createLogger, createRequestLogger } from '../../src/logger'
+import { enableDiagnosticsChannel } from '../../src/diagnostics'
+import { registerWideEventPublisher } from '../../src/shared/wideEventChannel'
 import { initSilentLogger, PAYLOADS } from './_fixtures'
 
 initSilentLogger()
+
+/** Registered once so the enabled/disabled benches differ only by the publish. */
+const disableChannel = await enableDiagnosticsChannel()
+disableChannel()
 
 describe('createLogger', () => {
   bench('no initial context', () => {
@@ -113,5 +119,22 @@ describe('log.set() payload sizes', () => {
     const log = createLogger()
     log.set(PAYLOADS.large)
     log.emit()
+  })
+})
+
+function emitOnce(): void {
+  const log = createRequestLogger({ method: 'POST', path: '/api/checkout' })
+  log.set({ user: { id: '123', plan: 'pro' } })
+  log.emit({ status: 200 })
+}
+
+describe('diagnostics channel', () => {
+  bench('emit — channel disabled', emitOnce, {
+    setup: () => void registerWideEventPublisher(null),
+  })
+
+  bench('emit — channel enabled, no subscriber', emitOnce, {
+    setup: async () => void await enableDiagnosticsChannel(),
+    teardown: () => void registerWideEventPublisher(null),
   })
 })

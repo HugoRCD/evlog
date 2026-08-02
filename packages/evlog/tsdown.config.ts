@@ -40,6 +40,7 @@ export default defineConfig({
     'adapters/memory': 'src/adapters/memory.ts',
     'enrichers': 'src/enrichers/index.ts',
     'pipeline': 'src/pipeline.ts',
+    'diagnostics': 'src/diagnostics.ts',
     'stream': 'src/stream.ts',
     'http': 'src/http.ts',
     'browser': 'src/browser.ts',

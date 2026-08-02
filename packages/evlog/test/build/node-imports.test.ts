@@ -52,8 +52,8 @@ function collectRelativeImports(entryPath: string): string[] {
 }
 
 function assertNoNodeBuiltins(source: string, label: string): void {
-  expect(source, label).not.toMatch(/import\s*\(\s*['"]node:(crypto|fs|path|module)['"]/)
-  expect(source, label).not.toMatch(/from\s+['"]node:(crypto|fs|path|module)['"]/)
+  expect(source, label).not.toMatch(/import\s*\(\s*['"]node:(crypto|fs|path|module|diagnostics_channel)['"]/)
+  expect(source, label).not.toMatch(/from\s+['"]node:(crypto|fs|path|module|diagnostics_channel)['"]/)
   expect(source, label).not.toContain('pretty-error-snippet.node')
 }
 
@@ -80,5 +80,15 @@ describe.skipIf(!distExists)('dist node built-in imports (#387)', () => {
 
   it('index entry does not pull pretty-error-snippet.node', () => {
     assertNoNodeBuiltins(readDist('index.mjs'), 'index.mjs')
+  })
+
+  it('the diagnostics channel stays out of the index graph', () => {
+    for (const chunk of collectRelativeImports('index.mjs')) {
+      assertNoNodeBuiltins(readDist(chunk), chunk)
+    }
+
+    const nodeChunk = listDistFiles().find(file => /^diagnostics-channel\.node-/.test(file))
+    expect(nodeChunk, 'expected a lazily-imported diagnostics-channel.node chunk').toBeDefined()
+    expect(readDist(nodeChunk!)).toMatch(/from\s+["']node:diagnostics_channel["']/)
   })
 })

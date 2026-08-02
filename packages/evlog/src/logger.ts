@@ -7,6 +7,7 @@ import { createPluginRunner, getEmptyPluginRunner } from './shared/plugin'
 import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } from './shared/pretty-error'
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { globalConfig } from './shared/globalRegistry'
+import { publishWideEvent } from './shared/wideEventChannel'
 import { EvlogError } from './error'
 import { colors, cssColors, detectEnvironment, elapsedMs, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
 
@@ -292,6 +293,8 @@ function emitWideEvent(
   }
 
   if (!deferDrain) {
+    publishWideEvent(formatted)
+
     const drainPromises: Array<Promise<unknown>> = []
     if (state.drain) {
       drainPromises.push(
