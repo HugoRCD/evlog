@@ -2,6 +2,7 @@ import type { DrainContext, EnrichContext, RedactConfig, RequestLogger, RouteCon
 import type { AuditableLogger } from '../audit'
 import { createRequestLogger, getGlobalDrain, getGlobalPluginRunner, isEnabled, markWideEventDrainStarted, shouldKeep } from '../logger'
 import { isGloballyRedacted, redactEvent, resolveRedactConfig } from '../redact'
+import { elapsedMs } from '../utils'
 import { extractErrorStatus } from './errors'
 import type { EvlogPlugin, PluginRunner } from './plugin'
 import { createPluginRunner, getEmptyPluginRunner } from './plugin'
@@ -293,7 +294,7 @@ export function createMiddlewareLogger(options: MiddlewareLoggerOptions): Middle
       requestLogger.set({ status })
     }
 
-    const durationMs = Date.now() - startTime
+    const durationMs = elapsedMs(startTime)
 
     const resolvedStatus = error
       ? extractErrorStatus(error)

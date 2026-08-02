@@ -445,6 +445,30 @@ describe('createRequestLogger', () => {
     })
   })
 
+  it('includes durationMs as a number alongside the formatted duration', async () => {
+    await withFakeTimers(() => {
+      const logger = createRequestLogger({})
+      vi.advanceTimersByTime(1500)
+      const event = logger.emit()
+
+      expect(event?.durationMs).toBe(1500)
+      expect(event?.duration).toBe('1.50s')
+    })
+  })
+
+  it('never reports a negative duration when the clock steps backwards', () => {
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValue(10_000)
+    const logger = createRequestLogger({})
+
+    // NTP step or manual clock change mid-request.
+    now.mockReturnValue(9_000)
+    const event = logger.emit()
+
+    expect(event?.durationMs).toBe(0)
+    expect(event?.duration).toBe('0ms')
+  })
+
   it('allows overrides on emit()', () => {
     const logger = createRequestLogger({})
     logger.set({ original: true })

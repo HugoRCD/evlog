@@ -638,6 +638,10 @@ export interface BaseWideEvent {
   version?: string
   commitHash?: string
   region?: string
+  /** Request duration, human-formatted (`"12ms"`, `"1.2s"`). Set by request loggers on emit. */
+  duration?: string
+  /** Request duration in milliseconds. Query this one — `duration` is for humans. */
+  durationMs?: number
   audit?: AuditFields
 }
 

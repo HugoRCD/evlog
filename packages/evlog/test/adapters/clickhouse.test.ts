@@ -58,6 +58,7 @@ describe('clickhouse adapter', () => {
         path: '/api/users',
         status: 200,
         duration: '12ms',
+        durationMs: 12,
       }))
       expect(row).toMatchObject({
         timestamp: '2024-01-01 12:00:00.000',
@@ -69,6 +70,7 @@ describe('clickhouse adapter', () => {
         path: '/api/users',
         status: 200,
         duration: '12ms',
+        duration_ms: 12,
       })
     })
 
@@ -92,6 +94,20 @@ describe('clickhouse adapter', () => {
       expect(row.method).toBe('')
       expect(row.error_name).toBe('')
       expect(row.status).toBeNull()
+      expect(row.duration_ms).toBeNull()
+    })
+
+    it('nulls a duration_ms that Nullable(UInt32) would reject', () => {
+      const event = createTestEvent()
+      for (const durationMs of [-1, 1.5, 4_294_967_296, Number.NaN, '12', null]) {
+        expect(
+          toClickHouseRow({ ...event, durationMs } as unknown as WideEvent).duration_ms,
+          String(durationMs),
+        ).toBeNull()
+      }
+
+      expect(toClickHouseRow(createTestEvent({ durationMs: 0 })).duration_ms).toBe(0)
+      expect(toClickHouseRow(createTestEvent({ durationMs: 4_294_967_295 })).duration_ms).toBe(4_294_967_295)
     })
 
     it('ignores a non-numeric status', () => {

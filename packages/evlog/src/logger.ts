@@ -8,7 +8,7 @@ import { buildErrorEntries, compactStackForStorage, PRETTY_ERROR_TREE_SPACER } f
 import { resolveDevTerminal } from './shared/dev-terminal'
 import { globalConfig } from './shared/globalRegistry'
 import { EvlogError } from './error'
-import { colors, cssColors, detectEnvironment, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
+import { colors, cssColors, detectEnvironment, elapsedMs, escapeFormatString, formatDuration, getConsoleMethod, getCssLevelColor, getLevelColor, isBrowser, isDev, isLevelEnabled, isoNow, matchesPattern } from './utils'
 
 const nativeStdoutWrite =
   typeof process !== 'undefined' && typeof process.stdout?.write === 'function'
@@ -641,6 +641,7 @@ function prettyPrintWideEvent(event: Record<string, unknown>): void {
     }
     delete rest.duration
   }
+  delete rest.durationMs
 
   writeLine(parts.join(''), ...styles)
 
@@ -941,7 +942,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
         return null
       }
 
-      const durationMs = Date.now() - startTime
+      const durationMs = elapsedMs(startTime)
       const level: LogLevel = manualLevel ?? (hasError ? 'error' : hasWarn ? 'warn' : 'info')
 
       let forceKeep = false
@@ -973,6 +974,7 @@ export function createLogger<T extends object = Record<string, unknown>>(initial
           if (key !== '_forceKeep') context[key] = obj[key]
         }
       }
+      context.durationMs = durationMs
       context.duration = formatDuration(durationMs)
 
       const wide = emitWideEvent(level, context, { deferDrain, ownsEvent: true, waitUntil })

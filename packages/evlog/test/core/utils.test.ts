@@ -1,6 +1,26 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { colors, formatDuration, getLevelColor, isBrowser, isClient, isDev, isLevelEnabled, isServer, isoNow, matchesPattern } from '../../src/utils'
+import { colors, elapsedMs, formatDuration, getLevelColor, isBrowser, isClient, isDev, isLevelEnabled, isServer, isoNow, matchesPattern } from '../../src/utils'
 import { shouldLog } from '../../src/shared/routes'
+
+describe('elapsedMs', () => {
+  afterEach(() => {
+    vi.restoreAllMocks()
+  })
+
+  it('measures elapsed milliseconds', () => {
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValue(5_000)
+
+    expect(elapsedMs(3_500)).toBe(1_500)
+  })
+
+  it('clamps a backward clock step to zero', () => {
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValue(1_000)
+
+    expect(elapsedMs(4_000)).toBe(0)
+  })
+})
 
 describe('formatDuration', () => {
   it('formats milliseconds for duration < 1s', () => {

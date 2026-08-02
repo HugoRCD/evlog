@@ -14,7 +14,7 @@ import { resolveEvlogConfigForNitroPlugin, setActiveNitroRuntime } from '../shar
 import { bindStreamingResponseLifecycle, shouldDeferEmitForResponse } from '../shared/streamResponse'
 import { startStreamServer, type StreamServerOptions } from '../stream'
 import type { RequestLogger, ServerEvent, TailSamplingContext } from '../types'
-import { filterSafeHeaders } from '../utils'
+import { elapsedMs, filterSafeHeaders } from '../utils'
 import { callEnrichAndDrain } from './enrich-drain'
 
 function getSafeHeaders(event: ServerEvent): Record<string, string> {
@@ -146,7 +146,7 @@ export default defineNitroPlugin(async (nitroApp) => {
       requestLog.set({ status: errorStatus })
 
       const startTime = e.context._evlogStartTime as number | undefined
-      const durationMs = startTime ? Date.now() - startTime : undefined
+      const durationMs = startTime ? elapsedMs(startTime) : undefined
 
       const tailCtx: TailSamplingContext = {
         status: errorStatus,
@@ -185,7 +185,7 @@ export default defineNitroPlugin(async (nitroApp) => {
       requestLog.set({ status })
 
       const startTime = e.context._evlogStartTime as number | undefined
-      const durationMs = startTime ? Date.now() - startTime : undefined
+      const durationMs = startTime ? elapsedMs(startTime) : undefined
 
       const tailCtx: TailSamplingContext = {
         status,

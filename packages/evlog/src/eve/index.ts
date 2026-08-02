@@ -107,6 +107,7 @@ const TURN_ONLY_KEYS = new Set([
   'path',
   'status',
   'duration',
+  'durationMs',
   'level',
   'error',
   'agent',
