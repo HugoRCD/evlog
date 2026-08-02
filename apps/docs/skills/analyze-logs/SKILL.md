@@ -4,7 +4,7 @@ description: Analyze application logs from the .evlog/logs/ directory. Use when 
 license: MIT
 metadata:
   author: HugoRCD
-  version: "0.2"
+  version: "0.3"
 ---
 
 # Analyze application logs
@@ -52,7 +52,14 @@ Files are named by date: `2026-03-14.jsonl`. Start with the most recent file.
 
 Before wiring a new drain, you can try `npx @evlog/cli doctor --json` — it checks whether `evlog` is installed and whether a local `.evlog/logs` sink already exists (read-only). Optional; skip if the CLI is unavailable.
 
-The file system drain may not be enabled. Guide the user to set it up:
+The file system drain may not be enabled. On Nuxt, Nitro, Next.js, or TanStack Start, the fastest path is the CLI — it detects the framework and wires the fs drain (its default dev sink) in one pass:
+
+```bash
+npx @evlog/cli init --dry-run --yes   # preview first
+npx @evlog/cli init --yes --drain fs  # apply
+```
+
+Ask before running it. On other frameworks (or if the user declines), guide the manual setup:
 
 ```typescript
 import { createFsDrain } from 'evlog/fs'

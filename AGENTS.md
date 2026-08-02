@@ -61,6 +61,7 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes)
   - `.agents/skills/create-adapter/SKILL.md`
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
+  - `.agents/skills/create-map-rule/SKILL.md` (also covers new `evlog map` framework adapters)
 - **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents — an adapter, enricher, integration, API surface, or workflow — update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
 
 ### Code style — no slop
