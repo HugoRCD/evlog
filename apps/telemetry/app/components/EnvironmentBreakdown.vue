@@ -1,94 +1,86 @@
 <script setup lang="ts">
+/**
+ * Environments are ordinal — development, preview, production is a progression
+ * toward the thing that matters — so they get one hue stepped by proximity to
+ * production rather than four unrelated colours. It also drops the donut: a
+ * three-slice ring costs 140px to say what a 6px bar says better, and reading
+ * angles is harder than reading lengths.
+ */
 const props = defineProps<{
   environments: EnvironmentCount[]
 }>()
 
 const total = computed(() => props.environments.reduce((sum, e) => sum + e.count, 0))
 
-/** `--chart-env-*` tokens (`main.css`) — full-saturation on light cards,
- * darkened off Nuxt UI's raw semantic tokens in dark mode so the ring reads
- * as a deliberate, muted palette rather than a "hyper brut" set of saturated
- * primaries against the dashboard's near-black background. */
-const colorByEnvironment: Record<string, string> = {
-  production: 'var(--chart-env-production)',
-  preview: 'var(--chart-env-preview)',
-  development: 'var(--chart-env-development)',
+/** Strongest for production, fading back through the pre-production stages. */
+const STEP_BY_ENVIRONMENT: Record<string, string> = {
+  production: 'var(--chart-series-1)',
+  preview: 'var(--chart-series-2)',
+  development: 'var(--chart-series-3)',
+  ci: 'var(--chart-series-4)',
 }
 
 function colorFor(environment: string) {
-  return colorByEnvironment[environment] ?? 'var(--chart-env-neutral)'
+  return STEP_BY_ENVIRONMENT[environment] ?? 'var(--chart-series-6)'
 }
 
-function shareOf(count: number) {
-  return total.value > 0 ? Math.round((count / total.value) * 100) : 0
-}
-
-/** Acronyms that read wrong under CSS `capitalize` (e.g. "ci" -> "Ci"). */
+/** Acronyms that read wrong under plain casing (e.g. "ci" -> "Ci"). */
 const LABEL_OVERRIDES: Record<string, string> = { ci: 'CI' }
 
 function labelFor(environment: string) {
   return LABEL_OVERRIDES[environment] ?? environment
 }
 
-/** `DonutChart` data is a plain `number[]` — order must match `categories` below. */
-const data = computed(() => props.environments.map(e => e.count))
+function shareOf(count: number) {
+  return total.value > 0 ? Math.round((count / total.value) * 100) : 0
+}
 
-const categories = computed<Record<string, BulletLegendItemInterface>>(() =>
-  Object.fromEntries(props.environments.map(e => [
-    e.environment,
-    { name: e.environment, color: colorFor(e.environment) },
-  ])),
-)
+const RANKED = Object.keys(STEP_BY_ENVIRONMENT)
+
+/** Production first, then the rest of the ramp, then anything custom by volume. */
+const ordered = computed(() => [...props.environments].sort((a, b) => {
+  const rank = (name: string) => {
+    const index = RANKED.indexOf(name)
+    return index === -1 ? Number.POSITIVE_INFINITY : index
+  }
+  const difference = rank(a.environment) - rank(b.environment)
+  return Number.isNaN(difference) || difference === 0 ? b.count - a.count : difference
+}))
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4', body: 'p-4' }">
-    <template #header>
-      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <GlassIconTile icon="i-nucleo-rocket" />
-        Environments
-      </h3>
-    </template>
+  <PanelCard title="Environments" subtitle="The stage each run reported itself as">
+    <EmptyState
+      v-if="total === 0"
+      message="No runs in this range."
+      hint="Widen the time range, or clear a filter."
+    />
 
-    <div v-if="environments.length === 0" class="py-6 text-center text-sm text-muted">
-      No data yet for this range.
-    </div>
-
-    <div v-else class="flex items-center gap-6">
-      <div class="h-[140px] w-[140px] shrink-0">
-        <DonutChart
-          :data
-          :height="140"
-          :radius="4"
-          :arc-width="18"
-          :pad-angle="0.02"
-          :categories
-          hide-legend
-        >
-          <template #tooltip="{ values }">
-            <div class="max-w-xs rounded-sm border border-default bg-elevated px-2 py-1 shadow-lg ring ring-default ring-offset-2 ring-offset-bg">
-              <div class="flex items-center justify-between gap-3">
-                <span class="text-sm text-muted">{{ labelFor(values?.label) }}</span>
-                <span class="text-sm font-semibold text-highlighted">{{ values?.[values?.label] }} · {{ shareOf(values?.[values?.label] ?? 0) }}%</span>
-              </div>
-            </div>
-          </template>
-          <div class="flex flex-col items-center">
-            <span class="text-lg font-semibold text-highlighted">{{ total.toLocaleString() }}</span>
-            <span class="text-[10px] text-muted">runs</span>
-          </div>
-        </DonutChart>
+    <template v-else>
+      <div class="flex h-1.5 w-full gap-[2px] overflow-hidden rounded-[2px]">
+        <div
+          v-for="env in ordered"
+          :key="env.environment"
+          class="breakdown-bar h-full rounded-[2px]"
+          :style="{ width: `${(env.count / total) * 100}%`, backgroundColor: colorFor(env.environment) }"
+        />
       </div>
 
-      <div class="flex flex-1 flex-col gap-2">
-        <div v-for="env in environments" :key="env.environment" class="flex items-center justify-between gap-2 text-sm">
-          <span class="flex min-w-0 items-center gap-2 truncate font-medium">
-            <span class="size-2 shrink-0 rounded-full" :style="{ backgroundColor: colorFor(env.environment) }" />
-            <span class="truncate">{{ labelFor(env.environment) }}</span>
+      <div class="mt-3 flex flex-col gap-1.5">
+        <div
+          v-for="env in ordered"
+          :key="env.environment"
+          class="flex items-center justify-between gap-3 text-[13px]"
+        >
+          <span class="flex min-w-0 items-center gap-2">
+            <span class="size-1.5 shrink-0 rounded-full" :style="{ backgroundColor: colorFor(env.environment) }" />
+            <span class="truncate text-toned">{{ labelFor(env.environment) }}</span>
           </span>
-          <span class="shrink-0 text-muted">{{ env.count }} · {{ shareOf(env.count) }}%</span>
+          <span class="shrink-0 text-[11px] text-dimmed tabular-nums">
+            {{ env.count.toLocaleString() }} · {{ shareOf(env.count) }}%
+          </span>
         </div>
       </div>
-    </div>
-  </UCard>
+    </template>
+  </PanelCard>
 </template>

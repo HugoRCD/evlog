@@ -47,7 +47,7 @@ const label = computed(() => {
 </script>
 
 <template>
-  <div class="flex items-center gap-2 border border-default bg-elevated/40 py-1 pl-2.5 pr-1 text-xs" :title="stalled ? 'Live refresh is failing — showing the last data that loaded successfully.' : undefined">
+  <div class="flex h-8 items-center gap-2 rounded-[--ui-radius] border border-default bg-elevated/40 pl-2.5 pr-1 text-xs" :title="stalled ? 'Live refresh is failing — showing the last data that loaded successfully.' : undefined">
     <span class="relative flex size-2">
       <span
         v-if="live"

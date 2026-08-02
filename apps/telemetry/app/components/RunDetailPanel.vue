@@ -7,10 +7,6 @@ const props = defineProps<{
 const flagEntries = computed(() => props.run ? Object.entries(props.run.flags) : [])
 const customEntries = computed(() => props.run ? Object.entries(props.run.custom) : [])
 
-/** Mirrors the icons `StatCard` uses for success/error rate, so the same
- * outcome reads the same way everywhere in the dashboard. */
-const outcomeIcon = computed(() => props.run?.outcome === 'success' ? 'i-nucleo-circle-check' : 'i-nucleo-circle-warning')
-
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
 }
@@ -21,191 +17,104 @@ function formatFieldValue(value: boolean | number | string) {
 </script>
 
 <template>
-  <div v-if="loading" class="flex justify-center py-12">
-    <UIcon name="i-nucleo-loader" class="size-5 animate-spin text-muted" />
+  <div v-if="loading" class="flex justify-center py-16">
+    <UIcon name="i-nucleo-loader" class="size-4 animate-spin text-dimmed" />
   </div>
 
-  <div v-else-if="!run" class="py-12 text-center text-sm text-muted">
+  <div v-else-if="!run" class="py-16 text-center text-[13px] text-muted">
     Run not found.
   </div>
 
-  <div v-else class="flex flex-col divide-y divide-default [&>section]:py-5 [&>section:first-child]:pt-0 [&>section:last-child]:pb-0">
-    <section>
-      <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-nucleo-circle-info" class="size-3.5 text-muted" />
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
-          Overview
-        </h4>
-      </div>
-
-      <!-- The two most "at a glance" useful facts — surfaced above the rest
-           of the details grid instead of buried as two more <dl> rows. -->
-      <div class="flex flex-wrap items-center gap-3 border border-default bg-elevated/40 px-4 py-3">
-        <UBadge size="lg" :icon="outcomeIcon" :color="run.outcome === 'success' ? 'success' : 'error'" variant="subtle">
+  <div v-else class="flex flex-col">
+    <!-- The headline plane: outcome, duration and command, on a raised surface
+         so the two facts you came for sit visibly above the reference data. -->
+    <div class="divider-y px-5 py-4">
+      <div class="surface-raised flex flex-wrap items-center gap-3 rounded-[--radius-lg] bg-elevated px-3 py-2.5">
+        <span
+          class="inline-flex items-center gap-1.5 rounded-[--radius-sm] px-1.5 py-0.5 text-[11px] font-medium"
+          :class="run.outcome === 'success' ? 'bg-success/10 text-success' : 'bg-error/10 text-error'"
+        >
+          <span class="size-1.5 rounded-full" :class="run.outcome === 'success' ? 'bg-success' : 'bg-error'" />
           {{ run.outcome }}
-          <span v-if="run.errorCode" class="ml-1 opacity-70">({{ run.errorCode }})</span>
-        </UBadge>
-        <div aria-hidden="true" class="h-6 w-px bg-border" />
-        <div class="flex items-baseline gap-1">
-          <span class="text-xl font-semibold text-highlighted">{{ run.durationMs }}</span>
-          <span class="text-xs text-muted">ms</span>
-        </div>
-        <code class="ml-auto max-w-[50%] truncate text-xs text-muted">{{ run.command }}</code>
-      </div>
+        </span>
+        <span v-if="run.errorCode" class="font-mono text-[11px] text-error">{{ run.errorCode }}</span>
 
-      <dl class="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
-        <div>
-          <dt class="text-xs text-muted">
-            Tool
-          </dt>
-          <dd class="mt-0.5">
-            {{ run.tool }} <span class="text-muted">@{{ run.version }}</span>
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            Environment
-          </dt>
-          <dd class="mt-0.5 capitalize">
-            {{ run.environment }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            Machine
-          </dt>
-          <dd class="mt-0.5 font-mono text-xs">
-            {{ run.machineId ?? '—' }}
-          </dd>
-        </div>
+        <span aria-hidden="true" class="h-4 w-px bg-accented" />
+
+        <span class="text-[15px] font-medium text-highlighted tabular-nums">{{ formatDuration(run.durationMs) }}</span>
+
+        <span class="ml-auto max-w-[55%] truncate font-mono text-[11px] text-dimmed">{{ run.command }}</span>
+      </div>
+    </div>
+
+    <RunDetailSection title="Overview">
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+        <RunDetailField label="Tool">
+          {{ run.tool }} <span class="text-dimmed">@{{ run.version }}</span>
+        </RunDetailField>
+        <RunDetailField label="Environment">
+          {{ run.environment }}
+        </RunDetailField>
+        <RunDetailField label="Machine" mono>
+          {{ run.machineId ?? '—' }}
+        </RunDetailField>
       </dl>
 
-      <!-- Timing grouped together and de-emphasized — useful for debugging,
-           but secondary to outcome/duration/environment above. -->
-      <div class="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-muted">
-        <span class="flex items-center gap-1.5">
-          <UIcon name="i-nucleo-calendar" class="size-3" />
-          Occurred {{ formatDateTime(run.timestamp) }}
-        </span>
-        <span class="flex items-center gap-1.5">
-          <UIcon name="i-nucleo-inbox" class="size-3" />
-          Received {{ formatDateTime(run.receivedAt) }}
-        </span>
+      <div class="mt-3 flex flex-col gap-1 text-[11px] text-dimmed">
+        <span>Occurred {{ formatDateTime(run.timestamp) }}</span>
+        <span>Received {{ formatDateTime(run.receivedAt) }}</span>
       </div>
-    </section>
+    </RunDetailSection>
 
-    <section>
-      <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-nucleo-server" class="size-3.5 text-muted" />
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
-          Environment
-        </h4>
-      </div>
-      <dl class="grid grid-cols-2 gap-x-4 gap-y-3 text-sm sm:grid-cols-3">
-        <div>
-          <dt class="text-xs text-muted">
-            Node
-          </dt>
-          <dd class="mt-0.5 font-mono">
-            {{ run.env.node }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            CI
-          </dt>
-          <dd class="mt-0.5">
-            {{ run.env.ci ? 'yes' : 'no' }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            Provider
-          </dt>
-          <dd class="mt-0.5">
-            {{ run.env.provider ?? '—' }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            TTY
-          </dt>
-          <dd class="mt-0.5">
-            {{ run.env.tty ? 'yes' : 'no' }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            Agent
-          </dt>
-          <dd class="mt-0.5">
-            {{ run.env.agent ?? '—' }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            OS
-          </dt>
-          <dd class="mt-0.5 flex items-center gap-1.5">
-            <UIcon v-if="run.env.os" :name="osIcon(run.env.os)" class="size-3 text-muted" />
+    <RunDetailSection title="Environment">
+      <dl class="grid grid-cols-2 gap-x-4 gap-y-3 sm:grid-cols-3">
+        <RunDetailField label="Node" mono>
+          {{ run.env.node }}
+        </RunDetailField>
+        <RunDetailField label="CI">
+          {{ run.env.ci ? 'yes' : 'no' }}
+        </RunDetailField>
+        <RunDetailField label="Provider">
+          {{ run.env.provider ?? '—' }}
+        </RunDetailField>
+        <RunDetailField label="TTY">
+          {{ run.env.tty ? 'yes' : 'no' }}
+        </RunDetailField>
+        <RunDetailField label="Agent">
+          {{ run.env.agent ?? '—' }}
+        </RunDetailField>
+        <RunDetailField label="OS">
+          <span class="flex items-center gap-1.5">
+            <UIcon v-if="run.env.os" :name="osIcon(run.env.os)" class="size-3 text-dimmed" />
             {{ run.env.os ? osLabel(run.env.os) : '—' }}
-          </dd>
-        </div>
-        <div>
-          <dt class="text-xs text-muted">
-            Arch
-          </dt>
-          <dd class="mt-0.5 font-mono">
-            {{ run.env.arch ?? '—' }}
-          </dd>
-        </div>
+          </span>
+        </RunDetailField>
+        <RunDetailField label="Arch" mono>
+          {{ run.env.arch ?? '—' }}
+        </RunDetailField>
       </dl>
-    </section>
+    </RunDetailSection>
 
-    <section>
-      <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-nucleo-flag" class="size-3.5 text-muted" />
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
-          Flags
-        </h4>
-      </div>
-      <p v-if="flagEntries.length === 0" class="text-sm text-muted">
-        No flags recorded.
+    <RunDetailSection title="Flags">
+      <p v-if="flagEntries.length === 0" class="text-[13px] text-dimmed">
+        None reported.
       </p>
-      <div v-else class="flex flex-wrap gap-2">
-        <span v-for="[key, value] in flagEntries" :key class="inline-flex items-stretch overflow-hidden border border-default text-xs">
-          <span class="bg-elevated px-2 py-1 text-muted">{{ key }}</span>
-          <span class="border-l border-default px-2 py-1 font-mono text-highlighted">{{ formatFieldValue(value) }}</span>
-        </span>
+      <div v-else class="flex flex-wrap gap-1.5">
+        <KeyValueChip v-for="[key, value] in flagEntries" :key :label="key" :value="formatFieldValue(value)" />
       </div>
-    </section>
+    </RunDetailSection>
 
-    <section>
-      <div class="mb-3 flex items-center gap-1.5">
-        <UIcon name="i-nucleo-tags" class="size-3.5 text-muted" />
-        <h4 class="text-xs font-semibold uppercase tracking-wide text-muted">
-          Custom fields
-        </h4>
-      </div>
-      <p v-if="customEntries.length === 0" class="text-sm text-muted">
-        No custom fields recorded.
+    <RunDetailSection title="Custom fields">
+      <p v-if="customEntries.length === 0" class="text-[13px] text-dimmed">
+        None reported.
       </p>
-      <div v-else class="flex flex-wrap gap-2">
-        <span v-for="[key, value] in customEntries" :key class="inline-flex items-stretch overflow-hidden border border-primary/30 text-xs">
-          <span class="bg-primary/10 px-2 py-1 text-primary">{{ key }}</span>
-          <span class="border-l border-primary/30 px-2 py-1 font-mono text-highlighted">{{ formatFieldValue(value) }}</span>
-        </span>
+      <div v-else class="flex flex-wrap gap-1.5">
+        <KeyValueChip v-for="[key, value] in customEntries" :key :label="key" :value="formatFieldValue(value)" />
       </div>
-    </section>
+    </RunDetailSection>
 
-    <section>
-      <div class="mb-2 flex items-center gap-1.5">
-        <UIcon name="i-nucleo-key" class="size-3 text-dimmed" />
-        <h4 class="text-[10px] font-medium uppercase tracking-wide text-dimmed">
-          Idempotency key
-        </h4>
-      </div>
-      <code class="block break-all bg-elevated/40 px-2 py-1 text-[11px] text-dimmed">{{ run.idempotencyKey }}</code>
-    </section>
+    <RunDetailSection title="Idempotency key" :divided="false">
+      <code class="block break-all rounded-[--radius-sm] bg-elevated/60 px-2 py-1.5 font-mono text-[11px] text-dimmed">{{ run.idempotencyKey }}</code>
+    </RunDetailSection>
   </div>
 </template>

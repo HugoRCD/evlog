@@ -48,7 +48,7 @@ async function copyConfig() {
 
 <template>
   <UPopover>
-    <UButton variant="ghost" color="neutral" icon="i-nucleo-plug">
+    <UButton variant="outline" color="neutral" size="sm" class="h-8" icon="i-nucleo-plug">
       Connect MCP
     </UButton>
 

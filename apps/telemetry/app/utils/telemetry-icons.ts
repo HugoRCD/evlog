@@ -21,11 +21,6 @@ export function agentIcon(agent: string | null): string {
   return AGENT_ICONS[agent.toLowerCase()] ?? 'i-nucleo-sparkle-outline'
 }
 
-/** Display label for an agent — `null` means no agent was detected. */
-export function agentLabel(agent: string | null): string {
-  return agent ?? 'terminal'
-}
-
 const PROVIDER_ICONS: Record<string, string> = {
   github_actions: 'i-simple-icons-githubactions',
   gitlab: 'i-simple-icons-gitlab',
@@ -48,6 +43,50 @@ export function providerIcon(provider: string): string {
 /** `github_actions` → `github actions` — provider slugs read better without underscores. */
 export function providerLabel(provider: string): string {
   return provider.replaceAll('_', ' ')
+}
+
+/** Icon for a source — CI providers and agents keep their own logo; the two local kinds get a glyph. */
+export function sourceIcon(source: SourceRef): string {
+  switch (source.kind) {
+    case 'ci': return providerIcon(source.id)
+    case 'agent': return agentIcon(source.id)
+    case 'terminal': return 'i-nucleo-terminal'
+    case 'automation': return 'i-nucleo-bolt'
+  }
+}
+
+/** Human label for a source — `github_actions` reads as `github actions`, the local kinds name themselves. */
+export function sourceLabel(source: SourceRef): string {
+  switch (source.kind) {
+    case 'ci': return providerLabel(source.id)
+    case 'agent': return source.id
+    case 'terminal': return 'terminal'
+    case 'automation': return 'automation'
+  }
+}
+
+const SOURCE_KIND_LABELS: Record<SourceKind, string> = {
+  ci: 'CI',
+  agent: 'AI agents',
+  terminal: 'Terminal',
+  automation: 'Automation',
+}
+
+/** Label for a whole source kind, as shown on the composition bar's legend. */
+export function sourceKindLabel(kind: SourceKind): string {
+  return SOURCE_KIND_LABELS[kind]
+}
+
+const SOURCE_KIND_HINTS: Record<SourceKind, string> = {
+  ci: 'pipelines and hosted builds',
+  agent: 'runs driven by a coding agent',
+  terminal: 'someone at a keyboard',
+  automation: 'scripts, hooks, cron',
+}
+
+/** One-line explanation of what a source kind covers. */
+export function sourceKindHint(kind: SourceKind): string {
+  return SOURCE_KIND_HINTS[kind]
 }
 
 const OS_ICONS: Record<string, string> = {

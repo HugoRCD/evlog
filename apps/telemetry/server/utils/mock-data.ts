@@ -1,18 +1,53 @@
 // Explicit import (unlike the rest of `server/utils/`) because this module's
 // pure functions are unit-tested directly with plain vitest, outside Nitro's
 // auto-import context.
-import { dailyBucketCount, dailyBucketKeys, fillDailyActivity, fillHourlyActivity, hourlyBucketKeys } from '../../shared/utils/activity-buckets'
+import type { FieldValueRow } from '../../shared/utils/adoption-shape'
+import { toFieldStats, toVersionAdoption } from '../../shared/utils/adoption-shape'
 import { DURATION_BUCKETS, durationBucketIndex, nodeMajor } from '../../shared/utils/duration-buckets'
-import { rangeToCutoff } from './query-filters'
+import { emptyActivityPoint, fillTimeline, previousTimelineBucketKeys, timelineBucketKey, timelineBucketKeys, timelineGranularity } from '../../shared/utils/timeline-buckets'
+import { classifySource, sourceToken } from '../../shared/utils/sources'
+import { previousWindow, rangeToCutoff } from './query-filters'
+
+const DAY_MS = 24 * 60 * 60 * 1000
 
 interface WeightedOption {
   weight: number
 }
 
-const MOCK_TOOLS: (WeightedOption & { name: string, version: string })[] = [
-  { name: 'evlog-cli', version: '0.4.2', weight: 0.88 },
-  { name: 'my-other-tool', version: '1.2.0', weight: 0.12 },
+/**
+ * Versions ship over time rather than all at once, so the adoption chart has
+ * a real rollout to draw: a run takes the newest version released by the time
+ * it happened, with a slice of stragglers still on the one before.
+ */
+interface MockRelease {
+  version: string
+  /** How long before "now" this version shipped. */
+  releasedDaysAgo: number
+}
+
+const MOCK_TOOLS: (WeightedOption & { name: string, releases: MockRelease[] })[] = [
+  {
+    name: 'evlog-cli',
+    weight: 0.88,
+    releases: [
+      { version: '0.3.7', releasedDaysAgo: 60 },
+      { version: '0.4.0', releasedDaysAgo: 38 },
+      { version: '0.4.2', releasedDaysAgo: 17 },
+      { version: '0.5.0', releasedDaysAgo: 5 },
+    ],
+  },
+  {
+    name: 'my-other-tool',
+    weight: 0.12,
+    releases: [
+      { version: '1.1.4', releasedDaysAgo: 60 },
+      { version: '1.2.0', releasedDaysAgo: 21 },
+    ],
+  },
 ]
+
+/** Share of runs that lag one release behind the newest one available to them. */
+const MOCK_STRAGGLER_RATE = 0.25
 
 const MOCK_ENVIRONMENTS: (WeightedOption & { name: string })[] = [
   { name: 'development', weight: 0.55 },
@@ -23,7 +58,6 @@ const MOCK_ENVIRONMENTS: (WeightedOption & { name: string })[] = [
 
 const MOCK_COMMANDS = ['doctor', 'telemetry status', 'telemetry enable', 'telemetry disable']
 const MOCK_ERROR_CODES = ['ENOENT', 'ETIMEDOUT', 'CONFIG_INVALID']
-const MOCK_MACHINE_IDS = Array.from({ length: 12 }, (_, i) => `mock-machine-${i.toString(16).padStart(4, '0')}`)
 const MOCK_NODE_VERSIONS = ['v20.11.1', 'v22.4.0', 'v18.20.2']
 const MOCK_PROVIDERS = [null, 'github_actions', 'vercel', 'netlify']
 const MOCK_AGENTS = [null, null, 'cursor', 'claude-code', 'copilot', 'codex']
@@ -32,9 +66,33 @@ const MOCK_OSES: (WeightedOption & { os: string, archs: string[] })[] = [
   { os: 'linux', archs: ['x64', 'arm64'], weight: 0.3 },
   { os: 'win32', archs: ['x64'], weight: 0.08 },
 ]
-const MOCK_RUN_COUNT = 420
-const MOCK_DAYS_SPAN = 30
+const MOCK_RUN_COUNT = 1400
+/**
+ * Twice the widest range (30d) so the 30-day view still has a full previous
+ * window to compare itself against — otherwise every delta on the KPI cards
+ * would read as "no baseline" on the sample data.
+ */
+const MOCK_DAYS_SPAN = 60
+/**
+ * Skews run ages toward the present (`age = rng^EXPONENT * span`), so usage
+ * grows over the dataset the way a tool's actually does. Deltas then come out
+ * positive instead of hovering around zero.
+ */
+const MOCK_AGE_SKEW = 1.7
 const MOCK_SEED = 42
+
+/**
+ * Machines adopt the tool progressively — index 0 has been around since the
+ * start of the dataset, the last one showed up yesterday. A run can only pick
+ * a machine that already existed when it happened, which is what gives the
+ * adoption chart a real new-vs-returning split instead of every machine
+ * appearing on the oldest bucket.
+ */
+const MOCK_MACHINE_COUNT = 64
+const MOCK_MACHINES = Array.from({ length: MOCK_MACHINE_COUNT }, (_, i) => ({
+  id: `mock-machine-${i.toString(16).padStart(4, '0')}`,
+  joinedDaysAgo: MOCK_DAYS_SPAN * (1 - i / MOCK_MACHINE_COUNT),
+}))
 
 /** Candidate flag keys — a run gets a random subset, mirroring real CLI usage. */
 const MOCK_FLAG_POOL: { key: string, values: (boolean | number | string)[] }[] = [
@@ -85,6 +143,20 @@ function pickFields(rng: () => number, pool: { key: string, values: (boolean | n
   return fields
 }
 
+/** Newest release available `ageDays` ago, with a slice of stragglers still one version behind. */
+function pickVersion(rng: () => number, releases: MockRelease[], ageDays: number): string {
+  const available = releases.filter(release => release.releasedDaysAgo >= ageDays)
+  const latest = available.at(-1) ?? releases[0]!
+  const behind = available.at(-2)
+  return behind && rng() < MOCK_STRAGGLER_RATE ? behind.version : latest.version
+}
+
+/** A machine that already existed `ageDays` ago — never one that joins later. */
+function pickMachineId(rng: () => number, ageDays: number): string {
+  const eligible = MOCK_MACHINES.filter(machine => machine.joinedDaysAgo >= ageDays)
+  return pick(rng, eligible.length > 0 ? eligible : [MOCK_MACHINES[0]!]).id
+}
+
 /** Deterministic env snapshot for one mock run — mirrors `@evlog/telemetry`'s `EnvInfo`. */
 function buildMockEnv(rng: () => number): RunEnvInfo {
   const osEntry = weightedPick(rng, MOCK_OSES)
@@ -124,20 +196,20 @@ function ensureMockDataset(): void {
     const tool = weightedPick(rng, MOCK_TOOLS)
     const environment = weightedPick(rng, MOCK_ENVIRONMENTS)
     const command = pick(rng, MOCK_COMMANDS)
-    const ageMs = rng() * MOCK_DAYS_SPAN * 24 * 60 * 60 * 1000
+    const ageDays = rng() ** MOCK_AGE_SKEW * MOCK_DAYS_SPAN
     const outcome: 'success' | 'error' = rng() < 0.92 ? 'success' : 'error'
     const durationMs = Math.round(80 + rng() * (command === 'doctor' ? 2500 : 400))
 
     return {
-      timestampMs: now - ageMs,
+      timestampMs: now - ageDays * DAY_MS,
       tool: tool.name,
-      version: tool.version,
+      version: pickVersion(rng, tool.releases, ageDays),
       command,
       durationMs,
       outcome,
       errorCode: outcome === 'error' ? pick(rng, MOCK_ERROR_CODES) : null,
       environment: environment.name,
-      machineId: pick(rng, MOCK_MACHINE_IDS),
+      machineId: pickMachineId(rng, ageDays),
       flags: pickFields(rng, MOCK_FLAG_POOL),
       custom: pickFields(rng, MOCK_CUSTOM_POOL),
       env: buildMockEnv(rng),
@@ -180,14 +252,23 @@ function ensureMockDataset(): void {
   cachedDetails = details
 }
 
-function filterMockRuns(runs: RunRow[], filter: RunsFilter): RunRow[] {
-  const cutoff = rangeToCutoff(filter.range).getTime()
+/** Mirrors `buildRunsWhere` — `window` overrides the range cutoff for the previous-period baseline. */
+function filterMockRuns(runs: RunRow[], filter: RunsFilter, window?: { from: Date, to: Date }): RunRow[] {
+  const from = (window?.from ?? rangeToCutoff(filter.range)).getTime()
+  const to = window ? window.to.getTime() : Number.POSITIVE_INFINITY
   return runs.filter((run) => {
-    if (new Date(run.timestamp).getTime() < cutoff) return false
+    const at = new Date(run.timestamp).getTime()
+    if (at < from || at >= to) return false
     if (filter.tool && run.tool !== filter.tool) return false
     if (filter.environment && run.environment !== filter.environment) return false
+    if (filter.source && sourceToken(sourceOf(run)) !== sourceToken(filter.source)) return false
     return true
   })
+}
+
+/** The source a mock run came from — reads the env block off its detail record. */
+function sourceOf(run: RunRow): SourceRef {
+  return classifySource(getMockRunDetail(run.id)!.env)
 }
 
 const SORT_EXTRACTORS: Record<RunSortKey, (run: RunRow) => string | number> = {
@@ -221,9 +302,37 @@ function tallyBy<TLabel extends string>(runs: RunRow[], key: (run: RunRow) => st
     .sort((a, b) => b.count - a.count)
 }
 
+/** Groups runs by their timeline bucket, mirroring SQL's `group by date_trunc(...)`. */
+function groupByBucket(runs: RunRow[], granularity: TimelineGranularity): [string, RunRow[]][] {
+  const buckets = new Map<string, RunRow[]>()
+  for (const run of runs) {
+    const bucket = timelineBucketKey(run.timestamp, granularity)
+    const existing = buckets.get(bucket)
+    if (existing) existing.push(run)
+    else buckets.set(bucket, [run])
+  }
+  return [...buckets.entries()]
+}
+
+/** Totals over an arbitrary set of runs — the current window and its predecessor share this. */
+function totalsFor(runs: RunRow[]): PreviousTotals {
+  const durations = runs.map(r => r.durationMs).sort((a, b) => a - b)
+  const success = runs.filter(r => r.outcome === 'success').length
+  return {
+    total: runs.length,
+    success,
+    errors: runs.length - success,
+    machines: new Set(runs.map(r => r.machineId)).size,
+    avgDurationMs: runs.length > 0 ? Math.round(durations.reduce((sum, d) => sum + d, 0) / runs.length) : 0,
+    p95DurationMs: percentile(durations, 0.95),
+  }
+}
+
 /** Mirrors `server/api/telemetry/stats.get.ts`'s SQL aggregation, in memory. */
 export function computeMockStats(filter: RunsFilter): StatsResponse {
   const runs = filterMockRuns(getMockRuns(), filter)
+  const previousRunRows = filterMockRuns(getMockRuns(), filter, previousWindow(filter.range))
+  const previous = totalsFor(previousRunRows)
 
   const success = runs.filter(r => r.outcome === 'success').length
   const errors = runs.length - success
@@ -235,12 +344,13 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
   const environments = tallyBy(runs, r => r.environment, 'environment') as EnvironmentCount[]
   const tools = tallyBy(runs, r => r.tool, 'tool') as ToolCount[]
 
-  const commandGroups = new Map<string, { count: number, success: number, totalDuration: number }>()
+  const commandGroups = new Map<string, { count: number, success: number, totalDuration: number, durations: number[] }>()
   for (const run of runs) {
-    const group = commandGroups.get(run.command) ?? { count: 0, success: 0, totalDuration: 0 }
+    const group = commandGroups.get(run.command) ?? { count: 0, success: 0, totalDuration: 0, durations: [] }
     group.count++
     if (run.outcome === 'success') group.success++
     group.totalDuration += run.durationMs
+    group.durations.push(run.durationMs)
     commandGroups.set(run.command, group)
   }
   const commands: CommandStat[] = [...commandGroups.entries()]
@@ -249,61 +359,48 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
       count: group.count,
       successRate: group.count > 0 ? group.success / group.count : 0,
       avgDurationMs: group.count > 0 ? Math.round(group.totalDuration / group.count) : 0,
+      p95DurationMs: percentile(group.durations.sort((a, b) => a - b), 0.95),
     }))
     .sort((a, b) => b.count - a.count)
     .slice(0, 10)
 
-  const dayGroups = new Map<string, { success: number, errors: number }>()
-  for (const run of runs) {
-    const day = run.timestamp.slice(0, 10)
-    const group = dayGroups.get(day) ?? { success: 0, errors: 0 }
-    if (run.outcome === 'success') group.success++
-    else group.errors++
-    dayGroups.set(day, group)
-  }
-  // Pre-fill every day/hour bucket in the range so the chart always plots a
-  // full, fixed-width timeline instead of shrinking to whichever days have events.
-  const dailyRows: DailyActivity[] = [...dayGroups.entries()]
-    .map(([day, group]) => ({ day, success: group.success, errors: group.errors }))
-  const daily = fillDailyActivity(dailyBucketKeys(dailyBucketCount(filter.range)), dailyRows)
+  // Pre-fill every bucket in the range so the chart always plots a full,
+  // fixed-width timeline instead of shrinking to whichever buckets have events.
+  const granularity = timelineGranularity(filter.range)
+  const timeline = fillTimeline(
+    timelineBucketKeys(filter.range),
+    groupByBucket(runs, granularity).map(([bucket, bucketRuns]) => {
+      const durations = bucketRuns.map(r => r.durationMs).sort((a, b) => a - b)
+      return {
+        bucket,
+        success: bucketRuns.filter(r => r.outcome === 'success').length,
+        errors: bucketRuns.filter(r => r.outcome === 'error').length,
+        machines: new Set(bucketRuns.map(r => r.machineId)).size,
+        avgDurationMs: Math.round(durations.reduce((sum, d) => sum + d, 0) / durations.length),
+        p95DurationMs: percentile(durations, 0.95),
+      }
+    }),
+    emptyActivityPoint,
+  )
 
-  let hourly: HourlyActivity[] = []
-  if (filter.range === '24h') {
-    const hourGroups = new Map<string, { success: number, errors: number }>()
-    for (const run of runs) {
-      const hour = `${run.timestamp.slice(0, 13)}:00`
-      const group = hourGroups.get(hour) ?? { success: 0, errors: 0 }
-      if (run.outcome === 'success') group.success++
-      else group.errors++
-      hourGroups.set(hour, group)
-    }
-    const hourlyRows: HourlyActivity[] = [...hourGroups.entries()]
-      .map(([hour, group]) => ({ hour, success: group.success, errors: group.errors }))
-    hourly = fillHourlyActivity(hourlyBucketKeys(24), hourlyRows)
-  }
+  const previousRuns = fillTimeline(
+    previousTimelineBucketKeys(filter.range),
+    groupByBucket(previousRunRows, granularity).map(([bucket, bucketRuns]) => ({ bucket, count: bucketRuns.length })),
+    bucket => ({ bucket, count: 0 }),
+  ).map(point => point.count)
 
   // env-level aggregations read the full detail record (RunRow has no env block).
   const envs = runs.map(run => getMockRunDetail(run.id)!.env)
 
-  const agentCounts = new Map<string | null, number>()
-  for (const env of envs) agentCounts.set(env.agent, (agentCounts.get(env.agent) ?? 0) + 1)
-  const agents: AgentCount[] = [...agentCounts.entries()]
-    .map(([agent, count]) => ({ agent, count }))
-    .sort((a, b) => b.count - a.count)
-
-  const ciRuns = envs.filter(env => env.ci).length
-  const providerCounts = new Map<string, number>()
+  const sourceCounts = new Map<string, SourceCount>()
   for (const env of envs) {
-    if (env.provider) providerCounts.set(env.provider, (providerCounts.get(env.provider) ?? 0) + 1)
+    const source = classifySource(env)
+    const key = sourceToken(source)
+    const entry = sourceCounts.get(key) ?? { ...source, count: 0 }
+    entry.count++
+    sourceCounts.set(key, entry)
   }
-  const ci: CiStats = {
-    ci: ciRuns,
-    local: envs.length - ciRuns,
-    providers: [...providerCounts.entries()]
-      .map(([provider, count]) => ({ provider, count }))
-      .sort((a, b) => b.count - a.count)
-      .slice(0, 8),
-  }
+  const sources: SourceCount[] = [...sourceCounts.values()].sort((a, b) => b.count - a.count)
 
   const nodeCounts = new Map<string, number>()
   for (const env of envs) {
@@ -356,14 +453,20 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
 
   return {
     range: filter.range,
+    filter: {
+      tool: filter.tool,
+      environment: filter.environment,
+      source: filter.source ? sourceToken(filter.source) : undefined,
+    },
+    granularity,
     totals: { total: runs.length, success, errors, machines, avgDurationMs },
+    previous,
     environments,
     tools,
     commands,
-    daily,
-    hourly,
-    agents,
-    ci,
+    timeline,
+    previousRuns,
+    sources,
     nodeVersions,
     toolVersions,
     os,
@@ -372,6 +475,81 @@ export function computeMockStats(filter: RunsFilter): StatsResponse {
     lastEventAt,
     mock: true,
   }
+}
+
+/** Mirrors `getAdoptionForFilter()`'s SQL aggregation, in memory. */
+export function computeMockAdoption(filter: RunsFilter): AdoptionResponse {
+  const all = getMockRuns()
+  const runs = filterMockRuns(all, filter)
+  const granularity = timelineGranularity(filter.range)
+  const keys = timelineBucketKeys(filter.range)
+  const buckets = groupByBucket(runs, granularity)
+
+  // First-seen is computed over the whole dataset, unfiltered, exactly like the
+  // `first_seen` CTE — a machine is only new the first time it is ever seen.
+  const firstSeen = new Map<string, string>()
+  for (const run of all) {
+    if (!run.machineId) continue
+    const current = firstSeen.get(run.machineId)
+    if (!current || run.timestamp < current) firstSeen.set(run.machineId, run.timestamp)
+  }
+
+  const versionRows = buckets.flatMap(([bucket, bucketRuns]) => {
+    const counts = new Map<string, number>()
+    for (const run of bucketRuns) counts.set(run.version, (counts.get(run.version) ?? 0) + 1)
+    return [...counts.entries()].map(([version, count]) => ({ bucket, version, count }))
+  })
+  const { versions, points } = toVersionAdoption(versionRows, keys)
+
+  const machines = fillTimeline(
+    keys,
+    buckets.map(([bucket, bucketRuns]) => {
+      const seen = new Set(bucketRuns.map(run => run.machineId).filter((id): id is string => id !== null))
+      const fresh = [...seen].filter(id => timelineBucketKey(firstSeen.get(id)!, granularity) === bucket)
+      return { bucket, active: seen.size, new: fresh.length }
+    }),
+    bucket => ({ bucket, active: 0, new: 0 }),
+  )
+
+  const punchcardCells = new Map<string, PunchcardCell>()
+  for (const run of runs) {
+    const date = new Date(run.timestamp)
+    // `getUTCDay()` is 0 (Sunday) to 6, while SQL's `isodow` is 1 (Monday) to 7.
+    const weekday = date.getUTCDay() === 0 ? 7 : date.getUTCDay()
+    const hour = date.getUTCHours()
+    const key = `${weekday}-${hour}`
+    const cell = punchcardCells.get(key) ?? { weekday, hour, count: 0 }
+    cell.count++
+    punchcardCells.set(key, cell)
+  }
+
+  return {
+    range: filter.range,
+    granularity,
+    versions,
+    versionAdoption: points,
+    machines,
+    punchcard: [...punchcardCells.values()],
+    flags: toFieldStats(tallyFields(runs, detail => detail.flags)),
+    custom: toFieldStats(tallyFields(runs, detail => detail.custom)),
+    mock: true,
+  }
+}
+
+/** Mirrors the `jsonb_each_text` breakdown — one row per observed key/value pair. */
+function tallyFields(runs: RunRow[], select: (detail: RunDetail) => Record<string, boolean | number | string>): FieldValueRow[] {
+  const rows = new Map<string, FieldValueRow>()
+  for (const run of runs) {
+    const detail = getMockRunDetail(run.id)!
+    for (const [key, value] of Object.entries(select(detail))) {
+      const mapKey = `${key} ${value}`
+      const row = rows.get(mapKey) ?? { key, value: String(value), count: 0, errors: 0 }
+      row.count++
+      if (run.outcome === 'error') row.errors++
+      rows.set(mapKey, row)
+    }
+  }
+  return [...rows.values()]
 }
 
 /** Linear-interpolated percentile, mirroring Postgres's `percentile_cont`. Expects `sorted` ascending. */

@@ -2,10 +2,21 @@
 @import "@nuxt/ui";
 
 /*
- * Brand tokens — mirror `apps/docs/app/assets/css/main.css` verbatim so the
- * telemetry dashboard matches evlog's actual brand instead of stock Nuxt UI
- * blue/rounded defaults. Keep in sync with the docs site if the brand changes.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Design tokens
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Everything visual is expressed here and consumed by role, never as a raw
+ * value in a component. Dark is the mode this dashboard is designed in and
+ * light is derived from it, not the other way round.
+ *
+ * The governing idea: separation comes from *surface*, not from lines. Panels
+ * sit on the page as slightly lighter planes, held by a hairline at 8% white —
+ * enough to catch the edge, not enough to draw a box. Colour is spent almost
+ * nowhere: the ramp is neutral, and a hue only appears where it carries
+ * meaning (an outcome, a source, a delta).
  */
+
 @theme static {
   --color-blue-400: #2853ff;
   --color-blue-500: #2853ff;
@@ -18,97 +29,290 @@
 }
 
 :root {
-  --ui-radius: 0;
-}
+  /*
+   * Radius scale. Nuxt UI derives control radii from `--ui-radius`, and at 8px
+   * a 20px-tall badge reads as a pill. 5px is the base: crisp at control size,
+   * still soft on a 400px panel.
+   */
+  --ui-radius: 0.3125rem;
+  --radius-sm: 0.25rem;
+  --radius-lg: 0.5rem;
 
-/* Dark-only surface overrides — scoped to `.dark` so the light mode Nuxt UI
- * ships out of the box (white bg, zinc text ramp) stays intact. */
-.dark {
-  --ui-bg: var(--color-zinc-950);
-  --ui-text-dimmed: var(--color-zinc-400);
+  /* Motion — short, decelerating, never bouncy. */
+  --ease-out: cubic-bezier(0.16, 1, 0.3, 1);
+  --duration-fast: 120ms;
+  --duration-base: 180ms;
 }
 
 /*
- * `nuxt-charts` (Unovis under the hood) theme — mirrors the styling used by
- * https://github.com/nuxt-ui-templates/chat's chart tool: transparent
- * tooltip chrome (each chart supplies its own tooltip via the `#tooltip`
- * slot), axis/legend colors pulled from Nuxt UI's semantic text tokens, and
- * a subtle dot-grid background behind the plot area.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Depth
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * A drop shadow is how you lift something off white paper. On a near-black
+ * ground it does nothing — black blurred into black is still black.
+ *
+ * So depth here is almost entirely a matter of *surface steps*: each level is
+ * a few points lighter than the one beneath it, held by a single hairline at
+ * a carefully chosen opacity. That is the whole system, and getting those two
+ * numbers right matters more than any effect layered on top.
+ *
+ * On top of that sits one borrowed trick. A panel carries *two* lines, not
+ * one: a light hairline as its border, and a dark ring immediately outside it.
+ * The dark ring pushes the light one off the page, and a light line with dark
+ * behind it stops reading as a drawn rectangle and starts reading as an edge
+ * catching light — the same reason an engraved rule looks cut rather than
+ * printed. It costs one `box-shadow` and no markup.
+ *
+ * Beyond that, shadows exist only for elements that genuinely float — a menu,
+ * a tooltip, the drawer — where there is a surface behind to land on.
+ */
+:root {
+  --shadow-sm: 0 1px 2px rgba(9, 9, 11, 0.06);
+  --shadow-md: 0 4px 12px -2px rgba(9, 9, 11, 0.1), 0 2px 4px -2px rgba(9, 9, 11, 0.06);
+  --shadow-lg: 0 16px 48px -12px rgba(9, 9, 11, 0.2), 0 4px 12px -4px rgba(9, 9, 11, 0.1);
+
+  --divider-dark: rgba(9, 9, 11, 0.07);
+  --divider-light: rgba(255, 255, 255, 0.8);
+
+  /* Sits *outside* the border, so the pair reads as one engraved edge. */
+  --ring-outer: rgba(9, 9, 11, 0.04);
+}
+
+.dark {
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.4);
+  --shadow-md: 0 8px 24px -8px rgba(0, 0, 0, 0.7), 0 2px 6px -2px rgba(0, 0, 0, 0.5);
+  --shadow-lg: 0 24px 64px -16px rgba(0, 0, 0, 0.85), 0 4px 12px -4px rgba(0, 0, 0, 0.6);
+
+  --divider-dark: rgba(0, 0, 0, 0.4);
+  --divider-light: rgba(255, 255, 255, 0.04);
+
+  --ring-outer: rgba(0, 0, 0, 0.6);
+}
+
+/* A flat plane, lighter than the page, held by the light/dark line pair. */
+.surface-raised {
+  border: 1px solid var(--ui-border);
+  box-shadow: 0 0 0 1px var(--ring-outer);
+}
+
+/* Lifted off the page: brighter edge, and a shadow that now has somewhere to land. */
+.surface-floating {
+  border: 1px solid var(--ui-border-accented);
+  box-shadow: 0 0 0 1px var(--ring-outer), var(--shadow-md);
+}
+
+/*
+ * Selected state. The ring picks up the element's own hue via `currentColor`
+ * on a `--tint` the component sets, so a chosen source is outlined in the
+ * colour it is already identified by rather than in a generic accent — the
+ * colours in the interface answer to each other instead of each being local.
+ */
+.ring-tinted {
+  border-color: color-mix(in srgb, var(--tint) 38%, transparent);
+  box-shadow:
+    0 0 0 1px var(--ring-outer),
+    inset 0 0 0 1px color-mix(in srgb, var(--tint) 10%, transparent);
+}
+
+/*
+ * The double-line divider. The element draws the dark line as its own border
+ * and the light one as a 1px shadow directly below, so the pair costs no extra
+ * markup and never doubles up at the ends of a list.
+ */
+.divider-y {
+  border-bottom: 1px solid var(--divider-dark);
+  box-shadow: 0 1px 0 var(--divider-light);
+}
+
+.divider-y-top {
+  border-top: 1px solid var(--divider-dark);
+  box-shadow: inset 0 1px 0 var(--divider-light);
+}
+
+/*
+ * Light mode. A very slightly warm paper so the neutral text doesn't read
+ * blue, with the same hairline logic inverted.
+ */
+:root {
+  --ui-bg: #ffffff;
+  --ui-bg-muted: #fafafa;
+  --ui-bg-elevated: #f6f6f7;
+  --ui-bg-accented: #eeeef0;
+
+  --ui-border-muted: rgba(9, 9, 11, 0.05);
+  --ui-border: rgba(9, 9, 11, 0.09);
+  --ui-border-accented: rgba(9, 9, 11, 0.14);
+
+  --ui-text-highlighted: #09090b;
+  --ui-text: rgba(9, 9, 11, 0.82);
+  --ui-text-toned: rgba(9, 9, 11, 0.66);
+  --ui-text-muted: rgba(9, 9, 11, 0.5);
+  --ui-text-dimmed: rgba(9, 9, 11, 0.36);
+}
+
+/*
+ * Dark mode — the primary design target. The ground is near-black with a
+ * trace of blue so it sits under the accent rather than fighting it; each
+ * surface step is a few points lighter, never a border.
+ */
+.dark {
+  --ui-bg: #08090a;
+  --ui-bg-muted: #0c0d0f;
+  --ui-bg-elevated: #141519;
+  --ui-bg-accented: #1c1d22;
+
+  --ui-border-muted: rgba(255, 255, 255, 0.05);
+  --ui-border: rgba(255, 255, 255, 0.08);
+  --ui-border-accented: rgba(255, 255, 255, 0.14);
+
+  --ui-text-highlighted: rgba(255, 255, 255, 0.95);
+  --ui-text: rgba(255, 255, 255, 0.8);
+  --ui-text-toned: rgba(255, 255, 255, 0.64);
+  --ui-text-muted: rgba(255, 255, 255, 0.46);
+  --ui-text-dimmed: rgba(255, 255, 255, 0.3);
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * Chart tokens
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Chart fills are never the raw brand blue. #2853ff is right for a 32px
+ * button and far too loud across a 600px area, so large marks use a settled
+ * indigo derived from it, and the pure brand colour stays for interactive
+ * accents. Semantic hues are muted for the same reason: a failure should read
+ * as serious, not as an alarm.
+ */
+:root {
+  --chart-accent: #3d54d8;
+  --chart-accent-soft: rgba(61, 84, 216, 0.16);
+  --chart-success: #3d54d8;
+  --chart-error: #b4453f;
+  --chart-neutral: rgba(9, 9, 11, 0.28);
+  --chart-grid: rgba(9, 9, 11, 0.07);
+
+  /* Source kinds — validated (adjacent-pair CVD separation) in the order the
+   * composition bar stacks them; muted well below the raw hues so four
+   * categories can coexist without the card turning into a rainbow. */
+  --chart-source-ci: #4c56b8;
+  --chart-source-agent: #9c5f24;
+  --chart-source-terminal: #137d5e;
+  --chart-source-automation: #7a52a8;
+
+  /* Ordered ramp for the version bands — one hue, stepped, because versions
+   * succeed one another rather than being unrelated categories. */
+  --chart-series-1: #3d54d8;
+  --chart-series-2: #5a6ee0;
+  --chart-series-3: #7787e8;
+  --chart-series-4: #94a1ef;
+  --chart-series-5: #b1baf5;
+  --chart-series-6: rgba(9, 9, 11, 0.22);
+}
+
+.dark {
+  --chart-accent: #5b6ee1;
+  --chart-accent-soft: rgba(91, 110, 225, 0.2);
+  --chart-success: #5b6ee1;
+  --chart-error: #b4534d;
+  --chart-neutral: rgba(255, 255, 255, 0.22);
+  --chart-grid: rgba(255, 255, 255, 0.05);
+
+  --chart-source-ci: #5e6ad2;
+  --chart-source-agent: #bf7a3f;
+  --chart-source-terminal: #2fa382;
+  --chart-source-automation: #9a6fbf;
+
+  --chart-series-1: #5b6ee1;
+  --chart-series-2: #4e5ec2;
+  --chart-series-3: #414ea3;
+  --chart-series-4: #343f85;
+  --chart-series-5: #283066;
+  --chart-series-6: rgba(255, 255, 255, 0.16);
+}
+
+/*
+ * ─────────────────────────────────────────────────────────────────────────
+ * Atmosphere
+ * ─────────────────────────────────────────────────────────────────────────
+ *
+ * Two full-page layers, both `pointer-events: none`, both deliberately below
+ * the threshold where you'd notice them individually.
+ *
+ * The grain fixes a real problem: large flat dark fills band on 8-bit panels,
+ * and the step between two near-black surfaces can show as a ragged edge
+ * rather than a clean one. A film of fractal noise dithers that away.
+ *
+ * It is deliberately the only full-page effect left. An earlier version also
+ * pooled brand light behind the masthead; at any opacity where it registered
+ * it was visibly tinting the top of the page, and a dashboard that glows is a
+ * dashboard that is decorating itself.
+ */
+body::after {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.028;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='160' height='160' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/*
+ * `nuxt-charts` (Unovis) theme. Everything the library draws by default —
+ * tooltip chrome, grid, domain lines — is either removed or pushed down to
+ * the faintest step, because each chart supplies its own tooltip and the plot
+ * should be the only thing with contrast.
  */
 :root {
   --vis-tooltip-padding: 0 !important;
   --vis-tooltip-background-color: transparent !important;
   --vis-tooltip-border-color: transparent !important;
 
-  --vis-axis-grid-color: rgba(255, 255, 255, 0) !important;
-  --vis-axis-tick-label-color: var(--ui-text-muted) !important;
-  --vis-axis-label-color: var(--ui-text-toned) !important;
+  --vis-axis-grid-color: var(--chart-grid) !important;
+  --vis-axis-tick-label-color: var(--ui-text-dimmed) !important;
+  --vis-axis-label-color: var(--ui-text-muted) !important;
+  --vis-axis-domain-color: transparent !important;
+  --vis-axis-tick-color: transparent !important;
   --vis-legend-label-color: var(--ui-text-muted) !important;
 
-  /* Unovis only auto-swaps this for its own dark-mode selectors
-   * (`html.dark-theme`/`html[data-theme="dark"]`, etc.), which Nuxt UI's
-   * `.dark` class never matches — override directly so the `padAngle` gaps
-   * in `EnvironmentBreakdown`'s donut don't show its light-mode default. */
+  /* Unovis only auto-swaps this for its own dark-mode selectors, which Nuxt
+   * UI's `.dark` class never matches — set it directly so the donut's
+   * `padAngle` gaps show the page ground and not a light default. */
   --vis-donut-background-color: transparent !important;
-
-  --dot-pattern-color: #111827;
-
-  /* Full-saturation on light cards — no need to darken toward black when the
-   * surface is already light. */
-  --chart-success-color: var(--ui-success);
-  --chart-error-color: var(--ui-error);
-  --chart-env-production: var(--ui-success);
-  --chart-env-preview: var(--ui-warning);
-  --chart-env-development: var(--ui-primary);
-  --chart-env-neutral: var(--ui-color-neutral-400);
-  --chart-primary-color: var(--ui-primary);
 }
 
-.dark {
-  --dot-pattern-color: #9ca3af;
-
-  /* Darkened off their raw saturated values so bars/arcs read as deliberate
-   * rather than "hyper brut" against the dashboard's near-black background. */
-  --chart-success-color: color-mix(in srgb, var(--ui-success) 75%, black);
-  --chart-error-color: color-mix(in srgb, var(--ui-error) 55%, black);
-  --chart-env-production: color-mix(in srgb, var(--ui-success) 75%, black);
-  --chart-env-preview: color-mix(in srgb, var(--ui-warning) 75%, black);
-  --chart-env-development: color-mix(in srgb, var(--ui-primary) 85%, black);
-  --chart-env-neutral: color-mix(in srgb, var(--ui-color-neutral-400) 70%, black);
-  --chart-primary-color: color-mix(in srgb, var(--ui-primary) 85%, black);
-}
-
-/*
- * Motion tokens — strong custom curves (built-in CSS easings are too weak to
- * read as intentional). Everything animating transform/opacity in the
- * dashboard shares these.
- */
+/* Axis and legend labels are chrome, not content — they stay small and quiet. */
 :root {
-  --ease-out-strong: cubic-bezier(0.23, 1, 0.32, 1);
+  --vis-axis-tick-label-font-size: 10px;
+  --vis-legend-label-font-size: 11px;
 }
 
 /*
- * Breakdown bar fills (`BreakdownBars`, `CiBreakdown`) — width changes are
- * expressed as `scaleX` so live refreshes glide on the GPU. Transitions (not
- * keyframes) so a poll landing mid-animation retargets smoothly.
+ * ─────────────────────────────────────────────────────────────────────────
+ * Motion
+ * ─────────────────────────────────────────────────────────────────────────
  */
+
+/* Breakdown bar fills — width changes are expressed as `scaleX` so live
+ * refreshes glide on the GPU. Transitions (not keyframes) so a poll landing
+ * mid-animation retargets smoothly. */
 .breakdown-bar {
   transform-origin: left;
-  transition: transform 250ms var(--ease-out-strong);
+  transition: transform 320ms var(--ease-out);
 }
 
-/*
- * Live flash — rows that just arrived on a poll (`LiveFeed`, `RunsTable`)
- * flash then fade. A one-shot keyframe (not a transition) so it can't hijack
- * the row's own hover background transition; each row flashes exactly once.
- */
+/* Rows that arrived on the latest poll lift once and settle. A one-shot
+ * keyframe (not a transition) so it can't hijack the row's own hover
+ * transition; each row flashes exactly once, and at 6% it registers
+ * peripherally without pulling the eye off whatever is being read. */
 .live-flash-fresh {
-  animation: live-flash 900ms ease-out both;
+  animation: live-flash 1200ms var(--ease-out) both;
 }
 
 @keyframes live-flash {
   from {
-    background-color: color-mix(in srgb, var(--ui-primary) 14%, transparent);
+    background-color: color-mix(in srgb, var(--ui-primary) 6%, transparent);
   }
 
   to {
@@ -117,19 +321,19 @@
 }
 
 .feed-enter-active {
-  transition: transform 250ms var(--ease-out-strong), opacity 250ms var(--ease-out-strong);
+  transition: transform 260ms var(--ease-out), opacity 260ms var(--ease-out);
 }
 
 .feed-enter-from {
   opacity: 0;
-  transform: translateY(-8px);
+  transform: translateY(-6px);
 }
 
 .feed-leave-active {
   /* Out of flow so remaining rows can start moving immediately. */
   position: absolute;
   width: 100%;
-  transition: opacity 150ms ease-out;
+  transition: opacity 140ms ease-out;
 }
 
 .feed-leave-to {
@@ -137,34 +341,82 @@
 }
 
 .feed-move {
-  transition: transform 250ms var(--ease-out-strong);
+  transition: transform 260ms var(--ease-out);
 }
 
-/*
- * Page-load stagger — sections cascade in (40ms apart, transform+opacity
- * only). Skipped entirely under reduced motion: content is simply there.
- */
+/* Page-load stagger — sections settle in 30ms apart, transform+opacity only. */
 @media (prefers-reduced-motion: no-preference) {
   .stagger-item {
-    animation: stagger-in 400ms var(--ease-out-strong) both;
+    animation: stagger-in 320ms var(--ease-out) both;
   }
 
-  .stagger-item:nth-child(3) { animation-delay: 40ms; }
-  .stagger-item:nth-child(4) { animation-delay: 80ms; }
-  .stagger-item:nth-child(5) { animation-delay: 120ms; }
-  .stagger-item:nth-child(6) { animation-delay: 160ms; }
-  .stagger-item:nth-child(7) { animation-delay: 200ms; }
-  .stagger-item:nth-child(8) { animation-delay: 240ms; }
+  .stagger-item:nth-child(3) { animation-delay: 30ms; }
+  .stagger-item:nth-child(4) { animation-delay: 60ms; }
+  .stagger-item:nth-child(5) { animation-delay: 90ms; }
+  .stagger-item:nth-child(6) { animation-delay: 120ms; }
+  .stagger-item:nth-child(7) { animation-delay: 150ms; }
+  .stagger-item:nth-child(8) { animation-delay: 180ms; }
 }
 
 @keyframes stagger-in {
   from {
     opacity: 0;
-    transform: translateY(8px);
+    transform: translateY(6px);
   }
 }
 
+/*
+ * The drawer arrives from the right with a trace of scale. The scale is the
+ * part that matters: sliding alone reads as a panel being pushed in from
+ * offscreen, while easing up from 98% reads as something coming toward you.
+ * It leaves faster than it enters — dismissal should feel immediate, arrival
+ * should feel placed.
+ */
+@keyframes drawer-in {
+  from {
+    opacity: 0;
+    transform: translateX(20px) scale(0.985);
+  }
+
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+@keyframes drawer-out {
+  from {
+    opacity: 1;
+    transform: none;
+  }
+
+  to {
+    opacity: 0;
+    transform: translateX(20px) scale(0.99);
+  }
+}
+
+/* Resting state for a chart that hasn't mounted yet — a slow breath, not a
+ * shimmer sweep, so an empty panel doesn't compete with the ones that have data. */
+.chart-skeleton {
+  animation: chart-skeleton-pulse 2.4s var(--ease-out) infinite;
+}
+
+@keyframes chart-skeleton-pulse {
+  0%, 100% { opacity: 0.35; }
+  50% { opacity: 0.6; }
+}
+
 @media (prefers-reduced-motion: reduce) {
+  .chart-skeleton {
+    animation: none;
+  }
+
+  [data-state="open"],
+  [data-state="closed"] {
+    animation-duration: 1ms !important;
+  }
+
   .breakdown-bar,
   .feed-enter-active,
   .feed-leave-active,
@@ -175,16 +427,4 @@
   .live-flash-fresh {
     animation: none;
   }
-}
-
-.dot-pattern {
-  position: absolute;
-  /* Purely decorative — never intercept hover/click, or it blocks the chart
-   * SVG it overlaps (e.g. breaks Unovis tooltip hover in `DailyActivityChart`). */
-  pointer-events: none;
-  background-image: radial-gradient(var(--dot-pattern-color) 1px, transparent 1px);
-  background-size: 7px 7px;
-  background-position: -8.5px -8.5px;
-  opacity: 20%;
-  mask-image: radial-gradient(ellipse at center, rgba(0, 0, 0, 1), transparent 75%);
 }

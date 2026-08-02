@@ -1,20 +1,20 @@
 # evlog telemetry
 
-A tiny, self-hostable analytics dashboard for [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) run events — built to receive data from the `evlog` CLI (and any other tool using the package), store it in Postgres via [NuxtHub](https://hub.nuxt.com) + Drizzle ORM, and show simple stats: totals, success/error rate, environments (development/preview/production), top commands, and a raw events browser.
+A tiny, self-hostable analytics dashboard for [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) run events — built to receive run events from anything that reports to it — a CLI someone typed, a GitHub Actions job, a Vercel build, an AI coding agent, a cron script — store them in Postgres via [NuxtHub](https://hub.nuxt.com) + Drizzle ORM, and show what's happening: totals and their trend, where the runs came from, latency, version adoption, and a raw events browser.
 
 [![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HugoRCD/evlog/tree/main/apps/telemetry&project-name=evlog-telemetry&repository-name=evlog-telemetry&products=%5B%7B%22type%22%3A%22integration%22%2C%22group%22%3A%22postgres%22%2C%22protocol%22%3A%22storage%22%7D%5D&env=ANALYTICS_PASSWORD,NUXT_SESSION_PASSWORD&envDescription=Dashboard+password+and+a+32%2B+char+session+secret)
 
 ## What you get
 
-- `POST /api/telemetry/ingest` — public endpoint the CLI posts to. Validated with `parseIngestBody()` from `@evlog/telemetry/ingest`, deduped on `idempotencyKey`, rate-limited per IP.
-- A password-gated dashboard (`nuxt-auth-utils` session) with:
-  - KPI cards — total runs, success rate, error rate, unique machines, avg duration
-  - Environment breakdown (development / preview / production / anything custom) as a donut chart
-  - Daily activity (success vs error) as a stacked bar chart
-  - Top commands
-  - Charts use [`nuxt-charts`](https://nuxtcharts.com) (the same lib + tooltip/legend styling as [nuxt-ui-templates/chat](https://github.com/nuxt-ui-templates/chat))
-  - A sortable, paginated raw events browser — click any column header to sort, click a row to open its full detail (flags, custom fields, environment info, idempotency key)
-  - All filters, sort, page, and the open run detail are reflected in the URL, so any view is a shareable/bookmarkable link — a "Reset filters" button appears whenever any of them differ from the defaults, to get back to a clean view in one click
+- `POST /api/telemetry/ingest` — public endpoint your tools post to. Validated with `parseIngestBody()` from `@evlog/telemetry/ingest`, deduped on `idempotencyKey`, rate-limited per IP.
+- A password-gated dashboard (`nuxt-auth-utils` session), split into four tabs:
+  - **Overview** — KPI cards (total runs, success rate, error rate, unique machines, avg and p95 duration), each carrying a sparkline of the range and its change against the *preceding window of equal length*; activity as a stacked bar chart (hourly on the 24h range, daily otherwise); a live feed; a **Sources** panel that classifies every run as CI, AI agent, terminal or automation and filters the whole dashboard when you click one; and the environment split
+  - **Performance** — average and p95 latency over time, error rate over time, the duration histogram, top commands (with p95), and top error codes
+  - **Adoption** — tool version rollout as a stacked area chart (how fast a release takes over), active machines split into new vs returning, a weekday × hour punchcard of when runs happen, Node/OS/version breakdowns, and the `flags` / `custom` field usage with the error share per value
+  - **Explorer** — a sortable, paginated raw events browser; click any column header to sort, click a row to open its full detail (flags, custom fields, environment info, idempotency key)
+  - Charts use [`nuxt-charts`](https://nuxtcharts.com) (the same lib + tooltip/legend styling as [nuxt-ui-templates/chat](https://github.com/nuxt-ui-templates/chat)); the sparklines and the punchcard are hand-rolled SVG/CSS, since axes, legends and tooltips are all features they'd have to turn back off
+  - The active tab, all filters, sort, page, and the open run detail are reflected in the URL, so any view is a shareable/bookmarkable link — a "Reset filters" button appears whenever any of them differ from the defaults, to get back to a clean view in one click
+  - The Explorer and Adoption queries are the most expensive reads in the app, so they're only fetched while their tab is on screen (a deep link to `?tab=adoption` still server-renders with its data)
 - An MCP server at `/mcp` (built with [`@nuxtjs/mcp-toolkit`](https://mcp-toolkit.nuxt.dev)) that exposes the same stats/runs data to AI assistants — see [MCP endpoint](#mcp-endpoint) below
 
 See the architecture writeup in the docs: [evlog.dev — telemetry ingest](https://evlog.dev/use-cases/telemetry/ingest).
@@ -25,7 +25,7 @@ Click the button above. During setup:
 
 1. Pick a Postgres provider from the Vercel Marketplace (Neon, Supabase, ...) — this auto-injects the connection string. NuxtHub picks up `DATABASE_URL`, `POSTGRES_URL`, or `POSTGRESQL_URL` automatically, so whichever name the integration creates just works.
 2. Set `ANALYTICS_PASSWORD` (the dashboard login — whatever you want to type in) and `NUXT_SESSION_PASSWORD` (32+ *random* chars from `openssl rand -base64 32` — this is a cookie-encryption secret, not a password you type in, and must not be the same value as `ANALYTICS_PASSWORD`).
-3. Point your tool's telemetry `endpoint` at `https://<your-deployment>/api/telemetry/ingest`.
+3. Point each tool's telemetry `endpoint` at `https://<your-deployment>/api/telemetry/ingest`. Anything using `@evlog/telemetry` reports the same event shape, so CLIs, CI jobs and scripts all land in the same dashboard.
 
 Table migrations (`server/db/migrations/postgresql/`) apply automatically during `nuxi build`/deploy — nothing to run by hand.
 
@@ -33,8 +33,11 @@ Table migrations (`server/db/migrations/postgresql/`) apply automatically during
 
 `/mcp` (see `server/mcp/`) exposes the dashboard's data to AI assistants like Cursor or Claude Desktop over the [Model Context Protocol](https://modelcontextprotocol.io), read-only:
 
-- `telemetry-stats` — aggregate totals, environment/tool breakdown, top commands, and daily activity for a time range
+- `telemetry-stats` — aggregate totals (plus the same totals one window back, for period-over-period comparison), environment/tool breakdown, top commands, and the activity timeline for a time range
+- `telemetry-adoption` — version rollout over time, new vs returning machines, the weekday/hour punchcard, and the flag/custom field breakdown
 - `telemetry-runs` — the raw events list, with the same filter/sort/pagination options as the dashboard's browser
+
+All three aggregate tools accept a `source` filter (`ci:github_actions`, `agent:claude-code`, `terminal`, `automation`), matching the dashboard's Sources panel.
 - `telemetry-run` — full detail (flags, custom fields, environment info) for one run by id
 
 Click **Connect MCP** in the dashboard header for the endpoint URL and a ready-to-paste client config. Auth mirrors the dashboard's own password gate: with no `ANALYTICS_PASSWORD` set, the endpoint is open; once it's set, clients must send `Authorization: Bearer <ANALYTICS_PASSWORD>` or the request gets a `403` (never a `401` — that would trigger unwanted OAuth discovery in MCP clients).

@@ -16,26 +16,19 @@ function lastSeenLabel(iso: string) {
 const items = computed<BreakdownBarItem[]>(() => props.errorCodes.map(e => ({
   key: e.errorCode,
   label: e.errorCode,
-  icon: 'i-nucleo-circle-warning',
   count: e.count,
-  hint: `last ${lastSeenLabel(e.lastSeen)}`,
+  hint: lastSeenLabel(e.lastSeen),
 })))
 </script>
 
 <template>
-  <UCard :ui="{ header: 'py-4 px-4', body: 'px-4 py-3' }">
-    <template #header>
-      <h3 class="flex items-center gap-2 text-lg font-normal text-highlighted">
-        <GlassIconTile icon="i-nucleo-bug" />
-        Error codes
-      </h3>
-    </template>
+  <PanelCard title="Error codes" subtitle="What failed most, and when it last happened" flush>
+    <EmptyState
+      v-if="items.length === 0"
+      message="No errors in this range."
+      hint="Every run in the window succeeded."
+    />
 
-    <div v-if="items.length === 0" class="flex flex-col items-center gap-2 py-6 text-sm text-muted">
-      <UIcon name="i-nucleo-circle-check" class="size-5 text-success/70" />
-      No errors in this range.
-    </div>
-
-    <BreakdownBars v-else :items bar-class="bg-error/12" />
-  </UCard>
+    <BreakdownBars v-else :items bar-class="bg-error/[0.045]" />
+  </PanelCard>
 </template>

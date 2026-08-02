@@ -7,6 +7,8 @@ import {
   parseRange,
   parseRunsFilter,
   parseSort,
+  previousWindow,
+  rangeDurationMs,
   rangeToCutoff,
 } from '../server/utils/query-filters'
 
@@ -39,6 +41,28 @@ describe('rangeToCutoff', () => {
     const after = Date.now()
     expect(cutoff.getTime()).toBeGreaterThanOrEqual(before - 24 * 60 * 60 * 1000)
     expect(cutoff.getTime()).toBeLessThanOrEqual(after - 24 * 60 * 60 * 1000)
+  })
+})
+
+describe('previousWindow', () => {
+  const now = new Date('2024-06-15T12:00:00Z').getTime()
+
+  it('is the window of equal length ending where the current one starts', () => {
+    expect(previousWindow('7d', now)).toEqual({
+      from: new Date('2024-06-01T12:00:00Z'),
+      to: new Date('2024-06-08T12:00:00Z'),
+    })
+  })
+
+  it('is exactly as long as the range it mirrors', () => {
+    for (const range of ['24h', '7d', '30d'] as const) {
+      const { from, to } = previousWindow(range, now)
+      expect(to.getTime() - from.getTime()).toBe(rangeDurationMs(range))
+    }
+  })
+
+  it('never overlaps the current window — its end is the current cutoff', () => {
+    expect(previousWindow('30d', now).to).toEqual(rangeToCutoff('30d', now))
   })
 })
 

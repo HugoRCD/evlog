@@ -6,8 +6,8 @@ const rateLimiter = createRateLimiter({ limit: 60, windowMs: 60_000 })
 /**
  * `POST /api/telemetry/ingest` — public, unauthenticated by design.
  *
- * CLI telemetry endpoints are semi-public (like a browser analytics key):
- * the URL ships inside the published CLI, so anyone can read it. Defense
+ * Tool telemetry endpoints are semi-public (like a browser analytics key):
+ * the URL ships inside the published tool, so anyone can read it. Defense
  * lives here, not in a secret — validate the payload shape, allowlist tool
  * names and custom keys, dedupe on `idempotencyKey`, and rate-limit.
  */
@@ -58,7 +58,7 @@ export default defineEventHandler(async (event) => {
 
   log.set({ ingest: { outcome: 'stored' } })
 
-  // 204 tells the CLI's outbox the batch delivered — anything else keeps it
+  // 204 tells the reporting tool's outbox the batch delivered — anything else keeps it
   // buffered locally for the next invocation to retry.
   setResponseStatus(event, 204)
   return null
