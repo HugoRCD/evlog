@@ -80,13 +80,22 @@ export interface SkillsCommand {
 const SKILL_NAME = /^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?$/
 
 /**
- * Reject anything that is not an http(s) URL.
+ * Characters an origin never needs, and `cmd.exe` reads as syntax.
  *
- * On Windows {@link runSkills} needs a shell to find `npx`, which means this
- * value reaches a `cmd.exe` command line where `&` and `|` separate commands.
- * Nobody types that against themselves, but a `--source` fed from CI config or
- * an interpolated variable is a different question, so the shape is checked
- * once here rather than trusted all the way down.
+ * Being an http(s) URL is not enough on its own: `https://evlog.dev?q=1&calc`
+ * parses, and `&` still separates commands. Node does not escape array
+ * arguments under `shell: true`, so the allowlist is the guard.
+ */
+const SAFE_SOURCE = /^[A-Za-z0-9._~:/-]+$/
+
+/**
+ * Reject anything that is not a plain http(s) origin.
+ *
+ * On Windows {@link runSkills} needs a shell to find `npx` — Node refuses to
+ * spawn a `.cmd` without one — which means this value reaches a `cmd.exe`
+ * command line. Nobody types `&` against themselves, but a `--source` fed from
+ * CI config or an interpolated variable is a different question, so the shape
+ * is checked once here rather than trusted all the way down.
  */
 function checkSource(value: string): string {
   let url: URL
@@ -96,6 +105,9 @@ function checkSource(value: string): string {
     throw cliErrors.AGENTS_INVALID_SOURCE({ value })
   }
   if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    throw cliErrors.AGENTS_INVALID_SOURCE({ value })
+  }
+  if (!SAFE_SOURCE.test(value)) {
     throw cliErrors.AGENTS_INVALID_SOURCE({ value })
   }
   return value
@@ -123,9 +135,10 @@ export function skillsCommand(options: {
   if (options.global) args.push('--global')
   if (!options.interactive) args.push('--yes')
 
-  /* `npx --yes` suppresses the install prompt for the skills package itself and
-     is noise in a command somebody may retype. */
-  return { display: `npx ${args.slice(1).join(' ')}`, bin: 'npx', args }
+  /* Every argument, including npx's own `--yes`: this string is what the plan
+     shows and what the report tells you to re-run, so it has to be the command
+     that actually runs rather than a tidied version of it. */
+  return { display: `npx ${args.join(' ')}`, bin: 'npx', args }
 }
 
 /**

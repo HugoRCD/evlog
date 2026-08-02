@@ -340,7 +340,7 @@ describe('runInit — agent guidelines', () => {
     const result = await runInit(fakeContext(cwd), undefined, { agentGuide: true, install: false, dryRun: true, yes: true })
 
     expect(result.agentGuide?.status).toBe('pending')
-    expect(result.agentGuide?.command).toContain('npx skills add')
+    expect(result.agentGuide?.command).toContain('npx --yes skills add')
     expect(skills.calls).toBe(0)
     expect(existsSync(join(cwd, 'AGENTS.md'))).toBe(false)
   })

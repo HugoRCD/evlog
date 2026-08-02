@@ -178,26 +178,31 @@ describe('findInstalledSkills', () => {
 
 describe('skillsCommand', () => {
   it('adds every published skill from the docs site by default', () => {
-    expect(skillsCommand({ interactive: true }).display).toBe('npx skills add https://www.evlog.dev')
+    expect(skillsCommand({ interactive: true }).display).toBe('npx --yes skills add https://www.evlog.dev')
+  })
+
+  it('shows the command it actually runs, argument for argument', () => {
+    /* The plan prints this and the report says to re-run it, so a tidied
+       version that drops npx's own --yes would not reproduce the run. */
+    const command = skillsCommand({ interactive: false })
+
+    expect(command.display).toBe(`${command.bin} ${command.args.join(' ')}`)
   })
 
   it('lets the skills CLI ask its own questions when somebody is watching', () => {
-    /* Which agents to install for is its question, not ours. */
-    expect(skillsCommand({ interactive: true }).display).not.toContain('--yes')
-    /* Non-interactively it must never block on a prompt nobody will answer. */
-    expect(skillsCommand({ interactive: false }).display).toContain('--yes')
-  })
-
-  it('always answers npx own install prompt', () => {
-    /* Distinct from the flag above: this one is npx being asked whether to
-       fetch the skills package, and it blocks even in a run we did not drive. */
-    expect(skillsCommand({ interactive: true }).args[0]).toBe('--yes')
+    /* Which agents to install for is its question, not ours — so the trailing
+       --yes, the one aimed at the skills CLI, appears only when nobody can
+       answer. The leading one is npx's and is always there. */
+    expect(skillsCommand({ interactive: true }).display)
+      .toBe('npx --yes skills add https://www.evlog.dev')
+    expect(skillsCommand({ interactive: false }).display)
+      .toBe('npx --yes skills add https://www.evlog.dev --yes')
   })
 
   it('passes the scope and the skill selection through', () => {
     const command = skillsCommand({ interactive: true, global: true, skills: ['analyze-logs'] })
 
-    expect(command.display).toBe('npx skills add https://www.evlog.dev --skill analyze-logs --global')
+    expect(command.display).toBe('npx --yes skills add https://www.evlog.dev --skill analyze-logs --global')
   })
 
   it('runs npx rather than depending on the package', () => {
@@ -205,9 +210,23 @@ describe('skillsCommand', () => {
   })
 
   it('rejects a source that is not an http(s) URL', () => {
-    /* On Windows the spawn needs a shell to find npx, so `&` in this value
-       would start a second command. Checked once, before anything is spawned. */
-    for (const source of ['https://evlog.dev && calc', 'file:///etc/passwd', 'not a url', '']) {
+    for (const source of ['file:///etc/passwd', 'not a url', '']) {
+      expect(() => skillsCommand({ interactive: true, source }), source)
+        .toThrowError(expect.objectContaining({ code: 'cli.AGENTS_INVALID_SOURCE' }))
+    }
+  })
+
+  it('rejects shell metacharacters even inside a valid URL', () => {
+    /* Being an http(s) URL is not enough: `?q=1&calc` parses, and on Windows
+       the spawn needs a shell, where `&` starts a second command. */
+    for (const source of [
+      'https://evlog.dev?q=1&calc',
+      'https://evlog.dev && calc',
+      'https://evlog.dev|calc',
+      'https://evlog.dev;calc',
+      'https://evlog.dev/%TEMP%',
+      'https://evlog.dev/$(calc)',
+    ]) {
       expect(() => skillsCommand({ interactive: true, source }), source)
         .toThrowError(expect.objectContaining({ code: 'cli.AGENTS_INVALID_SOURCE' }))
     }
@@ -222,7 +241,7 @@ describe('skillsCommand', () => {
 
   it('accepts a self-hosted origin', () => {
     expect(skillsCommand({ interactive: true, source: 'http://localhost:3000' }).display)
-      .toBe('npx skills add http://localhost:3000')
+      .toBe('npx --yes skills add http://localhost:3000')
   })
 })
 
@@ -270,7 +289,7 @@ describe('runAgents', () => {
 
     expect(await readFile(join(root, 'AGENTS.md'), 'utf8')).toContain(MARKER_START)
     expect(await readFile(join(root, 'CLAUDE.md'), 'utf8')).toBe('@AGENTS.md\n')
-    expect(result.skills).toMatchObject({ status: 'skipped', command: 'npx skills add https://www.evlog.dev --yes' })
+    expect(result.skills).toMatchObject({ status: 'skipped', command: 'npx --yes skills add https://www.evlog.dev --yes' })
   })
 
   it('is safe to run twice — the second run changes nothing', async () => {
