@@ -1,4 +1,5 @@
 import { sendRedirect, setResponseHeader } from 'h3'
+import { shouldFallbackToStaticOgImage } from '../utils/og-fallback'
 
 /**
  * When zeroRuntime is enabled, nuxt-og-image throws at runtime if a static OG
@@ -6,13 +7,10 @@ import { sendRedirect, setResponseHeader } from 'h3'
  * missed the CDN static file — redirect to the site-wide fallback image.
  */
 export default defineEventHandler((event) => {
-  if (import.meta.dev) {
-    return
-  }
-
-  const [pathname] = event.path.split('?')
-
-  if (!pathname.startsWith('/_og/s/')) {
+  if (!shouldFallbackToStaticOgImage(event.path, {
+    dev: import.meta.dev,
+    prerender: import.meta.prerender,
+  })) {
     return
   }
 
