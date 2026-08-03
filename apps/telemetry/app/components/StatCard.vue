@@ -97,7 +97,7 @@ const exactValue = computed(() => `${props.value.toLocaleString()}${props.suffix
         <span>{{ deltaLabel }}</span>
       </p>
 
-      <Sparkline v-if="series && series.length > 1" :values="series" color="var(--chart-accent)" class="w-20" />
+      <Sparkline v-if="series && series.length > 1" :values="series" color="var(--chart-accent)" class="min-w-20 flex-1" />
     </div>
   </div>
 </template>
