@@ -3,5 +3,5 @@ import { connectGitHubCredentials } from '@vercel/connect/eve'
 
 export default githubChannel({
   botName: 'evlogai',
-  credentials: connectGitHubCredentials('github/evi-github'),
+  credentials: connectGitHubCredentials('github/evi-github-production'),
 })
