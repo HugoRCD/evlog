@@ -20,6 +20,7 @@
   },
   "devDependencies": {
     "@types/node": "24.x",
+    "microsandbox": "^0.6.8",
     "typescript": "7.0.2"
   }
 }
