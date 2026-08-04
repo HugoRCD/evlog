@@ -52,3 +52,10 @@ minimumReleaseAgeExclude:
   - eve@0.24.3
   - satori@0.28.0
   - tsdown@0.22.8
+  - "@rolldown/*"
+  - "@workflow/*"
+  - experimental-ai-sdk-code-mode
+  - eve
+  - nitro
+  - rolldown
+  - workflow
