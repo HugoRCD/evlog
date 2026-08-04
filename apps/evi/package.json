@@ -14,10 +14,10 @@
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@vercel/connect": "0.4.3",
+    "@vercel/connect": "^0.6.1",
     "ai": "^7.0.38",
     "eve": "^0.29.5",
-    "zod": "4.4.3"
+    "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "24.x",
