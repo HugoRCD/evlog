@@ -2,6 +2,7 @@
   "name": "evi",
   "version": "0.0.0",
   "type": "module",
+  "private": true,
   "imports": {
     "#*": "./agent/*",
     "#evals/*": "./evals/*"
