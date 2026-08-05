@@ -37,6 +37,7 @@ scope.
 - dx (developer experience improvements)
 - elysia (Elysia plugin)
 - eve (eve agent integration)
+- evi (Evi agent)
 - express (Express middleware)
 - fastify (Fastify plugin)
 - fs (File System drain adapter)

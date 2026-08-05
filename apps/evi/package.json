@@ -17,7 +17,7 @@
     "@github-tools/eve-extension": "^0.1.0",
     "@vercel/connect": "^0.6.1",
     "ai": "^7.0.38",
-    "eve": "^0.29.5",
+    "eve": "^0.30.6",
     "zod": "^4.4.3"
   },
   "devDependencies": {

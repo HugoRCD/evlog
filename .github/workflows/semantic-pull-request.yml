@@ -46,6 +46,7 @@ jobs:
             dx
             elysia
             eve
+            evi
             express
             fastify
             fs
