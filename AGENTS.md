@@ -13,6 +13,8 @@ pnpm run test                      # run tests (vitest)
 pnpm run lint                      # lint all packages
 pnpm run typecheck                 # type-check all packages
 pnpm run docs                      # start docs site
+pnpm run telemetry                 # start the telemetry dashboard (apps/telemetry)
+pnpm telemetry:cli <command>       # run this repo's CLI into that local dashboard (--cwd to target an app)
 ```
 
 Publishing is automated: changesets + `.github/workflows/release.yml`. Never run `pnpm release` or `changeset publish` manually.
