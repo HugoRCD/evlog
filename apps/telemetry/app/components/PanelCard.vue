@@ -12,7 +12,14 @@ withDefaults(defineProps<{
   title: string
   /** One line on what this measures and how to read it. */
   subtitle?: string
-  /** Removes the body padding, for panels whose content spans edge to edge (tables, lists). */
+  /**
+   * Drops the horizontal body padding, for panels whose content spans edge to
+   * edge (tables, lists).
+   *
+   * The bottom padding stays: rows carry their own vertical rhythm, so without
+   * it the last one sits flush against the card border and the panel reads as
+   * clipped rather than finished.
+   */
   flush?: boolean
 }>(), {
   subtitle: undefined,
@@ -37,7 +44,7 @@ withDefaults(defineProps<{
       </div>
     </header>
 
-    <div class="flex-1" :class="flush ? '' : 'px-4 pb-4'">
+    <div class="flex-1" :class="flush ? 'pb-2' : 'px-4 pb-4'">
       <slot />
     </div>
   </section>

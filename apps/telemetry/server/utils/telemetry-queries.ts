@@ -305,7 +305,7 @@ export async function getAdoptionForFilter(filter: RunsFilter): Promise<Adoption
       .orderBy(desc(runCount))
       .limit(FIELD_ROW_LIMIT)
 
-  const [versionRows, machineRows, punchcard, flagRows, customRows] = await Promise.all([
+  const [versionRows, machineRows, punchcard, flagRows, customRows, frameworkRows] = await Promise.all([
     db.select({ bucket, version: schema.runs.toolVersion, count: runCount })
       .from(schema.runs).where(where)
       .groupBy(sql`1, 2`),
@@ -330,12 +330,47 @@ export async function getAdoptionForFilter(filter: RunsFilter): Promise<Adoption
 
     fieldBreakdown(schema.runs.flags),
     fieldBreakdown(schema.runs.custom),
+
+    /**
+     * Framework per bucket, read straight off the `custom` jsonb.
+     *
+     * Only the framework keys are expanded rather than every pair — the full
+     * `jsonb_each_text` cross join is the most expensive read in the app, and
+     * a tool reporting forty counters would multiply the row count by forty
+     * for two of them. `coalesce` picks whichever key the run carries; a run
+     * reporting both counts once, under `map`'s answer.
+     */
+    db.select({
+      bucket,
+      framework: sql<string>`coalesce(
+        ${schema.runs.custom} ->> 'mapFramework',
+        ${schema.runs.custom} ->> 'initFramework'
+      )`.as('framework'),
+      count: runCount,
+    })
+      .from(schema.runs)
+      .where(and(
+        where,
+        sql`${schema.runs.custom} ?| array['mapFramework', 'initFramework']`,
+      ))
+      .groupBy(sql`1, 2`),
   ])
 
   const keys = timelineBucketKeys(filter.range)
+  const { dimensions, fields: customFields } = splitFieldStats(
+    customRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) })),
+    PROMOTED_FIELD_KEYS,
+  )
   const { versions, points } = toVersionAdoption(
     versionRows.map(r => ({ bucket: r.bucket, version: r.version, count: Number(r.count) })),
     keys,
+  )
+  const frameworkTimeline = toStackedSeries(
+    frameworkRows
+      .filter(r => r.framework !== null)
+      .map(r => ({ bucket: r.bucket, series: frameworkSeries(r.framework), count: Number(r.count) })),
+    keys,
+    MAX_FRAMEWORK_SERIES,
   )
 
   return {
@@ -350,7 +385,10 @@ export async function getAdoptionForFilter(filter: RunsFilter): Promise<Adoption
     ),
     punchcard: punchcard.map(r => ({ weekday: Number(r.weekday), hour: Number(r.hour), count: Number(r.count) })),
     flags: toFieldStats(flagRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) }))),
-    custom: toFieldStats(customRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) }))),
+    custom: customFields,
+    dimensions,
+    frameworks: frameworkTimeline.series,
+    frameworkAdoption: frameworkTimeline.points,
     mock: false,
   }
 }

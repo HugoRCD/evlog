@@ -10,15 +10,22 @@ export const DEFAULT_ALLOWED_TOOLS = ['evlog-cli']
  * namespace rule would accept a key nobody here has looked at.
  *
  * `init*` comes from `initTelemetryFieldNames()` in `@evlog/cli`
- * (`src/lib/init/telemetry.ts`). Growing the CLI's catalog adds names there,
- * and a name missing here is dropped silently — so regenerate this list when
- * destinations, extras or enrichers change.
+ * (`src/lib/init/telemetry.ts`), `map*` from `mapTelemetryFieldNames()`, and
+ * the `doctor` group from `doctorTelemetryFieldNames()`. Growing the CLI's
+ * catalog or its rule registry adds names there, and a name missing here is
+ * dropped silently — so regenerate this list when destinations, extras,
+ * enrichers or map rules change.
  */
 export const DEFAULT_ALLOWED_CUSTOM_KEYS: Record<string, string[]> = {
   'evlog-cli': [
+    // evlog doctor — which part of a setup people get stuck on
     'checksFailed',
     'checksWarned',
+    'checksPassed',
     'workspace',
+    'doctorEvlogFound',
+    'doctorLogsSink',
+    'doctorStackDetected',
     // evlog init — which options were picked
     'initFramework',
     'initDevDrain',
@@ -66,6 +73,50 @@ export const DEFAULT_ALLOWED_CUSTOM_KEYS: Record<string, string[]> = {
     'agentsDryRun',
     'agentsInteractive',
     'agentsCancelled',
+    // evlog map — how projects actually score, and which rules fire or get waived
+    'mapFramework',
+    'mapFrameworkForced',
+    'mapScore',
+    'mapGrade',
+    'mapView',
+    'mapWrote',
+    'mapEntryPoints',
+    'mapSensitive',
+    'mapInstrumented',
+    'mapPartial',
+    'mapDark',
+    'mapExempt',
+    'mapSuppressedChecks',
+    'mapWarnings',
+    'mapSuggestions',
+    'mapProjectSuggestions',
+    'mapGate',
+    'mapGateFailed',
+    'mapMinScore',
+    'mapBaselineDelta',
+    'mapBaselineRegressions',
+    'mapBaselineFixed',
+    'mapBaselineAdded',
+    'mapFailWideEvent',
+    'mapSuppressedWideEvent',
+    'mapFailContext',
+    'mapSuppressedContext',
+    'mapFailStructuredErrors',
+    'mapSuppressedStructuredErrors',
+    'mapFailAudit',
+    'mapSuppressedAudit',
+    'mapFailErrorHandling',
+    'mapSuppressedErrorHandling',
+    'mapFailPageErrorHandling',
+    'mapSuppressedPageErrorHandling',
+    'mapFailErrorCatalog',
+    'mapSuppressedErrorCatalog',
+    'mapFailAuditCoverage',
+    'mapSuppressedAuditCoverage',
+    'mapFailAiLogging',
+    'mapSuppressedAiLogging',
+    'mapFailAuthIdentity',
+    'mapSuppressedAuthIdentity',
   ],
 }
 

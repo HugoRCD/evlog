@@ -208,6 +208,18 @@
   --chart-series-4: #94a1ef;
   --chart-series-5: #b1baf5;
   --chart-series-6: rgba(9, 9, 11, 0.22);
+
+  /* Frameworks are unrelated categories, not an order, so they get distinct
+   * hues rather than the stepped ramp above — five shades of one blue is a
+   * value-ramp on nominal data, and stacked it reads as a single smear.
+   * Slot order is the adjacency order the bands stack in, validated for
+   * CVD separation; keep indigo→orange→purple→teal (teal next to orange
+   * drops the protan pair to ΔE 7.7). */
+  --chart-cat-1: #4c56b8;
+  --chart-cat-2: #9c5f24;
+  --chart-cat-3: #7a52a8;
+  --chart-cat-4: #137d5e;
+  --chart-cat-other: rgba(9, 9, 11, 0.22);
 }
 
 .dark {
@@ -229,6 +241,13 @@
   --chart-series-4: #343f85;
   --chart-series-5: #283066;
   --chart-series-6: rgba(255, 255, 255, 0.16);
+
+  /* Re-stepped against the dark surface, not flipped — same slot order. */
+  --chart-cat-1: #5e6ad2;
+  --chart-cat-2: #bf7a3f;
+  --chart-cat-3: #9a6fbf;
+  --chart-cat-4: #2fa382;
+  --chart-cat-other: rgba(255, 255, 255, 0.16);
 }
 
 /*

@@ -268,6 +268,25 @@ function onSortChange({ sort: nextSort, order: nextOrder }: { sort: RunSortKey, 
 }
 
 const paletteOpen = ref(false)
+const helpOpen = ref(false)
+
+/**
+ * Keys for the things the toolbar already does, so a view you reach a hundred
+ * times a day does not cost four clicks. The list the `?` sheet renders comes
+ * back from the same call that binds them.
+ */
+const { groups: shortcutGroups } = useDashboardShortcuts({
+  goToTab: (value: string) => {
+    if (TABS.some(entry => entry.value === value)) tab.value = value as Tab
+  },
+  setRange: (value: string) => {
+    if ((VALID_RANGES as string[]).includes(value)) range.value = value as StatsRange
+  },
+  resetFilters,
+  toggleHelp: () => {
+    helpOpen.value = !helpOpen.value
+  },
+})
 
 const detailOpen = ref(false)
 const runDetail = ref<RunDetail | null>(null)
@@ -562,15 +581,24 @@ async function onLogout() {
         </div>
       </template>
 
+      <!--
+        Independent columns, same reasoning as Adoption below. Error codes is
+        three rows tall and Durations is a plot, so pairing either into a row
+        with a full-height timeline buys nothing but whitespace.
+
+        Split evenly rather than 2/1: this tab has four plots and one table, and
+        at 2/1 the narrow rail could hold only the two smallest cards while the
+        wide one ran twice as long.
+      -->
       <template v-else-if="tab === 'performance'">
-        <div class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
-          <div class="flex flex-col gap-4 lg:col-span-2">
+        <div class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+          <div class="flex flex-col gap-4">
             <LatencyChart :timeline :granularity />
-            <ErrorRateChart :timeline :granularity />
             <CommandsTable :commands="stats?.commands ?? []" />
           </div>
 
           <div class="flex flex-col gap-4">
+            <ErrorRateChart :timeline :granularity />
             <DurationHistogram :durations="stats?.durations ?? { p50: 0, p95: 0, histogram: [] }" />
             <ErrorCodesCard :error-codes="stats?.errorCodes ?? []" />
           </div>
@@ -583,13 +611,28 @@ async function onLogout() {
         </div>
 
         <!--
-          Two columns that flow independently rather than three rows of
-          equal-height cells. The charts on the left and the breakdown lists on
-          the right have wildly different natural heights, so a row-based grid
-          left a tall void under whichever side finished first.
+          Two columns that flow independently — NOT a row grid.
+
+          Every panel here has its own natural height, and a row grid aligns
+          pairs of them: the shorter card in each row leaves a hole as tall as
+          the difference, four times down the page. Independent columns let each
+          one end where its content ends, so the only gap left is the one at the
+          very bottom of the shorter column.
+
+          Which makes the assignment the real work: panels are split so the two
+          columns come out roughly level, with the wide column taking the plots
+          (a timeline squeezed into a third of the width stops being readable)
+          and the narrow one taking the lists. Rebalance this when a panel is
+          added, rather than adding a row.
         -->
         <div v-else class="stagger-item grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
           <div class="flex flex-col gap-4 lg:col-span-2">
+            <FrameworkAdoptionCard
+              :dimensions="adoption?.dimensions ?? []"
+              :frameworks="adoption?.frameworks ?? []"
+              :points="adoption?.frameworkAdoption ?? []"
+              :granularity="adoption?.granularity ?? granularity"
+            />
             <VersionAdoptionChart
               :versions="adoption?.versions ?? []"
               :points="adoption?.versionAdoption ?? []"
@@ -600,6 +643,7 @@ async function onLogout() {
           </div>
 
           <div class="flex flex-col gap-4">
+            <ScoreDistributionCard :dimensions="adoption?.dimensions ?? []" />
             <VersionsCard
               :node-versions="stats?.nodeVersions ?? []"
               :tool-versions="stats?.toolVersions ?? []"
@@ -607,15 +651,18 @@ async function onLogout() {
             />
             <FieldsCard
               title="Flags"
-              subtitle="Flags reported with each run, and how often each value failed"
+              subtitle="Flags passed on the command line, and how often each one failed"
               :fields="adoption?.flags ?? []"
               empty-label="No flags in this range."
+              as-flags
             />
             <FieldsCard
               title="Custom fields"
-              subtitle="Values your tools set via telemetry.set(), and how often each one failed"
+              subtitle="Values your tools set via telemetry.set(), grouped by the command that reports them"
               :fields="adoption?.custom ?? []"
               empty-label="No custom fields in this range."
+              grouped
+              :max-body-height="360"
             />
           </div>
         </div>
@@ -659,6 +706,8 @@ async function onLogout() {
       @update:source="source = $event"
       @reset="resetFilters"
     />
+
+    <ShortcutsHelp v-model:open="helpOpen" :groups="shortcutGroups" />
 
     <USlideover
       v-model:open="detailOpen"
