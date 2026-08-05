@@ -12,6 +12,7 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
+    "@nuxt/icon": "^2.3.1",
     "@nuxt/ui": "^4.9.0",
     "better-auth": "^1.6.23",
     "better-sqlite3": "^12.11.1",
