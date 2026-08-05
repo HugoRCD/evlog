@@ -21,6 +21,8 @@ import {
   formatMapWarnings,
 } from '../lib/map/report'
 import { scan } from '../lib/map/scan'
+import { recordMapRun, resolveGate } from '../lib/map/telemetry'
+import type { MapView } from '../lib/map/telemetry'
 import type { Framework, ScanContext, ScanResult } from '../lib/map/types'
 import { writeMapFile } from '../lib/map/write'
 
@@ -232,15 +234,20 @@ export default defineEvlogCommand('map', {
     const cwd = typeof args.cwd === 'string' && args.cwd.length > 0 ? args.cwd : undefined
     const ctx = cwd ? { ...cli, cwd } : cli
 
+    const entry = typeof args.entry === 'string' && args.entry.length > 0 ? args.entry : undefined
+    const view: MapView = entry ? 'inspect' : args.all ? 'all' : 'summary'
+
     let result: MapResult
     let threshold: number | undefined
+    let framework: Framework | undefined
     try {
       /* Before the scan, not after: an unusable threshold should cost nothing,
          and validating it afterwards means the command reads the whole project
          and writes evlog.map.json before admitting it cannot gate on it. */
       threshold = parseMinScoreArg(args.minScore)
+      framework = parseFrameworkArg(args.framework)
       result = await runMap(ctx, log, {
-        framework: parseFrameworkArg(args.framework),
+        framework,
         noWrite: !args.write,
         verbose: args.verbose,
         baseline: parseBaselineArg(args.baseline),
@@ -259,6 +266,16 @@ export default defineEvlogCommand('map', {
       throw error
     }
 
+    recordMapRun({
+      scan: result.scan,
+      frameworkForced: framework !== undefined,
+      gate: resolveGate({ minScore: threshold !== undefined, baseline: result.baseline !== null }),
+      minScore: threshold,
+      baseline: result.baseline,
+      view,
+      wrote: result.mapPath !== null,
+    })
+
     ui.done({
       jsonMode: args.json,
       json: {
@@ -267,11 +284,7 @@ export default defineEvlogCommand('map', {
         mapPath: result.mapPath,
         ...(result.baseline ? { baseline: result.baseline } : {}),
       },
-      human: formatMapReport(ctx, result, {
-        all: args.all,
-        entry: typeof args.entry === 'string' && args.entry.length > 0 ? args.entry : undefined,
-        minScore: threshold,
-      }),
+      human: formatMapReport(ctx, result, { all: args.all, entry, minScore: threshold }),
     })
 
     if (threshold !== undefined && result.scan.map.score < threshold) {

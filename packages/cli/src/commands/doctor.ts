@@ -304,6 +304,37 @@ export function formatDoctorReport(ctx: CliContext, result: DoctorResult): strin
 }
 
 /**
+ * What `evlog doctor` reports.
+ *
+ * Check ids are this CLI's own closed set; their statuses say which part of a
+ * setup people get stuck on, which is the thing worth fixing in the docs.
+ * Counts and booleans only — never the project name, the path, or the version.
+ */
+function doctorTelemetryFields(result: DoctorResult): Record<string, boolean | number> {
+  const statusOf = (id: string) => result.checks.find(check => check.id === id)?.status
+
+  return {
+    checksFailed: result.summary.fail,
+    checksWarned: result.summary.warn,
+    checksPassed: result.summary.ok,
+    workspace: result.project.kind !== 'single',
+    doctorEvlogFound: statusOf('evlog') === 'ok',
+    doctorLogsSink: statusOf('logs') === 'ok',
+    doctorStackDetected: result.project.stack.length,
+  }
+}
+
+/** Every field {@link doctorTelemetryFields} can emit — used to document the disclosure. */
+export function doctorTelemetryFieldNames(): string[] {
+  return Object.keys(doctorTelemetryFields({
+    project: { cwd: '', root: '', packageDir: '', kind: 'single', name: null, stack: [] },
+    checks: [],
+    sections: [],
+    summary: { ok: 0, warn: 0, fail: 0 },
+  }))
+}
+
+/**
  * `evlog doctor` — diagnose the local evlog setup.
  * Logic lives in {@link runDoctor}; this file owns the citty surface.
  */
@@ -317,11 +348,7 @@ export default defineEvlogCommand('doctor', {
     const ctx = cwd ? { ...cli, cwd } : cli
     const result = await runDoctor(ctx, log)
 
-    telemetry.set({
-      checksFailed: result.summary.fail,
-      checksWarned: result.summary.warn,
-      workspace: result.project.kind !== 'single',
-    })
+    telemetry.set(doctorTelemetryFields(result))
 
     ui.done({
       jsonMode: args.json,
