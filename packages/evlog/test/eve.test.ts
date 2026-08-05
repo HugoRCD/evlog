@@ -368,12 +368,13 @@ describe('evlog/eve', () => {
       data: { sequence: 0, turnId: TURN_ID },
     }, ctx)
     useLogger(toolContext()).set({ customer: { slug: 'acme' } })
-    await hook.events!['turn.completed']!({
-      type: 'turn.completed',
-      data: { sequence: 1, turnId: TURN_ID },
-    }, ctx)
 
     await hook.events!['session.completed']!({ type: 'session.completed' } as never, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const openTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID))
+    expect(openTurn?.status).toBe(200)
+    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
 
     hook.events!['turn.started']!({
       type: 'turn.started',
@@ -387,6 +388,46 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain, 2)
     const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
     expect(secondTurn?.customer).toBeUndefined()
+  })
+
+  it('finishes the remaining turns and clears session state when one turn fails to finish', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      keep: (tail) => {
+        if (tail.path?.endsWith(TURN_ID)) throw new Error('keep exploded')
+      },
+    })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    useLogger(toolContext()).set({ customer: { slug: 'acme' } })
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await hook.events!['session.completed']!({ type: 'session.completed' } as never, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    expect(findEventViaDrain(spies.drain, e => e.path?.endsWith(TURN_ID))).toBeUndefined()
+    expect(findEventViaDrain(spies.drain, e => e.path?.endsWith(TURN_ID_1))).toBeDefined()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 2, turnId: 'turn_2' },
+    }, ctx)
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 3, turnId: 'turn_2' },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const thirdTurn = findEventViaDrain(spies.drain, e => e.path?.endsWith('turn_2'))
+    expect(thirdTurn?.customer).toBeUndefined()
   })
 
   it('does not throw when an internal handler fails', async () => {

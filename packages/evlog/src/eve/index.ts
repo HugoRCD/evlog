@@ -633,13 +633,23 @@ async function finishTurn(
  * `session.completed` / `session.failed`; a turn left open at that point never
  * received its own terminal event, so without this it would neither be emitted
  * nor released.
+ *
+ * Each turn is finished independently: a user `keep` callback that throws
+ * rejects that turn's `finish`, and must not take the remaining turns with it.
  */
 async function finishOpenTurns(
   sessionId: string,
   opts: { status?: number; error?: Error },
+  decorate?: (state: TurnState) => void,
 ): Promise<void> {
   for (const turnId of openTurnIds(sessionId)) {
-    await finishTurn(sessionId, turnId, opts)
+    try {
+      const state = getTurnState(sessionId, turnId)
+      if (state && decorate) decorate(state)
+      await finishTurn(sessionId, turnId, opts)
+    } catch (err) {
+      console.error('[evlog] eve hook handler failed:', err)
+    }
   }
 }
 
@@ -872,9 +882,10 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
       async 'session.completed'(_event, ctx) {
         try {
           await finishOpenTurns(ctx.session.id, { status: 200 })
-          clearSessionState(ctx.session.id)
         } catch (err) {
           console.error('[evlog] eve hook handler failed:', err)
+        } finally {
+          clearSessionState(ctx.session.id)
         }
       },
 
@@ -882,8 +893,8 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
         try {
           const error = new Error(event.data.message)
           error.name = event.data.code
-          for (const turnId of openTurnIds(ctx.session.id)) {
-            getTurnState(ctx.session.id, turnId)?.logger.set({
+          await finishOpenTurns(ctx.session.id, { error, status: 500 }, (state) => {
+            state.logger.set({
               eve: {
                 failure: {
                   code: event.data.code,
@@ -892,11 +903,11 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
                 },
               },
             })
-            await finishTurn(ctx.session.id, turnId, { error, status: 500 })
-          }
-          clearSessionState(ctx.session.id)
+          })
         } catch (err) {
           console.error('[evlog] eve hook handler failed:', err)
+        } finally {
+          clearSessionState(ctx.session.id)
         }
       },
 
