@@ -43,6 +43,7 @@ async function runTurn(
   options: {
     turnId?: string
     fail?: boolean
+    cancel?: boolean
     steps?: number
     toolResults?: Array<{
       toolName: string
@@ -181,7 +182,12 @@ async function runTurn(
     }, ctx)
   }
 
-  if (options.fail) {
+  if (options.cancel) {
+    await events['turn.cancelled']!({
+      type: 'turn.cancelled',
+      data: { sequence: 99, turnId },
+    }, ctx)
+  } else if (options.fail) {
     await events['turn.failed']!({
       type: 'turn.failed',
       data: {
@@ -299,6 +305,88 @@ describe('evlog/eve', () => {
       code: 'TURN_ERROR',
       message: 'turn exploded',
     })
+  })
+
+  it('emits a cancelled turn as a non-error wide event', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, { cancel: true })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.status).toBe(499)
+    expect(event?.level).toBe('info')
+    expect(event?.eve).toMatchObject({ phase: 'cancelled', cancelled: true })
+  })
+
+  it('releases turn state after a cancelled turn', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, { cancel: true })
+
+    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+
+    await runTurn(hook, { turnId: TURN_ID_1 })
+    await waitForDrainCalls(spies.drain, 2)
+    expect(findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))).toBeDefined()
+  })
+
+  it('flushes an in-flight turn when the session fails without turn.failed', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+
+    await hook.events!['session.failed']!({
+      type: 'session.failed',
+      data: { code: 'SESSION_ERROR', message: 'session exploded', sessionId: SESSION_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.status).toBe(500)
+    expect(event?.level).toBe('error')
+    expect(event?.eve).toMatchObject({
+      failure: { code: 'SESSION_ERROR', message: 'session exploded' },
+    })
+    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+  })
+
+  it('drops session context once the session completes', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    useLogger(toolContext()).set({ customer: { slug: 'acme' } })
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID },
+    }, ctx)
+
+    await hook.events!['session.completed']!({ type: 'session.completed' } as never, ctx)
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID_1 },
+    }, ctx)
+    await hook.events!['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 1, turnId: TURN_ID_1 },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const secondTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID_1))
+    expect(secondTurn?.customer).toBeUndefined()
   })
 
   it('does not throw when an internal handler fails', async () => {
