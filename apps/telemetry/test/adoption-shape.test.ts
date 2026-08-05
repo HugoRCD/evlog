@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
-import { OTHER_VERSION, toFieldStats, toVersionAdoption } from '../shared/utils/adoption-shape'
+import { OTHER_VERSION, mergeFieldValues, splitFieldStats, toFieldStats, toVersionAdoption } from '../shared/utils/adoption-shape'
+import { PROMOTED_FIELD_KEYS } from '../shared/utils/field-dimensions'
 
 describe('toVersionAdoption', () => {
   const keys = ['d1', 'd2', 'd3']
@@ -82,5 +83,97 @@ describe('toFieldStats', () => {
 
   it('returns nothing for runs that carried no fields', () => {
     expect(toFieldStats([])).toEqual([])
+  })
+})
+
+describe('splitFieldStats', () => {
+  /** A promoted key ranked below the eight busiest counters — the real shape. */
+  function noisyRows() {
+    const rows = Array.from({ length: 10 }, (_, i) => ({
+      key: `counter${i}`,
+      value: '1',
+      count: 500,
+      errors: 0,
+    }))
+    return [
+      ...rows,
+      { key: 'mapFramework', value: 'nuxt', count: 9, errors: 1 },
+      { key: 'mapFramework', value: 'next', count: 4, errors: 0 },
+      { key: 'initFramework', value: 'nuxt', count: 2, errors: 0 },
+    ]
+  }
+
+  it('keeps a promoted key that the top-keys cut would have dropped', () => {
+    /* The whole reason the split exists: a tool reporting forty counters was
+       pushing its own headline dimension out of the list. */
+    const { dimensions, fields } = splitFieldStats(noisyRows(), PROMOTED_FIELD_KEYS)
+
+    expect(dimensions.map(d => d.key)).toEqual(['mapFramework', 'initFramework'])
+    expect(fields.map(f => f.key)).not.toContain('mapFramework')
+    expect(toFieldStats(noisyRows()).map(f => f.key)).not.toContain('mapFramework')
+  })
+
+  it('caps the generic list but never a promoted key', () => {
+    const values = Array.from({ length: 20 }, (_, i) => ({
+      key: 'mapGrade',
+      value: `band-${i}`,
+      count: 1,
+      errors: 0,
+    }))
+    const { dimensions, fields } = splitFieldStats([...noisyRows(), ...values], PROMOTED_FIELD_KEYS)
+
+    expect(fields).toHaveLength(8)
+    expect(dimensions.find(d => d.key === 'mapGrade')!.values).toHaveLength(20)
+  })
+
+  it('promotes nothing when no key is listed', () => {
+    expect(splitFieldStats(noisyRows(), []).dimensions).toEqual([])
+  })
+
+  it('caps per reporting command, not across all of them', () => {
+    /* `toFieldStats`'s single global top-8 makes the chattiest command starve
+       every other one: forty `map*` counters would leave no room for `init`.
+       The split caps each group on its own, so a command never disappears
+       because another one reports more. */
+    const chatty = Array.from({ length: 12 }, (_, i) => ({
+      key: `mapCounter${i}`,
+      value: '1',
+      count: 900 + i,
+      errors: 0,
+    }))
+    const quiet = [
+      { key: 'initFramework', value: 'nuxt', count: 3, errors: 0 },
+      { key: 'doctorEvlogFound', value: 'true', count: 2, errors: 0 },
+    ]
+
+    expect(toFieldStats([...chatty, ...quiet]).map(f => f.key))
+      .not.toContain('doctorEvlogFound')
+
+    const { fields } = splitFieldStats([...chatty, ...quiet], [])
+    const keys = fields.map(f => f.key)
+    expect(keys).toContain('doctorEvlogFound')
+    expect(keys).toContain('initFramework')
+    // map is still capped at 8 of its 12.
+    expect(keys.filter(key => key.startsWith('mapCounter'))).toHaveLength(8)
+  })
+})
+
+describe('mergeFieldValues', () => {
+  it('adds up the same value reported under different keys', () => {
+    /* `init` and `map` both answer "which framework"; the question wants one
+       number per framework, not one per command. */
+    const merged = mergeFieldValues([
+      { key: 'initFramework', count: 3, errors: 0, values: [{ value: 'nuxt', count: 2, errors: 0 }, { value: 'next', count: 1, errors: 0 }] },
+      { key: 'mapFramework', count: 9, errors: 2, values: [{ value: 'nuxt', count: 8, errors: 2 }, { value: 'next', count: 1, errors: 0 }] },
+    ])
+
+    expect(merged).toEqual([
+      { value: 'nuxt', count: 10, errors: 2 },
+      { value: 'next', count: 2, errors: 0 },
+    ])
+  })
+
+  it('is empty when no key reported anything', () => {
+    expect(mergeFieldValues([])).toEqual([])
   })
 })

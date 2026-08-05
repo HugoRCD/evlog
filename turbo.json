@@ -1,6 +1,5 @@
 {
   "$schema": "https://turborepo.dev/schema.v2.json",
-  "ui": "tui",
   "noUpdateNotifier": true,
   "globalPassThroughEnv": [
     "CI",

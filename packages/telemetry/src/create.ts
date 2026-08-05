@@ -18,6 +18,7 @@ import type {
   CollectFields,
   CollectFlags,
   CustomFields,
+  FlagDefinitions,
   RunEvent,
   RunOutcome,
   TelemetryCliError,
@@ -88,7 +89,11 @@ class InternalTelemetry<
   async run<T>(
     command: string,
     fn: () => T | Promise<T>,
-    opts?: { flags?: Record<string, unknown>, systemCustom?: Record<string, string> },
+    opts?: {
+      flags?: Record<string, unknown>
+      args?: FlagDefinitions
+      systemCustom?: Record<string, string>
+    },
   ): Promise<T> {
     if (!this._enabled) return fn()
 
@@ -114,7 +119,7 @@ class InternalTelemetry<
         durationMs: Date.now() - started,
         outcome,
         errorCode,
-        flags: sanitizeFlags(opts?.flags, this.options.collect),
+        flags: sanitizeFlags(opts?.flags, { collect: this.options.collect, args: opts?.args }),
         custom: ctx.custom,
         timestamp,
       })

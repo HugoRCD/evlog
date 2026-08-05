@@ -6,7 +6,7 @@ const STANDARD_FIELDS: Array<{ field: string, type: string, description: string 
   { field: 'durationMs', type: 'number', description: 'Run duration in milliseconds.' },
   { field: 'outcome', type: 'string', description: '`success` or `error`.' },
   { field: 'errorCode', type: 'string', description: 'From typed CLI errors when present.' },
-  { field: 'flags', type: 'object', description: 'Parsed flags — booleans/numbers as values, strings as presence unless allowlisted.' },
+  { field: 'flags', type: 'object', description: 'Flags you passed — booleans/numbers as values, strings as `<set>` unless allowlisted. Positionals, defaults and kebab-case duplicates are dropped.' },
   { field: 'tool.name', type: 'string', description: 'Tool name declared at setup.' },
   { field: 'tool.version', type: 'string', description: 'Tool version declared at setup.' },
   { field: 'env.node', type: 'string', description: 'Node.js version.' },

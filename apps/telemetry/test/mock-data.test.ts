@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import { classifySource } from '../shared/utils/sources'
 import { computeMockAdoption, computeMockRunsPage, computeMockStats, getMockRunDetail, getMockRuns } from '../server/utils/mock-data'
+import { GRADE_ORDER } from '../shared/utils/field-dimensions'
 
 /**
  * The dataset deliberately spans more than the widest range (so the 30d view
@@ -310,10 +311,27 @@ describe('computeMockAdoption', () => {
     }
   })
 
+  it('feeds the promoted dimension panels', () => {
+    /* Framework and grade are pulled out of `custom` into their own cards, so
+       a sample dataset without them demos those cards empty. */
+    const adoption = computeMockAdoption({ range: '30d' })
+    const keys = adoption.dimensions.map(d => d.key)
+
+    expect(keys).toContain('mapFramework')
+    expect(keys).toContain('initFramework')
+    expect(keys).toContain('mapGrade')
+    // Promoted out of the generic list, not duplicated into both.
+    expect(adoption.custom.map(f => f.key)).not.toContain('mapFramework')
+
+    const grades = adoption.dimensions.find(d => d.key === 'mapGrade')!
+    expect(grades.values.every(v => GRADE_ORDER.includes(v.value as typeof GRADE_ORDER[number]))).toBe(true)
+  })
+
   it('returns an empty-but-valid shape for a tool that does not exist', () => {
     const adoption = computeMockAdoption({ range: '30d', tool: 'nonexistent-tool' })
     expect(adoption.flags).toEqual([])
     expect(adoption.custom).toEqual([])
+    expect(adoption.dimensions).toEqual([])
     expect(adoption.punchcard).toEqual([])
     expect(adoption.machines).toHaveLength(30)
     expect(adoption.machines.every(point => point.active === 0 && point.new === 0)).toBe(true)

@@ -5,7 +5,24 @@ const props = defineProps<{
 }>()
 
 const flagEntries = computed(() => props.run ? Object.entries(props.run.flags) : [])
-const customEntries = computed(() => props.run ? Object.entries(props.run.custom) : [])
+
+/**
+ * Custom fields bucketed by the command that reports them, keys sorted.
+ *
+ * One `map` run reports nearly forty counters, and as a single unordered wrap
+ * of chips it is something you scan rather than read — `mapFailAudit` and
+ * `mapSuppressedAudit` end up rows apart. Grouping plus an alphabetical sort
+ * puts each rule's pair next to itself.
+ */
+const customGroups = computed(() => {
+  if (!props.run) return []
+
+  const entries = Object.entries(props.run.custom)
+    .map(([key, value]) => ({ key, value, count: 0 }))
+    .sort((a, b) => a.key.localeCompare(b.key))
+
+  return groupFieldStats(entries)
+})
 
 function formatDateTime(value: string) {
   return new Date(value).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'medium' })
@@ -97,19 +114,40 @@ function formatFieldValue(value: boolean | number | string) {
 
     <RunDetailSection title="Flags">
       <p v-if="flagEntries.length === 0" class="text-[13px] text-dimmed">
-        None reported.
+        None passed.
       </p>
+      <!-- The command line, reassembled. One mono run rather than key/value
+           chips: this is the thing the user typed, and splitting `--min-score`
+           from `90` turns a command back into a config object. -->
       <div v-else class="flex flex-wrap gap-1.5">
-        <KeyValueChip v-for="[key, value] in flagEntries" :key :label="key" :value="formatFieldValue(value)" />
+        <span
+          v-for="[key, value] in flagEntries"
+          :key
+          class="surface-raised inline-flex items-center rounded-[--radius-sm] bg-elevated px-1.5 py-0.5 font-mono text-[11px] text-toned"
+          :class="isValueSet(value) ? 'text-dimmed' : ''"
+          :title="isValueSet(value) ? 'A value was passed. Its content is not collected.' : undefined"
+        >{{ flagLabel(key, value) }}</span>
       </div>
     </RunDetailSection>
 
     <RunDetailSection title="Custom fields">
-      <p v-if="customEntries.length === 0" class="text-[13px] text-dimmed">
+      <p v-if="customGroups.length === 0" class="text-[13px] text-dimmed">
         None reported.
       </p>
-      <div v-else class="flex flex-wrap gap-1.5">
-        <KeyValueChip v-for="[key, value] in customEntries" :key :label="key" :value="formatFieldValue(value)" />
+      <div v-else class="flex flex-col gap-3">
+        <div v-for="section in customGroups" :key="section.group" class="flex flex-col gap-1.5">
+          <span class="font-mono text-[10px] uppercase tracking-wide text-dimmed">
+            {{ section.group }} <span class="tabular-nums">{{ section.fields.length }}</span>
+          </span>
+          <div class="flex flex-wrap gap-1.5">
+            <KeyValueChip
+              v-for="field in section.fields"
+              :key="field.key"
+              :label="field.key"
+              :value="formatFieldValue(field.value)"
+            />
+          </div>
+        </div>
       </div>
     </RunDetailSection>
 

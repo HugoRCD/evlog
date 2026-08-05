@@ -66,4 +66,24 @@ describe('the evlog-cli allowlist against the CLI itself', () => {
       expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
     }
   })
+
+  it('accepts every field evlog map can set', async () => {
+    /* Grows with the rule registry: adding a check adds two names here, and
+       missing them would leave the new rule invisible in the numbers. */
+    const { mapTelemetryFieldNames } = await import('../../../packages/cli/src/lib/map/telemetry')
+    const allowed = new Set(DEFAULT_ALLOWED_CUSTOM_KEYS['evlog-cli'])
+
+    for (const name of mapTelemetryFieldNames()) {
+      expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
+    }
+  })
+
+  it('accepts every field evlog doctor can set', async () => {
+    const { doctorTelemetryFieldNames } = await import('../../../packages/cli/src/commands/doctor')
+    const allowed = new Set(DEFAULT_ALLOWED_CUSTOM_KEYS['evlog-cli'])
+
+    for (const name of doctorTelemetryFieldNames()) {
+      expect(allowed.has(name), `${name} would be dropped by the ingest`).toBe(true)
+    }
+  })
 })

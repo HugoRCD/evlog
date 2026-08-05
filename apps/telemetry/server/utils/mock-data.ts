@@ -2,7 +2,8 @@
 // pure functions are unit-tested directly with plain vitest, outside Nitro's
 // auto-import context.
 import type { FieldValueRow } from '../../shared/utils/adoption-shape'
-import { toFieldStats, toVersionAdoption } from '../../shared/utils/adoption-shape'
+import { splitFieldStats, toFieldStats, toStackedSeries, toVersionAdoption } from '../../shared/utils/adoption-shape'
+import { MAX_FRAMEWORK_SERIES, PROMOTED_FIELD_KEYS, frameworkSeries } from '../../shared/utils/field-dimensions'
 import { DURATION_BUCKETS, durationBucketIndex, nodeMajor } from '../../shared/utils/duration-buckets'
 import { emptyActivityPoint, fillTimeline, previousTimelineBucketKeys, timelineBucketKey, timelineBucketKeys, timelineGranularity } from '../../shared/utils/timeline-buckets'
 import { classifySource, sourceToken } from '../../shared/utils/sources'
@@ -101,11 +102,25 @@ const MOCK_FLAG_POOL: { key: string, values: (boolean | number | string)[] }[] =
   { key: 'format', values: ['json', 'text', 'pretty'] },
 ]
 
-/** Candidate custom fields — a run gets a random subset, mirroring `telemetry.set()` usage. */
+/**
+ * Candidate custom fields — a run gets a random subset, mirroring
+ * `telemetry.set()` usage.
+ *
+ * The framework and grade keys are the ones the Adoption tab promotes into
+ * their own panels, so the sample dataset has to carry them or those panels
+ * demo empty. Values are repeated to weight the draw: a flat distribution
+ * across four frameworks makes the chart look broken rather than sampled.
+ */
 const MOCK_CUSTOM_POOL: { key: string, values: (boolean | number | string)[] }[] = [
   { key: 'filesChanged', values: [1, 3, 7, 12, 28] },
   { key: 'cacheHit', values: [true, false] },
   { key: 'plan', values: ['free', 'pro', 'enterprise'] },
+  { key: 'initFramework', values: ['nuxt', 'nuxt', 'nuxt', 'next', 'next', 'nitro', 'tanstack-start'] },
+  { key: 'mapFramework', values: ['nuxt', 'nuxt', 'nuxt', 'nuxt', 'next', 'next', 'nitro', 'tanstack-start'] },
+  { key: 'mapGrade', values: ['good', 'good', 'good', 'needs-work', 'needs-work', 'excellent', 'at-risk'] },
+  /* Spread inside the bands, not just on the thresholds — the histogram exists
+     to show where in a band scores actually land. */
+  { key: 'mapScore', values: [94, 88, 82, 76, 74, 71, 68, 63, 55, 47, 38] },
 ]
 
 /** Deterministic PRNG (mulberry32) — same seed, same dataset, every process. */
@@ -523,6 +538,23 @@ export function computeMockAdoption(filter: RunsFilter): AdoptionResponse {
     punchcardCells.set(key, cell)
   }
 
+  const customSplit = splitFieldStats(tallyFields(runs, detail => detail.custom), PROMOTED_FIELD_KEYS)
+
+  /* Mirrors the SQL `coalesce(mapFramework, initFramework)` — a run reporting
+     both counts once, under `map`'s answer. */
+  const frameworkRows = buckets.flatMap(([bucket, bucketRuns]) => {
+    const counts = new Map<string, number>()
+    for (const run of bucketRuns) {
+      const { custom } = getMockRunDetail(run.id)!
+      const framework = custom.mapFramework ?? custom.initFramework
+      if (typeof framework !== 'string') continue
+      const series = frameworkSeries(framework)
+      counts.set(series, (counts.get(series) ?? 0) + 1)
+    }
+    return [...counts.entries()].map(([series, count]) => ({ bucket, series, count }))
+  })
+  const frameworkTimeline = toStackedSeries(frameworkRows, keys, MAX_FRAMEWORK_SERIES)
+
   return {
     range: filter.range,
     granularity,
@@ -531,7 +563,10 @@ export function computeMockAdoption(filter: RunsFilter): AdoptionResponse {
     machines,
     punchcard: [...punchcardCells.values()],
     flags: toFieldStats(tallyFields(runs, detail => detail.flags)),
-    custom: toFieldStats(tallyFields(runs, detail => detail.custom)),
+    custom: customSplit.fields,
+    dimensions: customSplit.dimensions,
+    frameworks: frameworkTimeline.series,
+    frameworkAdoption: frameworkTimeline.points,
     mock: true,
   }
 }

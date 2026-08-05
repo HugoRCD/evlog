@@ -219,6 +219,15 @@ export interface AdoptionResponse {
   punchcard: PunchcardCell[]
   flags: FieldStat[]
   custom: FieldStat[]
+  /**
+   * Custom keys promoted out of `custom` into their own panels — framework and
+   * grade. Uncapped, so a dimension never loses to a busier counter.
+   */
+  dimensions: FieldStat[]
+  /** Framework ids plotted by `frameworkAdoption`, most used first. */
+  frameworks: string[]
+  /** Framework mix per bucket — the distribution's movement, not just its current state. */
+  frameworkAdoption: VersionAdoptionPoint[]
   /** `true` when this response is generated sample data (the `runs` table is empty). */
   mock: boolean
 }

@@ -47,7 +47,8 @@ const empty = computed(() => sections.value.every(s => s.items.length === 0))
       hint="Widen the time range, or clear a filter."
     />
 
-    <div v-else class="flex flex-col gap-3 pb-2">
+    <!-- Bottom spacing comes from PanelCard's flush body now, not from here. -->
+    <div v-else class="flex flex-col gap-3">
       <div v-for="section in sections" :key="section.title" class="flex flex-col gap-1">
         <p class="px-4 text-[11px] text-dimmed">
           {{ section.title }}

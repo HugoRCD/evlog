@@ -46,7 +46,7 @@ Click **Connect MCP** in the dashboard header for the endpoint URL and a ready-t
 
 ```bash
 pnpm install
-pnpm run analytics   # or: pnpm --filter evlog-telemetry dev
+pnpm run telemetry   # or: pnpm playground telemetry
 ```
 
 No `.env` needed to get started — with zero configuration:
@@ -54,6 +54,26 @@ No `.env` needed to get started — with zero configuration:
 - **No `DATABASE_URL`** → [NuxtHub](https://hub.nuxt.com) gives you a real local Postgres database for free, backed by [PGlite](https://pglite.dev) and stored in `.data/`. No Docker, no connection string, nothing to run by hand — schema migrations from `server/db/schema.ts` apply automatically on first request.
 - **Empty `runs` table** (fresh clone, nothing ingested yet) → the dashboard serves generated sample data (see `server/utils/mock-data.ts`) instead, so every chart, table, and filter is explorable and interactive from the first run. A banner on the dashboard makes this obvious. It switches to real data automatically the moment a real event lands — `POST /api/telemetry/ingest` always persists for real, mock mode only affects what the dashboard *reads*.
 - **No `ANALYTICS_PASSWORD`** → the login screen is skipped entirely.
+
+### Feeding it real events
+
+Mock data covers every chart, but it is generated — it will not show you what a
+field you just added actually looks like on the wire. `pnpm telemetry:cli` runs
+this repo's own CLI with its endpoint pointed at `localhost:3000`, so a command
+you run lands in the dashboard you have open:
+
+```bash [Terminal]
+pnpm run telemetry                                  # in one terminal
+pnpm telemetry:cli map --cwd apps/playground        # in another
+pnpm telemetry:cli doctor --cwd apps/playground
+```
+
+It runs from the repo root like `pnpm cli` does, so pass `--cwd` to point it at
+a real app. The first real event switches the dashboard off mock data
+automatically. For a spread of runs worth looking at rather than a handful,
+aim it at the throwaway apps `pnpm cli:sandbox` builds under `.sandbox/` — four
+frameworks with deliberately uneven instrumentation, so `map` reports four
+different scores.
 
 Once you're ready to point this at production data, copy `.env.example` to `.env` and fill in `DATABASE_URL` (and `ANALYTICS_PASSWORD` / `NUXT_SESSION_PASSWORD` if you want the dashboard locked down).
 

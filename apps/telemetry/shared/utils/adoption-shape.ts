@@ -9,6 +9,7 @@
  * auto-import context and pulls this module in directly.
  */
 
+import { groupFieldStats } from './field-dimensions'
 import { fillTimeline } from './timeline-buckets'
 
 /** Series the least-used versions are folded into, so the chart keeps a readable number of bands. */
@@ -30,29 +31,39 @@ export interface VersionBucketRow {
   count: number
 }
 
+/** One `(bucket, series, count)` row, before it is folded into a stacked timeline. */
+export interface SeriesBucketRow {
+  bucket: string
+  series: string
+  count: number
+}
+
 /**
- * Long `(bucket, version, count)` rows into one stacked point per bucket, plus
- * the series list to plot. Versions outside the top {@link MAX_VERSION_SERIES}
- * are merged into a single `other` band.
+ * Long `(bucket, series, count)` rows into one stacked point per bucket, plus
+ * the series list to plot, zero-filled across every bucket in `keys`.
+ *
+ * Series outside the top `maxSeries` are merged into a single `other` band, so
+ * a long tail cannot turn the chart into a colour salad.
  */
-export function toVersionAdoption(
-  rows: VersionBucketRow[],
+export function toStackedSeries(
+  rows: SeriesBucketRow[],
   keys: string[],
-): { versions: string[], points: VersionAdoptionPoint[] } {
+  maxSeries: number,
+): { series: string[], points: VersionAdoptionPoint[] } {
   const totals = new Map<string, number>()
-  for (const row of rows) totals.set(row.version, (totals.get(row.version) ?? 0) + row.count)
+  for (const row of rows) totals.set(row.series, (totals.get(row.series) ?? 0) + row.count)
 
-  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([version]) => version)
-  const top = new Set(ranked.slice(0, MAX_VERSION_SERIES))
-  const versions = ranked.length > top.size ? [...top, OTHER_VERSION] : [...top]
+  const ranked = [...totals.entries()].sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0])).map(([name]) => name)
+  const top = new Set(ranked.slice(0, maxSeries))
+  const series = ranked.length > top.size ? [...top, OTHER_VERSION] : [...top]
 
-  const zero = () => Object.fromEntries(versions.map(version => [version, 0]))
+  const zero = () => Object.fromEntries(series.map(name => [name, 0]))
 
   const byBucket = new Map<string, Record<string, number>>()
   for (const row of rows) {
     const counts = byBucket.get(row.bucket) ?? zero()
-    const series = top.has(row.version) ? row.version : OTHER_VERSION
-    counts[series] = (counts[series] ?? 0) + row.count
+    const name = top.has(row.series) ? row.series : OTHER_VERSION
+    counts[name] = (counts[name] ?? 0) + row.count
     byBucket.set(row.bucket, counts)
   }
 
@@ -62,7 +73,24 @@ export function toVersionAdoption(
     bucket => ({ bucket, counts: zero() }),
   )
 
-  return { versions, points }
+  return { series, points }
+}
+
+/**
+ * Long `(bucket, version, count)` rows into one stacked point per bucket, plus
+ * the series list to plot. Versions outside the top {@link MAX_VERSION_SERIES}
+ * are merged into a single `other` band.
+ */
+export function toVersionAdoption(
+  rows: VersionBucketRow[],
+  keys: string[],
+): { versions: string[], points: VersionAdoptionPoint[] } {
+  const { series, points } = toStackedSeries(
+    rows.map(row => ({ bucket: row.bucket, series: row.version, count: row.count })),
+    keys,
+    MAX_VERSION_SERIES,
+  )
+  return { versions: series, points }
 }
 
 /** One `(key, value) → count` row from a `flags`/`custom` jsonb breakdown. */
@@ -73,8 +101,8 @@ export interface FieldValueRow {
   errors: number
 }
 
-/** Flat `(key, value)` rows into per-key stats, most used key first, each with its top values. */
-export function toFieldStats(rows: FieldValueRow[]): FieldStat[] {
+/** Flat `(key, value)` rows into per-key stats, unsorted and uncapped. */
+function tallyByKey(rows: FieldValueRow[]): FieldStat[] {
   const byKey = new Map<string, FieldStat>()
 
   for (const row of rows) {
@@ -86,10 +114,68 @@ export function toFieldStats(rows: FieldValueRow[]): FieldStat[] {
   }
 
   return [...byKey.values()]
+}
+
+/** Most used first, each key carrying its most used values. */
+function rank(stats: FieldStat[], maxValues: number): FieldStat[] {
+  return stats
     .sort((a, b) => b.count - a.count || a.key.localeCompare(b.key))
-    .slice(0, MAX_FIELD_KEYS)
     .map(stat => ({
       ...stat,
-      values: stat.values.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)).slice(0, MAX_FIELD_VALUES),
+      values: stat.values.sort((a, b) => b.count - a.count || a.value.localeCompare(b.value)).slice(0, maxValues),
     }))
+}
+
+/** Flat `(key, value)` rows into per-key stats, most used key first, each with its top values. */
+export function toFieldStats(rows: FieldValueRow[]): FieldStat[] {
+  return rank(tallyByKey(rows), MAX_FIELD_VALUES).slice(0, MAX_FIELD_KEYS)
+}
+
+/**
+ * Same tally, split into the keys that get their own panel and the rest.
+ *
+ * Promoted keys are taken before the top-{@link MAX_FIELD_KEYS} cut and keep
+ * every value: a tool reporting forty counters would otherwise push its own
+ * headline dimension out of the list, and a framework missing from the chart
+ * because it ranked ninth is worse than no chart.
+ */
+export function splitFieldStats(
+  rows: FieldValueRow[],
+  promotedKeys: readonly string[],
+): { dimensions: FieldStat[], fields: FieldStat[] } {
+  const promoted = new Set(promotedKeys)
+  const all = tallyByKey(rows)
+
+  /* Capped per reporting command rather than globally: `map` reports forty
+     counters and `doctor` reports seven, so one global top-8 would show the
+     map fields and nothing else — a command disappearing from the breakdown
+     because another one is chattier is worse than a longer list. */
+  const rest = rank(all.filter(stat => !promoted.has(stat.key)), MAX_FIELD_VALUES)
+  const capped = groupFieldStats(rest).flatMap(({ fields }) => fields.slice(0, MAX_FIELD_KEYS))
+
+  return {
+    dimensions: rank(all.filter(stat => promoted.has(stat.key)), Number.POSITIVE_INFINITY),
+    fields: capped.sort((a, b) => b.count - a.count || a.key.localeCompare(b.key)),
+  }
+}
+
+/**
+ * Several keys carrying the same vocabulary into one value distribution.
+ *
+ * `initFramework` and `mapFramework` are two commands answering "which
+ * framework", and the question wants them added up rather than shown twice.
+ */
+export function mergeFieldValues(stats: FieldStat[]): FieldValueStat[] {
+  const byValue = new Map<string, FieldValueStat>()
+
+  for (const stat of stats) {
+    for (const value of stat.values) {
+      const merged = byValue.get(value.value) ?? { value: value.value, count: 0, errors: 0 }
+      merged.count += value.count
+      merged.errors += value.errors
+      byValue.set(value.value, merged)
+    }
+  }
+
+  return [...byValue.values()].sort((a, b) => b.count - a.count || a.value.localeCompare(b.value))
 }
