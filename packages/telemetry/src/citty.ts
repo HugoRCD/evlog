@@ -1,9 +1,16 @@
 import type { ArgsDef, CommandDef } from 'citty'
 import { createTelemetry } from './create'
-import type { CollectFields, CollectFlags, TelemetryOptions } from './types'
+import type { CollectFields, CollectFlags, FlagDefinitions, TelemetryOptions } from './types'
 
 type AnyCommand = CommandDef<ArgsDef> & {
   subCommands?: Record<string, AnyCommand>
+}
+
+/** citty allows `args` to be lazy; only a plain object can be read synchronously. */
+function syncArgs(args: AnyCommand['args']): FlagDefinitions | undefined {
+  return args && typeof args === 'object' && !('then' in args)
+    ? args as FlagDefinitions
+    : undefined
 }
 
 function wrapCommand(
@@ -36,6 +43,7 @@ function wrapCommand(
         const name = commandPath.join(' ') || segment || 'run'
         return telemetry.run(name, () => command.run!(ctx), {
           flags: ctx.args as Record<string, unknown>,
+          args: syncArgs(command.args),
         })
       }
       : command.run,

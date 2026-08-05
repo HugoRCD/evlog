@@ -1,13 +1,15 @@
 import { mkdir, mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
+import { defineCommand, runCommand } from 'citty'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
 import { resolveConsent, purgeOutbox } from '../src/consent'
-import { sanitizeFlags, sanitizeCustom, sanitizeSystemCustom } from '../src/sanitize'
+import { FLAG_VALUE_SET, sanitizeFlags, sanitizeCustom, sanitizeSystemCustom } from '../src/sanitize'
 import { computeRunIdempotencyKey } from '../src/idempotency'
 import { generateDisclosure, exampleRunEvent } from '../src/disclosure'
 import { TelemetryOutbox } from '../src/outbox'
 import { formatTelemetryNotice } from '../src/notice'
+import { withTelemetry } from '../src/citty'
 import {
   createTelemetry,
   telemetry,
@@ -54,16 +56,45 @@ describe('telemetry sanitize', () => {
     expect(sanitizeFlags({ json: true, limit: 50 })).toEqual({ json: true, limit: 50 })
   })
 
-  it('records string flags as presence-only by default', () => {
-    expect(sanitizeFlags({ output: '/secret/path' })).toEqual({ output: true })
+  it('marks undeclared string flag values as set without recording them', () => {
+    expect(sanitizeFlags({ output: '/secret/path' })).toEqual({ output: FLAG_VALUE_SET })
   })
 
   it('allowlists declared string flag values', () => {
     const flags = sanitizeFlags(
       { format: 'json' },
-      { flags: { format: ['json', 'csv'] } },
+      { collect: { flags: { format: ['json', 'csv'] } } },
     )
     expect(flags).toEqual({ format: 'json' })
+  })
+
+  it('drops the positional bucket', () => {
+    expect(sanitizeFlags({ _: ['src/api'], all: true })).toEqual({ all: true })
+  })
+
+  it('collapses kebab-case duplicates onto the camelCase flag', () => {
+    expect(sanitizeFlags({ 'minScore': 90, 'min-score': 90 })).toEqual({ minScore: 90 })
+  })
+
+  it('allowlists a kebab-case flag under its camelCase name', () => {
+    const flags = sanitizeFlags(
+      { 'out-format': 'csv' },
+      { collect: { flags: { outFormat: ['json', 'csv'] } } },
+    )
+    expect(flags).toEqual({ outFormat: 'csv' })
+  })
+
+  it('drops flags left at their declared default', () => {
+    const flags = sanitizeFlags(
+      { write: true, verbose: true },
+      { args: { write: { default: true }, verbose: { default: false } } },
+    )
+    expect(flags).toEqual({ verbose: true })
+  })
+
+  it('keeps a flag whose value differs from its declared default', () => {
+    const flags = sanitizeFlags({ write: false }, { args: { write: { default: true } } })
+    expect(flags).toEqual({ write: false })
   })
 
   it('drops undeclared string custom fields', () => {
@@ -317,5 +348,57 @@ describe('telemetry status command', () => {
     } finally {
       process.stderr.write = original
     }
+  })
+})
+
+describe('citty flag capture', () => {
+  let base: string
+
+  beforeEach(async () => {
+    base = await mkdtemp(join(tmpdir(), 'evlog-telemetry-'))
+    process.env.XDG_CONFIG_HOME = base
+    process.env.EVLOG_TELEMETRY = '1'
+  })
+
+  afterEach(async () => {
+    await rm(base, { recursive: true, force: true })
+    delete process.env.XDG_CONFIG_HOME
+    delete process.env.EVLOG_TELEMETRY
+    _resetActiveTelemetryForTests()
+  })
+
+  /** The wrapper's own view of a run — parsed args in, outbox event out. */
+  async function runWrapped(rawArgs: string[]) {
+    const command = withTelemetry(
+      defineCommand({
+        meta: { name: 'scan' },
+        args: {
+          entry: { type: 'positional', required: false },
+          write: { type: 'boolean', default: true },
+          minScore: { type: 'string' },
+          all: { type: 'boolean' },
+        },
+        run: () => {},
+      }),
+      { name: TOOL, version: '0.0.0' },
+    )
+    await runCommand(command, { rawArgs })
+    const [event] = await new TelemetryOutbox({ toolName: TOOL }).readAll()
+    return event!
+  }
+
+  it('reports the flags the user passed, not the parser defaults', async () => {
+    const event = await runWrapped(['--all', '--min-score', '90'])
+    expect(event.flags).toEqual({ all: true, minScore: FLAG_VALUE_SET })
+  })
+
+  it('keeps a defaulted flag once it is negated', async () => {
+    const event = await runWrapped(['--no-write'])
+    expect(event.flags).toEqual({ write: false })
+  })
+
+  it('leaves positional values out of the payload', async () => {
+    const event = await runWrapped(['server/api/checkout.ts'])
+    expect(event.flags).toEqual({ entry: FLAG_VALUE_SET })
   })
 })

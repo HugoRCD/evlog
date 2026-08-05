@@ -50,6 +50,14 @@ export interface RunEvent {
   timestamp: string
 }
 
+/**
+ * A command's declared arguments, reduced to what flag sanitization needs.
+ *
+ * Structural on purpose — citty's `ArgsDef` satisfies it, and so does any other
+ * parser's definition, without `@evlog/telemetry` taking a dependency on one.
+ */
+export type FlagDefinitions = Record<string, { default?: unknown } | undefined>
+
 /** Allowlisted string flag values declared via `collect.flags`. */
 export type CollectFlags = Record<string, readonly string[]>
 
@@ -133,7 +141,12 @@ export interface TelemetryHandle<
   run: <T>(
     command: string,
     fn: () => T | Promise<T>,
-    opts?: { flags?: Record<string, unknown>, systemCustom?: Record<string, string> },
+    opts?: {
+      flags?: Record<string, unknown>
+      /** Declared args for `flags`, so defaults are not reported as choices. */
+      args?: FlagDefinitions
+      systemCustom?: Record<string, string>
+    },
   ) => Promise<T>
   /** Flush buffered events within the hard cap. Never throws. */
   flush: () => Promise<void>

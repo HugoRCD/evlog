@@ -12,7 +12,7 @@ exports[`telemetry disclosure > matches snapshot for default envelope 1`] = `
 | \`durationMs\` | number | Run duration in milliseconds. |
 | \`outcome\` | string | \`success\` or \`error\`. |
 | \`errorCode\` | string | From typed CLI errors when present. |
-| \`flags\` | object | Parsed flags — booleans/numbers as values, strings as presence unless allowlisted. |
+| \`flags\` | object | Flags you passed — booleans/numbers as values, strings as \`<set>\` unless allowlisted. Positionals, defaults and kebab-case duplicates are dropped. |
 | \`tool.name\` | string | Tool name declared at setup. |
 | \`tool.version\` | string | Tool version declared at setup. |
 | \`env.node\` | string | Node.js version. |
@@ -64,7 +64,7 @@ exports[`telemetry disclosure > matches snapshot with collect extensions 1`] = `
 | \`durationMs\` | number | Run duration in milliseconds. |
 | \`outcome\` | string | \`success\` or \`error\`. |
 | \`errorCode\` | string | From typed CLI errors when present. |
-| \`flags\` | object | Parsed flags — booleans/numbers as values, strings as presence unless allowlisted. |
+| \`flags\` | object | Flags you passed — booleans/numbers as values, strings as \`<set>\` unless allowlisted. Positionals, defaults and kebab-case duplicates are dropped. |
 | \`tool.name\` | string | Tool name declared at setup. |
 | \`tool.version\` | string | Tool version declared at setup. |
 | \`env.node\` | string | Node.js version. |
@@ -122,7 +122,7 @@ Set \`EVLOG_TELEMETRY_DEBUG=1\` to print would-be payloads to stderr.",
       "type": "string",
     },
     {
-      "description": "Parsed flags — booleans/numbers as values, strings as presence unless allowlisted.",
+      "description": "Flags you passed — booleans/numbers as values, strings as \`<set>\` unless allowlisted. Positionals, defaults and kebab-case duplicates are dropped.",
       "field": "flags",
       "type": "object",
     },
