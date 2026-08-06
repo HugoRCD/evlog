@@ -585,7 +585,16 @@ const log = useLogger()
 log.set({ order: { id: input.orderId } })
 ```
 
-`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools — the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override. Complements eve Agent Runs and OpenTelemetry — see the [eve use case](https://evlog.dev/use-cases/eve).
+```typescript
+// agent/instrumentation.ts — joins eve's OTel spans to the wide events
+import { defineEvlogInstrumentation } from 'evlog/eve'
+
+export default defineEvlogInstrumentation()
+```
+
+`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools — the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override.
+
+`defineEvlogInstrumentation()` is optional: it stamps `evlog.request_id` onto eve's AI SDK spans so a trace joins back to its wide event, and back. Requires eve 0.30 or later. Complements eve Agent Runs — see the [eve use case](https://evlog.dev/use-cases/eve).
 
 See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
 
