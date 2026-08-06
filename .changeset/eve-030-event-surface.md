@@ -1,8 +1,8 @@
 ---
-"evlog": major
+"evlog": minor
 ---
 
-Cover the eve 0.30 event surface. **Requires eve >= 0.30** — the peer range moves from `>=0.24.3`, which is why this is a major release. Agents on an older eve keep working on the previous evlog; upgrade eve first.
+Cover the eve 0.30 event surface. **`evlog/eve` now requires eve >= 0.30** — the peer range moves from `>=0.24.3`. The eve integration is still beta and its peer floor moves with it, so this ships as a minor; nothing outside `evlog/eve` is affected. Agents on an older eve keep working on the previous evlog — upgrade eve first.
 
 The wide event now carries what eve started reporting since 0.24:
 
