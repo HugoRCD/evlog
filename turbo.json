@@ -6,7 +6,8 @@
     "GITHUB_ACTIONS",
     "GITHUB_EVENT_NAME",
     "GITHUB_REF",
-    "GITHUB_SHA"
+    "GITHUB_SHA",
+    "TMPDIR"
   ],
   "tasks": {
     "build": {
