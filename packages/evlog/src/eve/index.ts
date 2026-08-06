@@ -22,7 +22,7 @@ const CANCELLED_STATUS = 499
  *
  * - `omit` — no message content at all (default)
  * - `preview` — text truncated to `messagePreviewLength`, attachments reduced
- *   to their type and size
+ *   to their type and media type
  * - `full` — text and attachment parts verbatim
  */
 export type EveMessageMode = 'omit' | 'preview' | 'full'
@@ -95,7 +95,6 @@ interface EveApprovalPending {
 interface SessionRollup {
   turnCount: number
   lastAccess: number
-  startedAt: number
   calls: number
   inputTokens: number
   outputTokens: number
@@ -109,9 +108,9 @@ interface SessionRollup {
 
 /** Identity of the eve instance serving a session, from `session.started`. */
 interface EveRuntimeInfo {
-  version: string
-  agentId: string
-  model: string
+  version?: string
+  agentId?: string
+  model?: string
   gitSha?: string
   gitBranch?: string
   deployedAt?: string
@@ -156,6 +155,7 @@ interface TurnAccumulator {
   authorizations: EveAuthorizationRecord[]
   stepFailures: EveStepFailure[]
   compactions: number
+  compactionsRequested: number
   compactionModel?: string
   compactionInputTokens?: number
   contextCleared: boolean
@@ -215,6 +215,7 @@ function freshAccumulator(options: EvlogEveOptions): TurnAccumulator {
     authorizations: [],
     stepFailures: [],
     compactions: 0,
+    compactionsRequested: 0,
     contextCleared: false,
     pausedForInput: false,
     costMap: options.cost,
@@ -492,7 +493,6 @@ function freshRollup(): SessionRollup {
   return {
     turnCount: 0,
     lastAccess: 0,
-    startedAt: Date.now(),
     calls: 0,
     inputTokens: 0,
     outputTokens: 0,
@@ -671,9 +671,14 @@ function flushEveMetadata(state: TurnState): void {
     eve.stepFailures = acc.stepFailures.map(f => ({ ...f }))
     eve.failedSteps = acc.stepFailures.length
   }
-  if (acc.compactions > 0) {
+  // A compaction requested but not yet completed still carries the most
+  // actionable signal — the context was full enough to trigger one.
+  if (acc.compactions > 0 || acc.compactionsRequested > 0) {
     eve.compaction = {
       count: acc.compactions,
+      ...(acc.compactionsRequested > acc.compactions
+        ? { requested: acc.compactionsRequested }
+        : {}),
       ...(acc.compactionModel ? { model: acc.compactionModel } : {}),
       ...(acc.compactionInputTokens !== undefined
         ? { inputTokensAtTrigger: acc.compactionInputTokens }
@@ -691,15 +696,10 @@ function buildLineage(sessionId: string, ctx: HookContext): Record<string, unkno
   const runtime = sessionRuntimes().get(sessionId)
   if (runtime) {
     const { subagent, ...identity } = runtime
-    eve.runtime = identity
+    if (Object.keys(identity).length > 0) eve.runtime = identity
   }
 
-  const { parent } = (ctx.session as { parent?: {
-    callId: string
-    rootSessionId: string
-    sessionId: string
-    turn?: { id?: string }
-  } })
+  const { parent } = ctx.session
   if (parent) {
     eve.parent = {
       sessionId: parent.sessionId,
@@ -795,7 +795,7 @@ async function finishTurn(
     const ctx = state.logger.getContext() as Record<string, unknown>
     const phase = derivePhase(ctx, state.accumulator, httpStatus)
     const sessionTurns = bumpSessionTurnCount(sessionId)
-    accumulateSessionTotals(sessionId, state.accumulator, phase)
+    accumulateSessionTotals(sessionId, state.accumulator, httpStatus)
     state.logger.set({
       eve: {
         ...(phase ? { phase } : {}),
@@ -821,7 +821,7 @@ async function finishTurn(
 function accumulateSessionTotals(
   sessionId: string,
   acc: TurnAccumulator,
-  phase: string | undefined,
+  httpStatus: number,
 ): void {
   const rollup = sessionRollups().get(sessionId)
   if (!rollup) return
@@ -833,8 +833,10 @@ function accumulateSessionTotals(
   rollup.compactions += acc.compactions
   rollup.authorizations += acc.authorizations.length
   for (const tool of acc.toolExecutions) rollup.tools.add(tool.name)
-  if (phase === 'failed') rollup.failedTurns += 1
-  if (phase === 'cancelled') rollup.cancelledTurns += 1
+  // Classified from the terminal status, not the phase: a turn that fails while
+  // parked on an approval or an authorization reports that phase, not 'failed'.
+  if (httpStatus === CANCELLED_STATUS) rollup.cancelledTurns += 1
+  else if (httpStatus >= 400) rollup.failedTurns += 1
 }
 
 /**
@@ -964,9 +966,9 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           if (!runtime && !invocation) return
           touchSession(ctx.session.id)
           sessionRuntimes().set(ctx.session.id, {
-            version: runtime?.eveVersion ?? '',
-            agentId: runtime?.agentId ?? '',
-            model: runtime?.modelId ?? '',
+            ...(runtime?.eveVersion ? { version: runtime.eveVersion } : {}),
+            ...(runtime?.agentId ? { agentId: runtime.agentId } : {}),
+            ...(runtime?.modelId ? { model: runtime.modelId } : {}),
             ...(runtime?.build?.gitSha ? { gitSha: runtime.build.gitSha } : {}),
             ...(runtime?.build?.gitBranch ? { gitBranch: runtime.build.gitBranch } : {}),
             ...(runtime?.build?.deployedAt ? { deployedAt: runtime.build.deployedAt } : {}),
@@ -1086,6 +1088,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           const state = getTurnState(ctx.session.id, event.data.turnId)
           if (!state) return
           const acc = state.accumulator
+          acc.compactionsRequested += 1
           acc.compactionModel = event.data.modelId
           if (event.data.usageInputTokens !== null) {
             acc.compactionInputTokens = event.data.usageInputTokens

@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HookContext } from 'eve/hooks'
+import type { HookContext, HookEventMap } from 'eve/hooks'
 import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
@@ -53,13 +53,17 @@ async function runTurn(
     }>
     toolRequests?: Array<{ toolName: string, callId: string }>
     message?: string
-    messageParts?: Array<Record<string, unknown>>
+    messageParts?: HookEventMap['message.received']['data']['parts']
     inputRequests?: Array<{ requestId: string, toolName: string, prompt: string }>
     subagents?: Array<{ phase: 'called' | 'completed', callId: string, name: string }>
     costUsd?: number
     stepFailures?: Array<{ code: string, message: string, stepIndex: number }>
-    authorizations?: Array<{ name: string, outcome?: string, reason?: string }>
-    compactions?: Array<{ modelId: string, usageInputTokens: number | null, complete?: boolean }>
+    authorizations?: Array<{
+      name: string
+      outcome?: HookEventMap['authorization.completed']['data']['outcome']
+      reason?: string
+    }>
+    compactions?: Array<{ modelId: string, usageInputTokens: number | null }>
     clearContext?: boolean
     ctx?: HookContext
   } = {},
@@ -82,7 +86,7 @@ async function runTurn(
         sequence: 1,
         turnId,
       },
-    } as never, ctx)
+    }, ctx)
   }
 
   const stepCount = options.steps ?? 1
@@ -133,7 +137,7 @@ async function runTurn(
           stepIndex: 0,
           turnId,
         },
-      } as never, ctx)
+      }, ctx)
     }
   }
 
@@ -148,12 +152,10 @@ async function runTurn(
         usageInputTokens: compaction.usageInputTokens,
       },
     }, ctx)
-    if (compaction.complete !== false) {
-      events['compaction.completed']!({
-        type: 'compaction.completed',
-        data: { modelId: compaction.modelId, sequence: 41 + index, sessionId: SESSION_ID, turnId },
-      }, ctx)
-    }
+    events['compaction.completed']!({
+      type: 'compaction.completed',
+      data: { modelId: compaction.modelId, sequence: 41 + index, sessionId: SESSION_ID, turnId },
+    }, ctx)
   }
 
   if (options.clearContext) {
@@ -683,8 +685,8 @@ describe('evlog/eve', () => {
     }, ctx)
     events['subagent.started']!({
       type: 'subagent.started',
-      data: { callId: 'call_1', childSessionId: 'child_1', sequence: 21, subagentName: 'researcher' },
-    } as never, ctx)
+      data: { callId: 'call_1', subagentName: 'researcher' },
+    }, ctx)
     events['subagent.completed']!({
       type: 'subagent.completed',
       data: { callId: 'call_1', output: 'done', subagentName: 'researcher' },
@@ -768,6 +770,44 @@ describe('evlog/eve', () => {
       outputTokens: 100,
       costUsd: 0.03,
       toolCalls: ['search'],
+    })
+  })
+
+  it('counts a turn parked on an authorization as failed in the session rollup', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, sessionEvent: true })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    hook.events!['authorization.required']!({
+      type: 'authorization.required',
+      data: {
+        description: 'sign in to linear',
+        name: 'linear',
+        sequence: 1,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+
+    await hook.events!['session.failed']!({
+      type: 'session.failed',
+      data: { code: 'SESSION_ERROR', message: 'session exploded', sessionId: SESSION_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const turnEvent = findEventViaDrain(spies.drain, e => e.path?.endsWith(TURN_ID))
+    expect(turnEvent?.eve).toMatchObject({ phase: 'awaiting-authorization' })
+
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.eve).toMatchObject({
+      scope: 'session',
+      sessionId: SESSION_ID,
+      turns: 1,
+      failedTurns: 1,
     })
   })
 
