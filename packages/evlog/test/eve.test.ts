@@ -869,6 +869,24 @@ describe('evlog/eve', () => {
     expect((sessionEvent?.ai as Record<string, unknown>).costUsd).toBeUndefined()
   })
 
+  it('reports both cost sources when a session mixes them', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      sessionEvent: true,
+      cost: { 'gpt-5': { input: 1000, output: 2000 } },
+    })
+    const ctx = hookContext()
+
+    await runTurn(hook, { ctx, costUsd: 0.01 })
+    await runTurn(hook, { ctx, turnId: TURN_ID_1 })
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
+
+    await waitForDrainCalls(spies.drain, 3)
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.ai).toMatchObject({ costUsd: 0.01, estimatedCost: 0.2 })
+  })
+
   it('emits no session wide event by default', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })

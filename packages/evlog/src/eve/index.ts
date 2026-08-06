@@ -831,8 +831,10 @@ function accumulateSessionTotals(
   rollup.calls += acc.calls
   rollup.inputTokens += acc.inputTokens
   rollup.outputTokens += acc.outputTokens
-  rollup.costUsd += acc.costUsd
-  rollup.estimatedCost += computeEstimatedCost(acc) ?? 0
+  // Mirrors the per-turn rule in `buildAiField`: a turn contributes to one cost
+  // bucket or the other, never both, so the two session totals cannot overlap.
+  if (acc.costUsd > 0) rollup.costUsd += acc.costUsd
+  else rollup.estimatedCost += computeEstimatedCost(acc) ?? 0
   rollup.compactions += acc.compactions
   rollup.authorizations += acc.authorizations.length
   for (const tool of acc.toolExecutions) rollup.tools.add(tool.name)
@@ -886,11 +888,10 @@ async function emitSessionEvent(
       inputTokens: rollup.inputTokens,
       outputTokens: rollup.outputTokens,
       totalTokens: rollup.inputTokens + rollup.outputTokens,
-      ...(rollup.costUsd > 0
-        ? { costUsd: roundCost(rollup.costUsd) }
-        : rollup.estimatedCost > 0
-          ? { estimatedCost: roundCost(rollup.estimatedCost) }
-          : {}),
+      ...(rollup.costUsd > 0 ? { costUsd: roundCost(rollup.costUsd) } : {}),
+      ...(rollup.estimatedCost > 0
+        ? { estimatedCost: roundCost(rollup.estimatedCost) }
+        : {}),
       ...(rollup.tools.size > 0 ? { toolCalls: [...rollup.tools] } : {}),
     },
   })
