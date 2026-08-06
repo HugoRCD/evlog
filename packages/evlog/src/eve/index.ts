@@ -1,5 +1,12 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
 import { defineHook, type HookContext, type HookDefinition } from 'eve/hooks'
+import {
+  defineInstrumentation,
+  type InstrumentationDefinition,
+  type InstrumentationSetupContext,
+  type InstrumentationStepStartedEventInput,
+  type InstrumentationStepStartedEventResult,
+} from 'eve/instrumentation'
 import type { AuditableLogger } from '../audit'
 import type { AIToolExecution, AIEventData, ModelCost } from '../ai/index'
 import { initLogger, isLoggerInitialized, isLoggerLocked } from '../logger'
@@ -1329,6 +1336,84 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           console.error('[evlog] eve hook handler failed:', err)
         }
       },
+    },
+  })
+}
+
+/** Options for {@link defineEvlogInstrumentation}. */
+export interface EvlogEveInstrumentationOptions {
+  /** Overrides `ai.telemetry.functionId` on spans. Defaults to the agent name. */
+  functionId?: string
+  /** Whether the AI SDK records full model inputs on spans. eve defaults to `true`. */
+  recordInputs?: boolean
+  /** Whether the AI SDK records model outputs on spans. eve defaults to `true`. */
+  recordOutputs?: boolean
+  /** Whether eve emits the inbound HTTP `SERVER` span wrapping each channel request. */
+  traceChannelRequests?: boolean
+  /**
+   * Runs at server startup with the resolved agent name — register your OTel
+   * provider here, exactly as you would in a hand-written
+   * `defineInstrumentation`. Omit it and eve keeps writing its local traces.
+   */
+  setup?: (context: InstrumentationSetupContext) => void
+}
+
+/**
+ * Per-model-call context linking an AI SDK span back to the evlog wide event
+ * for the same turn. Returns `undefined` outside a tracked turn, which
+ * contributes no context rather than a half-filled one.
+ */
+function buildInstrumentationContext(
+  input: InstrumentationStepStartedEventInput,
+): InstrumentationStepStartedEventResult | undefined {
+  const state = getTurnState(input.session.id, input.turn.id)
+  if (!state) return undefined
+
+  return {
+    runtimeContext: {
+      'evlog.request_id': state.turnId,
+      'evlog.session_id': state.sessionId,
+    },
+  }
+}
+
+/**
+ * Create an eve instrumentation definition that stamps evlog's turn identity
+ * onto the AI SDK telemetry spans.
+ *
+ * Export the result as the default export of `agent/instrumentation.ts`. Every
+ * model-call span — and its children — then carries `evlog.request_id`, the
+ * same value the wide event reports as `requestId`, so a trace in Braintrust,
+ * Datadog or Agent Runs joins to the wide event in your drain, and back.
+ *
+ * `eve.` is reserved for framework-owned context, so evlog writes under
+ * `evlog.`. Passing no `setup` leaves OpenTelemetry export untouched: eve keeps
+ * recording its local traces and only the runtime context is added.
+ *
+ * @example
+ * ```ts
+ * // agent/instrumentation.ts
+ * import { defineEvlogInstrumentation } from 'evlog/eve'
+ * import { registerOTel } from '@vercel/otel'
+ *
+ * export default defineEvlogInstrumentation({
+ *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
+ * })
+ * ```
+ */
+export function defineEvlogInstrumentation(
+  options: EvlogEveInstrumentationOptions = {},
+): InstrumentationDefinition {
+  return defineInstrumentation({
+    ...(options.functionId !== undefined ? { functionId: options.functionId } : {}),
+    ...(options.recordInputs !== undefined ? { recordInputs: options.recordInputs } : {}),
+    ...(options.recordOutputs !== undefined ? { recordOutputs: options.recordOutputs } : {}),
+    ...(options.traceChannelRequests !== undefined
+      ? { traceChannelRequests: options.traceChannelRequests }
+      : {}),
+    ...(options.setup !== undefined ? { setup: options.setup } : {}),
+    events: {
+      'step.started': buildInstrumentationContext,
     },
   })
 }

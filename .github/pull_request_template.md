@@ -37,6 +37,7 @@ scope.
 - dx (developer experience improvements)
 - elysia (Elysia plugin)
 - eve (eve agent integration)
+- eve-extension (@evlog/eve, the installable eve extension)
 - evi (Evi agent)
 - express (Express middleware)
 - fastify (Fastify plugin)

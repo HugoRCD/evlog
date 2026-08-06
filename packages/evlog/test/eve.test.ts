@@ -4,6 +4,7 @@ import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
   defineEvlogHook,
+  defineEvlogInstrumentation,
   useLogger,
   detachActiveTurnLoggerForTests,
 } from '../src/eve/index'
@@ -1547,5 +1548,82 @@ describe('evlog/eve', () => {
 
     expect(initSpy).not.toHaveBeenCalled()
     initSpy.mockRestore()
+  })
+})
+
+describe('defineEvlogInstrumentation', () => {
+  beforeEach(() => {
+    resetEvlogEveForTests()
+    initLogger({ env: { service: 'eve-test' } })
+  })
+
+  afterEach(() => {
+    resetEvlogEveForTests()
+  })
+
+  function stepStartedInput(overrides: { sessionId?: string, turnId?: string } = {}) {
+    return {
+      channel: { kind: 'http' },
+      modelInput: { instructions: undefined, messages: [] },
+      session: { id: overrides.sessionId ?? SESSION_ID, auth: { current: null, initiator: null } },
+      step: { index: 0 },
+      turn: { id: overrides.turnId ?? TURN_ID, sequence: 0 },
+    } as Parameters<NonNullable<NonNullable<ReturnType<typeof defineEvlogInstrumentation>['events']>['step.started']>>[0]
+  }
+
+  it('links the model-call span to the wide event of the active turn', () => {
+    const hook = defineEvlogHook({})
+    const instrumentation = defineEvlogInstrumentation()
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
+      runtimeContext: {
+        'evlog.request_id': TURN_ID,
+        'evlog.session_id': SESSION_ID,
+      },
+    })
+  })
+
+  it('contributes no context outside a tracked turn', () => {
+    const instrumentation = defineEvlogInstrumentation()
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toBeUndefined()
+  })
+
+  it('does not throw when no hook is registered', () => {
+    const instrumentation = defineEvlogInstrumentation()
+
+    expect(() => instrumentation.events!['step.started']!(stepStartedInput())).not.toThrow()
+  })
+
+  it('passes capture settings and setup through to eve', () => {
+    const setup = vi.fn()
+    const instrumentation = defineEvlogInstrumentation({
+      functionId: 'support-agent',
+      recordInputs: false,
+      recordOutputs: false,
+      traceChannelRequests: true,
+      setup,
+    })
+
+    expect(instrumentation).toMatchObject({
+      functionId: 'support-agent',
+      recordInputs: false,
+      recordOutputs: false,
+      traceChannelRequests: true,
+    })
+    instrumentation.setup!({ agentName: 'support-agent' })
+    expect(setup).toHaveBeenCalledWith({ agentName: 'support-agent' })
+  })
+
+  it('omits capture settings that were not configured', () => {
+    const instrumentation = defineEvlogInstrumentation()
+
+    expect(Object.keys(instrumentation)).toEqual(['events'])
   })
 })

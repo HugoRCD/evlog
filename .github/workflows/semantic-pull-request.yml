@@ -46,6 +46,7 @@ jobs:
             dx
             elysia
             eve
+            eve-extension
             evi
             express
             fastify
