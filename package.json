@@ -54,7 +54,6 @@
     "automd": "^0.4.3",
     "dotenv-cli": "^11.0.0",
     "eslint": "^9.39.5",
-    "evlog": "workspace:*",
     "h3": "^1.15.11",
     "turbo": "^2.10.5",
     "typescript": "^6.0.3",
