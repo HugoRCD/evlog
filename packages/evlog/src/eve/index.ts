@@ -14,6 +14,9 @@ import {
 
 const DEFAULT_MAX_SESSIONS = 256
 
+/** Client-closed-request status used for turns eve cancelled before a terminal outcome. */
+const CANCELLED_STATUS = 499
+
 /** Options for {@link defineEvlogHook}. */
 export interface EvlogEveOptions extends BaseEvlogOptions {
   /** Passed to {@link initLogger} on the first hook invocation. */
@@ -305,6 +308,7 @@ export function useLogger(ctx?: EveTurnSessionContext): AuditableLogger {
 interface EveGlobalState {
   turnStates: Map<string, TurnState>
   activeTurnBySession: Map<string, string>
+  sessionTurnIds: Map<string, Set<string>>
   sessionSnapshots: Map<string, Record<string, unknown>>
   sessionPendingActions: Map<string, Map<string, PendingAction>>
   sessionApprovals: Map<string, EveApprovalPending[]>
@@ -323,6 +327,7 @@ function getEveGlobalState(): EveGlobalState {
     host[EVE_GLOBAL_STATE] = {
       turnStates: new Map(),
       activeTurnBySession: new Map(),
+      sessionTurnIds: new Map(),
       sessionSnapshots: new Map(),
       sessionPendingActions: new Map(),
       sessionApprovals: new Map(),
@@ -340,6 +345,15 @@ function turnStates(): Map<string, TurnState> {
 
 function activeTurnBySession(): Map<string, string> {
   return getEveGlobalState().activeTurnBySession
+}
+
+function sessionTurnIds(): Map<string, Set<string>> {
+  return getEveGlobalState().sessionTurnIds
+}
+
+/** Turn ids still open for a session, as a snapshot safe to iterate while finishing. */
+function openTurnIds(sessionId: string): string[] {
+  return [...(sessionTurnIds().get(sessionId) ?? [])]
 }
 
 function sessionSnapshots(): Map<string, Record<string, unknown>> {
@@ -371,6 +385,7 @@ function clearSessionState(sessionId: string): void {
   sessionRollups().delete(sessionId)
   sessionPendingActions().delete(sessionId)
   sessionApprovals().delete(sessionId)
+  sessionTurnIds().delete(sessionId)
 }
 
 function evictStaleSessions(): void {
@@ -409,10 +424,12 @@ function derivePhase(
   accumulator: TurnAccumulator,
   httpStatus: number,
 ): string | undefined {
+  const eve = ctx.eve as { cancelled?: boolean } | undefined
+  if (eve?.cancelled) return 'cancelled'
   const approval = ctx.approval as { status?: string } | undefined
   if (approval?.status === 'rejected') return 'rejected'
   if (approval?.status === 'pending' || accumulator.pausedForInput) return 'awaiting-approval'
-  if (httpStatus >= 400) return 'failed'
+  if (httpStatus >= 400 && httpStatus !== CANCELLED_STATUS) return 'failed'
   return undefined
 }
 
@@ -564,6 +581,9 @@ function getOrCreateTurnState(
 
   turnStates().set(key, state)
   activeTurnBySession().set(sessionId, turnId)
+  const open = sessionTurnIds().get(sessionId) ?? new Set<string>()
+  open.add(turnId)
+  sessionTurnIds().set(sessionId, open)
   return state
 }
 
@@ -601,7 +621,35 @@ async function finishTurn(
     if (activeTurnBySession().get(sessionId) === turnId) {
       activeTurnBySession().delete(sessionId)
     }
+    const open = sessionTurnIds().get(sessionId)
+    open?.delete(turnId)
+    if (open?.size === 0) sessionTurnIds().delete(sessionId)
     pruneEmptySessionMaps(sessionId)
+  }
+}
+
+/**
+ * Emit every turn still open for a session. eve ends a session with
+ * `session.completed` / `session.failed`; a turn left open at that point never
+ * received its own terminal event, so without this it would neither be emitted
+ * nor released.
+ *
+ * Each turn is finished independently: a user `keep` callback that throws
+ * rejects that turn's `finish`, and must not take the remaining turns with it.
+ */
+async function finishOpenTurns(
+  sessionId: string,
+  opts: { status?: number; error?: Error },
+  decorate?: (state: TurnState) => void,
+): Promise<void> {
+  for (const turnId of openTurnIds(sessionId)) {
+    try {
+      const state = getTurnState(sessionId, turnId)
+      if (state && decorate) decorate(state)
+      await finishTurn(sessionId, turnId, opts)
+    } catch (err) {
+      console.error('[evlog] eve hook handler failed:', err)
+    }
   }
 }
 
@@ -821,6 +869,48 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
         }
       },
 
+      async 'turn.cancelled'(event, ctx) {
+        try {
+          const state = getTurnState(ctx.session.id, event.data.turnId)
+          state?.logger.set({ eve: { cancelled: true } })
+          await finishTurn(ctx.session.id, event.data.turnId, { status: CANCELLED_STATUS })
+        } catch (err) {
+          console.error('[evlog] eve hook handler failed:', err)
+        }
+      },
+
+      async 'session.completed'(_event, ctx) {
+        try {
+          await finishOpenTurns(ctx.session.id, { status: 200 })
+        } catch (err) {
+          console.error('[evlog] eve hook handler failed:', err)
+        } finally {
+          clearSessionState(ctx.session.id)
+        }
+      },
+
+      async 'session.failed'(event, ctx) {
+        try {
+          const error = new Error(event.data.message)
+          error.name = event.data.code
+          await finishOpenTurns(ctx.session.id, { error, status: 500 }, (state) => {
+            state.logger.set({
+              eve: {
+                failure: {
+                  code: event.data.code,
+                  message: event.data.message,
+                  ...(event.data.details ? { details: event.data.details } : {}),
+                },
+              },
+            })
+          })
+        } catch (err) {
+          console.error('[evlog] eve hook handler failed:', err)
+        } finally {
+          clearSessionState(ctx.session.id)
+        }
+      },
+
       async 'turn.failed'(event, ctx) {
         try {
           const state = getTurnState(ctx.session.id, event.data.turnId)
@@ -855,6 +945,7 @@ export function resetEvlogEveForTests(): void {
   clearAsyncLocalStorage(turnLoggerStorage)
   turnStates().clear()
   activeTurnBySession().clear()
+  sessionTurnIds().clear()
   sessionSnapshots().clear()
   sessionPendingActions().clear()
   sessionApprovals().clear()
