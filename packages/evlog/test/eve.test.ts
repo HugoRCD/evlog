@@ -4,6 +4,7 @@ import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
   defineEvlogHook,
+  defineEvlogInstrumentation,
   useLogger,
   detachActiveTurnLoggerForTests,
 } from '../src/eve/index'
@@ -65,6 +66,9 @@ async function runTurn(
     }>
     compactions?: Array<{ modelId: string, usageInputTokens: number | null, complete?: boolean }>
     clearContext?: boolean
+    reasoning?: string[]
+    response?: string | null
+    result?: unknown
     ctx?: HookContext
   } = {},
 ) {
@@ -164,6 +168,27 @@ async function runTurn(
     events['context.cleared']!({
       type: 'context.cleared',
       data: { sequence: 45, sessionId: SESSION_ID, turnId },
+    }, ctx)
+  }
+
+  for (const [index, reasoning] of (options.reasoning ?? []).entries()) {
+    events['reasoning.completed']!({
+      type: 'reasoning.completed',
+      data: { reasoning, sequence: 50 + index, stepIndex: 0, turnId },
+    }, ctx)
+  }
+
+  if (options.response !== undefined) {
+    events['message.completed']!({
+      type: 'message.completed',
+      data: { finishReason: 'stop', message: options.response, sequence: 55, stepIndex: 0, turnId },
+    }, ctx)
+  }
+
+  if (options.result !== undefined) {
+    events['result.completed']!({
+      type: 'result.completed',
+      data: { result: options.result as never, sequence: 56, stepIndex: 0, turnId },
     }, ctx)
   }
 
@@ -646,6 +671,62 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain)
     const event = findEventViaDrain(spies.drain, () => true)
     expect(event?.eve).toMatchObject({ phase: 'awaiting-authorization' })
+  })
+
+  it('sizes the model reasoning without recording its content', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'full' })
+
+    await runTurn(hook, { reasoning: ['weighing the refund policy', 'checking the order'] })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({ reasoning: { blocks: 2, chars: 44 } })
+    expect(JSON.stringify(event)).not.toContain('weighing the refund policy')
+  })
+
+  it('records the response length even when the message is omitted', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, { response: 'Refund issued for order 4821.' })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.message).toEqual({ responseChars: 29 })
+  })
+
+  it('records the response text once the message mode allows it', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'preview', messagePreviewLength: 10 })
+
+    await runTurn(hook, { response: 'x'.repeat(50) })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.message).toEqual({ responseChars: 50, response: `${'x'.repeat(10)}…` })
+  })
+
+  it('ignores a step that produced no assistant message', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'full' })
+
+    await runTurn(hook, { response: null })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.message).toBeUndefined()
+  })
+
+  it('records the structured result of an agent with an output schema', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, { result: { refunded: true, orderId: '4821' } })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({ result: { refunded: true, orderId: '4821' } })
   })
 
   it('records compaction and context clearing', async () => {
@@ -1547,5 +1628,81 @@ describe('evlog/eve', () => {
 
     expect(initSpy).not.toHaveBeenCalled()
     initSpy.mockRestore()
+  })
+})
+
+describe('defineEvlogInstrumentation', () => {
+  beforeEach(() => {
+    resetEvlogEveForTests()
+    initLogger({ env: { service: 'eve-test' } })
+  })
+
+  afterEach(() => {
+    resetEvlogEveForTests()
+  })
+
+  function stepStartedInput(turnId = TURN_ID) {
+    return {
+      channel: { kind: 'http' },
+      modelInput: { instructions: undefined, messages: [] },
+      session: { id: SESSION_ID, auth: { current: null, initiator: null } },
+      step: { index: 0 },
+      turn: { id: turnId, sequence: 0 },
+    } as Parameters<
+      NonNullable<NonNullable<ReturnType<typeof defineEvlogInstrumentation>['events']>['step.started']>
+    >[0]
+  }
+
+  it('links the model-call span to the wide event of the active turn', () => {
+    const hook = defineEvlogHook({})
+    const instrumentation = defineEvlogInstrumentation()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, hookContext())
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
+      runtimeContext: {
+        'evlog.request_id': TURN_ID,
+        'evlog.session_id': SESSION_ID,
+      },
+    })
+  })
+
+  it('contributes no context outside a tracked turn', () => {
+    const instrumentation = defineEvlogInstrumentation()
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toBeUndefined()
+  })
+
+  it('does not throw when no hook is registered', () => {
+    const instrumentation = defineEvlogInstrumentation()
+
+    expect(() => instrumentation.events!['step.started']!(stepStartedInput())).not.toThrow()
+  })
+
+  it('passes capture settings and setup through to eve', () => {
+    const setup = vi.fn()
+    const instrumentation = defineEvlogInstrumentation({
+      functionId: 'support-agent',
+      recordInputs: false,
+      recordOutputs: false,
+      traceChannelRequests: true,
+      setup,
+    })
+
+    expect(instrumentation).toMatchObject({
+      functionId: 'support-agent',
+      recordInputs: false,
+      recordOutputs: false,
+      traceChannelRequests: true,
+    })
+    instrumentation.setup!({ agentName: 'support-agent' })
+    expect(setup).toHaveBeenCalledWith({ agentName: 'support-agent' })
+  })
+
+  it('declares nothing beyond the event hook when unconfigured', () => {
+    expect(Object.keys(defineEvlogInstrumentation())).toEqual(['events'])
   })
 })
