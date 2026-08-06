@@ -43,9 +43,6 @@ importers:
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(jiti@2.7.0)
-      evlog:
-        specifier: workspace:*
-        version: link:packages/evlog
       h3:
         specifier: ^1.15.11
         version: 1.15.11
