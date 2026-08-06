@@ -99,6 +99,7 @@ interface SessionRollup {
   inputTokens: number
   outputTokens: number
   costUsd: number
+  estimatedCost: number
   tools: Set<string>
   compactions: number
   authorizations: number
@@ -497,6 +498,7 @@ function freshRollup(): SessionRollup {
     inputTokens: 0,
     outputTokens: 0,
     costUsd: 0,
+    estimatedCost: 0,
     tools: new Set(),
     compactions: 0,
     authorizations: 0,
@@ -830,6 +832,7 @@ function accumulateSessionTotals(
   rollup.inputTokens += acc.inputTokens
   rollup.outputTokens += acc.outputTokens
   rollup.costUsd += acc.costUsd
+  rollup.estimatedCost += computeEstimatedCost(acc) ?? 0
   rollup.compactions += acc.compactions
   rollup.authorizations += acc.authorizations.length
   for (const tool of acc.toolExecutions) rollup.tools.add(tool.name)
@@ -883,7 +886,11 @@ async function emitSessionEvent(
       inputTokens: rollup.inputTokens,
       outputTokens: rollup.outputTokens,
       totalTokens: rollup.inputTokens + rollup.outputTokens,
-      ...(rollup.costUsd > 0 ? { costUsd: roundCost(rollup.costUsd) } : {}),
+      ...(rollup.costUsd > 0
+        ? { costUsd: roundCost(rollup.costUsd) }
+        : rollup.estimatedCost > 0
+          ? { estimatedCost: roundCost(rollup.estimatedCost) }
+          : {}),
       ...(rollup.tools.size > 0 ? { toolCalls: [...rollup.tools] } : {}),
     },
   })
@@ -1089,9 +1096,13 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           if (!state) return
           const acc = state.accumulator
           acc.compactionsRequested += 1
-          acc.compactionModel = event.data.modelId
-          if (event.data.usageInputTokens !== null) {
-            acc.compactionInputTokens = event.data.usageInputTokens
+          // Keep the first trigger of the turn: `inputTokensAtTrigger` reports
+          // how full the context was when compaction first kicked in.
+          if (acc.compactionModel === undefined) {
+            acc.compactionModel = event.data.modelId
+            if (event.data.usageInputTokens !== null) {
+              acc.compactionInputTokens = event.data.usageInputTokens
+            }
           }
         })
       },

@@ -14,6 +14,6 @@ The wide event now carries what eve started reporting since 0.24:
 - `ai.costUsd` — the cost eve reports, used in place of the `cost` pricing map when available. `ai.model` falls back to the model reported at session start, so `model` is only needed for dynamic-model agents
 - subagents record `durationMs` and a `started` status
 
-`message` replaces `redactMessage` with three modes: `'omit'` (default), `'preview'` (text truncated to `messagePreviewLength`, attachments reduced to their type) and `'full'`. Attachment parts were previously not redacted at all. `redactMessage` still works and is deprecated.
+`message` replaces `redactMessage` with three modes: `'omit'` (default), `'preview'` (text truncated to `messagePreviewLength`, attachments reduced to their type and media type) and `'full'`. Attachment parts were previously not redacted at all. `redactMessage` still works and is deprecated.
 
 `sessionEvent: true` adds one wide event per session on top of the per-turn ones, rolling up turns, tokens, cost, tools used, compactions and authorizations — one row per conversation, which is what makes tail sampling useful on an agent.
