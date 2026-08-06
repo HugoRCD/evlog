@@ -172,6 +172,11 @@ export interface AIEventData {
   totalDurationMs?: number
   embedding?: AIEmbeddingData
   estimatedCost?: number
+  /**
+   * Cost in dollars as reported by the runtime or provider, as opposed to
+   * {@link AIEventData.estimatedCost}, which is derived from a pricing map.
+   */
+  costUsd?: number
 }
 
 /**

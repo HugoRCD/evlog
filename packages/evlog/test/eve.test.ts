@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import type { HookContext } from 'eve/hooks'
+import type { HookContext, HookEventMap } from 'eve/hooks'
 import { initLogger } from '../src/logger'
 import {
   resetEvlogEveForTests,
@@ -53,12 +53,23 @@ async function runTurn(
     }>
     toolRequests?: Array<{ toolName: string, callId: string }>
     message?: string
+    messageParts?: HookEventMap['message.received']['data']['parts']
     inputRequests?: Array<{ requestId: string, toolName: string, prompt: string }>
     subagents?: Array<{ phase: 'called' | 'completed', callId: string, name: string }>
+    costUsd?: number
+    stepFailures?: Array<{ code: string, message: string, stepIndex: number }>
+    authorizations?: Array<{
+      name: string
+      outcome?: HookEventMap['authorization.completed']['data']['outcome']
+      reason?: string
+    }>
+    compactions?: Array<{ modelId: string, usageInputTokens: number | null, complete?: boolean }>
+    clearContext?: boolean
+    ctx?: HookContext
   } = {},
 ) {
   const turnId = options.turnId ?? TURN_ID
-  const ctx = hookContext()
+  const ctx = options.ctx ?? hookContext()
   const events = hook.events!
 
   events['turn.started']!({
@@ -69,7 +80,12 @@ async function runTurn(
   if (options.message !== undefined) {
     events['message.received']!({
       type: 'message.received',
-      data: { message: options.message, sequence: 1, turnId },
+      data: {
+        message: options.message,
+        ...(options.messageParts ? { parts: options.messageParts } : {}),
+        sequence: 1,
+        turnId,
+      },
     }, ctx)
   }
 
@@ -86,8 +102,68 @@ async function runTurn(
           inputTokens: 100,
           outputTokens: 50,
           cacheReadTokens: 10,
+          ...(options.costUsd !== undefined ? { costUsd: options.costUsd } : {}),
         },
       },
+    }, ctx)
+  }
+
+  for (const failure of options.stepFailures ?? []) {
+    events['step.failed']!({
+      type: 'step.failed',
+      data: { ...failure, sequence: 4, turnId },
+    }, ctx)
+  }
+
+  for (const [index, auth] of (options.authorizations ?? []).entries()) {
+    events['authorization.required']!({
+      type: 'authorization.required',
+      data: {
+        description: `sign in to ${auth.name}`,
+        name: auth.name,
+        sequence: 30 + index,
+        stepIndex: 0,
+        turnId,
+      },
+    }, ctx)
+    if (auth.outcome) {
+      events['authorization.completed']!({
+        type: 'authorization.completed',
+        data: {
+          name: auth.name,
+          outcome: auth.outcome,
+          ...(auth.reason ? { reason: auth.reason } : {}),
+          sequence: 31 + index,
+          stepIndex: 0,
+          turnId,
+        },
+      }, ctx)
+    }
+  }
+
+  for (const [index, compaction] of (options.compactions ?? []).entries()) {
+    events['compaction.requested']!({
+      type: 'compaction.requested',
+      data: {
+        modelId: compaction.modelId,
+        sequence: 40 + index,
+        sessionId: SESSION_ID,
+        turnId,
+        usageInputTokens: compaction.usageInputTokens,
+      },
+    }, ctx)
+    if (compaction.complete !== false) {
+      events['compaction.completed']!({
+        type: 'compaction.completed',
+        data: { modelId: compaction.modelId, sequence: 41 + index, sessionId: SESSION_ID, turnId },
+      }, ctx)
+    }
+  }
+
+  if (options.clearContext) {
+    events['context.cleared']!({
+      type: 'context.cleared',
+      data: { sequence: 45, sessionId: SESSION_ID, turnId },
     }, ctx)
   }
 
@@ -369,7 +445,7 @@ describe('evlog/eve', () => {
     }, ctx)
     useLogger(toolContext()).set({ customer: { slug: 'acme' } })
 
-    await hook.events!['session.completed']!({ type: 'session.completed' } as never, ctx)
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
 
     await waitForDrainCalls(spies.drain)
     const openTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID))
@@ -410,7 +486,7 @@ describe('evlog/eve', () => {
       data: { sequence: 1, turnId: TURN_ID_1 },
     }, ctx)
 
-    await hook.events!['session.completed']!({ type: 'session.completed' } as never, ctx)
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
 
     await waitForDrainCalls(spies.drain)
     expect(findEventViaDrain(spies.drain, e => e.path?.endsWith(TURN_ID))).toBeUndefined()
@@ -428,6 +504,399 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain, 2)
     const thirdTurn = findEventViaDrain(spies.drain, e => e.path?.endsWith('turn_2'))
     expect(thirdTurn?.customer).toBeUndefined()
+  })
+
+  it('records runtime identity from session.started on every turn', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    hook.events!['session.started']!({
+      type: 'session.started',
+      data: {
+        runtime: {
+          agentId: 'agent_1',
+          agentName: 'support',
+          eveVersion: '0.30.8',
+          modelId: 'anthropic/claude-opus-5',
+          build: { gitSha: 'abc123', gitBranch: 'main', deployedAt: '2026-08-05T00:00:00Z' },
+        },
+      },
+    }, ctx)
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      runtime: {
+        version: '0.30.8',
+        agentId: 'agent_1',
+        model: 'anthropic/claude-opus-5',
+        gitSha: 'abc123',
+        gitBranch: 'main',
+        deployedAt: '2026-08-05T00:00:00Z',
+      },
+    })
+    expect(event?.ai).toMatchObject({ model: 'anthropic/claude-opus-5' })
+  })
+
+  it('records parent lineage for a subagent session', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = {
+      ...hookContext(),
+      session: {
+        id: SESSION_ID,
+        parent: {
+          callId: 'call_delegate',
+          rootSessionId: 'sess_root',
+          sessionId: 'sess_parent',
+          turn: { id: 'turn_parent' },
+        },
+      },
+    } as HookContext
+
+    hook.events!['session.started']!({
+      type: 'session.started',
+      data: {
+        invocation: {
+          kind: 'subagent',
+          name: 'researcher',
+          parentCallId: 'call_delegate',
+          parentSessionId: 'sess_parent',
+          parentTurnId: 'turn_parent',
+        },
+      },
+    }, ctx)
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      parent: {
+        sessionId: 'sess_parent',
+        rootSessionId: 'sess_root',
+        callId: 'call_delegate',
+        turnId: 'turn_parent',
+        subagent: 'researcher',
+      },
+    })
+  })
+
+  it('prefers the cost reported by eve over the configured pricing map', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      cost: { 'gpt-5': { input: 1000, output: 2000 } },
+    })
+
+    await runTurn(hook, { steps: 2, costUsd: 0.0125 })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.ai).toMatchObject({ costUsd: 0.025 })
+    expect((event?.ai as Record<string, unknown>).estimatedCost).toBeUndefined()
+  })
+
+  it('records failed model steps on a turn that still completes', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      stepFailures: [{ code: 'RATE_LIMIT', message: 'slow down', stepIndex: 0 }],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.status).toBe(200)
+    expect(event?.eve).toMatchObject({
+      failedSteps: 1,
+      stepFailures: [{ code: 'RATE_LIMIT', message: 'slow down', stepIndex: 0 }],
+    })
+  })
+
+  it('records connection authorization outcomes', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      authorizations: [{ name: 'linear', outcome: 'declined', reason: 'user said no' }],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    const { authorizations } = (event?.eve as { authorizations?: Array<Record<string, unknown>> })
+    expect(authorizations).toHaveLength(1)
+    expect(authorizations?.[0]).toMatchObject({
+      name: 'linear',
+      outcome: 'declined',
+      reason: 'user said no',
+    })
+    expect(authorizations?.[0]?.durationMs).toBeTypeOf('number')
+  })
+
+  it('marks a turn awaiting an authorization that never completed', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, { authorizations: [{ name: 'github' }] })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({ phase: 'awaiting-authorization' })
+  })
+
+  it('records compaction and context clearing', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      compactions: [{ modelId: 'gpt-5-mini', usageInputTokens: 180_000 }],
+      clearContext: true,
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      compaction: { count: 1, model: 'gpt-5-mini', inputTokensAtTrigger: 180_000 },
+      contextCleared: true,
+    })
+  })
+
+  it('reports a compaction that was requested but never completed', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      compactions: [{ modelId: 'gpt-5-mini', usageInputTokens: 180_000, complete: false }],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      compaction: {
+        count: 0,
+        requested: 1,
+        model: 'gpt-5-mini',
+        inputTokensAtTrigger: 180_000,
+      },
+    })
+  })
+
+  it('keeps the first trigger when a turn compacts more than once', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook, {
+      compactions: [
+        { modelId: 'gpt-5-mini', usageInputTokens: 180_000 },
+        { modelId: 'gpt-5-nano', usageInputTokens: 90_000 },
+      ],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      compaction: { count: 2, model: 'gpt-5-mini', inputTokensAtTrigger: 180_000 },
+    })
+  })
+
+  it('marks a subagent started and times it to completion', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+
+    events['turn.started']!({ type: 'turn.started', data: { sequence: 0, turnId: TURN_ID } }, ctx)
+    events['subagent.called']!({
+      type: 'subagent.called',
+      data: {
+        callId: 'call_1',
+        childSessionId: 'child_1',
+        sessionId: SESSION_ID,
+        sequence: 20,
+        name: 'researcher',
+        toolName: 'delegate',
+        turnId: TURN_ID,
+        workflowId: 'wf_1',
+      },
+    }, ctx)
+    events['subagent.started']!({
+      type: 'subagent.started',
+      data: { callId: 'call_1', subagentName: 'researcher' },
+    }, ctx)
+    events['subagent.completed']!({
+      type: 'subagent.completed',
+      data: { callId: 'call_1', output: 'done', subagentName: 'researcher' },
+    }, ctx)
+    await events['turn.completed']!({
+      type: 'turn.completed',
+      data: { sequence: 99, turnId: TURN_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    const { subagents } = (event?.eve as { subagents?: Array<Record<string, unknown>> })
+    expect(subagents?.[0]).toMatchObject({ callId: 'call_1', status: 'completed' })
+    expect(subagents?.[0]?.durationMs).toBeTypeOf('number')
+  })
+
+  it('summarizes attachment parts without their content in preview mode', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'preview' })
+
+    await runTurn(hook, {
+      message: 'here is my passport',
+      messageParts: [{ type: 'file', mediaType: 'application/pdf', filename: 'john-doe-passport.pdf', data: 'JVBER' },],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.message).toEqual({
+      received: 'here is my passport',
+      parts: [{ type: 'file', mediaType: 'application/pdf' }],
+    })
+  })
+
+  it('keeps attachment parts verbatim in full mode', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'full' })
+
+    await runTurn(hook, {
+      message: 'x'.repeat(600),
+      messageParts: [{ type: 'text', text: 'hello' }],
+    })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    const message = event?.message as { received: string, parts: unknown[] }
+    expect(message.received).toHaveLength(600)
+    expect(message.parts).toEqual([{ type: 'text', text: 'hello' }])
+  })
+
+  it('truncates the preview to messagePreviewLength', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, message: 'preview', messagePreviewLength: 10 })
+
+    await runTurn(hook, { message: 'x'.repeat(50) })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect((event?.message as { received: string }).received).toBe(`${'x'.repeat(10)}…`)
+  })
+
+  it('emits a session wide event rolling up every turn when sessionEvent is on', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, sessionEvent: true })
+    const ctx = hookContext()
+
+    await runTurn(hook, { ctx, costUsd: 0.01, toolResults: [{ toolName: 'search', status: 'completed' }] })
+    await runTurn(hook, { ctx, turnId: TURN_ID_1, cancel: true, costUsd: 0.02 })
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
+
+    await waitForDrainCalls(spies.drain, 3)
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.eve).toMatchObject({
+      scope: 'session',
+      sessionId: SESSION_ID,
+      turns: 2,
+      cancelledTurns: 1,
+    })
+    expect(sessionEvent?.ai).toMatchObject({
+      calls: 2,
+      inputTokens: 200,
+      outputTokens: 100,
+      costUsd: 0.03,
+      toolCalls: ['search'],
+    })
+  })
+
+  it('counts a turn parked on an authorization as failed in the session rollup', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain, sessionEvent: true })
+    const ctx = hookContext()
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, ctx)
+    hook.events!['authorization.required']!({
+      type: 'authorization.required',
+      data: {
+        description: 'sign in to linear',
+        name: 'linear',
+        sequence: 1,
+        stepIndex: 0,
+        turnId: TURN_ID,
+      },
+    }, ctx)
+
+    await hook.events!['session.failed']!({
+      type: 'session.failed',
+      data: { code: 'SESSION_ERROR', message: 'session exploded', sessionId: SESSION_ID },
+    }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const turnEvent = findEventViaDrain(spies.drain, e => e.path?.endsWith(TURN_ID))
+    expect(turnEvent?.eve).toMatchObject({ phase: 'awaiting-authorization' })
+
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.eve).toMatchObject({
+      scope: 'session',
+      sessionId: SESSION_ID,
+      turns: 1,
+      failedTurns: 1,
+    })
+  })
+
+  it('rolls up the estimated cost when eve reports no cost', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      sessionEvent: true,
+      cost: { 'gpt-5': { input: 1000, output: 2000 } },
+    })
+    const ctx = hookContext()
+
+    await runTurn(hook, { ctx })
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
+
+    await waitForDrainCalls(spies.drain, 2)
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.ai).toMatchObject({ estimatedCost: 0.2 })
+    expect((sessionEvent?.ai as Record<string, unknown>).costUsd).toBeUndefined()
+  })
+
+  it('reports both cost sources when a session mixes them', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({
+      drain: spies.drain,
+      sessionEvent: true,
+      cost: { 'gpt-5': { input: 1000, output: 2000 } },
+    })
+    const ctx = hookContext()
+
+    await runTurn(hook, { ctx, costUsd: 0.01 })
+    await runTurn(hook, { ctx, turnId: TURN_ID_1 })
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
+
+    await waitForDrainCalls(spies.drain, 3)
+    const sessionEvent = findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)
+    expect(sessionEvent?.ai).toMatchObject({ costUsd: 0.01, estimatedCost: 0.2 })
+  })
+
+  it('emits no session wide event by default', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+
+    await runTurn(hook, { ctx })
+    await hook.events!['session.completed']!({ type: 'session.completed' }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    expect(findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)).toBeUndefined()
   })
 
   it('does not throw when an internal handler fails', async () => {
@@ -899,6 +1368,7 @@ describe('evlog/eve', () => {
         childSessionId: 'child_sub_1',
         status: 'completed',
         output: 'done',
+        durationMs: expect.any(Number),
       },
     ])
   })
