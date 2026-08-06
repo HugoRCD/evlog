@@ -430,6 +430,7 @@ interface EveGlobalState {
   sessionAuthorizationStarts: Map<string, Map<string, number>>
   maxSessions: number
   initialized: boolean
+  hookCount: number
 }
 
 const EVE_GLOBAL_STATE = Symbol.for('evlog.eve.state')
@@ -451,6 +452,7 @@ function getEveGlobalState(): EveGlobalState {
       sessionAuthorizationStarts: new Map(),
       maxSessions: DEFAULT_MAX_SESSIONS,
       initialized: false,
+      hookCount: 0,
     }
   }
   return host[EVE_GLOBAL_STATE]
@@ -971,6 +973,16 @@ function getTurnState(sessionId: string, turnId: string): TurnState | undefined 
 export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
   const messageMode = resolveMessageMode(options)
   const previewLength = options.messagePreviewLength ?? DEFAULT_MESSAGE_PREVIEW_LENGTH
+
+  const state = getEveGlobalState()
+  state.hookCount += 1
+  if (state.hookCount > 1) {
+    console.warn(
+      '[evlog] defineEvlogHook() ran more than once in this process. Every hook '
+      + 'accumulates into the same turn, so token and step counts are recorded '
+      + 'once per hook. Mount @evlog/eve or write agent/hooks/evlog.ts, not both.',
+    )
+  }
 
   return defineHook({
     events: {

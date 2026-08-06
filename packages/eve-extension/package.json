@@ -1,0 +1,68 @@
+{
+  "name": "@evlog/eve",
+  "version": "0.1.0",
+  "description": "evlog as an installable eve extension — wide events, drains, and agent-authored annotations for eve agents",
+  "author": "HugoRCD <contact@hrcd.fr>",
+  "homepage": "https://evlog.dev",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/HugoRCD/evlog.git",
+    "directory": "packages/eve-extension"
+  },
+  "bugs": {
+    "url": "https://github.com/HugoRCD/evlog/issues"
+  },
+  "keywords": [
+    "evlog",
+    "eve",
+    "eve-extension",
+    "agent",
+    "observability",
+    "wide-events"
+  ],
+  "license": "MIT",
+  "type": "module",
+  "eve": {
+    "extension": {
+      "source": "./extension",
+      "dist": "./dist/extension"
+    }
+  },
+  "files": [
+    "dist"
+  ],
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.mjs"
+    },
+    "./tools": {
+      "types": "./dist/tools/index.d.ts",
+      "default": "./dist/tools/index.mjs"
+    }
+  },
+  "scripts": {
+    "build": "eve extension build",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "test": "vitest run",
+    "test:watch": "vitest watch",
+    "typecheck": "tsc"
+  },
+  "dependencies": {
+    "evlog": "workspace:*",
+    "zod": "^4.4.3"
+  },
+  "devDependencies": {
+    "@types/node": "^24.13.3",
+    "eve": "^0.30.8",
+    "typescript": "^5.9.0",
+    "vitest": "^4.1.10"
+  },
+  "peerDependencies": {
+    "eve": "*"
+  },
+  "engines": {
+    "node": ">=24"
+  }
+}

@@ -900,6 +900,18 @@ describe('evlog/eve', () => {
     expect(findEventViaDrain(spies.drain, e => e.path === `/sessions/${SESSION_ID}`)).toBeUndefined()
   })
 
+  it('warns when a second hook would double-count the same turn', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    defineEvlogHook({})
+    expect(warn).not.toHaveBeenCalled()
+
+    defineEvlogHook({})
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('more than once'))
+
+    warn.mockRestore()
+  })
+
   it('does not throw when an internal handler fails', async () => {
     const hook = defineEvlogHook({
       enrich: () => {
