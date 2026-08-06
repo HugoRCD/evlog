@@ -23,6 +23,8 @@ type Exports = Record<string, { import?: string, default?: string } | string>
  * `worker-preset-dist-imports.test.ts`).
  */
 describe.skipIf(!distExists)('public API surface', () => {
+  // Every dist entrypoint is imported serially; the 5s default times out when
+  // the rest of the monorepo builds in parallel.
   it('matches snapshot for all subpath exports', async () => {
     const exportsField = pkg.exports as Exports
     const subpaths = Object.keys(exportsField).sort()
@@ -41,5 +43,5 @@ describe.skipIf(!distExists)('public API surface', () => {
     }
 
     expect(surfaces).toMatchSnapshot()
-  })
+  }, 30_000)
 })
