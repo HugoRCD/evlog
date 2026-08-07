@@ -26,6 +26,7 @@ const FS_FIELDS: ConfigField<FsConfig>[] = [
 ]
 
 const gitignoreWritten = new Set<string>()
+const writableDirs = new Map<string, boolean>()
 let warnedFsEdgeRuntime = false
 
 function isEdgeRuntime(): boolean {
@@ -36,6 +37,36 @@ function warnFsEdgeRuntimeOnce(): void {
   if (warnedFsEdgeRuntime) return
   warnedFsEdgeRuntime = true
   console.warn('[evlog/fs] File system drain is not available on the Edge runtime. Use evlog/memory or a HTTP adapter instead.')
+}
+
+/** Read-only or permission-denied, as opposed to a full disk or a real bug. */
+function isUnwritableError(error: unknown): boolean {
+  const code = (error as NodeJS.ErrnoException | null)?.code
+  return code === 'EROFS' || code === 'EACCES' || code === 'EPERM'
+}
+
+/**
+ * Whether `dir` can be created and written to, probed once per directory.
+ *
+ * Serverless hosts mount everything outside the temp directory read-only, so a
+ * drain attached there would otherwise throw on every batch for the lifetime of
+ * the deployment. Anything other than a permission failure still propagates.
+ */
+async function isDirWritable(dir: string): Promise<boolean> {
+  const cached = writableDirs.get(dir)
+  if (cached !== undefined) return cached
+
+  try {
+    await mkdir(dir, { recursive: true })
+  } catch (error) {
+    if (!isUnwritableError(error)) throw error
+    writableDirs.set(dir, false)
+    console.warn(`[evlog/fs] "${dir}" is not writable, so the file system drain is disabled. This is expected on a serverless host, where only the temp directory is writable and does not outlive the instance — send events to a HTTP adapter instead, or set the drain's \`dir\` to a writable path.`)
+    return false
+  }
+
+  writableDirs.set(dir, true)
+  return true
 }
 
 async function ensureGitignore(dir: string): Promise<void> {
@@ -155,8 +186,10 @@ export function createFsDrain(overrides?: Partial<FsConfig>) {
         return null
       }
       const resolved = await resolveAdapterConfig<FsConfig>('fs', FS_FIELDS, overrides)
+      const dir = resolved.dir ?? '.evlog/logs'
+      if (!await isDirWritable(dir)) return null
       return {
-        dir: resolved.dir ?? '.evlog/logs',
+        dir,
         pretty: resolved.pretty ?? false,
         maxFiles: resolved.maxFiles,
         maxSizePerFile: resolved.maxSizePerFile,
