@@ -52,12 +52,10 @@ const TOOLS = [
   'getDiscussion',
   'addDiscussionComment',
 
-  // Releases
+  // Releases, read only: AGENTS.md forbids agents from creating one
   'listReleases',
   'getLatestRelease',
   'getReleaseContext',
-  'createRelease',
-  'updateRelease',
 
   // CI, read only — diagnose a red build, never restart or cancel one
   'listCheckRuns',

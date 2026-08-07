@@ -19,8 +19,8 @@ On GitHub it is not, for three compounding reasons:
    `onCheckSuite` are wired, a turn that hits an approval gate parks forever.
 
 Approval is an interaction pattern for a trusted one-to-one channel. On a public
-thread it is theatre. The control has to be authorization: decided server-side,
-from an identity the actor cannot choose.
+thread it confirms nothing. The control has to be authorization: decided
+server-side, from an identity the actor cannot choose.
 
 ## Decide at dispatch, not at the tool
 
@@ -74,7 +74,7 @@ const DENY = { type: 'denied', reason: 'Only repository maintainers can ask Evi 
 
 requireApproval: {
   addLabels: ({ session }) => tier(session) === 'admin' ? 'not-applicable' : DENY,
-  createRelease: ({ session }) => tier(session) === 'admin' ? 'user-approval' : DENY,
+  createPullRequest: ({ session }) => tier(session) === 'admin' ? 'user-approval' : DENY,
   // …
 }
 ```
@@ -100,7 +100,15 @@ Reversible only. Anything that is one click to undo:
 Everything else keeps a real approval even for admin: `createIssue`, `closeIssue`,
 `deleteIssueComment`, `deletePullRequestComment`, `createBranch`,
 `createOrUpdateFile`, `createPullRequest`, `updatePullRequest`,
-`createPullRequestReview`, `createRelease`, `updateRelease`.
+`createPullRequestReview`.
+
+Release writes are not on the list at all: `AGENTS.md` forbids an agent from
+creating one, so the tool set stops at reading them.
+
+And "reversible" is about the repository record, not about side effects. A
+comment triggers `issue_comment` workflows and notifies watchers; deleting it
+afterwards undoes neither. On a thread opened by someone outside the tier, treat
+that as a reason to keep even the reversible list behind approval.
 
 One trap in that split: **`updateIssue` also sets `state`**, so auto-approving it
 hands over `closeIssue` through the back door. Gate on the input, not the name:
@@ -168,5 +176,7 @@ to any agent on a public repository, not just this one.
   admin/public is enough. Start with two; a third is easy to add later.
 - Rate limiting is a separate concern and still unsolved: it needs a store that
   outlives a session, which `defineState` is not.
-- No eval covers any of this yet. The gate needs cases asserting a public caller is
-  refused and an admin is not.
+- No eval covers the tier gate yet. `safety/write-requires-approval` already
+  covers approval parking, but nothing asserts that a public caller is refused,
+  or that an approval came from the maintainer who triggered the turn rather than
+  whoever replied first.

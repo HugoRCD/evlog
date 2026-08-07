@@ -68,6 +68,14 @@ registers the turn logger on `turn.started` itself, so two hooks race on the sam
 event. The attempt was removed rather than shipped: an annotation present on 6%
 of turns is worse than none, because it looks like data and is a biased sample.
 
+`evlog/eve` now records `eve.caller` itself, and `agent/instrumentation.ts` puts
+the same principal on the spans. Two things follow from that. The principal is a
+stable per-person identifier duplicated across logs and traces, so it inherits
+whatever retention the drain has — decide that before adding a drain that keeps
+events longer than the platform does. And an unauthenticated caller is omitted
+rather than written blank: an empty attribute reads as a caller whose id happens
+to be empty.
+
 ## Proposals
 
 ### evlog/eve — let `defineEvlogInstrumentation` take `events`
