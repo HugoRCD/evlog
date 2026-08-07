@@ -26,7 +26,7 @@ const FS_FIELDS: ConfigField<FsConfig>[] = [
 ]
 
 const gitignoreWritten = new Set<string>()
-const writableDirs = new Map<string, boolean>()
+const unwritableDirs = new Set<string>()
 let warnedFsEdgeRuntime = false
 
 function isEdgeRuntime(): boolean {
@@ -36,7 +36,7 @@ function isEdgeRuntime(): boolean {
 function warnFsEdgeRuntimeOnce(): void {
   if (warnedFsEdgeRuntime) return
   warnedFsEdgeRuntime = true
-  console.warn('[evlog/fs] File system drain is not available on the Edge runtime. Use evlog/memory or a HTTP adapter instead.')
+  console.warn('[evlog/fs] File system drain is not available on the Edge runtime. Use evlog/memory or an HTTP adapter instead.')
 }
 
 /** Read-only or permission-denied, as opposed to a full disk or a real bug. */
@@ -46,27 +46,15 @@ function isUnwritableError(error: unknown): boolean {
 }
 
 /**
- * Whether `dir` can be created and written to, probed once per directory.
+ * Record that `dir` cannot be written to, and say so once.
  *
- * Serverless hosts mount everything outside the temp directory read-only, so a
- * drain attached there would otherwise throw on every batch for the lifetime of
- * the deployment. Anything other than a permission failure still propagates.
+ * Synchronous on purpose: concurrent batches that all fail their first write
+ * reach this together, and the check-then-add pair cannot interleave.
  */
-async function isDirWritable(dir: string): Promise<boolean> {
-  const cached = writableDirs.get(dir)
-  if (cached !== undefined) return cached
-
-  try {
-    await mkdir(dir, { recursive: true })
-  } catch (error) {
-    if (!isUnwritableError(error)) throw error
-    writableDirs.set(dir, false)
-    console.warn(`[evlog/fs] "${dir}" is not writable, so the file system drain is disabled. This is expected on a serverless host, where only the temp directory is writable and does not outlive the instance — send events to a HTTP adapter instead, or set the drain's \`dir\` to a writable path.`)
-    return false
-  }
-
-  writableDirs.set(dir, true)
-  return true
+function markUnwritable(dir: string): void {
+  if (unwritableDirs.has(dir)) return
+  unwritableDirs.add(dir)
+  console.warn(`[evlog/fs] "${dir}" is not writable, so the file system drain is disabled. This is expected on a serverless host, where only the temp directory is writable and does not outlive the instance — send events to an HTTP adapter instead, or set the drain's \`dir\` to a writable path.`)
 }
 
 async function ensureGitignore(dir: string): Promise<void> {
@@ -187,7 +175,7 @@ export function createFsDrain(overrides?: Partial<FsConfig>) {
       }
       const resolved = await resolveAdapterConfig<FsConfig>('fs', FS_FIELDS, overrides)
       const dir = resolved.dir ?? '.evlog/logs'
-      if (!await isDirWritable(dir)) return null
+      if (unwritableDirs.has(dir)) return null
       return {
         dir,
         pretty: resolved.pretty ?? false,
@@ -195,7 +183,17 @@ export function createFsDrain(overrides?: Partial<FsConfig>) {
         maxSizePerFile: resolved.maxSizePerFile,
       }
     },
-    send: writeBatchToFs,
+    // The write itself is the probe. `mkdir` is a no-op on a directory that
+    // already exists, so it succeeds on a read-only one and proves nothing;
+    // only the append tells you whether this host will take the events.
+    send: async (events, config) => {
+      try {
+        await writeBatchToFs(events, config)
+      } catch (error) {
+        if (!isUnwritableError(error)) throw error
+        markUnwritable(config.dir)
+      }
+    },
   })
 }
 
