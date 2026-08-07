@@ -62,3 +62,4 @@ minimumReleaseAgeExclude:
 
 patchedDependencies:
   '@github-tools/eve-extension@0.3.0': patches/@github-tools__eve-extension@0.3.0.patch
+  eve@0.30.6: patches/eve@0.30.6.patch
