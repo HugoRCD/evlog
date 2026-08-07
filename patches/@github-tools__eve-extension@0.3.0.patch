@@ -1,5 +1,5 @@
 diff --git a/dist/extension/tools/github.mjs b/dist/extension/tools/github.mjs
-index b22c2c9765696501b6787a63b8824fc1d575058f..0691bb3d4ee5cdc324a8e6417fedb86254402944 100644
+index b22c2c9765696501b6787a63b8824fc1d575058f..577fd2dc5407c763319505c370d7149fbb4c01b7 100644
 --- a/dist/extension/tools/github.mjs
 +++ b/dist/extension/tools/github.mjs
 @@ -7,13 +7,9 @@ import extension_default from "../extension.mjs";
@@ -30,7 +30,7 @@ index b22c2c9765696501b6787a63b8824fc1d575058f..0691bb3d4ee5cdc324a8e6417fedb862
 +async function runGithubEveTool(name, input) {
 +	return executeGithubEveTool(name, input, buildSessionOptions());
 +}
-+var github_default = defineDynamic({ events: { "session.started": async () => {
++var github_default = defineDynamic({ events: { "step.started": async () => {
 +	const sessionOptions = buildSessionOptions();
  	const descriptors = listEveToolDescriptors(sessionOptions);
  	const tools = {};
