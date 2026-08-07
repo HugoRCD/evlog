@@ -336,5 +336,42 @@ describe('fs adapter', () => {
         warnSpy.mockRestore()
       }
     })
+
+    it('warns once and disables itself when the directory is read-only', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      const readOnly = Object.assign(new Error('EROFS'), { code: 'EROFS' })
+
+      try {
+        vi.resetModules()
+        mockedMkdir.mockRejectedValue(readOnly)
+        const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')
+        const drain = createFsDrainFresh({ dir: '/var/task/.evlog/logs' })
+
+        await drain(createDrainContext({ action: 'readonly' }))
+        await drain(createDrainContext({ action: 'readonly_again' }))
+
+        expect(warnSpy).toHaveBeenCalledTimes(1)
+        expect(warnSpy.mock.calls[0]?.[0]).toContain('not writable')
+        expect(mockedAppendFile).not.toHaveBeenCalled()
+        // Probed once, then answered from cache.
+        expect(mockedMkdir).toHaveBeenCalledTimes(1)
+      } finally {
+        warnSpy.mockRestore()
+      }
+    })
+
+    it('propagates a write failure that is not a permission problem', async () => {
+      vi.resetModules()
+      mockedMkdir.mockRejectedValue(Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }))
+      const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')
+      const drain = createFsDrainFresh({ dir: '.evlog/logs' })
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+      try {
+        await expect(drain(createDrainContext())).rejects.toThrow('ENOSPC')
+      } finally {
+        errorSpy.mockRestore()
+      }
+    })
   })
 })
