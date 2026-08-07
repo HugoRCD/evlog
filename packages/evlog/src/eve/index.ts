@@ -724,6 +724,24 @@ function flushEveMetadata(state: TurnState): void {
 }
 
 /** Wide-event view of the eve instance and the parent session, when there is one. */
+/**
+ * Who triggered this turn, from the caller principal eve resolved at dispatch.
+ *
+ * Only the identifiers eve itself routes on: `principalId` is opaque on every
+ * channel eve ships (`github:<id>`, a Slack user id), and `subject` and
+ * `attributes` are deliberately left out because a channel may put a name or an
+ * email in them.
+ */
+function buildCaller(ctx: HookContext): Record<string, string> | null {
+  const auth = ctx.session.auth?.current
+  if (!auth) return null
+  return {
+    principalId: auth.principalId,
+    principalType: auth.principalType,
+    authenticator: auth.authenticator,
+  }
+}
+
 function buildLineage(sessionId: string, ctx: HookContext): Record<string, unknown> {
   const eve: Record<string, unknown> = {}
   const runtime = sessionRuntimes().get(sessionId)
@@ -731,6 +749,9 @@ function buildLineage(sessionId: string, ctx: HookContext): Record<string, unkno
     const { subagent, ...identity } = runtime
     if (Object.keys(identity).length > 0) eve.runtime = identity
   }
+
+  const caller = buildCaller(ctx)
+  if (caller) eve.caller = caller
 
   const { parent } = ctx.session
   if (parent) {
@@ -1410,6 +1431,28 @@ export interface EvlogEveInstrumentationOptions {
    * and eve keeps writing its local traces.
    */
   setup?: (context: InstrumentationSetupContext) => void
+  /**
+   * Your own runtime-context contributions, merged with evlog's.
+   *
+   * An agent has exactly one `agent/instrumentation.ts`, and other integrations
+   * want that same `step.started` slot — PostHog's, for instance, links spans to
+   * the initiating user. Without this, adopting one means dropping the other.
+   * evlog's `evlog.request_id` / `evlog.session_id` are applied first, so your
+   * keys win on a collision and you can attach anything the callback's
+   * `session`, `turn`, `step`, `channel` or `modelInput` exposes.
+   *
+   * @example
+   * ```ts
+   * defineEvlogInstrumentation({
+   *   events: {
+   *     'step.started': ({ session }) => ({
+   *       runtimeContext: { 'caller.id': session.auth.current?.principalId ?? '' },
+   *     }),
+   *   },
+   * })
+   * ```
+   */
+  events?: InstrumentationDefinition['events']
 }
 
 /**
@@ -1467,7 +1510,19 @@ export function defineEvlogInstrumentation(
       : {}),
     ...(options.setup !== undefined ? { setup: options.setup } : {}),
     events: {
-      'step.started': buildInstrumentationContext,
+      ...options.events,
+      'step.started': (input) => {
+        const evlogContext = buildInstrumentationContext(input)
+        const authored = options.events?.['step.started']?.(input)
+        if (!evlogContext && !authored) return undefined
+        return {
+          ...authored,
+          runtimeContext: {
+            ...evlogContext?.runtimeContext,
+            ...authored?.runtimeContext,
+          },
+        }
+      },
     },
   })
 }

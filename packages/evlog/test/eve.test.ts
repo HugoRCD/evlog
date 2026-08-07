@@ -610,6 +610,82 @@ describe('evlog/eve', () => {
     })
   })
 
+  it('records the caller principal that triggered the turn', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = {
+      ...hookContext(),
+      session: {
+        id: SESSION_ID,
+        auth: {
+          current: {
+            principalId: 'github:1234',
+            principalType: 'user',
+            authenticator: 'github',
+            subject: 'someone@example.com',
+            attributes: { login: 'someone' },
+          },
+          initiator: null,
+        },
+      },
+    } as unknown as HookContext
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      caller: {
+        principalId: 'github:1234',
+        principalType: 'user',
+        authenticator: 'github',
+      },
+    })
+  })
+
+  it('keeps the caller subject and attributes off the event', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = {
+      ...hookContext(),
+      session: {
+        id: SESSION_ID,
+        auth: {
+          current: {
+            principalId: 'github:1234',
+            principalType: 'user',
+            authenticator: 'github',
+            subject: 'someone@example.com',
+            attributes: { login: 'someone' },
+          },
+          initiator: null,
+        },
+      },
+    } as unknown as HookContext
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    const { caller } = event?.eve as { caller?: Record<string, unknown> }
+    expect(Object.keys(caller ?? {}).sort()).toEqual([
+      'authenticator',
+      'principalId',
+      'principalType',
+    ])
+  })
+
+  it('omits the caller when the session carries no authenticated principal', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).not.toHaveProperty('caller')
+  })
+
   it('prefers the cost reported by eve over the configured pricing map', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({
@@ -1704,5 +1780,67 @@ describe('defineEvlogInstrumentation', () => {
 
   it('declares nothing beyond the event hook when unconfigured', () => {
     expect(Object.keys(defineEvlogInstrumentation())).toEqual(['events'])
+  })
+
+  it('merges an authored runtime context with its own', () => {
+    const hook = defineEvlogHook({})
+    const instrumentation = defineEvlogInstrumentation({
+      events: {
+        'step.started': ({ session }) => ({
+          runtimeContext: { 'caller.id': session.auth.current?.principalId ?? 'anonymous' },
+        }),
+      },
+    })
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, hookContext())
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
+      runtimeContext: {
+        'evlog.request_id': TURN_ID,
+        'evlog.session_id': SESSION_ID,
+        'caller.id': 'anonymous',
+      },
+    })
+  })
+
+  it('lets an authored key win over its own on a collision', () => {
+    const hook = defineEvlogHook({})
+    const instrumentation = defineEvlogInstrumentation({
+      events: {
+        'step.started': () => ({ runtimeContext: { 'evlog.request_id': 'authored' } }),
+      },
+    })
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, hookContext())
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toMatchObject({
+      runtimeContext: { 'evlog.request_id': 'authored' },
+    })
+  })
+
+  it('still contributes the authored context outside a tracked turn', () => {
+    const instrumentation = defineEvlogInstrumentation({
+      events: {
+        'step.started': () => ({ runtimeContext: { 'caller.id': 'anonymous' } }),
+      },
+    })
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
+      runtimeContext: { 'caller.id': 'anonymous' },
+    })
+  })
+
+  it('contributes nothing when neither side has context to add', () => {
+    const instrumentation = defineEvlogInstrumentation({
+      events: { 'step.started': () => undefined },
+    })
+
+    expect(instrumentation.events!['step.started']!(stepStartedInput())).toBeUndefined()
   })
 })
