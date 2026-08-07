@@ -76,6 +76,15 @@ Because app-scoped is non-interactive, eve never emits a challenge:
 anyone can approve, on every turn. User-scoped at least fails loudly with
 `principal_required`.
 
+**A misconfigured OAuth connection does not degrade, it breaks the whole run.**
+On EVL-213, the Linear MCP connection took every GitHub tool down with it: five
+calls, all `Cannot read properties of undefined (reading 'toLowerCase')`, thrown
+from `isProvisionableConnectorUid` in
+`@vercel/connect/dist/eve/provision-oauth-connector.js`. Local evals never saw it
+because `provisionEveOAuthConnector` returns early without an OIDC token; in
+production it runs. The connection is removed until Connect can mint the token —
+assuming the agent simply answers without that connection is wrong.
+
 **`vercel connect token` from the CLI proves nothing about app-scoped auth** — it
 resolves through your own Vercel identity, the user-scoped path.
 

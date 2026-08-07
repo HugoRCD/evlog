@@ -8,10 +8,8 @@ export const gatewayRouting = {
 } as const
 
 /**
- * Tags stamped on every gateway request, read back through the spend report.
- *
- * One tag per dimension, not one compound string: the report groups by a single
- * dimension at a time, so this yields a row per environment and a row per surface.
+ * Tags stamped on every gateway request. One tag per dimension, not a compound
+ * string: the spend report groups by a single dimension at a time.
  */
 export function sessionTags(kind?: string): string[] {
   return [`evi:env:${environment()}`, `evi:surface:${channelName(kind)}`]
