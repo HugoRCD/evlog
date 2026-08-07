@@ -17,9 +17,9 @@ export default defineTool({
     orderId: z.string(),
     reason: z.string().describe('Why the customer is getting a refund'),
   }),
-  needsApproval: ({ toolInput }) => {
+  approval: ({ toolInput }) => {
     const order = findOrder(String(toolInput?.orderId ?? ''))
-    return orderRequiresApproval(order)
+    return orderRequiresApproval(order) ? 'user-approval' : 'not-applicable'
   },
   async execute({ orderId, reason }) {
     await fakeLatency(900, 1600)
