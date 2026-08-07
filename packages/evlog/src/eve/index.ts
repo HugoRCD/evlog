@@ -724,6 +724,24 @@ function flushEveMetadata(state: TurnState): void {
 }
 
 /** Wide-event view of the eve instance and the parent session, when there is one. */
+/**
+ * Who triggered this turn, from the caller principal eve resolved at dispatch.
+ *
+ * Only the identifiers eve itself routes on: `principalId` is opaque on every
+ * channel eve ships (`github:<id>`, a Slack user id), and `subject` and
+ * `attributes` are deliberately left out because a channel may put a name or an
+ * email in them.
+ */
+function buildCaller(ctx: HookContext): Record<string, string> | null {
+  const auth = ctx.session.auth?.current
+  if (!auth) return null
+  return {
+    principalId: auth.principalId,
+    principalType: auth.principalType,
+    authenticator: auth.authenticator,
+  }
+}
+
 function buildLineage(sessionId: string, ctx: HookContext): Record<string, unknown> {
   const eve: Record<string, unknown> = {}
   const runtime = sessionRuntimes().get(sessionId)
@@ -731,6 +749,9 @@ function buildLineage(sessionId: string, ctx: HookContext): Record<string, unkno
     const { subagent, ...identity } = runtime
     if (Object.keys(identity).length > 0) eve.runtime = identity
   }
+
+  const caller = buildCaller(ctx)
+  if (caller) eve.caller = caller
 
   const { parent } = ctx.session
   if (parent) {
@@ -1413,22 +1434,54 @@ export interface EvlogEveInstrumentationOptions {
 }
 
 /**
- * Per-model-call context linking an AI SDK span back to the evlog wide event
- * for the same turn. Returns `undefined` outside a tracked turn, which
- * contributes no context rather than a half-filled one.
+ * Per-model-call attributes linking an AI SDK span back to the evlog wide event
+ * for the same turn, ready to spread into your own runtime context.
+ *
+ * Use this when the agent already has an `agent/instrumentation.ts` — from
+ * `eve add instrumentation/...` or written by hand. Every observability
+ * integration writes that one file, so evlog contributes attributes to yours
+ * rather than asking you to nest it inside a wrapper:
+ *
+ * @example
+ * ```ts
+ * // agent/instrumentation.ts
+ * import { defineInstrumentation } from 'eve/instrumentation'
+ * import { evlogRuntimeContext } from 'evlog/eve'
+ *
+ * export default defineInstrumentation({
+ *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
+ *   events: {
+ *     'step.started': input => ({
+ *       runtimeContext: {
+ *         ...evlogRuntimeContext(input),
+ *         posthog_distinct_id: input.session.auth.current?.principalId ?? '',
+ *       },
+ *     }),
+ *   },
+ * })
+ * ```
+ *
+ * Returns `undefined` outside a tracked turn — spreading that adds nothing,
+ * which is the point. {@link defineEvlogInstrumentation} is the shortcut for an
+ * agent with no other instrumentation to compose with.
  */
-function buildInstrumentationContext(
+export function evlogRuntimeContext(
   input: InstrumentationStepStartedEventInput,
-): InstrumentationStepStartedEventResult | undefined {
+): Record<string, string> | undefined {
   const state = getTurnState(input.session.id, input.turn.id)
   if (!state) return undefined
 
   return {
-    runtimeContext: {
-      'evlog.request_id': state.turnId,
-      'evlog.session_id': state.sessionId,
-    },
+    'evlog.request_id': state.turnId,
+    'evlog.session_id': state.sessionId,
   }
+}
+
+function buildInstrumentationContext(
+  input: InstrumentationStepStartedEventInput,
+): InstrumentationStepStartedEventResult | undefined {
+  const runtimeContext = evlogRuntimeContext(input)
+  return runtimeContext ? { runtimeContext } : undefined
 }
 
 /**
@@ -1454,6 +1507,11 @@ function buildInstrumentationContext(
  *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
  * })
  * ```
+ *
+ * This is the shortcut for an agent whose instrumentation is evlog's alone. It
+ * owns the file's `events` slot, so once another integration needs it — PostHog
+ * links spans to the initiating user there — drop the wrapper and spread
+ * {@link evlogRuntimeContext} into your own `defineInstrumentation` instead.
  */
 export function defineEvlogInstrumentation(
   options: EvlogEveInstrumentationOptions = {},

@@ -117,6 +117,7 @@ exports[`public API surface > matches snapshot for all subpath exports 1`] = `
     "defineEvlogHook",
     "defineEvlogInstrumentation",
     "detachActiveTurnLoggerForTests",
+    "evlogRuntimeContext",
     "resetEvlogEveForTests",
     "useLogger",
   ],

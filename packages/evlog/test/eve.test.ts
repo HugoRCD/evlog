@@ -5,6 +5,7 @@ import {
   resetEvlogEveForTests,
   defineEvlogHook,
   defineEvlogInstrumentation,
+  evlogRuntimeContext,
   useLogger,
   detachActiveTurnLoggerForTests,
 } from '../src/eve/index'
@@ -608,6 +609,82 @@ describe('evlog/eve', () => {
         subagent: 'researcher',
       },
     })
+  })
+
+  it('records the caller principal that triggered the turn', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = {
+      ...hookContext(),
+      session: {
+        id: SESSION_ID,
+        auth: {
+          current: {
+            principalId: 'github:1234',
+            principalType: 'user',
+            authenticator: 'github',
+            subject: 'someone@example.com',
+            attributes: { login: 'someone' },
+          },
+          initiator: null,
+        },
+      },
+    } as unknown as HookContext
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).toMatchObject({
+      caller: {
+        principalId: 'github:1234',
+        principalType: 'user',
+        authenticator: 'github',
+      },
+    })
+  })
+
+  it('keeps the caller subject and attributes off the event', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = {
+      ...hookContext(),
+      session: {
+        id: SESSION_ID,
+        auth: {
+          current: {
+            principalId: 'github:1234',
+            principalType: 'user',
+            authenticator: 'github',
+            subject: 'someone@example.com',
+            attributes: { login: 'someone' },
+          },
+          initiator: null,
+        },
+      },
+    } as unknown as HookContext
+
+    await runTurn(hook, { ctx })
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    const { caller } = event?.eve as { caller?: Record<string, unknown> }
+    expect(Object.keys(caller ?? {}).sort()).toEqual([
+      'authenticator',
+      'principalId',
+      'principalType',
+    ])
+  })
+
+  it('omits the caller when the session carries no authenticated principal', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.eve).not.toHaveProperty('caller')
   })
 
   it('prefers the cost reported by eve over the configured pricing map', async () => {
@@ -1704,5 +1781,49 @@ describe('defineEvlogInstrumentation', () => {
 
   it('declares nothing beyond the event hook when unconfigured', () => {
     expect(Object.keys(defineEvlogInstrumentation())).toEqual(['events'])
+  })
+})
+
+describe('evlogRuntimeContext', () => {
+  beforeEach(() => {
+    resetEvlogEveForTests()
+    initLogger({ env: { service: 'eve-test' } })
+  })
+
+  afterEach(() => {
+    resetEvlogEveForTests()
+  })
+
+  function stepStartedInput(turnId = TURN_ID) {
+    return {
+      channel: { kind: 'http' },
+      modelInput: { instructions: undefined, messages: [] },
+      session: { id: SESSION_ID, auth: { current: null, initiator: null } },
+      step: { index: 0 },
+      turn: { id: turnId, sequence: 0 },
+    } as Parameters<typeof evlogRuntimeContext>[0]
+  }
+
+  it('returns attributes that spread into an authored runtime context', () => {
+    const hook = defineEvlogHook({})
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, hookContext())
+
+    expect({
+      ...evlogRuntimeContext(stepStartedInput()),
+      posthog_distinct_id: 'user_1',
+    }).toEqual({
+      'evlog.request_id': TURN_ID,
+      'evlog.session_id': SESSION_ID,
+      posthog_distinct_id: 'user_1',
+    })
+  })
+
+  it('spreads to nothing outside a tracked turn', () => {
+    expect(evlogRuntimeContext(stepStartedInput())).toBeUndefined()
+    expect({ ...evlogRuntimeContext(stepStartedInput()) }).toEqual({})
   })
 })

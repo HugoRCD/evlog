@@ -594,7 +594,9 @@ export default defineEvlogInstrumentation()
 
 `defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools — the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override.
 
-`defineEvlogInstrumentation()` is optional: it stamps `evlog.request_id` onto eve's AI SDK spans so a trace joins back to its wide event, and back. Requires eve 0.30 or later. Complements eve Agent Runs — see the [eve use case](https://evlog.dev/use-cases/eve).
+`defineEvlogInstrumentation()` is optional: it stamps `evlog.request_id` onto eve's AI SDK spans so a trace joins back to its wide event, and back. It owns `agent/instrumentation.ts`, so when another observability backend needs that file, use eve's own `defineInstrumentation` and spread `evlogRuntimeContext(input)` into your runtime context instead. Requires eve 0.30 or later. Complements eve Agent Runs — see the [eve use case](https://evlog.dev/use-cases/eve).
+
+Every turn event carries `eve.caller` — `principalId`, `principalType` and `authenticator` — so cost and volume group by who triggered the turn.
 
 See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
 
