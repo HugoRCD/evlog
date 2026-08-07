@@ -703,8 +703,7 @@ function flushEveMetadata(state: TurnState): void {
     }
   }
   if (acc.contextCleared) eve.contextCleared = true
-  // Size of the model's thinking, never its content: chain-of-thought is the
-  // last thing that should leave the agent in a log line.
+  // Reasoning size only — the reasoning text itself is never recorded.
   if (acc.reasoningBlocks > 0) {
     eve.reasoning = { blocks: acc.reasoningBlocks, chars: acc.reasoningChars }
   }
@@ -712,8 +711,8 @@ function flushEveMetadata(state: TurnState): void {
 
   if (Object.keys(eve).length > 0) state.logger.set({ eve })
 
-  // Response length is a size signal, recorded whatever the message mode; the
-  // text itself follows the same rule as the incoming message.
+  // Response length is recorded in every message mode; the response text is
+  // only present when the mode allowed the handler to keep it.
   if (acc.responseChars > 0) {
     state.logger.set({
       message: {

@@ -68,7 +68,7 @@ async function runTurn(
     clearContext?: boolean
     reasoning?: string[]
     response?: string | null
-    result?: unknown
+    result?: HookEventMap['result.completed']['data']['result']
     ctx?: HookContext
   } = {},
 ) {
@@ -188,7 +188,7 @@ async function runTurn(
   if (options.result !== undefined) {
     events['result.completed']!({
       type: 'result.completed',
-      data: { result: options.result as never, sequence: 56, stepIndex: 0, turnId },
+      data: { result: options.result, sequence: 56, stepIndex: 0, turnId },
     }, ctx)
   }
 
