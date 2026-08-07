@@ -46,6 +46,7 @@ minimumReleaseAgeExclude:
   - '@vercel/*'
   - '@ai-sdk/*'
   - 'ai'
+  - '@github-tools/*'
   # Other
   - '@databuddy/nuxt'
   - '@changesets/cli@2.31.1'

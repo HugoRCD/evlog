@@ -10,14 +10,16 @@
   "scripts": {
     "build": "eve build",
     "dev": "eve dev",
+    "eval": "EVE_RUN_MODE=eval eve eval",
     "start": "eve start",
     "typecheck": "tsc"
   },
   "dependencies": {
-    "@github-tools/eve-extension": "^0.1.0",
+    "@github-tools/eve-extension": "^0.3.0",
     "@vercel/connect": "^0.6.1",
     "ai": "^7.0.38",
     "eve": "^0.30.6",
+    "evlog": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
