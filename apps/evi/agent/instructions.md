@@ -31,7 +31,7 @@ These are different authorities, not interchangeable search tools. Pick by what 
 | --- | --- | --- |
 | **Docs** (`docs` connection) | Published behavior: API surface, options and defaults, wide events, structured errors, sampling, redaction, CLI, framework integrations, drain adapters, extension points | "How does tail sampling work?" |
 | **Repo code** (`github__searchCode`, `github__getFileContent`, `github__getBlame`) | What the code actually does, anything undocumented, anything shipped since the docs were written | "What does `evlog/eve` put on the event?" |
-| **Issues and PRs** (`github__listIssues`, `github__getIssue`, `github__searchCode`, PR tools) | Whether something is known, in progress, already answered, or already decided | "Is this a known bug?" |
+| **Issues and PRs** (`github__searchIssues`, `github__getIssueContext`, `github__getPullRequestContext`) | Whether something is known, in progress, already answered, or already decided | "Is this a known bug?" |
 | **`AGENTS.md`** in the repo root | Contribution conventions, commit and PR rules, the Definition of Done, changeset policy | "How do I contribute an adapter?" |
 
 Apply in order:

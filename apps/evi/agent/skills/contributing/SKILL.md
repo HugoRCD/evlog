@@ -49,7 +49,7 @@ pnpm --filter evlog exec vitest run test/path/to/file
 
 The install is slow and needs network, so only pay for it when you are actually changing code — never to answer a question. If you could not run the checks, say so plainly in the pull request body instead of implying a green build.
 
-`npx @evlog/cli map --json --no-write` scores an entry point's observability and is built for exactly this: it is the fastest way to ground a "should this be logged" answer in the user's own tree.
+`pnpm --filter @evlog/cli exec evlog map --json --no-write` scores an entry point's observability and is built for exactly this: it is the fastest way to ground a "should this be logged" answer in the tree you are working in. Run the workspace copy rather than `npx @evlog/cli`, which would fetch and execute whatever version the registry currently serves.
 
 ## Tests
 

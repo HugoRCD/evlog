@@ -48,8 +48,14 @@ async function tierFor(ctx: GitHubInboundContext): Promise<'admin' | 'public'> {
 
 Both paths on purpose: the hardcoded set keeps working when the API call fails or
 rate-limits, and the permission lookup means adding a maintainer on GitHub is
-enough — nobody has to remember to edit this file. Cache the lookup per session;
-it costs an API call per turn otherwise.
+enough — nobody has to remember to edit this file.
+
+**Cache the lookup by actor id, never by session.** A GitHub thread is one
+session that different people comment in, so a tier cached on the session would
+be handed to whoever comments next. Key it on `ctx.sender.id` and re-resolve when
+the actor changes; the id is numeric and immutable, so it is a safe cache key.
+Without that, a maintainer's turn raises the tier for every later commenter in
+the same thread.
 
 Then merge the tier into the auth the hook returns:
 
@@ -99,7 +105,8 @@ full grounded answer.
 
 ## What admin runs without being asked
 
-Reversible only. Anything that is one click to undo:
+Reversible only, and only on a thread a maintainer opened. On any other thread
+this list keeps its approval too, for the reason below:
 
 `addIssueComment`, `updateIssueComment`, `addPullRequestComment`,
 `updatePullRequestComment`, `addIssueReaction`, `addCommentReaction`,
