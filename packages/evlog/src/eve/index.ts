@@ -1431,47 +1431,57 @@ export interface EvlogEveInstrumentationOptions {
    * and eve keeps writing its local traces.
    */
   setup?: (context: InstrumentationSetupContext) => void
-  /**
-   * Your own runtime-context contributions, merged with evlog's.
-   *
-   * An agent has exactly one `agent/instrumentation.ts`, and other integrations
-   * want that same `step.started` slot — PostHog's, for instance, links spans to
-   * the initiating user. Without this, adopting one means dropping the other.
-   * evlog's `evlog.request_id` / `evlog.session_id` are applied first, so your
-   * keys win on a collision and you can attach anything the callback's
-   * `session`, `turn`, `step`, `channel` or `modelInput` exposes.
-   *
-   * @example
-   * ```ts
-   * defineEvlogInstrumentation({
-   *   events: {
-   *     'step.started': ({ session }) => ({
-   *       runtimeContext: { 'caller.id': session.auth.current?.principalId ?? '' },
-   *     }),
-   *   },
-   * })
-   * ```
-   */
-  events?: InstrumentationDefinition['events']
 }
 
 /**
- * Per-model-call context linking an AI SDK span back to the evlog wide event
- * for the same turn. Returns `undefined` outside a tracked turn, which
- * contributes no context rather than a half-filled one.
+ * Per-model-call attributes linking an AI SDK span back to the evlog wide event
+ * for the same turn, ready to spread into your own runtime context.
+ *
+ * Use this when the agent already has an `agent/instrumentation.ts` — from
+ * `eve add instrumentation/...` or written by hand. Every observability
+ * integration writes that one file, so evlog contributes attributes to yours
+ * rather than asking you to nest it inside a wrapper:
+ *
+ * @example
+ * ```ts
+ * // agent/instrumentation.ts
+ * import { defineInstrumentation } from 'eve/instrumentation'
+ * import { evlogRuntimeContext } from 'evlog/eve'
+ *
+ * export default defineInstrumentation({
+ *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
+ *   events: {
+ *     'step.started': input => ({
+ *       runtimeContext: {
+ *         ...evlogRuntimeContext(input),
+ *         posthog_distinct_id: input.session.auth.current?.principalId ?? '',
+ *       },
+ *     }),
+ *   },
+ * })
+ * ```
+ *
+ * Returns `undefined` outside a tracked turn — spreading that adds nothing,
+ * which is the point. {@link defineEvlogInstrumentation} is the shortcut for an
+ * agent with no other instrumentation to compose with.
  */
-function buildInstrumentationContext(
+export function evlogRuntimeContext(
   input: InstrumentationStepStartedEventInput,
-): InstrumentationStepStartedEventResult | undefined {
+): Record<string, string> | undefined {
   const state = getTurnState(input.session.id, input.turn.id)
   if (!state) return undefined
 
   return {
-    runtimeContext: {
-      'evlog.request_id': state.turnId,
-      'evlog.session_id': state.sessionId,
-    },
+    'evlog.request_id': state.turnId,
+    'evlog.session_id': state.sessionId,
   }
+}
+
+function buildInstrumentationContext(
+  input: InstrumentationStepStartedEventInput,
+): InstrumentationStepStartedEventResult | undefined {
+  const runtimeContext = evlogRuntimeContext(input)
+  return runtimeContext ? { runtimeContext } : undefined
 }
 
 /**
@@ -1497,6 +1507,11 @@ function buildInstrumentationContext(
  *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
  * })
  * ```
+ *
+ * This is the shortcut for an agent whose instrumentation is evlog's alone. It
+ * owns the file's `events` slot, so once another integration needs it — PostHog
+ * links spans to the initiating user there — drop the wrapper and spread
+ * {@link evlogRuntimeContext} into your own `defineInstrumentation` instead.
  */
 export function defineEvlogInstrumentation(
   options: EvlogEveInstrumentationOptions = {},
@@ -1510,19 +1525,7 @@ export function defineEvlogInstrumentation(
       : {}),
     ...(options.setup !== undefined ? { setup: options.setup } : {}),
     events: {
-      ...options.events,
-      'step.started': (input) => {
-        const evlogContext = buildInstrumentationContext(input)
-        const authored = options.events?.['step.started']?.(input)
-        if (!evlogContext && !authored) return undefined
-        return {
-          ...authored,
-          runtimeContext: {
-            ...evlogContext?.runtimeContext,
-            ...authored?.runtimeContext,
-          },
-        }
-      },
+      'step.started': buildInstrumentationContext,
     },
   })
 }

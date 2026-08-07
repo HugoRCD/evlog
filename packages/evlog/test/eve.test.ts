@@ -5,6 +5,7 @@ import {
   resetEvlogEveForTests,
   defineEvlogHook,
   defineEvlogInstrumentation,
+  evlogRuntimeContext,
   useLogger,
   detachActiveTurnLoggerForTests,
 } from '../src/eve/index'
@@ -1781,66 +1782,48 @@ describe('defineEvlogInstrumentation', () => {
   it('declares nothing beyond the event hook when unconfigured', () => {
     expect(Object.keys(defineEvlogInstrumentation())).toEqual(['events'])
   })
+})
 
-  it('merges an authored runtime context with its own', () => {
+describe('evlogRuntimeContext', () => {
+  beforeEach(() => {
+    resetEvlogEveForTests()
+    initLogger({ env: { service: 'eve-test' } })
+  })
+
+  afterEach(() => {
+    resetEvlogEveForTests()
+  })
+
+  function stepStartedInput(turnId = TURN_ID) {
+    return {
+      channel: { kind: 'http' },
+      modelInput: { instructions: undefined, messages: [] },
+      session: { id: SESSION_ID, auth: { current: null, initiator: null } },
+      step: { index: 0 },
+      turn: { id: turnId, sequence: 0 },
+    } as Parameters<typeof evlogRuntimeContext>[0]
+  }
+
+  it('returns attributes that spread into an authored runtime context', () => {
     const hook = defineEvlogHook({})
-    const instrumentation = defineEvlogInstrumentation({
-      events: {
-        'step.started': ({ session }) => ({
-          runtimeContext: { 'caller.id': session.auth.current?.principalId ?? 'anonymous' },
-        }),
-      },
-    })
 
     hook.events!['turn.started']!({
       type: 'turn.started',
       data: { sequence: 0, turnId: TURN_ID },
     }, hookContext())
 
-    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
-      runtimeContext: {
-        'evlog.request_id': TURN_ID,
-        'evlog.session_id': SESSION_ID,
-        'caller.id': 'anonymous',
-      },
+    expect({
+      ...evlogRuntimeContext(stepStartedInput()),
+      posthog_distinct_id: 'user_1',
+    }).toEqual({
+      'evlog.request_id': TURN_ID,
+      'evlog.session_id': SESSION_ID,
+      posthog_distinct_id: 'user_1',
     })
   })
 
-  it('lets an authored key win over its own on a collision', () => {
-    const hook = defineEvlogHook({})
-    const instrumentation = defineEvlogInstrumentation({
-      events: {
-        'step.started': () => ({ runtimeContext: { 'evlog.request_id': 'authored' } }),
-      },
-    })
-
-    hook.events!['turn.started']!({
-      type: 'turn.started',
-      data: { sequence: 0, turnId: TURN_ID },
-    }, hookContext())
-
-    expect(instrumentation.events!['step.started']!(stepStartedInput())).toMatchObject({
-      runtimeContext: { 'evlog.request_id': 'authored' },
-    })
-  })
-
-  it('still contributes the authored context outside a tracked turn', () => {
-    const instrumentation = defineEvlogInstrumentation({
-      events: {
-        'step.started': () => ({ runtimeContext: { 'caller.id': 'anonymous' } }),
-      },
-    })
-
-    expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
-      runtimeContext: { 'caller.id': 'anonymous' },
-    })
-  })
-
-  it('contributes nothing when neither side has context to add', () => {
-    const instrumentation = defineEvlogInstrumentation({
-      events: { 'step.started': () => undefined },
-    })
-
-    expect(instrumentation.events!['step.started']!(stepStartedInput())).toBeUndefined()
+  it('spreads to nothing outside a tracked turn', () => {
+    expect(evlogRuntimeContext(stepStartedInput())).toBeUndefined()
+    expect({ ...evlogRuntimeContext(stepStartedInput()) }).toEqual({})
   })
 })

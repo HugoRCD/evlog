@@ -2,19 +2,27 @@
 "evlog": minor
 ---
 
-`evlog/eve` records the caller and no longer takes the instrumentation slot for itself.
+`evlog/eve` records the caller, and composes with another observability backend.
 
-`defineEvlogInstrumentation()` now accepts `events`, merged with the runtime context it contributes. An agent has exactly one `agent/instrumentation.ts`, and other integrations want that same `step.started` slot — PostHog's links spans to the initiating user — so adopting one used to mean dropping the other. evlog's `evlog.request_id` / `evlog.session_id` are applied first and your keys win on a collision:
+An agent has exactly one `agent/instrumentation.ts`, and every observability item in eve's registry writes it. `defineEvlogInstrumentation()` owns that file, so it only fits an agent whose instrumentation is evlog's alone. The new `evlogRuntimeContext` contributes evlog's span attributes to instrumentation you already have, the way the other integrations do:
 
 ```ts
-export default defineEvlogInstrumentation({
-  setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
+import { defineInstrumentation } from 'eve/instrumentation'
+import { evlogRuntimeContext } from 'evlog/eve'
+
+export default defineInstrumentation({
+  setup: ({ agentName }) => registerOTel({ serviceName: agentName, spanProcessors: [...] }),
   events: {
-    'step.started': ({ session }) => ({
-      runtimeContext: { 'caller.id': session.auth.current?.principalId ?? '' },
+    'step.started': input => ({
+      runtimeContext: {
+        ...evlogRuntimeContext(input),
+        posthog_distinct_id: input.session.auth.current?.principalId ?? '',
+      },
     }),
   },
 })
 ```
+
+It returns `undefined` outside a tracked turn, so spreading it adds nothing.
 
 Turn and session events now carry `eve.caller` with the principal eve resolved at dispatch: `principalId`, `principalType` and `authenticator`. On a multi-user channel that is the dimension you group cost, volume and refusals by, and it was previously unreachable — the enrich hook is HTTP-shaped and exposes no path to the eve session. `subject` and `attributes` are deliberately excluded, since a channel may put a name or an email in them.
