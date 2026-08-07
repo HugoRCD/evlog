@@ -19,9 +19,10 @@ export default defineAgent({
   }),
   /** This model honors only `high` and `xhigh`. */
   reasoning: 'high',
+  /** Bounds a runaway session, not cost: one real thread runs a few million in. */
   limits: {
-    maxInputTokensPerSession: 5_000_000,
-    maxOutputTokensPerSession: 100_000,
+    maxInputTokensPerSession: 20_000_000,
+    maxOutputTokensPerSession: 250_000,
   },
   modelOptions: {
     providerOptions: { gateway: { ...gatewayRouting, tags: sessionTags() } },
