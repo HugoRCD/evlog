@@ -59,3 +59,6 @@ minimumReleaseAgeExclude:
   - nitro
   - rolldown
   - workflow
+
+patchedDependencies:
+  '@github-tools/eve-extension@0.3.0': patches/@github-tools__eve-extension@0.3.0.patch
