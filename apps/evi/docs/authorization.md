@@ -2,7 +2,8 @@
 
 Design note, not implemented. Written while Evi is still gated to a single user
 (`onComment` rejects everyone but `hugorcd`). Pick this up before that gate comes
-off, or before wiring the autonomous webhook hooks — either one makes it load-bearing.
+off, or before wiring the autonomous webhook hooks. The gate is required before
+either of those lands.
 
 ## Approval is not an authorization control here
 
@@ -70,14 +71,22 @@ That is enough to build the whole gate today:
 
 ```ts
 const tier = (s) => s.auth.current?.attributes?.tier
+const trusted = (s) => s.auth.current?.attributes?.threadTier === 'admin'
 const DENY = { type: 'denied', reason: 'Only repository maintainers can ask Evi to do that.' }
 
 requireApproval: {
-  addLabels: ({ session }) => tier(session) === 'admin' ? 'not-applicable' : DENY,
+  // Reversible, so no prompt — but only on a thread a maintainer opened. See
+  // "Why admin is not simply allowed everything" for why provenance matters.
+  addLabels: ({ session }) =>
+    tier(session) !== 'admin' ? DENY : trusted(session) ? 'not-applicable' : 'user-approval',
   createPullRequest: ({ session }) => tier(session) === 'admin' ? 'user-approval' : DENY,
   // …
 }
 ```
+
+That means `onComment` stamps two values, not one: the caller's tier, and the
+tier of whoever opened the thread. The second is what stops a maintainer's
+mention on an attacker's issue from running frictionless.
 
 `toolName` arrives namespaced (`github__addLabels`), so match with `.endsWith()`
 rather than `===` if you write a single catch-all predicate instead of per-tool
@@ -111,7 +120,8 @@ afterwards undoes neither. On a thread opened by someone outside the tier, treat
 that as a reason to keep even the reversible list behind approval.
 
 One trap in that split: **`updateIssue` also sets `state`**, so auto-approving it
-hands over `closeIssue` through the back door. Gate on the input, not the name:
+also grants `closeIssue`, since supplying `state` closes the issue. Gate on the
+input, not the tool name:
 
 ```ts
 updateIssue: ({ session, toolInput }) => {

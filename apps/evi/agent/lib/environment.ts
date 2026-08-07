@@ -9,8 +9,3 @@ export function environment(): string {
   if (process.env.EVE_RUN_MODE === 'eval') return 'eval'
   return process.env.VERCEL_ENV ?? 'local'
 }
-
-/** False on Vercel, where everything outside `/tmp` is read-only. */
-export function hasDurableDisk(): boolean {
-  return process.env.VERCEL !== '1'
-}

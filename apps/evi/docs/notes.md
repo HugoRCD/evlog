@@ -32,8 +32,8 @@ runaway session near $8 at current prices.
 
 **Eval runs leak sessions.** `t.succeeded()` accepts a healthy open session, so
 each run leaves a `sessionTimeoutWorkflow` queued against a dead dev server. Later
-runs print a growing wall of `[world-local] Queue delivery failed`. Harmless, and
-exactly the kind of noise that trains you to stop reading output.
+runs print a growing wall of `[world-local] Queue delivery failed`. The queued
+work grows every run and buries real failures in the output.
 
 **`sessionEvent` has never been observed firing.** It emits on session
 completion, which the eval runner never reaches.
@@ -58,7 +58,8 @@ decimals, which is how the overspend was found.
 Gists API rejects installation tokens — plus repo creation and merge.
 
 **`updateIssue` also sets `state`**, so auto-approving it grants `closeIssue`
-through the back door. Gate on the input, not the tool name.
+as well, since supplying `state` closes the issue. Gate on the input, not the
+tool name.
 
 **`*Context` tools collapse round-trips.** `getIssueContext` returns the issue,
 its labels and recent comments in one call.

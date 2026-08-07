@@ -2,11 +2,8 @@ import { defineInstrumentation } from 'eve/instrumentation'
 import { evlogRuntimeContext } from 'evlog/eve'
 
 /**
- * Enables eve's OpenTelemetry surface and joins it to the evlog wide events.
- *
- * Uses eve's own `defineInstrumentation` rather than `defineEvlogInstrumentation`,
- * which owns the whole file: this slot is also where a PostHog or Sentry exporter
- * would land. Register one through `setup` — without it eve keeps traces local.
+ * OpenTelemetry spans for every turn, carrying evlog's correlation ids and the
+ * calling principal. Register an exporter through `setup` to ship them.
  */
 export default defineInstrumentation({
   events: {
@@ -15,8 +12,7 @@ export default defineInstrumentation({
       return {
         runtimeContext: {
           ...evlogRuntimeContext(input),
-          // Omitted rather than blank when unauthenticated: an empty attribute
-          // reads as a caller whose id happens to be empty.
+          // Omitted rather than blank: an empty attribute reads as an empty id.
           ...(caller ? { 'caller.principal_id': caller.principalId } : {}),
           ...(caller ? { 'caller.principal_type': caller.principalType } : {}),
         },
