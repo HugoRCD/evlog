@@ -11,4 +11,4 @@ The file system drain disables itself when its directory is not writable.
 const drain = process.env.VERCEL !== '1' ? createFsDrain() : undefined
 ```
 
-The drain now probes the directory once, and on `EROFS`, `EACCES` or `EPERM` warns a single time and stops, the same way it already disables itself in the Edge runtime. Attach it unconditionally. Any other failure — a full disk, a genuine bug — still propagates.
+The drain now disables itself once it observes an `EROFS`, `EACCES` or `EPERM` write failure for that directory, warning a single time, the same way it already disables itself in the Edge runtime. Attach it unconditionally. Any other failure — a full disk, a genuine bug — still propagates.

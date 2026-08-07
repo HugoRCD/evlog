@@ -401,7 +401,7 @@ describe('fs adapter', () => {
       }
     })
 
-    it('propagates a write failure that is not a permission problem', async () => {
+    it('reports a write failure that is not a permission problem', async () => {
       vi.resetModules()
       mockedAppendFile.mockRejectedValue(Object.assign(new Error('ENOSPC'), { code: 'ENOSPC' }))
       const { createFsDrain: createFsDrainFresh } = await import('../../src/adapters/fs')

@@ -164,6 +164,12 @@ export async function writeBatchToFs(events: WideEvent[], config: FsConfig): Pro
  *   pretty: true,
  * }))
  * ```
+ *
+ * @remarks
+ * A write that fails with `EROFS`, `EACCES` or `EPERM` marks the configured
+ * directory unavailable and disables the drain for the rest of the process,
+ * after warning once. Attaching it on a host without a writable directory is
+ * therefore safe, though the events go nowhere.
  */
 export function createFsDrain(overrides?: Partial<FsConfig>) {
   return defineDrain<FsConfig>({
