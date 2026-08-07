@@ -189,8 +189,8 @@ against a dev server that no longer exists, so subsequent runs print a growing
 wall of `[world-local] Queue delivery failed ... TypeError: fetch failed`. It
 reached 409 lines on a 16-eval run here, and it grows with every run.
 
-The queued work grows with every run and buries real failures in the output, so
-it costs signal rather than correctness. Either the eval runner should close the
+The queued work grows with every run and obscures real failures in the output, so
+it obscures real failures rather than causing them. Either the eval runner should close the
 sessions it opened, or the local world should discard messages whose target run
 is gone. A related one-off also appears: `Cannot set attributes on run in
 terminal state "completed"`.

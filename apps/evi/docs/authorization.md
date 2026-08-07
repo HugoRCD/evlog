@@ -3,7 +3,7 @@
 Design note, not implemented. Written while Evi is still gated to a single user
 (`onComment` rejects everyone but `hugorcd`). Pick this up before that gate comes
 off, or before wiring the autonomous webhook hooks. The gate is required before
-either of those lands.
+either is implemented.
 
 ## Approval is not an authorization control here
 

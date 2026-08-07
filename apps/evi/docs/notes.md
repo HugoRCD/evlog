@@ -33,7 +33,7 @@ runaway session near $8 at current prices.
 **Eval runs leak sessions.** `t.succeeded()` accepts a healthy open session, so
 each run leaves a `sessionTimeoutWorkflow` queued against a dead dev server. Later
 runs print a growing wall of `[world-local] Queue delivery failed`. The queued
-work grows every run and buries real failures in the output.
+work grows every run and obscures real failures in the output.
 
 **`sessionEvent` has never been observed firing.** It emits on session
 completion, which the eval runner never reaches.
