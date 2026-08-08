@@ -1,6 +1,6 @@
 import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
-import { isMaintainer } from '../lib/trust'
+import { isAutonomous, isMaintainer } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -66,8 +66,16 @@ const TOOLS = [
 
 const PROTECTED_BRANCHES = new Set(['main', 'master'])
 
-/** Routine writes run without a card when Hugo asked; everyone else gets one. */
-function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
+/**
+ * Routine writes run without a card when Hugo asked; everyone else gets one.
+ * Autonomous first-responder turns are denied outright: they run unattended so
+ * an approval request would park forever, and their reply is posted by the
+ * channel rather than by a tool.
+ */
+function policy({ session }: ApprovalContext): ApprovalStatus {
+  if (isAutonomous(session.auth.current)) {
+    return { type: 'denied', reason: 'Autonomous turns are comment-only.' }
+  }
   return isMaintainer(session.auth.current) ? 'not-applicable' : 'user-approval'
 }
 
@@ -93,28 +101,28 @@ export default githubExtension({
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
   // deletePullRequestComment, createPullRequestReview, requestReviewers.
   requireApproval: {
-    createBranch: maintainerWrite,
+    createBranch: policy,
     createOrUpdateFile: (ctx: ApprovalContext): ApprovalStatus => {
       const branch = (ctx.toolInput as { branch?: string } | undefined)?.branch
       if (branch !== undefined && PROTECTED_BRANCHES.has(branch)) {
         return { type: 'denied', reason: `Direct writes to ${branch} are not allowed. Use a feature branch and a pull request.` }
       }
-      return maintainerWrite(ctx)
+      return policy(ctx)
     },
-    createPullRequest: maintainerWrite,
-    updatePullRequest: maintainerWrite,
-    createIssue: maintainerWrite,
-    updateIssue: maintainerWrite,
-    addIssueComment: maintainerWrite,
-    updateIssueComment: maintainerWrite,
-    addPullRequestComment: maintainerWrite,
-    updatePullRequestComment: maintainerWrite,
-    addDiscussionComment: maintainerWrite,
-    addLabels: maintainerWrite,
-    removeLabel: maintainerWrite,
-    addAssignees: maintainerWrite,
-    removeAssignees: maintainerWrite,
-    addIssueReaction: maintainerWrite,
-    addCommentReaction: maintainerWrite,
+    createPullRequest: policy,
+    updatePullRequest: policy,
+    createIssue: policy,
+    updateIssue: policy,
+    addIssueComment: policy,
+    updateIssueComment: policy,
+    addPullRequestComment: policy,
+    updatePullRequestComment: policy,
+    addDiscussionComment: policy,
+    addLabels: policy,
+    removeLabel: policy,
+    addAssignees: policy,
+    removeAssignees: policy,
+    addIssueReaction: policy,
+    addCommentReaction: policy,
   },
 })
