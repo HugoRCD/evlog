@@ -38,16 +38,16 @@ Each covers source, build config, package exports, tests, and every doc page tha
 
 ## Verifying a change before you propose it
 
-The sandbox has `git`, `node` and `pnpm`, and on a GitHub turn it holds the repository. When you have written or edited code, run the checks rather than asserting they pass:
+The sandbox carries a ready-to-work checkout at `/workspace/repo`, with dependencies installed and `dev:prepare` already run; each session starts on the current `main`. When you have written or edited code, run the checks there rather than asserting they pass:
 
 ```
-pnpm install --frozen-lockfile   # once per session, it is not preinstalled
+cd /workspace/repo
 pnpm run lint
 pnpm run typecheck
 pnpm --filter evlog exec vitest run test/path/to/file
 ```
 
-The install is slow and needs network, so only pay for it when you are actually changing code, never to answer a question. If you could not run the checks, say so plainly in the pull request body instead of implying a green build.
+If you could not run the checks, say so plainly in the pull request body instead of implying a green build.
 
 `pnpm --filter @evlog/cli exec evlog map --json --no-write` scores an entry point's observability and is built for exactly this: it is the fastest way to ground a "should this be logged" answer in the tree you are working in. Run the workspace copy rather than `npx @evlog/cli`, which would fetch and execute whatever version the registry currently serves.
 

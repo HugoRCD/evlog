@@ -38,6 +38,19 @@ work grows every run and obscures real failures in the output.
 **`sessionEvent` has never been observed firing.** It emits on session
 completion, which the eval runner never reaches.
 
+## Schedules
+
+**Chat-sdk channels target a provider-native `threadId` from a schedule.**
+`receive(photon, { target })` takes `{ adapterName: 'imessage', threadId }`, not
+a session handle. For a direct chat the id is derivable, no capture needed:
+Spectrum direct-chat guids are `any;-;<address>`, so the thread is
+`imessage:any;-;<phone>`. The optional `~<phone>` suffix in the full format
+selects the sending line; irrelevant while the Photon project has one number.
+
+**Vercel evaluates schedule cron in UTC.** `0 6 * * *` fires 08:00 Paris in
+summer (CEST) and drifts to 07:00 in winter (CET). `eve dev` never fires crons;
+`POST /eve/v1/dev/schedules/digest` triggers one locally.
+
 ## AI Gateway
 
 **`sort: 'cost'` beats a hardcoded provider order.** Routing was landing on a
