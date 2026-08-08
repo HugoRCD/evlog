@@ -9,6 +9,8 @@ import type { SessionAuthContext } from 'eve/context'
  */
 export const MAINTAINER_PHONE = process.env.MAINTAINER_PHONE
 export const MAINTAINER_GITHUB_ID = process.env.MAINTAINER_GITHUB_ID
+/** Hugo's GitHub login, used to assign escalated issues to him. Public handle, not a credential. */
+export const MAINTAINER_GITHUB_LOGIN = 'hugorcd'
 
 const MAINTAINER_PRINCIPALS = new Set(
   [
