@@ -17,13 +17,13 @@
   "dependencies": {
     "@github-tools/eve-extension": "^0.3.0",
     "@vercel/connect": "^0.6.1",
-    "ai": "^7.0.38",
-    "eve": "^0.30.6",
+    "ai": "^7.0.56",
+    "eve": "^0.31.2",
     "evlog": "workspace:*",
     "zod": "^4.4.3"
   },
   "devDependencies": {
-    "@types/node": "24.x",
+    "@types/node": "24.13.3",
     "microsandbox": "^0.6.8",
     "typescript": "7.0.2"
   }
