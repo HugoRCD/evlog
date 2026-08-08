@@ -1,4 +1,6 @@
 import githubExtension from '@github-tools/eve-extension'
+import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
+import { isMaintainer } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -62,6 +64,13 @@ const TOOLS = [
   'getCiFailureContext',
 ] as const
 
+const PROTECTED_BRANCHES = new Set(['main', 'master'])
+
+/** Routine writes run without a card when Hugo asked; everyone else gets one. */
+function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
+  return isMaintainer(session.auth.current) ? 'not-applicable' : 'user-approval'
+}
+
 export default githubExtension({
   connector: 'github/evi-github-production',
   connect: {
@@ -81,4 +90,31 @@ export default githubExtension({
   },
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
+  // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
+  // deletePullRequestComment, createPullRequestReview, requestReviewers.
+  requireApproval: {
+    createBranch: maintainerWrite,
+    createOrUpdateFile: (ctx: ApprovalContext): ApprovalStatus => {
+      const branch = (ctx.toolInput as { branch?: string } | undefined)?.branch
+      if (branch !== undefined && PROTECTED_BRANCHES.has(branch)) {
+        return { type: 'denied', reason: `Direct writes to ${branch} are not allowed. Use a feature branch and a pull request.` }
+      }
+      return maintainerWrite(ctx)
+    },
+    createPullRequest: maintainerWrite,
+    updatePullRequest: maintainerWrite,
+    createIssue: maintainerWrite,
+    updateIssue: maintainerWrite,
+    addIssueComment: maintainerWrite,
+    updateIssueComment: maintainerWrite,
+    addPullRequestComment: maintainerWrite,
+    updatePullRequestComment: maintainerWrite,
+    addDiscussionComment: maintainerWrite,
+    addLabels: maintainerWrite,
+    removeLabel: maintainerWrite,
+    addAssignees: maintainerWrite,
+    removeAssignees: maintainerWrite,
+    addIssueReaction: maintainerWrite,
+    addCommentReaction: maintainerWrite,
+  },
 })

@@ -1,5 +1,6 @@
 import { connectPhotonCredentials } from '@vercel/connect/eve'
 import { photonIMessageChannel } from 'eve/channels/photon'
+import { MAINTAINER_PHONE } from '../lib/trust'
 
 const MAX_VALUE_LENGTH = 160
 
@@ -11,6 +12,19 @@ function formatValue(value: unknown) {
 
 export default photonIMessageChannel({
   credentials: connectPhotonCredentials('photon/evi'),
+  // The Photon project's user allowlist only registers Hugo, so every inbound
+  // message is his. Revisit when more users are added there.
+  onMessage(_ctx, message) {
+    if (message.author.isBot || MAINTAINER_PHONE === undefined) return null
+    return {
+      auth: {
+        attributes: {},
+        authenticator: 'photon-imessage',
+        principalId: `imessage:${MAINTAINER_PHONE}`,
+        principalType: 'user',
+      },
+    }
+  },
   events: {
     async 'input.requested'(event, channel) {
       if (!channel.thread || event.requests.length === 0) return
@@ -28,7 +42,7 @@ export default photonIMessageChannel({
 
           const options = request.options ?? []
           if (options.length > 0) {
-            lines.push('', ...options.map((option) => `· ${option.label} — reply "${option.id}"`))
+            lines.push('', ...options.map((option) => `· ${option.label}: reply "${option.id}"`))
           }
 
           return lines.join('\n')
