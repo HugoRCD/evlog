@@ -66,8 +66,8 @@ const TOOLS = [
 
 const PROTECTED_BRANCHES = new Set(['main', 'master'])
 
-function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
-  return isMaintainer(session.auth.current) ? 'not-applicable' : 'user-approval'
+function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
+  return isMaintainer(ctx.session.auth.current) ? 'not-applicable' : 'user-approval'
 }
 
 /**
@@ -76,11 +76,11 @@ function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
  * outright: the turn runs unattended, so an approval request would park
  * forever, and its reply is posted by the channel.
  */
-function policy({ session }: ApprovalContext): ApprovalStatus {
-  if (isAutonomous(session.auth.current)) {
+function policy(ctx: ApprovalContext): ApprovalStatus {
+  if (isAutonomous(ctx.session.auth.current)) {
     return { type: 'denied', reason: 'Autonomous turns may only label the issue, open a doc-gap issue, or assign the maintainer.' }
   }
-  return maintainerWrite({ session })
+  return maintainerWrite(ctx)
 }
 
 /** The writes an autonomous turn may reach: reversible and low blast radius. */
