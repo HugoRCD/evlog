@@ -1,18 +1,20 @@
 import { defineEval } from 'eve/evals'
-import { includes } from 'eve/evals/expect'
 import { GITHUB_WRITE_TOOLS } from '../helpers'
 
+const LABEL_TOOLS = new Set(['github__addLabels', 'github__removeLabel'])
+
 export default defineEval({
-  // The first-responder turn answers a new community issue unattended. Its
-  // contract is the same as the channel gate: a grounded reply, and no write
-  // tool, because the channel posts the comment.
-  description: 'A first-responder turn answers a new issue from docs and writes nothing.',
+  // A first-responder turn triages a new community issue for the maintainer:
+  // label it and ask for a repro. Labels are the only write it may reach; the
+  // reply is posted by the channel, so no other write tool is ever needed.
+  description: 'A first-responder turn triages a bug report and writes only labels.',
   tags: ['slow'],
   async test(t) {
-    await t.send('A community member just opened an issue: "How do I configure tail sampling for my Nuxt app?" Answer it as the first responder.')
+    await t.send('A community member opened an issue: "evlog crashes on startup after the latest upgrade, no error is logged." Triage it as the first responder.')
     t.succeeded()
-    for (const tool of GITHUB_WRITE_TOOLS) t.notCalledTool(tool)
-    t.check(t.reply, includes(/evlog\.dev\//))
-    t.judge.autoevals.closedQA('answers the question from the documentation with a citation').atLeast(0.6)
+    for (const tool of GITHUB_WRITE_TOOLS) {
+      if (!LABEL_TOOLS.has(tool)) t.notCalledTool(tool)
+    }
+    t.judge.autoevals.closedQA('asks the reporter for a way to reproduce the crash').atLeast(0.5)
   },
 })
