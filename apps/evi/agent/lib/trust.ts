@@ -20,3 +20,12 @@ const MAINTAINER_PRINCIPALS = new Set(
 export function isMaintainer(auth: SessionAuthContext | null): boolean {
   return auth !== null && MAINTAINER_PRINCIPALS.has(auth.principalId)
 }
+
+/**
+ * Sessions allowed to reach the admin observability tools (Vercel MCP, AI
+ * Gateway spend): maintainers, plus app-principal sessions such as schedules,
+ * which carry no user identity. The weekly self-review runs from a schedule.
+ */
+export function canAccessAdminTools(auth: SessionAuthContext | null): boolean {
+  return isMaintainer(auth) || auth?.principalType === 'app'
+}
