@@ -1,6 +1,6 @@
 import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
-import { isAutonomous, isMaintainer } from '../lib/trust'
+import { isAutonomous, isMaintainer, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -71,14 +71,14 @@ function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
 }
 
 /**
- * Autonomous first-responder turns may label the issue or open a doc-gap issue
- * and nothing else. Everything else is denied outright: the turn runs
- * unattended, so an approval request would park forever, and its reply is
- * posted by the channel.
+ * Autonomous first-responder turns may label the issue, open a doc-gap issue,
+ * or assign the maintainer, and nothing else. Everything else is denied
+ * outright: the turn runs unattended, so an approval request would park
+ * forever, and its reply is posted by the channel.
  */
 function policy({ session }: ApprovalContext): ApprovalStatus {
   if (isAutonomous(session.auth.current)) {
-    return { type: 'denied', reason: 'Autonomous turns may only label the issue or open a doc-gap issue.' }
+    return { type: 'denied', reason: 'Autonomous turns may only label the issue, open a doc-gap issue, or assign the maintainer.' }
   }
   return maintainerWrite({ session })
 }
@@ -86,6 +86,18 @@ function policy({ session }: ApprovalContext): ApprovalStatus {
 /** The writes an autonomous turn may reach: reversible and low blast radius. */
 function autonomousWrite(ctx: ApprovalContext): ApprovalStatus {
   return isAutonomous(ctx.session.auth.current) ? 'not-applicable' : policy(ctx)
+}
+
+/** Escalation: an autonomous turn assigns the issue to the maintainer, and no one else. */
+function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
+  if (isAutonomous(ctx.session.auth.current)) {
+    const assignees = (ctx.toolInput as { assignees?: unknown } | undefined)?.assignees
+    const ok = Array.isArray(assignees)
+      && assignees.length > 0
+      && assignees.every((assignee) => String(assignee).toLowerCase() === MAINTAINER_GITHUB_LOGIN)
+    return ok ? 'not-applicable' : { type: 'denied', reason: `Autonomous turns may only assign ${MAINTAINER_GITHUB_LOGIN}.` }
+  }
+  return policy(ctx)
 }
 
 export default githubExtension({
@@ -127,7 +139,7 @@ export default githubExtension({
     addPullRequestComment: policy,
     updatePullRequestComment: policy,
     addDiscussionComment: policy,
-    addAssignees: policy,
+    addAssignees: assignPolicy,
     removeAssignees: policy,
     addIssueReaction: policy,
     addCommentReaction: policy,
