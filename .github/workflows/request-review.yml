@@ -1,0 +1,30 @@
+name: Request review
+
+on:
+  pull_request_target:
+    types:
+      - opened
+      - ready_for_review
+      - reopened
+    branches:
+      - main
+
+jobs:
+  request-review:
+    name: Request hugorcd review
+    # Only PRs opened by the evlogai bot; human PRs already have their author.
+    if: github.event.pull_request.user.login == 'evlogai[bot]'
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    permissions:
+      pull-requests: write
+    steps:
+      - uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9.0.0
+        with:
+          script: |
+            await github.rest.pulls.requestReviewers({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              pull_number: ${{ github.event.pull_request.number }},
+              reviewers: ['hugorcd']
+            })
