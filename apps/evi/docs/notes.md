@@ -47,8 +47,8 @@ Spectrum direct-chat guids are `any;-;<address>`, so the thread is
 `imessage:any;-;<phone>`. The optional `~<phone>` suffix in the full format
 selects the sending line; irrelevant while the Photon project has one number.
 
-**Vercel evaluates schedule cron in UTC.** `0 6 * * *` fires 08:00 Paris in
-summer (CEST) and drifts to 07:00 in winter (CET). `eve dev` never fires crons;
+**Vercel evaluates schedule cron in UTC.** `0 5 * * *` fires 06:00 London in
+summer (BST) and drifts to 05:00 in winter (GMT). `eve dev` never fires crons;
 `POST /eve/v1/dev/schedules/digest` triggers one locally.
 
 ## AI Gateway
@@ -70,9 +70,9 @@ decimals, which is how the overspend was found.
 **The `maintainer` preset ships gist tools that always 403 over Connect** — the
 Gists API rejects installation tokens — plus repo creation and merge.
 
-**`updateIssue` also sets `state`**, so auto-approving it grants `closeIssue`
-as well, since supplying `state` closes the issue. Gate on the input, not the
-tool name.
+**`updateIssue` also sets `state`**, so auto-approving it grants `closeIssue` as
+well, since supplying `state` closes the issue. Gate on the input, not the tool
+name.
 
 **`*Context` tools collapse round-trips.** `getIssueContext` returns the issue,
 its labels and recent comments in one call.
