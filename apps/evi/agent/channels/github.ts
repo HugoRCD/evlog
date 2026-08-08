@@ -18,7 +18,9 @@ export default githubChannel({
   },
   onIssue: (ctx, issue) => {
     if (ctx.action !== 'opened') return null
-    if (ctx.sender.login.toLowerCase() === botName) return null
+    const login = ctx.sender.login.toLowerCase()
+    // Community only: never the maintainer, never a bot (including our own loop).
+    if (login === botName || login.endsWith('[bot]')) return null
     if (String(ctx.sender.id) === MAINTAINER_GITHUB_ID) return null
     if (issue.pull_request) return null
     // Unattended turn: the session runs as the bot, never as the issue opener.
