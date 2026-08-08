@@ -37,14 +37,16 @@ function adminOnlyVercelAuth() {
   }
 }
 
-const VERCEL_MCP_INSTRUCTIONS = VERCEL_TEAM_ID
-  ? `**Vercel MCP connection (vercel__*, admin only): read-only, use judiciously.**
+// The description must stay non-empty at build time, when VERCEL_TEAM_ID is
+// absent; it is only interpolated here, never gated on.
+const TEAM_ID = VERCEL_TEAM_ID ? `teamId=${VERCEL_TEAM_ID}` : 'the teamId from VERCEL_TEAM_ID'
+
+const VERCEL_MCP_INSTRUCTIONS = `**Vercel MCP connection (vercel__*, admin only): read-only, use judiciously.**
 
 - Discover exact schemas via \`connection_search\`, then call \`vercel__<tool>\`.
-- The connection is scoped to the evlog team (\`teamId=${VERCEL_TEAM_ID}\`) but NOT to a single project: evlog runs several Vercel projects, and Evi may need logs, deployments, or agent runs from any of them. Pass \`teamId=${VERCEL_TEAM_ID}\` to \`list_deployments\`, \`get_deployment\`, \`get_deployment_build_logs\`, \`get_runtime_logs\`, \`get_runtime_errors\`, \`get_project\`, and use \`list_agent_run_projects\` to find the project hosting Evi's Agent Runs.
+- The connection is scoped to the evlog team (${TEAM_ID}) but NOT to a single project: evlog runs several Vercel projects, and Evi may need logs, deployments, or agent runs from any of them. Pass the team id to \`list_deployments\`, \`get_deployment\`, \`get_deployment_build_logs\`, \`get_runtime_logs\`, \`get_runtime_errors\`, \`get_project\`, and use \`list_agent_run_projects\` to find the project hosting Evi's Agent Runs.
 - Evi's own Agent Runs (\`list_agent_runs\`) live in the eve service's own project, not the app project. Call \`list_agent_run_projects\` first to discover it. Still NOT tokens/cost. Use \`ai_gateway__*\` for that. No per-run trace access: this connection only exposes run-level metadata, never raw conversation content.
 - \`search_vercel_documentation\` needs no ids: general Vercel platform docs search.`
-  : ''
 
 export default defineMcpClientConnection({
   url: 'https://mcp.vercel.com',
