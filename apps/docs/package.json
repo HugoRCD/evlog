@@ -14,7 +14,7 @@
   "dependencies": {
     "@databuddy/nuxt": "^2.4.20",
     "@nuxt/fonts": "0.14.0",
-    "@nuxt/icon": "^2.3.1",
+    "@nuxt/icon": "^2.4.1",
     "@nuxt/ui": "^4.10.0",
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
@@ -24,7 +24,7 @@
     "motion-v": "^2.3.0",
     "nuxt": "^4.4.4",
     "nuxt-studio": "^1.7.0",
-    "satori": "^0.28.0",
+    "satori": "^0.29.0",
     "shaders": "^2.5.135"
   },
   "devDependencies": {
