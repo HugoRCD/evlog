@@ -1,5 +1,92 @@
 # evlog
 
+## 2.25.0
+
+### Minor Changes
+
+- [#501](https://github.com/HugoRCD/evlog/pull/501) [`16d5323`](https://github.com/HugoRCD/evlog/commit/16d5323efb132fead23643bc002d2411d1f48124) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Cover the eve 0.30 event surface. **`evlog/eve` now requires eve >= 0.30** — the peer range moves from `>=0.24.3`. The eve integration is still beta and its peer floor moves with it, so this ships as a minor; nothing outside `evlog/eve` is affected. Agents on an older eve keep working on the previous evlog — upgrade eve first.
+
+  The wide event now carries what eve started reporting since 0.24:
+  - `eve.runtime` — eve version, agent id, model, and the deployed git sha, branch and date, from `session.started`
+  - `eve.parent` — parent and root session ids for a subagent run, so a drain can rebuild the delegation tree
+  - `eve.authorizations` — connection sign-ins with their outcome, reason and duration; a turn parked on one ends as `eve.phase: 'awaiting-authorization'`
+  - `eve.compaction` — how many compactions ran, on which model, and how full the context was when the first one triggered
+  - `eve.contextCleared`, `eve.stepFailures` and `eve.failedSteps` — a model call that failed and was retried no longer disappears from a turn that ends up succeeding
+  - `ai.costUsd` — the cost eve reports, used in place of the `cost` pricing map when available. `ai.model` falls back to the model reported at session start, so `model` is only needed for dynamic-model agents
+  - subagents record `durationMs` and a `started` status
+
+  `message` replaces `redactMessage` with three modes: `'omit'` (default), `'preview'` (text truncated to `messagePreviewLength`, attachments reduced to their type and media type) and `'full'`. Attachment parts were previously not redacted at all. `redactMessage` still works and is deprecated.
+
+  `sessionEvent: true` adds one wide event per session on top of the per-turn ones, rolling up turns, tokens, cost, tools used, compactions and authorizations — one row per conversation, which is what makes tail sampling useful on an agent.
+
+- [#506](https://github.com/HugoRCD/evlog/pull/506) [`f8fb677`](https://github.com/HugoRCD/evlog/commit/f8fb677d5a267d2a25bca52bff2453b5f0c1bdf2) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Close the remaining gaps in the eve integration, and add `defineEvlogInstrumentation()`.
+
+  A wide event and an Agent Runs span describe the same turn, but nothing joined them: you could not jump from a trace in Braintrust, Datadog or the Vercel dashboard to the event in your drain. Export the new definition from `agent/instrumentation.ts` and every model-call span carries `evlog.request_id` and `evlog.session_id`, the values the wide event reports as `requestId` and `eve.sessionId`:
+
+  ```ts
+  // agent/instrumentation.ts
+  import { defineEvlogInstrumentation } from "evlog/eve";
+
+  export default defineEvlogInstrumentation();
+  ```
+
+  Without `setup`, OpenTelemetry export is untouched and eve keeps writing its local traces. `functionId`, `recordInputs`, `recordOutputs` and `traceChannelRequests` pass through to eve.
+
+  Three more of eve's stream events now reach the wide event:
+  - `eve.reasoning` — `blocks` and `chars`, the size of the model's thinking. The reasoning text itself is never recorded.
+  - `message.responseChars`, and `message.response` once `message` is `'preview'` or `'full'` — the agent's answer, following the same rule as the incoming message.
+  - `eve.result` — the structured result of an agent with an output schema.
+
+- [#507](https://github.com/HugoRCD/evlog/pull/507) [`1838d60`](https://github.com/HugoRCD/evlog/commit/1838d609ed41f973a48ebf62dc0557a16117221d) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `evlog/eve` records the caller, and composes with another observability backend.
+
+  An agent has exactly one `agent/instrumentation.ts`, and every observability item in eve's registry writes it. `defineEvlogInstrumentation()` owns that file, so it only fits an agent whose instrumentation is evlog's alone. The new `evlogRuntimeContext` contributes evlog's span attributes to instrumentation you already have, the way the other integrations do:
+
+  ```ts
+  import { defineInstrumentation } from 'eve/instrumentation'
+  import { evlogRuntimeContext } from 'evlog/eve'
+
+  export default defineInstrumentation({
+    setup: ({ agentName }) => registerOTel({ serviceName: agentName, spanProcessors: [...] }),
+    events: {
+      'step.started': input => ({
+        runtimeContext: {
+          ...evlogRuntimeContext(input),
+          posthog_distinct_id: input.session.auth.current?.principalId ?? '',
+        },
+      }),
+    },
+  })
+  ```
+
+  It returns `undefined` outside a tracked turn, so spreading it adds nothing.
+
+  Turn and session events now carry `eve.caller` with the principal eve resolved at dispatch: `principalId`, `principalType` and `authenticator`. On a multi-user channel that is the dimension you group cost, volume and refusals by, and it was previously unreachable — the enrich hook is HTTP-shaped and exposes no path to the eve session. `subject` and `attributes` are deliberately excluded, since a channel may put a name or an email in them.
+
+### Patch Changes
+
+- [#500](https://github.com/HugoRCD/evlog/pull/500) [`8ffba92`](https://github.com/HugoRCD/evlog/commit/8ffba925f5fedb94cce782aa173011cde0245ace) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Emit a wide event for eve turns that end without `turn.completed` or `turn.failed`.
+
+  A turn cancelled by eve produced no wide event, and its logger, accumulator and session slot stayed in memory for good: LRU eviction skips any session that still has an active turn, so nothing ever reclaimed them. `turn.cancelled` now closes the turn on its own terminal path — status `499`, `eve.phase: 'cancelled'`, level `info`, because cancellation is not a failure in eve's model.
+
+  `session.failed` and `session.completed` flush any turn still open for that session and drop its carried-over context, which also ends the indefinite retention of snapshots for finished sessions.
+
+- [#510](https://github.com/HugoRCD/evlog/pull/510) [`68b05fa`](https://github.com/HugoRCD/evlog/commit/68b05fa1456ee3b7d6cfe9e34abe3175c74cb5d0) Thanks [@HugoRCD](https://github.com/HugoRCD)! - The file system drain now detects an unwritable directory reliably.
+
+  The previous check probed with `mkdir({ recursive: true })`, which is a no-op on a directory that already exists and therefore succeeds even when that directory is read-only. A deployment whose log directory already existed still threw on every batch. The probe also ran per call rather than per resolved state, so concurrent batches could each warn.
+
+  The write itself is now the check: once an append fails with `EROFS`, `EACCES` or `EPERM`, the drain is disabled for that directory and warns once. Batches already in flight when that happens still attempt their own append. Any other failure, including a full disk, is reported by the drain as before.
+
+- [#509](https://github.com/HugoRCD/evlog/pull/509) [`2dfde11`](https://github.com/HugoRCD/evlog/commit/2dfde11d5c79a2b119a5c64110dc25d0e2f43656) Thanks [@HugoRCD](https://github.com/HugoRCD)! - The file system drain disables itself when its directory is not writable.
+
+  `createFsDrain()` guarded neither its `mkdir` nor its `appendFile`, so attaching it on a serverless host — where everything outside the temp directory is read-only — threw once per batch for the lifetime of the deployment, and the events went nowhere regardless. Callers had to guess at the environment to avoid it:
+
+  ```ts
+  // no longer needed
+  const drain = process.env.VERCEL !== "1" ? createFsDrain() : undefined;
+  ```
+
+  The drain now disables itself once it observes an `EROFS`, `EACCES` or `EPERM` write failure for that directory, warning a single time, the same way it already disables itself in the Edge runtime. Attach it unconditionally. Any other failure — a full disk, a genuine bug — still propagates.
+
 ## 2.24.0
 
 ### Minor Changes
