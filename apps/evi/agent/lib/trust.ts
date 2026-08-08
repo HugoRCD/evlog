@@ -8,10 +8,11 @@ import type { SessionAuthContext } from 'eve/context'
  * trusted set, so its writes fall back to asking.
  */
 export const MAINTAINER_PHONE = process.env.MAINTAINER_PHONE
+export const MAINTAINER_GITHUB_ID = process.env.MAINTAINER_GITHUB_ID
 
 const MAINTAINER_PRINCIPALS = new Set(
   [
-    process.env.MAINTAINER_GITHUB_ID && `github:${process.env.MAINTAINER_GITHUB_ID}`,
+    MAINTAINER_GITHUB_ID && `github:${MAINTAINER_GITHUB_ID}`,
     process.env.MAINTAINER_LINEAR_ID && `linear:${process.env.MAINTAINER_LINEAR_ID}`,
     MAINTAINER_PHONE && `imessage:${MAINTAINER_PHONE}`,
   ].filter((principal): principal is string => Boolean(principal)),
@@ -19,6 +20,18 @@ const MAINTAINER_PRINCIPALS = new Set(
 
 export function isMaintainer(auth: SessionAuthContext | null): boolean {
   return auth !== null && MAINTAINER_PRINCIPALS.has(auth.principalId)
+}
+
+/**
+ * The constructed principal for unattended GitHub turns (first responder on
+ * new issues). Projected actors always carry a numeric `github:<id>`, so this
+ * fixed login cannot collide with a real one.
+ */
+export const AUTONOMOUS_GITHUB_PRINCIPAL = 'github:evlogai'
+
+/** Unattended turns: comment-only, never trusted, nothing may park on a card. */
+export function isAutonomous(auth: SessionAuthContext | null): boolean {
+  return auth !== null && auth.principalId === AUTONOMOUS_GITHUB_PRINCIPAL
 }
 
 /**
