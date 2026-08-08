@@ -66,17 +66,25 @@ const TOOLS = [
 
 const PROTECTED_BRANCHES = new Set(['main', 'master'])
 
+function maintainerWrite({ session }: ApprovalContext): ApprovalStatus {
+  return isMaintainer(session.auth.current) ? 'not-applicable' : 'user-approval'
+}
+
 /**
- * Routine writes run without a card when Hugo asked; everyone else gets one.
- * Autonomous first-responder turns are denied outright: they run unattended so
- * an approval request would park forever, and their reply is posted by the
- * channel rather than by a tool.
+ * Autonomous first-responder turns may label the issue they triage and nothing
+ * else. Everything else is denied outright: the turn runs unattended, so an
+ * approval request would park forever, and its reply is posted by the channel.
  */
 function policy({ session }: ApprovalContext): ApprovalStatus {
   if (isAutonomous(session.auth.current)) {
-    return { type: 'denied', reason: 'Autonomous turns are comment-only.' }
+    return { type: 'denied', reason: 'Autonomous turns may only add or update labels on the issue.' }
   }
-  return isMaintainer(session.auth.current) ? 'not-applicable' : 'user-approval'
+  return maintainerWrite({ session })
+}
+
+/** Labels are reversible, so they are the one write an autonomous turn may reach. */
+function labelPolicy(ctx: ApprovalContext): ApprovalStatus {
+  return isAutonomous(ctx.session.auth.current) ? 'not-applicable' : policy(ctx)
 }
 
 export default githubExtension({
@@ -118,11 +126,11 @@ export default githubExtension({
     addPullRequestComment: policy,
     updatePullRequestComment: policy,
     addDiscussionComment: policy,
-    addLabels: policy,
-    removeLabel: policy,
     addAssignees: policy,
     removeAssignees: policy,
     addIssueReaction: policy,
     addCommentReaction: policy,
+    addLabels: labelPolicy,
+    removeLabel: labelPolicy,
   },
 })
