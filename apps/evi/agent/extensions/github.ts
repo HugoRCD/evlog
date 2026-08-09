@@ -99,9 +99,11 @@ export default githubExtension({
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
-  // deletePullRequestComment, createPullRequestReview, requestReviewers, deleteLabel.
+  // deletePullRequestComment, createPullRequestReview, deleteLabel.
   // Connect scopes are derived from `include` (createLabel → issues:write) in sdk ≥ 1.11.1.
   requireApproval: {
+    // Reversible and harmless on every kind of run; a card here only slows the PR flow down.
+    requestReviewers: (): ApprovalStatus => 'not-applicable',
     createPullRequest: policy,
     updatePullRequest: policy,
     createIssue: autonomousWrite,
