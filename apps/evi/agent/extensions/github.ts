@@ -19,6 +19,7 @@ const TOOLS = [
   'searchIssues',
   'listIssues',
   'getIssueContext',
+  'listIssueComments',
   'createIssue',
   'updateIssue',
   'closeIssue',
@@ -28,6 +29,8 @@ const TOOLS = [
 
   // Triage
   'listLabels',
+  'createLabel',
+  'updateLabel',
   'addLabels',
   'removeLabel',
   'addAssignees',
@@ -68,14 +71,14 @@ function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
 }
 
 /**
- * Autonomous first-responder turns may label the issue, open a doc-gap issue,
+ * Autonomous first-responder turns may create/apply labels, open a doc-gap issue,
  * or assign the maintainer, and nothing else. Everything else is denied
  * outright: the turn runs unattended, so an approval request would park
  * forever, and its reply is posted by the channel.
  */
 function policy(ctx: ApprovalContext): ApprovalStatus {
   if (isAutonomous(ctx.session.auth.current)) {
-    return { type: 'denied', reason: 'Autonomous turns may only label the issue, open a doc-gap issue, or assign the maintainer.' }
+    return { type: 'denied', reason: 'Autonomous turns may only create or apply labels, open a doc-gap issue, or assign the maintainer.' }
   }
   return maintainerWrite(ctx)
 }
@@ -99,25 +102,11 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
 
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
-  connect: {
-    scopes: [
-      'metadata:read',
-      'contents:read',
-      'contents:write',
-      'issues:read',
-      'issues:write',
-      'pull_requests:read',
-      'pull_requests:write',
-      'discussions:read',
-      'discussions:write',
-      'checks:read',
-      'actions:read',
-    ],
-  },
+  // Connect scopes are derived from `include` by @github-tools/eve-extension@0.3.1+.
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
-  // deletePullRequestComment, createPullRequestReview, requestReviewers.
+  // deletePullRequestComment, createPullRequestReview, requestReviewers, deleteLabel.
   requireApproval: {
     createPullRequest: policy,
     updatePullRequest: policy,
@@ -134,5 +123,7 @@ export default githubExtension({
     addCommentReaction: policy,
     addLabels: autonomousWrite,
     removeLabel: autonomousWrite,
+    createLabel: autonomousWrite,
+    updateLabel: policy,
   },
 })
