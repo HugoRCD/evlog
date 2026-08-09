@@ -1,7 +1,8 @@
 import { defineDynamic, defineInstructions } from 'eve/instructions'
 import { isAutonomous } from '../lib/trust'
 
-const FIRST_RESPONDER = `## First responder on this issue
+/** Exported for the first-responder eval, which cannot forge autonomous channel auth. */
+export const FIRST_RESPONDER = `## First responder on this issue
 
 This turn triages a new community issue without waiting to be asked and without approval: the issue body is the request. Add or update the relevant label on the issue; never delete a label from the repository.
 
