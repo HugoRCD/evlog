@@ -68,6 +68,15 @@ export default defineChannel({
         'mcp-session-id': mcpSessionId,
       }
       if (result.body === null) return new Response(null, { status: result.status, headers })
+      // Streamable HTTP lets the server answer POSTs as JSON or as an SSE
+      // frame; clients built against SSE-framing servers (Linear's among
+      // them) expect the frame when their Accept says so.
+      if (req.headers.get('accept')?.includes('text/event-stream')) {
+        return new Response(`event: message\ndata: ${JSON.stringify(result.body)}\n\n`, {
+          status: result.status,
+          headers: { ...headers, 'content-type': 'text/event-stream' },
+        })
+      }
       return Response.json(result.body, { status: result.status, headers })
     }),
   ],
