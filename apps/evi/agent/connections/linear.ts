@@ -10,5 +10,5 @@ import { adminOnlyAppConnection } from '../lib/connect'
 export default defineMcpClientConnection({
   url: 'https://mcp.linear.app/mcp/readonly',
   description: "Hugo's Linear workspace, read-only (admin only): issues, projects, initiatives, milestones, cycles, documents, status updates. The authority on what is planned, in progress, or decided in Linear. Use it to answer questions about planning state or to ground a digest; interacting with Linear (creating or updating issues) happens on the Linear channel, not here.",
-  auth: adminOnlyAppConnection('scl_D48zMshnOiQncJ3eFn2mRA'),
+  auth: adminOnlyAppConnection('linear/mcp'),
 })
