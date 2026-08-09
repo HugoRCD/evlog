@@ -1,4 +1,5 @@
 import type { SessionAuthContext } from 'eve/context'
+import { environment } from './environment'
 
 /**
  * Hugo's identity on each channel, read from the environment so the public
@@ -21,6 +22,9 @@ const MAINTAINER_PRINCIPALS = new Set(
 )
 
 export function isMaintainer(auth: SessionAuthContext | null): boolean {
+  // An `eve dev` session runs on the maintainer's own machine; its REPL
+  // caller is him. Deployments and eval runs never resolve to `local`.
+  if (environment() === 'local') return true
   return auth !== null && MAINTAINER_PRINCIPALS.has(auth.principalId)
 }
 

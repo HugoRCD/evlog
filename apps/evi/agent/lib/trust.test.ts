@@ -13,8 +13,10 @@ function auth(overrides: Partial<SessionAuthContext>): SessionAuthContext {
 
 async function loadTrust(env: Record<string, string | undefined>) {
   vi.resetModules()
+  // Tests model deployed behavior unless a case opts into the local grant.
+  vi.stubEnv('VERCEL_ENV', 'production')
   for (const [key, value] of Object.entries(env)) {
-    if (value === undefined) vi.stubEnv(key, '')
+    if (value === undefined) vi.stubEnv(key, undefined)
     else vi.stubEnv(key, value)
   }
   return await import('./trust')
@@ -47,6 +49,18 @@ describe('isMaintainer', () => {
     expect(trust.isMaintainer(auth({ principalId: 'github:12345' }))).toBe(true)
     expect(trust.isMaintainer(auth({ principalId: 'linear:abc-def' }))).toBe(false)
     expect(trust.isMaintainer(auth({ principalId: 'imessage:+33600000000' }))).toBe(false)
+  })
+})
+
+describe('local dev grant', () => {
+  it('trusts any caller when running locally, but never in eval or deployed runs', async () => {
+    const local = await loadTrust({ VERCEL_ENV: undefined })
+    expect(local.isMaintainer(null)).toBe(true)
+    expect(local.canAccessAdminTools(auth({ principalId: 'anon' }))).toBe(true)
+    const evalRun = await loadTrust({ VERCEL_ENV: undefined, EVE_RUN_MODE: 'eval' })
+    expect(evalRun.isMaintainer(null)).toBe(false)
+    const deployed = await loadTrust({})
+    expect(deployed.isMaintainer(auth({ principalId: 'anon' }))).toBe(false)
   })
 })
 
