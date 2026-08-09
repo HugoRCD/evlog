@@ -19,11 +19,13 @@ describe('exchangeTurboToken', () => {
     expect(captured?.get('team_id_or_slug')).toBe('hrcd')
   })
 
-  it('surfaces a failed exchange and a missing access token', async () => {
+  it('surfaces a failed exchange and a missing or non-string access token', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('denied', { status: 403 })))
     await expect(exchangeTurboToken('oidc', 'hrcd')).rejects.toThrow('failed (403)')
-    vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
-    await expect(exchangeTurboToken('oidc', 'hrcd')).rejects.toThrow('no access_token')
+    for (const payload of ['{}', '{"access_token":123}', '{"access_token":""}']) {
+      vi.stubGlobal('fetch', vi.fn(async () => new Response(payload, { status: 200 })))
+      await expect(exchangeTurboToken('oidc', 'hrcd')).rejects.toThrow('no access_token')
+    }
   })
 })
 
@@ -34,7 +36,9 @@ describe('turboConfigCommand', () => {
     expect(command).toContain(`printf '%s' '{"teamId":"team_x","teamSlug":"hrcd"}' > /workspace/repo/.turbo/config.json`)
   })
 
-  it('refuses a token that could escape the quoting', () => {
-    expect(() => turboConfigCommand("tok'; rm -rf /", 'team_x', 'hrcd')).toThrow('Unexpected characters')
+  it('refuses any value that could escape the quoting', () => {
+    expect(() => turboConfigCommand("tok'; rm -rf /", 'team_x', 'hrcd')).toThrow('Unexpected characters in the Turborepo token')
+    expect(() => turboConfigCommand('tok', "team' x", 'hrcd')).toThrow('Unexpected characters in the Turborepo teamId')
+    expect(() => turboConfigCommand('tok', 'team_x', "hr'cd")).toThrow('Unexpected characters in the Turborepo teamSlug')
   })
 })

@@ -17,13 +17,16 @@ export async function exchangeTurboToken(oidcToken: string, team: string): Promi
     team_id_or_slug: team,
     subject_token: oidcToken,
   })
-  const response = await fetch(EXCHANGE_URL, { method: 'POST', body })
+  const response = await fetch(EXCHANGE_URL, { method: 'POST', body, signal: AbortSignal.timeout(10_000) })
   if (!response.ok) {
     throw new Error(`Turborepo token exchange failed (${response.status}): ${await response.text()}`)
   }
-  const payload = await response.json() as { access_token?: string }
-  if (!payload.access_token) throw new Error('Turborepo token exchange returned no access_token.')
-  return payload.access_token
+  const payload = await response.json() as { access_token?: unknown }
+  const token = payload?.access_token
+  if (typeof token !== 'string' || token.length === 0) {
+    throw new Error('Turborepo token exchange returned no access_token.')
+  }
+  return token
 }
 
 /**
@@ -33,7 +36,11 @@ export async function exchangeTurboToken(oidcToken: string, team: string): Promi
  * single quotes.
  */
 export function turboConfigCommand(token: string, teamId: string, teamSlug: string): string {
-  if (!/^[\w.-]+$/.test(token)) throw new Error('Unexpected characters in the Turborepo token.')
+  // All three land inside single quotes; refusing anything outside this
+  // charset (which real tokens, team ids, and slugs never leave) beats escaping.
+  for (const [name, value] of [['token', token], ['teamId', teamId], ['teamSlug', teamSlug]] as const) {
+    if (!/^[\w.-]+$/.test(value)) throw new Error(`Unexpected characters in the Turborepo ${name}.`)
+  }
   const auth = JSON.stringify({ token })
   const repo = JSON.stringify({ teamId, teamSlug })
   return [
