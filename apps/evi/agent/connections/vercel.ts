@@ -1,7 +1,5 @@
-import { connect } from '@vercel/connect/eve'
 import { defineMcpClientConnection } from 'eve/connections'
-import type { SessionContext } from 'eve/context'
-import { canAccessAdminTools } from '../lib/trust'
+import { adminOnlyAppConnection } from '../lib/connect'
 
 const VERCEL_TEAM_ID = process.env.VERCEL_TEAM_ID
 
@@ -18,26 +16,6 @@ const ALLOWED_TOOLS: string[] = [
   'list_agent_runs',
   'list_projects',
 ]
-
-/**
- * Read-only Vercel platform access, gated to maintainer and app-principal
- * sessions. A blocked caller gets a terminal error instead of a silent
- * authorization challenge, matching the notes in docs/notes.md on app-scoped
- * Connect auth.
- */
-function adminOnlyVercelAuth() {
-  return (ctx: SessionContext) => {
-    if (!canAccessAdminTools(ctx.session.auth.current)) {
-      return {
-        principalType: 'app' as const,
-        async getToken(): Promise<never> {
-          throw new Error('This tool is not available in the current session.')
-        },
-      }
-    }
-    return connect({ connector: 'vercel/mcp', principalType: 'app', autoProvision: false })
-  }
-}
 
 // The description must stay non-empty at build time, when VERCEL_TEAM_ID is
 // absent; it is only interpolated here, never gated on.
@@ -57,5 +35,5 @@ export default defineMcpClientConnection({
   url: 'https://mcp.vercel.com',
   description: VERCEL_MCP_INSTRUCTIONS,
   tools: { allow: ALLOWED_TOOLS },
-  auth: adminOnlyVercelAuth(),
+  auth: adminOnlyAppConnection('vercel/mcp'),
 })
