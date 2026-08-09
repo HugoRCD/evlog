@@ -57,9 +57,11 @@ async function ensureEscalationLabel(token: string): Promise<void> {
       description: 'Evi failed on this issue and a human needs to take over',
     }),
   })
-  // 422 already_exists: another session created it between the lookup and here.
-  if (!created.ok && created.status !== 422) {
-    throw new Error(`GitHub label creation failed (${created.status}): ${await created.text()}`)
+  if (!created.ok) {
+    const body = await created.text()
+    // already_exists: another session created it between the lookup and here.
+    if (created.status === 422 && body.includes('"already_exists"')) return
+    throw new Error(`GitHub label creation failed (${created.status}): ${body}`)
   }
 }
 

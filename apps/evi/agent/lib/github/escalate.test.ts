@@ -84,6 +84,18 @@ describe('escalateFailedTriage', () => {
     ])
   })
 
+  it('surfaces a 422 that is not already_exists', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const path = new URL(String(url)).pathname
+      if (init?.method === undefined) return new Response('not found', { status: 404 })
+      if (path.endsWith('/labels') && !path.includes('/issues/')) {
+        return new Response('{"errors":[{"code":"invalid","field":"color"}]}', { status: 422 })
+      }
+      return new Response('{}', { status: 200 })
+    }))
+    await expect(escalateFailedTriage(9)).rejects.toThrow('failed (422)')
+  })
+
   it('surfaces a failed GitHub call', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') return new Response('nope', { status: 403 })
