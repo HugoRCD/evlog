@@ -125,6 +125,18 @@ turn and writes events nobody can read.
 for both local and eval traffic while the spend tags separate them. Both now read
 `agent/lib/environment.ts`.
 
+## MCP channel
+
+External harnesses (Raycast AI, Claude Code, Cursor) reach Evi at
+`POST /eve/v1/mcp` with `Authorization: Bearer $EVI_MCP_TOKEN`: a single `evi`
+tool that runs a real session under the `mcp:hugo` principal, trusted as the
+maintainer only while the token env is set. The `mcp-session-id` returned on
+`initialize` keys the conversation, so one Raycast chat is one Evi session.
+Setup: generate a token (`openssl rand -hex 32`), set `EVI_MCP_TOKEN` on the
+project, add an HTTP MCP server in the client pointing at the production URL
+with the Authorization header. Rotate by changing the env var. There is no
+OAuth AS on purpose: single-user surface, a static bearer is the right size.
+
 ## Open
 
 - Per-tool input-token attribution. `ai.tools[]` records name, duration and
