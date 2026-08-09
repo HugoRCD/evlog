@@ -28,7 +28,8 @@
     "nuxt-auth-utils": "^0.5.29",
     "nuxt-charts": "^2.2.0",
     "postgres": "^3.4.9",
-    "zod": "^4.4.3"
+    "zod": "^4.4.3",
+    "jose": "^6.2.3"
   },
   "devDependencies": {
     "eslint": "^9.39.5",

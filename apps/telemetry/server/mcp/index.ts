@@ -9,8 +9,8 @@
  * the rest of the dashboard.
  */
 export default defineMcpHandler({
-  middleware: (event) => {
-    if (!isMcpRequestAuthorized(getHeader(event, 'authorization'))) {
+  middleware: async (event) => {
+    if (!(await isMcpRequestAuthorized(getHeader(event, 'authorization')))) {
       throw telemetryErrors.MCP_UNAUTHORIZED()
     }
   },

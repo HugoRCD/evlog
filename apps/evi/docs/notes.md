@@ -104,6 +104,17 @@ assuming the agent simply answers without that connection is wrong.
 **`vercel connect token` from the CLI proves nothing about app-scoped auth** — it
 resolves through your own Vercel identity, the user-scoped path.
 
+## Telemetry
+
+**The agent's telemetry MCP authenticates with its Vercel OIDC token, not a
+shared password.** The connection sends `process.env.VERCEL_OIDC_TOKEN` (the
+same token the turbo remote-cache tool uses); the telemetry app verifies it
+against Vercel's team JWKS and trusts only the `evi` project's production
+environment (`apps/telemetry/server/utils/vercel-oidc.ts`). Locally there is no
+OIDC token, and the dashboard's soft auth means a password-less local dashboard
+stays open. If the evi project's OIDC issuer mode ever changes, the constants in
+`vercel-oidc.ts` move with it.
+
 ## evlog
 
 **The fs drain guards neither its `mkdir` nor its `appendFile`.** On Vercel,
