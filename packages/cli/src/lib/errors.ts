@@ -40,13 +40,6 @@ export const cliErrors = defineErrorCatalog('cli', {
     fix: 'Run your package manager install step',
     tags: ['doctor', 'evlog'],
   },
-  LOGS_SINK_MISSING: {
-    status: 404,
-    message: 'No local .evlog/logs sink yet',
-    why: 'The fs drain has not written any local logs yet',
-    fix: 'Run evlog init to create the sink; the fs drain (evlog/fs) writes it on first event',
-    tags: ['doctor', 'logs'],
-  },
   COMMAND_FAILED: {
     status: 500,
     message: 'CLI command failed',

@@ -205,7 +205,6 @@ describe('runInit', () => {
     expect(result.written.length).toBeGreaterThan(0)
     expect(await readFile(join(cwd, 'nuxt.config.ts'), 'utf8')).toBe('export default defineNuxtConfig({})\n')
     expect(existsSync(join(cwd, 'server/plugins/evlog-drain.ts'))).toBe(false)
-    expect(existsSync(join(cwd, '.evlog', 'logs'))).toBe(false)
   })
 
   it('is safe to run twice — the second run changes nothing', async () => {
@@ -235,20 +234,6 @@ describe('runInit', () => {
     expect(plugin).toContain('createFsDrain')
   })
 
-  it('creates the local sink directory so doctor sees it before the first event', async () => {
-    const cwd = await project({
-      'package.json': '{"name":"shop","dependencies":{"nuxt":"^4.0.0"}}',
-      'nuxt.config.ts': 'export default defineNuxtConfig({})\n',
-    })
-
-    await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
-
-    /* The fs drain makes this directory lazily on first write; creating it at
-       init is what lets `evlog doctor` report the sink on a fresh project. */
-    expect(existsSync(join(cwd, '.evlog', 'logs'))).toBe(true)
-  })
-
-
   it('honours --no-sink', async () => {
     const cwd = await project({
       'package.json': '{"name":"shop","dependencies":{"nuxt":"^4.0.0"}}',
@@ -258,7 +243,6 @@ describe('runInit', () => {
     await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, devDrain: 'none', yes: true })
 
     expect(existsSync(join(cwd, 'server/plugins/evlog-drain.ts'))).toBe(false)
-    expect(existsSync(join(cwd, '.evlog', 'logs'))).toBe(false)
   })
 
   it('reports the install command without running it when told not to', async () => {

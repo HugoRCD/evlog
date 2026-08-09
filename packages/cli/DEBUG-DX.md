@@ -19,8 +19,8 @@ export default defineEvlogCommand('audit', {
   async run({ args, cli, log, ui }) {
     const data = await log.step('load', () => load(cli.cwd))
     if (!data) {
-      log.finding(cliErrors.LOGS_SINK_MISSING, { id: 'logs' })
-      ui.done({ human: 'No sink.', summary: { ok: 0, warn: 1, fail: 0 } })
+      log.finding(cliErrors.EVLOG_DECLARED_NOT_INSTALLED, { id: 'evlog' })
+      ui.done({ human: 'No evlog.', summary: { ok: 0, warn: 1, fail: 0 } })
       return
     }
     // unexpected throw inside step → steps trail + cli.COMMAND_FAILED when --debug

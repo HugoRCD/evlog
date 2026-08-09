@@ -246,6 +246,51 @@ export async function findLogsSink(project: ProjectInfo): Promise<{
   return null
 }
 
+/** The fs drain's default directory, used when no env override names another. */
+const DEFAULT_FS_DIR = '.evlog/logs'
+
+/**
+ * Whether the project declares an fs drain. The drain creates its directory
+ * lazily on first write, so a declared drain is a sink even before any event,
+ * and a project without one is not expected to have a local sink at all.
+ */
+export async function findConfiguredFsDrain(
+  project: ProjectInfo,
+  env: Record<string, string | undefined>,
+): Promise<{ dir: string } | null> {
+  const envDir = env.EVLOG_FS_DIR ?? env.NUXT_EVLOG_FS_DIR
+  if (envDir) return { dir: envDir }
+
+  for (const base of uniquePaths([project.cwd, project.packageDir, project.root])) {
+    if (await dirWiresFsDrain(join(base, 'server', 'plugins'))) return { dir: DEFAULT_FS_DIR }
+    if (await fileWiresFsDrain(join(base, 'lib', 'evlog.ts'))) return { dir: DEFAULT_FS_DIR }
+    if (await fileWiresFsDrain(join(base, 'src', 'lib', 'evlog.ts'))) return { dir: DEFAULT_FS_DIR }
+  }
+  return null
+}
+
+async function dirWiresFsDrain(dir: string): Promise<boolean> {
+  let entries: string[]
+  try {
+    entries = await readdir(dir)
+  } catch {
+    return false
+  }
+  for (const entry of entries) {
+    if (!/\.(ts|mts|js|mjs)$/.test(entry)) continue
+    if (await fileWiresFsDrain(join(dir, entry))) return true
+  }
+  return false
+}
+
+async function fileWiresFsDrain(path: string): Promise<boolean> {
+  try {
+    return (await readFile(path, 'utf8')).includes('createFsDrain')
+  } catch {
+    return false
+  }
+}
+
 /** Framework / integration hints based on package.json dependencies. */
 export function detectStack(pkg: PackageJson | null): string[] {
   if (!pkg) return []

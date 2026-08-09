@@ -15,6 +15,7 @@ import { createNoopCliDebug } from '../lib/debug'
 import { cliErrors } from '../lib/errors'
 import {
   detectStack,
+  findConfiguredFsDrain,
   findLogsSink,
   prettyPath,
   resolveEvlog,
@@ -127,25 +128,34 @@ function checkStack(stack: string[], hasEvlog: boolean): Check | null {
   }
 }
 
-async function checkLogs(project: ProjectInfo): Promise<Check> {
+/**
+ * The fs drain is optional: it writes lazily, so a wired drain is a sink even
+ * before the first event, and a project without one needs no local sink.
+ * Returns `null` when the check has nothing to say.
+ */
+async function checkLogs(project: ProjectInfo, env: Record<string, string | undefined>): Promise<Check | null> {
   const sink = await findLogsSink(project)
-  if (!sink) {
+  if (sink) {
+    const loc = prettyPath(project.cwd, sink.dir)
+    if (sink.files === 0) return { id: 'logs', status: 'ok', message: `empty sink · ${loc}` }
     return {
       id: 'logs',
-      status: 'warn',
-      message: 'no local sink yet',
-      hint: 'evlog init creates it; the fs drain (evlog/fs) writes it on first event → .evlog/logs',
+      status: 'ok',
+      message: `${sink.files} file${sink.files === 1 ? '' : 's'} · ${loc}`,
     }
   }
-  const loc = prettyPath(project.cwd, sink.dir)
-  if (sink.files === 0) {
-    return { id: 'logs', status: 'ok', message: `empty sink · ${loc}` }
+
+  const declared = await findConfiguredFsDrain(project, env)
+  if (declared) {
+    const loc = prettyPath(project.cwd, declared.dir)
+    return {
+      id: 'logs',
+      status: 'ok',
+      message: `empty sink · ${loc}`,
+      hint: 'created on first write by the fs drain (evlog/fs)',
+    }
   }
-  return {
-    id: 'logs',
-    status: 'ok',
-    message: `${sink.files} file${sink.files === 1 ? '' : 's'} · ${loc}`,
-  }
+  return null
 }
 
 function findingsForChecks(
@@ -176,10 +186,6 @@ function findingsForChecks(
         status: check.status,
       })
       continue
-    }
-
-    if (check.id === 'logs') {
-      findings.push({ source: cliErrors.LOGS_SINK_MISSING, id: check.id, status: check.status })
     }
   }
 
@@ -233,10 +239,11 @@ export async function runDoctor(
     const stackCheck = checkStack(stack, !!resolved.install)
     if (stackCheck) environment.push(stackCheck)
 
+    const logsCheck = await checkLogs(project, ctx.env)
     return [
       ...environment,
       checkEvlog(project, resolved),
-      await checkLogs(project),
+      ...(logsCheck ? [logsCheck] : []),
     ]
   })
 

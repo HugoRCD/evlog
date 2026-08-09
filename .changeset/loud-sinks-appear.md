@@ -2,4 +2,4 @@
 '@evlog/cli': patch
 ---
 
-fix: create `.evlog/logs` during `evlog init` so `evlog doctor` reports the local sink on a project that has not emitted an event yet
+fix: `evlog doctor` treats a wired fs drain as a local sink before the first event, and no longer warns when no local sink is configured
