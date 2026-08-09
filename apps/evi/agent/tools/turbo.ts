@@ -1,3 +1,4 @@
+import { getVercelOidcToken } from '@vercel/oidc'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { canAccessAdminTools } from '../lib/trust'
@@ -12,11 +13,18 @@ function turboTools() {
         if (!canAccessAdminTools(ctx.session.auth.current)) {
           return { success: false as const, error: 'Remote cache access is not available in this session.' }
         }
-        const oidc = process.env.VERCEL_OIDC_TOKEN
         const teamSlug = process.env.TURBO_TEAM
         const teamId = process.env.VERCEL_TEAM_ID
-        if (!oidc || !teamSlug || !teamId) {
-          return { success: false as const, error: 'VERCEL_OIDC_TOKEN, TURBO_TEAM, and VERCEL_TEAM_ID must be configured for remote caching.' }
+        if (!teamSlug || !teamId) {
+          return { success: false as const, error: 'TURBO_TEAM and VERCEL_TEAM_ID must be configured for remote caching.' }
+        }
+        // Fetched per call: the env token is minted at boot and expires on a warm instance.
+        let oidc: string
+        try {
+          oidc = await getVercelOidcToken()
+        }
+        catch (error) {
+          return { success: false as const, error: `No Vercel OIDC token available: ${error instanceof Error ? error.message : String(error)}` }
         }
         const token = await exchangeTurboToken(oidc, teamSlug)
         const sandbox = await ctx.getSandbox()

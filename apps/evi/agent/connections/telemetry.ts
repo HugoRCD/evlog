@@ -1,3 +1,4 @@
+import { getVercelOidcToken } from '@vercel/oidc'
 import { defineMcpClientConnection } from 'eve/connections'
 import type { SessionContext } from 'eve/context'
 import { canAccessAdminTools } from '../lib/trust'
@@ -34,7 +35,9 @@ function telemetryAuth() {
       }
     }
     return {
-      getToken: async () => ({ token: process.env.VERCEL_OIDC_TOKEN ?? '' }),
+      // Fetched per call: the env var is only minted at boot and expires
+      // within the hour on a warm instance, which the telemetry app rejects.
+      getToken: async () => ({ token: await getVercelOidcToken() }),
     }
   }
 }
