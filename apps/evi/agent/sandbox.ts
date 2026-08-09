@@ -13,13 +13,17 @@ const BEFORE_AFTER_CLI = '@vercel/before-and-after@0.0.4'
  */
 export default defineSandbox({
   backend: defaultBackend({ vercel: { resources: { vcpus: 4 } } }),
-  revalidationKey: () => `evlog-workspace-v3:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
+  revalidationKey: () => `evlog-workspace-v4:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
     await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
     // Commits authored in the sandbox belong to the bot, on every channel.
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
+    // The template builds under a different uid than the session user; without
+    // these, every git command in a session dies on "dubious ownership" and the
+    // GitHub channel checkout fails silently.
+    await sandbox.run({ command: 'git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/repo' })
     // Browser tooling is template-scoped: Chromium and the capture CLI are
     // paid once per template build, never per session.
     await installAgentBrowser(sandbox)
