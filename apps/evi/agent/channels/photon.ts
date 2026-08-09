@@ -51,7 +51,7 @@ export default photonIMessageChannel({
 
       await channel.thread.post(body)
     },
-    // A silent death reads as Evi ignoring Hugo; both terminal failures say so in the thread.
+    // A terminal failure is always reported in the thread; a failed turn never ends silent.
     async 'turn.failed'(event, channel) {
       if (!channel.thread) return
       await channel.thread.post(failureText('That turn failed', 'Send the message again to retry.', event))

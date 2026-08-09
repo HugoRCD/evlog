@@ -7,6 +7,13 @@ import { isMaintainer } from '../lib/trust'
 /** The template clone with dependencies installed; sessions branch, verify, and push from here. */
 const REPO_DIR = '/workspace/repo'
 
+/**
+ * Pushes go to this URL literally, never through the `origin` remote: remote
+ * config inside the sandbox (`pushurl`, `pushDefault`, per-branch remotes) is
+ * model-writable and must not be able to redirect the brokered credential.
+ */
+const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
+
 function gitTools() {
   return {
     push: defineTool({
@@ -25,7 +32,7 @@ function gitTools() {
         await sandbox.setNetworkPolicy(pushBrokerPolicy(token))
         try {
           const push = await sandbox.run({
-            command: `git -C ${REPO_DIR} push --set-upstream origin '${input.branch}'`,
+            command: `git -C ${REPO_DIR} push ${PUSH_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
           })
           if (push.exitCode !== 0) {
             return {

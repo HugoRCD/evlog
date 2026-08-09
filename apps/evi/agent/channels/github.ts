@@ -35,9 +35,8 @@ export default githubChannel({
     }
   },
   events: {
-    // Both handlers replace eve's default error comment: an autonomous triage
-    // failure escalates silently (label + assign) instead of posting bot noise
-    // in front of the community; interactive failures keep the comment.
+    // Autonomous triage failures escalate silently (label + assign); only
+    // interactive failures post an error comment.
     async 'turn.failed'(event, channel, ctx) {
       if (isAutonomous(ctx.session.auth.current)) {
         await escalate(channel.state)

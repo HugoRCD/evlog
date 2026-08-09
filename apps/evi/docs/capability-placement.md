@@ -24,9 +24,11 @@ Use this order when placing a new capability:
 
 ## The two-layer rule
 
-Every file under `agent/` outside `agent/lib/` is wiring: it declares a
+Every code file under `agent/` outside `agent/lib/` is wiring: it declares a
 channel, tool, schedule, instruction fragment, or connection, and imports its
-logic from `agent/lib/`. Logic lives in `agent/lib/<domain>/` (or a flat
+logic from `agent/lib/`. Skills (`agent/skills/*/SKILL.md`) and the core
+`instructions.md` are authored prose, not code; they live where eve discovers
+them and have no `agent/lib/` counterpart. Logic lives in `agent/lib/<domain>/` (or a flat
 module while a domain has only one), in small single-purpose functions, each
 with a colocated `*.test.ts`. A module stays flat until its domain has a
 second file; then the domain gets a directory (`agent/lib/github/` was the

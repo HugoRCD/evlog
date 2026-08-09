@@ -3,10 +3,7 @@ interface FailureEvent {
   readonly message?: string
 }
 
-/**
- * Mirrors the shape of eve's default GitHub failure comment, which Evi loses
- * by overriding the failure handlers to gate autonomous escalation.
- */
+/** Failure reply for interactive GitHub turns: lead, truncated hint, guidance, error code. */
 export function failureComment(lead: string, guidance: string, event: FailureEvent): string {
   const hint = event.message?.trim()
   const lines = [`${lead}${hint ? ` (${truncate(hint)})` : ''}.`, '', guidance]

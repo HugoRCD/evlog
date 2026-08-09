@@ -48,11 +48,19 @@ async function ensureEscalationLabel(token: string): Promise<void> {
   if (existing.status !== 404) {
     throw new Error(`GitHub label lookup failed (${existing.status}): ${await existing.text()}`)
   }
-  await githubRequest(token, 'POST', `/repos/${OWNER}/${REPO}/labels`, {
-    name: ESCALATION_LABEL,
-    color: 'B60205',
-    description: 'Evi failed on this issue and a human needs to take over',
+  const created = await fetch(`${GITHUB_API}/repos/${OWNER}/${REPO}/labels`, {
+    method: 'POST',
+    headers: headers(token),
+    body: JSON.stringify({
+      name: ESCALATION_LABEL,
+      color: 'B60205',
+      description: 'Evi failed on this issue and a human needs to take over',
+    }),
   })
+  // 422 already_exists: another session created it between the lookup and here.
+  if (!created.ok && created.status !== 422) {
+    throw new Error(`GitHub label creation failed (${created.status}): ${await created.text()}`)
+  }
 }
 
 async function githubRequest(token: string, method: string, path: string, body: unknown): Promise<void> {

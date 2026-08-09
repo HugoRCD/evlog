@@ -15,6 +15,11 @@ export function validatePushBranch(branch: string): string | null {
   if (!BRANCH_PATTERN.test(branch) || branch.includes('..') || branch.includes('//')) {
     return `"${branch}" is not a valid branch name.`
   }
+  // `refs/heads/main` and `HEAD` would reach the protected branch under
+  // another name; only plain branch names are accepted.
+  if (branch.startsWith('refs/') || branch === 'HEAD') {
+    return `"${branch}" is not a plain branch name. Pass the branch name without a refs/ prefix.`
+  }
   if (PROTECTED_BRANCHES.has(branch)) {
     return `Direct pushes to ${branch} are not allowed. Push a feature branch and open a pull request.`
   }

@@ -13,6 +13,14 @@ describe('validatePushBranch', () => {
     expect(validatePushBranch('master')).toMatch(/not allowed/)
   })
 
+  it('refuses qualified refs and HEAD that reach a branch under another name', () => {
+    expect(validatePushBranch('refs/heads/main')).toMatch(/not a plain branch name/)
+    expect(validatePushBranch('refs/heads/master')).toMatch(/not a plain branch name/)
+    expect(validatePushBranch('refs/heads/feature')).toMatch(/not a plain branch name/)
+    expect(validatePushBranch('HEAD')).toMatch(/not a plain branch name/)
+    expect(validatePushBranch('feature/main')).toBeNull()
+  })
+
   it('refuses names that could escape the command line or the ref namespace', () => {
     expect(validatePushBranch('fix; rm -rf /')).toMatch(/not a valid branch name/)
     expect(validatePushBranch("fix'`x")).toMatch(/not a valid branch name/)

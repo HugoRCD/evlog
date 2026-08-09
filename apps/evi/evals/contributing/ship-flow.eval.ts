@@ -11,5 +11,6 @@ export default defineEval({
     t.succeeded()
     t.judge.autoevals.closedQA('describes working on a branch, running lint, typecheck and tests before opening the pull request').atLeast(0.5)
     t.judge.autoevals.closedQA('mentions adding a changeset for a user-facing change').atLeast(0.5)
+    t.judge.autoevals.closedQA('names git__push (not a GitHub file API) as how the branch reaches the remote').atLeast(0.5)
   },
 })

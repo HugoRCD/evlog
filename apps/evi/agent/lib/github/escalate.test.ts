@@ -63,6 +63,27 @@ describe('escalateFailedTriage', () => {
     ])
   })
 
+  it('treats a concurrent label creation (422) as success', async () => {
+    const methods: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const path = new URL(String(url)).pathname
+      methods.push(`${init?.method ?? 'GET'} ${path}`)
+      if (init?.method === undefined) return new Response('not found', { status: 404 })
+      if (path.endsWith('/labels') && !path.includes('/issues/')) {
+        return new Response('{"errors":[{"code":"already_exists"}]}', { status: 422 })
+      }
+      return new Response('{}', { status: 200 })
+    }))
+
+    await escalateFailedTriage(9)
+
+    expect(methods.slice(1)).toEqual([
+      'POST /repos/HugoRCD/evlog/labels',
+      'POST /repos/HugoRCD/evlog/issues/9/labels',
+      'POST /repos/HugoRCD/evlog/issues/9/assignees',
+    ])
+  })
+
   it('surfaces a failed GitHub call', async () => {
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       if (init?.method === 'POST') return new Response('nope', { status: 403 })

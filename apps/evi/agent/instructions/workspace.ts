@@ -1,7 +1,9 @@
 import { defineDynamic, defineInstructions } from 'eve/instructions'
 import { channelName } from '../lib/channel'
 
-const RUN_BEFORE_ASSERT = `**Run before you assert.** Any claim about how the code behaves — "this is the bug", "this snippet works", "the test covers it" — is executed in \`/workspace/repo\` with \`bash\` before you state it. A fix you propose has its checks run there first. If you could not run it, present it as unverified.`
+const RUN_BEFORE_ASSERT = `**Run before you assert.** Any claim about how the code behaves — "this is the bug", "this snippet works", "the test covers it" — is executed in \`/workspace/repo\` with \`bash\` before you state it. A fix you propose has its checks run there first. If you could not run it, present it as unverified.
+
+\`/workspace/repo\` starts on the current \`main\`, so that is the revision your run verified. When the claim is about the thread's own revision and it differs from \`main\`, check it out there first (\`git fetch origin <sha> && git checkout --detach <sha>\`, then back to \`main\` when done) or say explicitly that the result was verified on \`main\`.`
 
 const CHECKED_OUT = `## Workspace
 
