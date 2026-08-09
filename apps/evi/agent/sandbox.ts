@@ -20,10 +20,6 @@ export default defineSandbox({
     await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
     // Commits authored in the sandbox belong to the bot, on every channel.
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
-    // The template builds under a different uid than the session user; without
-    // these, every git command in a session dies on "dubious ownership" and the
-    // GitHub channel checkout fails silently.
-    await sandbox.run({ command: 'git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/repo' })
     // Browser tooling is template-scoped: Chromium and the capture CLI are
     // paid once per template build, never per session.
     await installAgentBrowser(sandbox)
@@ -31,6 +27,12 @@ export default defineSandbox({
   },
   async onSession({ use }) {
     const sandbox = await use()
+    // The template snapshot is owned by the builder uid, not the session user;
+    // without these entries every git command, this fetch included, dies on
+    // "dubious ownership" and the GitHub channel checkout fails silently.
+    // Written here rather than in bootstrap so they land in the session
+    // identity's own config whatever HOME it resolves to.
+    await sandbox.run({ command: 'git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/repo' })
     await sandbox.run({ command: 'cd repo && git fetch origin main && git checkout -B main origin/main' })
   },
 })
