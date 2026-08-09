@@ -26,8 +26,13 @@ The frameworks this app runs on move independently: eve and its satellites (@age
 - One draft PR per coherent change: a dependency bump with its adaptation, or a workaround replacement. Never bundle unrelated updates.
 - Branch off `main` in `/workspace/repo`, apply the change, run `pnpm run lint`, `pnpm run typecheck` and `pnpm run test`. Add a changeset when a consumer of evlog would notice the change.
 - Push the branch, open a draft PR per branch. Drafts cannot merge; marking one ready is Hugo's call.
-- Post one summary to the thread: what moved upstream, each PR link with one line on what it does, and anything left for Hugo's judgment.
+
+## 4. Track what needs a human in Linear
+
+A draft PR is its own artifact and needs nothing else. But an upstream finding that could **not** become a safe PR — a deprecation to plan around, a breaking change to schedule, a new capability worth adopting deliberately — becomes a **Linear issue** via `linear__save_issue` on the evlog team: a title stating the situation, the upstream link, what it affects in this repo, and the decision Hugo has to make. One issue per finding; search `linear__list_issues` first so a recurring finding updates the existing issue instead of duplicating it.
+
+Then post one summary to the thread: one line per draft PR and per Linear issue, links inline.
 
 ## When nothing is warranted
 
-One line in the thread: versions current, or nothing in the releases affects this app. Never invent work to fill the run.
+One line in the thread: versions current, or nothing in the releases affects this app. Never invent work to fill the run, and never open a Linear issue to say nothing happened.

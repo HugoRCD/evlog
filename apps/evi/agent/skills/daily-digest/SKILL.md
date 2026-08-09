@@ -5,7 +5,14 @@ description: Build and deliver the daily activity digest, covering GitHub activi
 
 # Daily digest
 
-One message summarizing the last 24 hours, most attention-worthy first. Post it to the thread the request came from. Read-only: gather and report, never modify anything.
+A summary of the last 24 hours, most attention-worthy first. Gathering is read-only; the only write is the Linear document below.
+
+**Delivery: a Linear document, not a chat wall.** Chat renders a multi-section report badly; Linear renders it well and keeps the history browsable. On the scheduled run (and whenever Hugo asks for "the digest"):
+
+1. Write the full digest as a Linear document via `linear__save_document`, on the evlog team, titled `Daily digest — YYYY-MM-DD`, with real markdown headings per section.
+2. Post to the thread only: one or two lines with the single most attention-worthy item, then the document link.
+
+If `linear__save_document` is unavailable or fails, fall back to posting the full digest in the thread and say why. An ad-hoc question in conversation ("what happened this week?") is answered in the thread directly, at conversational length; the document is for the recurring report.
 
 When the request names a different window ("this week", "since Monday"), keep the structure and widen the window; the 24-hour default is for the scheduled morning run.
 
