@@ -1,0 +1,69 @@
+# Choosing where a capability lives in Evi
+
+Evi is a vertical agent: one domain (evlog), one repository, one maintainer. The
+root surface carries everything today, and that is correct at this size. The
+discipline is in *how* each capability is expressed, so the surface stays
+readable as it grows.
+
+Use this order when placing a new capability:
+
+1. If the model only needs an optional procedure for capabilities it already
+   has, write a **skill** (`agent/skills/<id>/SKILL.md`). Cheapest, no code.
+2. If work must start on a cadence, add a **schedule** (`agent/schedules/`)
+   that sends a prompt into the right channel; the prompt's procedure belongs
+   in a skill the agent loads, not in the schedule file.
+3. If the capability is a remote API the model should call directly, prefer a
+   **connection** (`agent/connections/`) with an explicit `tools.allow` list
+   over hand-written fetch tools.
+4. Write an authored **tool** (`agent/tools/`) only when the operation needs
+   Evi-side logic a connection cannot express: credential brokering, gating,
+   response shaping. Gate visibility with `defineDynamic` +
+   `agent/lib/trust.ts` rather than checking inside `execute` alone.
+5. Reach for a **subagent** only at the trigger below. Do not create one to
+   make the tree look cleaner.
+
+## The two-layer rule
+
+Every file under `agent/` outside `agent/lib/` is wiring: it declares a
+channel, tool, schedule, instruction fragment, or connection, and imports its
+logic from `agent/lib/`. Logic lives in `agent/lib/<domain>/` (or a flat
+module while a domain has only one), in small single-purpose functions, each
+with a colocated `*.test.ts`. A module stays flat until its domain has a
+second file; then the domain gets a directory (`agent/lib/github/` was the
+first).
+
+Authority is expressed once, in `agent/lib/trust.ts` (`isMaintainer`,
+`isAutonomous`, `canAccessAdminTools`), and referenced everywhere else. A new
+capability never invents its own caller check.
+
+## Instructions
+
+`agent/instructions.md` holds only what every session needs: identity, voice,
+the retrieval rules, response depth. Anything conditional on the channel or
+the caller posture is a dynamic fragment in `agent/instructions/*.ts`
+(`workspace.ts`, `first-responder.ts`), injected at `turn.started`. When a
+section of the core file starts with "on this channel" or "when unattended",
+it belongs in a fragment.
+
+## When a subagent becomes justified
+
+The trigger is observed, not aesthetic: interactive GitHub or iMessage
+sessions blowing up in input tokens or losing the thread because deep repo
+research (dozens of files read to answer one question) shares their context.
+At that point, add a local `repo-research` subagent: isolated context, the
+sandbox file tools only, optionally a cheaper model, returning a synthesized
+answer. Nothing else about Evi's routing changes.
+
+A second, later trigger is an independent authority boundary: a capability
+whose credentials, failure modes, or release cadence should not move with Evi.
+None exists today.
+
+## Review checklist
+
+Before adding a capability, answer in the PR:
+
+1. Skill, schedule, connection, tool, or subagent — and why not the cheaper
+   one above it?
+2. Which `trust.ts` gate applies, and what does an autonomous turn see?
+3. Where does the logic live in `agent/lib/`, and where is its test?
+4. Which skill or instruction fragment documents it, updated in the same PR?

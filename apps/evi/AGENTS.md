@@ -10,3 +10,8 @@ Before implementing an integration yourself, use
 `eve registry search <query>` or `eve registry list` to discover available
 integrations. Inspect one with `eve registry view <item>`, then install it with
 `eve add <item>`.
+
+Before adding a capability (tool, connection, skill, schedule, subagent), read
+`docs/capability-placement.md`: it decides where the capability lives and holds
+the two-layer rule (files under `agent/` are wiring; logic goes in `agent/lib/`
+with a colocated test).
