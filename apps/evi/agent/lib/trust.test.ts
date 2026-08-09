@@ -15,6 +15,7 @@ async function loadTrust(env: Record<string, string | undefined>) {
   vi.resetModules()
   // Tests model deployed behavior unless a case opts into the local grant.
   vi.stubEnv('VERCEL_ENV', 'production')
+  vi.stubEnv('EVE_RUN_MODE', undefined)
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) vi.stubEnv(key, undefined)
     else vi.stubEnv(key, value)
@@ -53,13 +54,40 @@ describe('isMaintainer', () => {
 })
 
 describe('local dev grant', () => {
-  it('trusts any caller when running locally, but never in eval or deployed runs', async () => {
-    const local = await loadTrust({ VERCEL_ENV: undefined })
-    expect(local.isMaintainer(null)).toBe(true)
-    expect(local.canAccessAdminTools(auth({ principalId: 'anon' }))).toBe(true)
-    const evalRun = await loadTrust({ VERCEL_ENV: undefined, EVE_RUN_MODE: 'eval' })
+  const oidc = (claims: Record<string, unknown>) =>
+    `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`
+
+  it('requires local environment and a decodable team OIDC token together', async () => {
+    const granted = await loadTrust({
+      VERCEL_ENV: undefined,
+      VERCEL_OIDC_TOKEN: oidc({ owner_id: 'team_x' }),
+      VERCEL_TEAM_ID: 'team_x',
+    })
+    expect(granted.isMaintainer(null)).toBe(true)
+    expect(granted.canAccessAdminTools(auth({ principalId: 'anon' }))).toBe(true)
+
+    const noToken = await loadTrust({ VERCEL_ENV: undefined, VERCEL_OIDC_TOKEN: undefined })
+    expect(noToken.isMaintainer(null)).toBe(false)
+
+    const wrongTeam = await loadTrust({
+      VERCEL_ENV: undefined,
+      VERCEL_OIDC_TOKEN: oidc({ owner_id: 'team_other' }),
+      VERCEL_TEAM_ID: 'team_x',
+    })
+    expect(wrongTeam.isMaintainer(null)).toBe(false)
+
+    const garbage = await loadTrust({ VERCEL_ENV: undefined, VERCEL_OIDC_TOKEN: 'not-a-jwt' })
+    expect(garbage.isMaintainer(null)).toBe(false)
+  })
+
+  it('never applies in eval or deployed runs, token or not', async () => {
+    const evalRun = await loadTrust({
+      VERCEL_ENV: undefined,
+      EVE_RUN_MODE: 'eval',
+      VERCEL_OIDC_TOKEN: oidc({ owner_id: 'team_x' }),
+    })
     expect(evalRun.isMaintainer(null)).toBe(false)
-    const deployed = await loadTrust({})
+    const deployed = await loadTrust({ VERCEL_OIDC_TOKEN: oidc({ owner_id: 'team_x' }) })
     expect(deployed.isMaintainer(auth({ principalId: 'anon' }))).toBe(false)
   })
 })

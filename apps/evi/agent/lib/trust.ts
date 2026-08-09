@@ -21,10 +21,37 @@ const MAINTAINER_PRINCIPALS = new Set(
   ].filter((principal): principal is string => Boolean(principal)),
 )
 
+function decodeJwtClaims(token: string): Record<string, unknown> | null {
+  const payload = token.split('.')[1]
+  if (payload === undefined) return null
+  try {
+    return JSON.parse(Buffer.from(payload, 'base64url').toString()) as Record<string, unknown>
+  }
+  catch {
+    return null
+  }
+}
+
+/**
+ * A local `eve dev` session counts as the maintainer only when the process
+ * also holds a Vercel OIDC token for this project's team: the repo is public,
+ * but that token only lands in `.env.local` through `vercel env pull` under
+ * an authorized Vercel login. Claims are decoded, not signature-verified, and
+ * expiry is ignored on purpose: possession is the signal, not freshness.
+ * Deployments and eval runs never resolve to `local`.
+ */
+function isTrustedLocalDev(): boolean {
+  if (environment() !== 'local') return false
+  const token = process.env.VERCEL_OIDC_TOKEN
+  if (!token) return false
+  const claims = decodeJwtClaims(token)
+  if (claims === null) return false
+  const team = process.env.VERCEL_TEAM_ID
+  return team === undefined || claims.owner_id === team
+}
+
 export function isMaintainer(auth: SessionAuthContext | null): boolean {
-  // An `eve dev` session runs on the maintainer's own machine; its REPL
-  // caller is him. Deployments and eval runs never resolve to `local`.
-  if (environment() === 'local') return true
+  if (isTrustedLocalDev()) return true
   return auth !== null && MAINTAINER_PRINCIPALS.has(auth.principalId)
 }
 

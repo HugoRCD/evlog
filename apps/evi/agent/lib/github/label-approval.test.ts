@@ -15,6 +15,7 @@ async function load(env: Record<string, string | undefined> = {}) {
   vi.resetModules()
   // Tests model deployed behavior; the local dev grant would trust every caller.
   vi.stubEnv('VERCEL_ENV', 'production')
+  vi.stubEnv('EVE_RUN_MODE', undefined)
   for (const [key, value] of Object.entries(env)) {
     if (value === undefined) vi.stubEnv(key, '')
     else vi.stubEnv(key, value)
