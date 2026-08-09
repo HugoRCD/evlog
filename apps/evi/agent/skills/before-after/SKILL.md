@@ -20,13 +20,15 @@ The `@vercel/before-and-after` CLI is preinstalled in the sandbox and drives the
 
 ## 2. Capture
 
+**Frame the change, not the page.** The default capture is the viewport at scroll position zero: for anything smaller than a full-page redesign that produces two near-identical frames where the change is a needle in a haystack. Capture the changed element with a CSS selector instead, which scrolls it into view and crops to it:
+
 ```bash
-before-and-after '<before-url>' '<after-url>' --output ./screenshots
+before-and-after '<before-url>' '<after-url>' '.hero' --output ./screenshots
 ```
 
-- Target a component with a CSS selector: `before-and-after '<url1>' '<url2>' '.hero'` (or two selectors when the markup changed: `'.old' '.new'`).
+- Find the right selector first: `browser__snapshot` (or `browser__get` on styles/attributes) on the page, then pick the tightest stable container around the change — a section class or landmark, not a hashed utility class. Two selectors when the markup itself changed: `'.old' '.new'`.
+- A full-viewport capture is for page-level changes only (layout, theme, redesign); `--full` only when explicitly asked for the whole scrollable page.
 - Viewports: `--mobile` (375×812), `--tablet` (768×1024), `--size 1920x1080`. Add mobile when the change affects responsive layout.
-- `--full` only when explicitly asked for the full scrollable page.
 - **Never use `--markdown` or `--upload`**: their default upload target is a public third-party host. Hosting goes through Blob, below.
 
 ## 3. Review, then host

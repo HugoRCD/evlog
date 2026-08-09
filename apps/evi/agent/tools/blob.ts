@@ -5,8 +5,10 @@ import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType
 import { canAccessAdminTools } from '../lib/trust'
 
 function blobTools() {
+  // Dynamic map keys are bare tool names (no file-slug prefix), so the
+  // namespace is spelled out here to match every blob__upload_image reference.
   return {
-    upload_image: defineTool({
+    blob__upload_image: defineTool({
       description: 'Upload an image file from the sandbox to the evlog Vercel Blob store and return its public URL. Use it to share screenshots (before/after comparisons, visual evidence) in pull requests and conversations. png/jpg/webp/gif, 8 MB max. The URL is public: upload only captures of evlog surfaces.',
       inputSchema: z.object({
         path: z.string().min(1).describe('Sandbox path of the image, e.g. /workspace/screenshots/after.png'),
@@ -43,9 +45,14 @@ function blobTools() {
   }
 }
 
-/** The URL is public the instant it exists, so autonomous turns never see this tool. */
+/**
+ * The URL is public the instant it exists, so autonomous turns never see this
+ * tool. Re-resolved every turn so the gate follows the turn's actual caller
+ * and survives a session resumed on a fresh deployment.
+ */
 export default defineDynamic({
   events: {
     'session.started': (_event, ctx) => (canAccessAdminTools(ctx.session.auth.current) ? blobTools() : null),
+    'turn.started': (_event, ctx) => (canAccessAdminTools(ctx.session.auth.current) ? blobTools() : null),
   },
 })

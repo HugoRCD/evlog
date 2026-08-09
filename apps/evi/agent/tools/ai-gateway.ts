@@ -77,15 +77,17 @@ function filterReportByApiKeyName(payload: unknown, apiKeyName: string): {
 }
 
 function aiGatewayTools() {
+  // Dynamic map keys are bare tool names (no file-slug prefix), so the
+  // namespace is spelled out here to match every ai_gateway__* reference.
   return {
-    credits: defineTool({
+    ai_gateway__credits: defineTool({
       description: 'Admin: AI Gateway credit balance and lifetime spend for the entire team account (not Evi-scoped). Prefer ai_gateway__report for Evi digests.',
       inputSchema: z.object({}),
       async execute() {
         return await gatewayFetch('/credits')
       },
     }),
-    report: defineTool({
+    ai_gateway__report: defineTool({
       description: `Admin: Evi-scoped AI Gateway spend/tokens over a date range. Scopes via AI_GATEWAY_REPORT_API_KEY_NAME (preferred for historical) and/or tags (default ${defaultReportTag()}). Never returns unscoped account totals.`,
       inputSchema: z.object({
         startDate: dateSchema.describe('Start date (UTC, inclusive), YYYY-MM-DD'),
@@ -159,7 +161,7 @@ function aiGatewayTools() {
         }
       },
     }),
-    generation: defineTool({
+    ai_gateway__generation: defineTool({
       description: 'Admin: cost, latency, and token usage for a single AI Gateway generation id.',
       inputSchema: z.object({
         id: z.string().min(1).describe('Generation id, e.g. gen_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
@@ -171,9 +173,15 @@ function aiGatewayTools() {
   }
 }
 
+// Re-resolved every turn so the gate follows the turn's actual caller and
+// survives a session resumed on a fresh deployment.
 export default defineDynamic({
   events: {
     'session.started': async (_event, ctx) => {
+      if (!canAccessAdminTools(ctx.session.auth.current)) return null
+      return aiGatewayTools()
+    },
+    'turn.started': async (_event, ctx) => {
       if (!canAccessAdminTools(ctx.session.auth.current)) return null
       return aiGatewayTools()
     },
