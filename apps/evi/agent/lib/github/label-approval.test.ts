@@ -27,7 +27,7 @@ beforeEach(() => {
 })
 
 describe('writePolicy', () => {
-  it('denies autonomous removeLabel-style writes', async () => {
+  it('denies autonomous label writes', async () => {
     const { trust, labels } = await load({ MAINTAINER_GITHUB_ID: '12345' })
     expect(labels.writePolicy(auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL }))).toEqual({
       type: 'denied',
@@ -70,9 +70,24 @@ describe('createLabelPolicy', () => {
       type: 'denied',
       reason: expect.stringContaining('description'),
     })
+    expect(labels.createLabelPolicy(autonomous, {
+      name: 'a'.repeat(51),
+      color: 'ffffff',
+    })).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('name'),
+    })
+    expect(labels.createLabelPolicy(autonomous, {
+      name: 'bug',
+      color: 'ffffff',
+      description: 'd'.repeat(101),
+    })).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('description'),
+    })
   })
 
-  it('rejects free-form injection-looking names', async () => {
+  it('rejects URL label names', async () => {
     const { trust, labels } = await load({})
     expect(labels.createLabelPolicy(
       auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL }),
@@ -81,6 +96,21 @@ describe('createLabelPolicy', () => {
       type: 'denied',
       reason: expect.stringContaining('name'),
     })
+  })
+
+  it('rejects Unicode line separators in descriptions', async () => {
+    const { trust, labels } = await load({})
+    const autonomous = auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL })
+    for (const separator of ['\u2028', '\u2029']) {
+      expect(labels.createLabelPolicy(autonomous, {
+        name: 'bug',
+        color: 'ffffff',
+        description: `one${separator}two`,
+      })).toEqual({
+        type: 'denied',
+        reason: expect.stringContaining('description'),
+      })
+    }
   })
 
   it('falls through to writePolicy for interactive callers', async () => {

@@ -7,6 +7,8 @@ const LABEL_DESCRIPTION_MAX = 100
 /** Taxonomy-shaped names only — rejects whitespace padding, URLs, and free-form injection. */
 const LABEL_NAME = /^[a-zA-Z0-9][a-zA-Z0-9 ._:@-]{0,49}$/
 const LABEL_COLOR = /^[0-9a-fA-F]{6}$/
+/** LF, CR, and Unicode line/paragraph separators. */
+const MULTILINE = /[\n\r\u2028\u2029]/
 
 /**
  * Default write gate: autonomous turns are denied; maintainers skip the card;
@@ -39,7 +41,7 @@ export function autonomousCreateLabelDenial(toolInput: unknown): string | null {
     || name !== name.trim()
     || name.length > LABEL_NAME_MAX
     || !LABEL_NAME.test(name)
-    || /[\n\r]/.test(name)
+    || MULTILINE.test(name)
   ) {
     return 'Autonomous createLabel requires a short taxonomy-shaped name with no surrounding whitespace.'
   }
@@ -51,7 +53,7 @@ export function autonomousCreateLabelDenial(toolInput: unknown): string | null {
     || (description !== undefined && (
       description !== description.trim()
       || description.length > LABEL_DESCRIPTION_MAX
-      || /[\n\r]/.test(description)
+      || MULTILINE.test(description)
     ))
   ) {
     return 'Autonomous createLabel description must be a short single line with no surrounding whitespace.'
