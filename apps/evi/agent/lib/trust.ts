@@ -45,8 +45,13 @@ export function canAccessAdminTools(auth: SessionAuthContext | null): boolean {
   return isMaintainer(auth) || isScheduleAppAuth(auth)
 }
 
-/** The app principal eve stamps on schedule-dispatched turns (eve `channel/schedule-auth`). */
-function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
+/**
+ * The app principal eve stamps on schedule-dispatched turns (eve
+ * `channel/schedule-auth`). Schedule turns may push feature branches so the
+ * upstream-sync run can deliver its PRs; they are never a user identity and
+ * can never touch main.
+ */
+export function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
   return auth !== null
     && auth.authenticator === 'app'
     && auth.principalId === 'eve:app'

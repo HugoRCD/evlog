@@ -59,6 +59,22 @@ describe('isAutonomous', () => {
   })
 })
 
+describe('isScheduleAppAuth', () => {
+  it('matches only the app principal stamped on schedule turns', async () => {
+    const trust = await loadTrust({})
+    expect(
+      trust.isScheduleAppAuth(
+        auth({ authenticator: 'app', principalId: 'eve:app', principalType: 'runtime' }),
+      ),
+    ).toBe(true)
+    expect(
+      trust.isScheduleAppAuth(auth({ principalId: 'eve:app', principalType: 'runtime' })),
+    ).toBe(false)
+    expect(trust.isScheduleAppAuth(auth({ principalId: 'github:12345' }))).toBe(false)
+    expect(trust.isScheduleAppAuth(null)).toBe(false)
+  })
+})
+
 describe('canAccessAdminTools', () => {
   it('allows the maintainer and schedule app principals, nobody else', async () => {
     const trust = await loadTrust({ MAINTAINER_GITHUB_ID: '12345' })

@@ -2,7 +2,7 @@ import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { githubCredentials } from '../lib/github/credentials'
 import { mintInstallationToken, pushBrokerPolicy, validatePushBranch } from '../lib/github/push'
-import { isMaintainer } from '../lib/trust'
+import { isMaintainer, isScheduleAppAuth } from '../lib/trust'
 
 /** The template clone with dependencies installed; sessions branch, verify, and push from here. */
 const REPO_DIR = '/workspace/repo'
@@ -24,8 +24,8 @@ function gitTools() {
         branch: z.string().min(1).describe('Branch name in /workspace/repo to push, e.g. fix/pipeline-flush'),
       }),
       async execute(input, ctx) {
-        if (!isMaintainer(ctx.session.auth.current)) {
-          return { success: false as const, error: 'Only maintainer sessions may push.' }
+        if (!isMaintainer(ctx.session.auth.current) && !isScheduleAppAuth(ctx.session.auth.current)) {
+          return { success: false as const, error: 'Only maintainer and schedule-app sessions may push.' }
         }
         const refusal = validatePushBranch(input.branch)
         if (refusal) return { success: false as const, error: refusal }
@@ -60,14 +60,19 @@ function gitTools() {
 }
 
 /**
- * Visible only when the current caller is the maintainer; community and
- * autonomous turns never see a push surface. Re-resolved every turn so the
- * gate follows the turn's actual caller and survives a session resumed on a
- * fresh deployment, where session.started never fires again.
+ * Visible to maintainer sessions and to schedule-app turns (the upstream-sync
+ * run pushes its feature branches); community and autonomous turns never see a
+ * push surface. The push itself is inert: it only ever creates a feature
+ * branch, and the PR that references it carries the approval card. Re-resolved
+ * every turn so the gate follows the turn's actual caller and survives a
+ * session resumed on a fresh deployment, where session.started never fires
+ * again.
  */
 export default defineDynamic({
   events: {
-    'session.started': (_event, ctx) => (isMaintainer(ctx.session.auth.current) ? gitTools() : null),
-    'turn.started': (_event, ctx) => (isMaintainer(ctx.session.auth.current) ? gitTools() : null),
+    'session.started': (_event, ctx) =>
+      (isMaintainer(ctx.session.auth.current) || isScheduleAppAuth(ctx.session.auth.current) ? gitTools() : null),
+    'turn.started': (_event, ctx) =>
+      (isMaintainer(ctx.session.auth.current) || isScheduleAppAuth(ctx.session.auth.current) ? gitTools() : null),
   },
 })
