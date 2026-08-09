@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { defineChannel, POST } from 'eve/channels'
+import { defineChannel, GET, POST } from 'eve/channels'
 import { finalMessageFromStream, handleMcpRequest, mcpSessionAuth, verifyMcpBearer } from '../lib/mcp'
 
 /**
@@ -32,12 +32,15 @@ function parseError(): Response {
 
 export default defineChannel({
   cors: {
-    methods: ['POST'],
+    methods: ['GET', 'POST'],
     allowHeaders: ['authorization', 'content-type', 'mcp-protocol-version', 'mcp-session-id'],
   },
   routes: [
     // Absolute path: custom-channel routes are not auto-prefixed, and only
     // /eve/v1/* is the eve surface in production.
+    // Streamable HTTP: no server-initiated streams are offered, so GET is a
+    // spec-compliant 405 instead of an SSE channel.
+    GET('/eve/v1/mcp', async () => new Response(null, { status: 405, headers: { allow: 'POST' } })),
     POST('/eve/v1/mcp', async (req, { send }) => {
       if (!verifyMcpBearer(req.headers.get('authorization'), process.env.EVI_MCP_TOKEN?.trim())) {
         return unauthorized()

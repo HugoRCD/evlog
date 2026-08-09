@@ -1,7 +1,7 @@
 import { createHash, timingSafeEqual } from 'node:crypto'
 import type { SessionAuthContext } from 'eve/context'
 
-const PROTOCOL_VERSION = '2024-11-05'
+const PROTOCOL_VERSION = '2025-03-26'
 const SERVER_INFO = { name: 'evi', version: '1.0.0' } as const
 
 /** The principal MCP bearer sessions run under; trusted as the maintainer when the token is configured. */
@@ -94,8 +94,7 @@ function err(id: number | string | null, code: number, message: string): McpRpcR
 
 /**
  * Handles one parsed MCP JSON-RPC request. Protocol problems map to JSON-RPC
- * errors; a thrown `callEvi` becomes an `isError` tool result. Ported from
- * V's proven MCP proxy shape.
+ * errors; a thrown `callEvi` becomes an `isError` tool result.
  */
 export async function handleMcpRequest(body: unknown, callEvi: CallEvi): Promise<McpRpcResult> {
   if (typeof body !== 'object' || body === null || typeof (body as { method?: unknown }).method !== 'string') {
