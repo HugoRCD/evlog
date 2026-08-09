@@ -1,0 +1,97 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import type { SessionAuthContext } from 'eve/context'
+
+function auth(overrides: Partial<SessionAuthContext>): SessionAuthContext {
+  return {
+    attributes: {},
+    authenticator: 'test',
+    principalId: 'test:none',
+    principalType: 'user',
+    ...overrides,
+  }
+}
+
+async function load(env: Record<string, string | undefined> = {}) {
+  vi.resetModules()
+  for (const [key, value] of Object.entries(env)) {
+    if (value === undefined) vi.stubEnv(key, '')
+    else vi.stubEnv(key, value)
+  }
+  const trust = await import('../trust')
+  const labels = await import('./label-approval')
+  return { trust, labels }
+}
+
+beforeEach(() => {
+  vi.unstubAllEnvs()
+})
+
+describe('writePolicy', () => {
+  it('denies autonomous removeLabel-style writes', async () => {
+    const { trust, labels } = await load({ MAINTAINER_GITHUB_ID: '12345' })
+    expect(labels.writePolicy(auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL }))).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('Autonomous turns'),
+    })
+  })
+
+  it('skips approval for the maintainer and asks everyone else', async () => {
+    const { labels } = await load({ MAINTAINER_GITHUB_ID: '12345' })
+    expect(labels.writePolicy(auth({ principalId: 'github:12345' }))).toBe('not-applicable')
+    expect(labels.writePolicy(auth({ principalId: 'github:99999' }))).toBe('user-approval')
+  })
+})
+
+describe('createLabelPolicy', () => {
+  it('allows a taxonomy-shaped autonomous create', async () => {
+    const { trust, labels } = await load({})
+    expect(labels.createLabelPolicy(
+      auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL }),
+      { name: 'good first issue', color: '7057ff', description: 'Good for newcomers' },
+    )).toBe('not-applicable')
+  })
+
+  it('rejects padded or overlong payloads the tool would still receive', async () => {
+    const { trust, labels } = await load({})
+    const autonomous = auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL })
+    expect(labels.createLabelPolicy(autonomous, { name: 'bug ', color: 'ffffff' })).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('name'),
+    })
+    expect(labels.createLabelPolicy(autonomous, { name: 'bug', color: ' ffffff' })).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('color'),
+    })
+    expect(labels.createLabelPolicy(autonomous, {
+      name: 'bug',
+      color: 'ffffff',
+      description: ' padded',
+    })).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('description'),
+    })
+  })
+
+  it('rejects free-form injection-looking names', async () => {
+    const { trust, labels } = await load({})
+    expect(labels.createLabelPolicy(
+      auth({ principalId: trust.AUTONOMOUS_GITHUB_PRINCIPAL }),
+      { name: 'http://evil.example', color: 'ffffff' },
+    )).toEqual({
+      type: 'denied',
+      reason: expect.stringContaining('name'),
+    })
+  })
+
+  it('falls through to writePolicy for interactive callers', async () => {
+    const { labels } = await load({ MAINTAINER_GITHUB_ID: '12345' })
+    expect(labels.createLabelPolicy(
+      auth({ principalId: 'github:12345' }),
+      { name: 'anything', color: 'not-hex' },
+    )).toBe('not-applicable')
+    expect(labels.createLabelPolicy(
+      auth({ principalId: 'github:99999' }),
+      { name: 'anything', color: 'not-hex' },
+    )).toBe('user-approval')
+  })
+})

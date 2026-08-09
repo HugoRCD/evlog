@@ -1,7 +1,8 @@
 import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
 import { GITHUB_CONNECTOR } from '../lib/github/credentials'
-import { isAutonomous, isMaintainer, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
+import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
+import { isAutonomous, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -66,10 +67,6 @@ const TOOLS = [
   'getCiFailureContext',
 ] as const
 
-function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
-  return isMaintainer(ctx.session.auth.current) ? 'not-applicable' : 'user-approval'
-}
-
 /**
  * Autonomous first-responder turns may create/apply labels, open a doc-gap issue,
  * or assign the maintainer, and nothing else. Everything else is denied
@@ -77,10 +74,7 @@ function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
  * forever, and its reply is posted by the channel.
  */
 function policy(ctx: ApprovalContext): ApprovalStatus {
-  if (isAutonomous(ctx.session.auth.current)) {
-    return { type: 'denied', reason: 'Autonomous turns may only create or apply labels, open a doc-gap issue, or assign the maintainer.' }
-  }
-  return maintainerWrite(ctx)
+  return writePolicy(ctx.session.auth.current)
 }
 
 /** The writes an autonomous turn may reach: reversible and low blast radius. */
@@ -100,43 +94,13 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
   return policy(ctx)
 }
 
-const LABEL_NAME_MAX = 50
-const LABEL_DESCRIPTION_MAX = 100
-const LABEL_COLOR = /^[0-9a-fA-F]{6}$/
-
-/**
- * Autonomous createLabel may grow the triage taxonomy, but only with a short
- * single-line name, a 6-digit hex color, and an optional short description —
- * not a free-form dump into the repo label set.
- */
-function createLabelPolicy(ctx: ApprovalContext): ApprovalStatus {
-  if (!isAutonomous(ctx.session.auth.current)) return policy(ctx)
-
-  const input = ctx.toolInput as { name?: unknown, color?: unknown, description?: unknown } | undefined
-  const name = typeof input?.name === 'string' ? input.name.trim() : ''
-  const color = typeof input?.color === 'string' ? input.color.trim() : ''
-  const description = input?.description === undefined || input?.description === null
-    ? undefined
-    : typeof input.description === 'string' ? input.description.trim() : null
-
-  if (!name || name.length > LABEL_NAME_MAX || /[\n\r]/.test(name)) {
-    return { type: 'denied', reason: 'Autonomous createLabel requires a short single-line name.' }
-  }
-  if (!LABEL_COLOR.test(color)) {
-    return { type: 'denied', reason: 'Autonomous createLabel requires a 6-digit hex color.' }
-  }
-  if (description === null || (description !== undefined && (description.length > LABEL_DESCRIPTION_MAX || /[\n\r]/.test(description)))) {
-    return { type: 'denied', reason: 'Autonomous createLabel description must be a short single line.' }
-  }
-  return 'not-applicable'
-}
-
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
   // deletePullRequestComment, createPullRequestReview, requestReviewers, deleteLabel.
+  // Connect scopes are derived from `include` (createLabel → issues:write) in sdk ≥ 1.11.1.
   requireApproval: {
     createPullRequest: policy,
     updatePullRequest: policy,
@@ -153,7 +117,7 @@ export default githubExtension({
     addCommentReaction: policy,
     addLabels: autonomousWrite,
     removeLabel: policy,
-    createLabel: createLabelPolicy,
+    createLabel: (ctx) => createLabelPolicy(ctx.session.auth.current, ctx.toolInput),
     updateLabel: policy,
   },
 })
