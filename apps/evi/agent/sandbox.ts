@@ -1,3 +1,4 @@
+import { agentBrowserRevalidationKey, installAgentBrowser } from '@agent-browser/eve/sandbox'
 import { defaultBackend, defineSandbox } from 'eve/sandbox'
 
 /**
@@ -9,13 +10,17 @@ import { defaultBackend, defineSandbox } from 'eve/sandbox'
  */
 export default defineSandbox({
   backend: defaultBackend({ vercel: { resources: { vcpus: 4 } } }),
-  revalidationKey: () => 'evlog-workspace-v2',
+  revalidationKey: () => `evlog-workspace-v3:${agentBrowserRevalidationKey()}`,
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
     await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
     // Commits authored in the sandbox belong to the bot, on every channel.
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
+    // Browser tooling is template-scoped: Chromium and the capture CLI are
+    // paid once per template build, never per session.
+    await installAgentBrowser(sandbox)
+    await sandbox.run({ command: 'npm install -g @vercel/before-and-after' })
   },
   async onSession({ use }) {
     const sandbox = await use()
