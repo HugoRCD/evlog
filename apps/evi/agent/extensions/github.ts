@@ -102,7 +102,6 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
 
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
-  // Connect scopes are derived from `include` by @github-tools/eve-extension@0.3.1+.
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,

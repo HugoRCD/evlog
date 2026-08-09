@@ -16,7 +16,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@github-tools/eve-extension": "^0.3.1",
+    "@github-tools/eve-extension": "^0.3.2",
     "@vercel/connect": "^0.6.1",
     "ai": "^7.0.38",
     "eve": "^0.30.6",

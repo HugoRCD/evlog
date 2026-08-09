@@ -117,8 +117,8 @@ importers:
   apps/evi:
     dependencies:
       '@github-tools/eve-extension':
-        specifier: ^0.3.1
-        version: 0.3.1(b3ea8ee8156bf7b627e407f2b1440c53)
+        specifier: ^0.3.2
+        version: 0.3.2(b3ea8ee8156bf7b627e407f2b1440c53)
       '@vercel/connect':
         specifier: ^0.6.1
         version: 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
@@ -2773,8 +2773,8 @@ packages:
   '@floating-ui/vue@1.1.11':
     resolution: {integrity: sha512-HzHKCNVxnGS35r9fCHBc3+uCnjw9IWIlCPL683cGgM9Kgj2BiAl8x1mS7vtvP6F9S/e/q4O6MApwSHj8hNLGfw==}
 
-  '@github-tools/eve-extension@0.3.1':
-    resolution: {integrity: sha512-1UnDN75f5Bp16JxCxZnczqyKWqtblGpzNmH7tqAfHgaJaOdzPOCeO7QpEWP3r7eeLHECOZl+2aBCwQ0j6z7fKw==}
+  '@github-tools/eve-extension@0.3.2':
+    resolution: {integrity: sha512-CijPv26ey9Klr1PU1gAkTnBm8LRaGN3KCq5tu31JZKXxw+kpdr0B1GBmLbcC73BeLxIhCqydQ5pbGTuzEs8L+Q==}
     engines: {node: 24.x}
     peerDependencies:
       '@vercel/connect': '>=0.3.2'
@@ -2783,8 +2783,8 @@ packages:
       '@vercel/connect':
         optional: true
 
-  '@github-tools/sdk@1.11.0':
-    resolution: {integrity: sha512-NxssCrCqRlk4jDFqYMvda/hnlmvQw3N/t/KeEcguSQGdrWnjyD2+YpWKBx2oruR5+S1OR45WHU7ZFIQCNl4AXQ==}
+  '@github-tools/sdk@1.11.1':
+    resolution: {integrity: sha512-SGENlT0i4JTvAnuHMLbNWiCV5yXyrx01duuR2x0bv10qF9RR2xmVbPeGpN56VTE+L/bd0SP731exyTB7bF3FNA==}
     peerDependencies:
       '@ai-sdk/workflow': ^1.0.16
       '@vercel/connect': '>=0.3.2'
@@ -19577,9 +19577,9 @@ snapshots:
       - '@vue/composition-api'
       - vue
 
-  '@github-tools/eve-extension@0.3.1(b3ea8ee8156bf7b627e407f2b1440c53)':
+  '@github-tools/eve-extension@0.3.2(b3ea8ee8156bf7b627e407f2b1440c53)':
     dependencies:
-      '@github-tools/sdk': 1.11.0(18170ff63bf7361b7954dd7c9e1192bc)
+      '@github-tools/sdk': 1.11.1(18170ff63bf7361b7954dd7c9e1192bc)
       eve: 0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
       zod: 4.4.3
     optionalDependencies:
@@ -19590,7 +19590,7 @@ snapshots:
       - ai
       - workflow
 
-  '@github-tools/sdk@1.11.0(18170ff63bf7361b7954dd7c9e1192bc)':
+  '@github-tools/sdk@1.11.1(18170ff63bf7361b7954dd7c9e1192bc)':
     dependencies:
       ai: 7.0.51(zod@4.4.3)
       octokit: 5.0.5

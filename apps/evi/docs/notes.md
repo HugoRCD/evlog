@@ -64,10 +64,6 @@ decimals, which is how the overspend was found.
 
 ## github-tools
 
-**Connect scopes follow `include` / `exclude`** as of
-`@github-tools/eve-extension@0.3.1` / `@github-tools/sdk@1.11.0`. No need to pin
-`connect.scopes` for a static tool list.
-
 **The `maintainer` preset ships gist tools that always 403 over Connect** — the
 Gists API rejects installation tokens — plus repo creation and merge.
 
