@@ -12,7 +12,8 @@
     "dev": "eve dev",
     "eval": "EVE_RUN_MODE=eval eve eval",
     "start": "eve start",
-    "typecheck": "tsc"
+    "typecheck": "tsc",
+    "test": "vitest run"
   },
   "dependencies": {
     "@github-tools/eve-extension": "^0.3.0",
@@ -25,6 +26,7 @@
   "devDependencies": {
     "@types/node": "24.x",
     "microsandbox": "^0.6.8",
-    "typescript": "7.0.2"
+    "typescript": "7.0.2",
+    "vitest": "^4.1.10"
   }
 }

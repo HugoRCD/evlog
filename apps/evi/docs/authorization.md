@@ -114,9 +114,10 @@ this list keeps its approval too, for the reason below:
 `requestReviewers`, `addDiscussionComment`.
 
 Everything else keeps a real approval even for admin: `createIssue`, `closeIssue`,
-`deleteIssueComment`, `deletePullRequestComment`, `createBranch`,
-`createOrUpdateFile`, `createPullRequest`, `updatePullRequest`,
-`createPullRequestReview`.
+`deleteIssueComment`, `deletePullRequestComment`, `createPullRequest`,
+`updatePullRequest`, `createPullRequestReview`. Code itself never moves through
+the API: it ships from the sandbox via `git__push`, which is only mounted on
+maintainer sessions.
 
 Release writes are not on the list at all: `AGENTS.md` forbids an agent from
 creating one, so the tool set stops at reading them.
