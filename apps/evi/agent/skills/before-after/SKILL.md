@@ -31,4 +31,9 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 
 - Omit `selector` only for page-level changes (layout, theme, redesign).
 - For responsive changes, call it again with `viewport: 'mobile'`.
+- Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.
+
+## 4. Precise checks, when they earn their keep
+
+The `before-and-after` CLI is installed in the sandbox as a diff engine for the frames the tool already saved under `/workspace/screenshots/`: `before-and-after '<before.png>' '<after.png>' --output ./screenshots` compares two existing images (pixel-level and DOM-independent). Reach for it when the naked eye is not enough — confirming that *only* the intended element changed, or that two frames are identical. Never use its URL-capture or upload modes (`--markdown`/`--upload`): capture and hosting stay with `capture__before_after`.

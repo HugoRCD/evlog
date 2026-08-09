@@ -4,7 +4,7 @@ import { defineDynamic, defineTool } from 'eve/tools'
 import type { SandboxSession } from 'eve/sandbox'
 import { z } from 'zod'
 import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from '../lib/blob'
-import { CAPTURE_SETTLE_MS, CAPTURE_VIEWPORTS, captureMarkdown, validateCaptureUrl, type CaptureViewport } from '../lib/capture'
+import { CAPTURE_SETTLE_MS, CAPTURE_VIEWPORTS, captureMarkdown, sensitiveCaptureReason, validateCaptureUrl, type CaptureViewport } from '../lib/capture'
 import { canAccessAdminTools } from '../lib/trust'
 
 const SCREENSHOT_DIR = '/workspace/screenshots'
@@ -56,6 +56,23 @@ function captureTools() {
         viewport: z.enum(['desktop', 'mobile', 'tablet']).optional().describe('Defaults to desktop (1280×800)'),
         caption: z.string().trim().min(1).max(200).describe('One line naming the surface and viewport, e.g. "Landing hero, desktop viewport."'),
       }),
+      // Skill-level "review sensitive surfaces first" is not an enforceable
+      // control; a capture of a surface that can show real user data parks on
+      // an approval card before anything publishes.
+      approval(ctx) {
+        for (const raw of [ctx.toolInput?.beforeUrl, ctx.toolInput?.afterUrl]) {
+          if (typeof raw !== 'string') continue
+          let reason: string | null
+          try {
+            reason = sensitiveCaptureReason(raw)
+          }
+          catch {
+            continue // invalid URL: execute() refuses it with a clear error
+          }
+          if (reason) return 'user-approval'
+        }
+        return 'not-applicable'
+      },
       async execute(input, ctx) {
         if (!canAccessAdminTools(ctx.session.auth.current)) {
           return { success: false as const, error: 'Captures are not available in this session.' }

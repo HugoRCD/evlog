@@ -43,6 +43,42 @@ export function validateCaptureUrl(raw: string): string | null {
   return allowed ? null : `"${host}" is outside the allowed capture origins.`
 }
 
+/**
+ * Surfaces that can show real user data: captures of these publish only after
+ * an explicit approval, whatever the skill says. evlog.cloud is the hosted
+ * product and any telemetry host shows live dashboards.
+ */
+export function sensitiveCaptureReason(raw: string): string | null {
+  const host = new URL(raw).hostname.toLowerCase()
+  if (host === 'evlog.cloud' || host.endsWith('.evlog.cloud')) {
+    return `${host} is the hosted product and can show real user data.`
+  }
+  if (host.includes('telemetry')) {
+    return `${host} serves telemetry dashboards and can show real user data.`
+  }
+  return null
+}
+
+/**
+ * One-line text safe inside the Markdown table and the <sub> receipt: line
+ * breaks collapse, and the characters that could open HTML or break the
+ * table are escaped.
+ */
+export function escapeInline(text: string): string {
+  return text
+    .replace(/\s+/g, ' ')
+    .trim()
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('|', '\\|')
+}
+
+/** Normalized URL for Markdown embedding; parentheses would end the link early. */
+export function markdownUrl(raw: string): string {
+  return new URL(raw).toString().replaceAll('(', '%28').replaceAll(')', '%29')
+}
+
 interface AttestationInput {
   readonly afterUrl: string
   readonly beforeUrl: string
@@ -53,8 +89,8 @@ interface AttestationInput {
 
 /** Human-readable receipt embedded under the comparison table. */
 export function captureAttestation(input: AttestationInput): string {
-  const frame = input.selector ?? 'full viewport'
-  return `captured by agent-browser · ${input.beforeUrl} → ${input.afterUrl} · ${input.viewport} · ${frame} · ${input.capturedAt}`
+  const frame = input.selector === null ? 'full viewport' : escapeInline(input.selector)
+  return `captured by agent-browser · ${markdownUrl(input.beforeUrl)} → ${markdownUrl(input.afterUrl)} · ${input.viewport} · ${frame} · ${input.capturedAt}`
 }
 
 /** The finished markdown block: table, caption, attestation receipt. */
@@ -66,9 +102,9 @@ export function captureMarkdown(input: AttestationInput & {
   return [
     '| Before | After |',
     '| --- | --- |',
-    `| ![before](${input.beforeImageUrl}) | ![after](${input.afterImageUrl}) |`,
+    `| ![before](${markdownUrl(input.beforeImageUrl)}) | ![after](${markdownUrl(input.afterImageUrl)}) |`,
     '',
-    `${input.caption}`,
+    escapeInline(input.caption),
     '',
     `<sub>${captureAttestation(input)}</sub>`,
   ].join('\n')
