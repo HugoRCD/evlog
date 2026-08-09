@@ -13,7 +13,7 @@ const BEFORE_AFTER_CLI = '@vercel/before-and-after@0.0.4'
  */
 export default defineSandbox({
   backend: defaultBackend({ vercel: { resources: { vcpus: 4 } } }),
-  revalidationKey: () => `evlog-workspace-v3:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
+  revalidationKey: () => `evlog-workspace-v4:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
@@ -27,6 +27,12 @@ export default defineSandbox({
   },
   async onSession({ use }) {
     const sandbox = await use()
+    // The template snapshot is owned by the builder uid, not the session user;
+    // without these entries every git command, this fetch included, dies on
+    // "dubious ownership" and the GitHub channel checkout fails silently.
+    // Written here rather than in bootstrap so they land in the session
+    // identity's own config whatever HOME it resolves to.
+    await sandbox.run({ command: 'git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/repo' })
     await sandbox.run({ command: 'cd repo && git fetch origin main && git checkout -B main origin/main' })
   },
 })
