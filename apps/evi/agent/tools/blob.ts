@@ -1,7 +1,7 @@
 import { put } from '@vercel/blob'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
-import { imageContentType, MAX_IMAGE_BYTES, screenshotKey } from '../lib/blob'
+import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from '../lib/blob'
 import { canAccessAdminTools } from '../lib/trust'
 
 function blobTools() {
@@ -26,6 +26,11 @@ function blobTools() {
         }
         if (bytes.byteLength > MAX_IMAGE_BYTES) {
           return { success: false as const, error: `Image is ${bytes.byteLength} bytes; the limit is ${MAX_IMAGE_BYTES}.` }
+        }
+        // The upload is public: the bytes must actually be the image the
+        // extension claims, not arbitrary data renamed to .png.
+        if (sniffImageContentType(bytes) !== contentType) {
+          return { success: false as const, error: `The content of "${input.path}" does not match its extension; only real image files are uploaded.` }
         }
         const blob = await put(screenshotKey(input.path), Buffer.from(bytes), {
           access: 'public',

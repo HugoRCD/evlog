@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { imageContentType, MAX_IMAGE_BYTES, screenshotKey } from './blob'
+import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from './blob'
 
 describe('imageContentType', () => {
   it('maps image extensions case-insensitively', () => {
@@ -19,6 +19,26 @@ describe('screenshotKey', () => {
   it('keys by basename under the screenshots prefix', () => {
     expect(screenshotKey('/workspace/screenshots/after.png')).toBe('evi/screenshots/after.png')
     expect(screenshotKey('after.png')).toBe('evi/screenshots/after.png')
+  })
+})
+
+describe('sniffImageContentType', () => {
+  it('recognizes each supported format by its magic bytes', () => {
+    expect(sniffImageContentType(new Uint8Array([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A, 0x00]))).toBe('image/png')
+    expect(sniffImageContentType(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0]))).toBe('image/jpeg')
+    expect(sniffImageContentType(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61]))).toBe('image/gif')
+    expect(sniffImageContentType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0x00, 0x00, 0x00, 0x00, 0x57, 0x45, 0x42, 0x50]))).toBe('image/webp')
+  })
+
+  it('rejects non-image bytes regardless of the claimed extension', () => {
+    const text = new TextEncoder().encode('SECRET=hunter2\n')
+    for (const name of ['leak.png', 'leak.jpg', 'leak.jpeg', 'leak.gif', 'leak.webp']) {
+      expect(imageContentType(name)).not.toBeNull()
+      expect(sniffImageContentType(text)).toBeNull()
+    }
+    expect(sniffImageContentType(new Uint8Array([]))).toBeNull()
+    // RIFF container that is not WEBP (e.g. WAV) stays rejected.
+    expect(sniffImageContentType(new Uint8Array([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x41, 0x56, 0x45]))).toBeNull()
   })
 })
 

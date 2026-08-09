@@ -1,6 +1,9 @@
 import { agentBrowserRevalidationKey, installAgentBrowser } from '@agent-browser/eve/sandbox'
 import { defaultBackend, defineSandbox } from 'eve/sandbox'
 
+/** Pinned so template reuse invalidates when the capture CLI moves. */
+const BEFORE_AFTER_CLI = '@vercel/before-and-after@0.0.4'
+
 /**
  * The sandbox template carries a ready-to-work evlog checkout so sessions can
  * run lint, typecheck, and tests instead of shipping unverified changes.
@@ -10,7 +13,7 @@ import { defaultBackend, defineSandbox } from 'eve/sandbox'
  */
 export default defineSandbox({
   backend: defaultBackend({ vercel: { resources: { vcpus: 4 } } }),
-  revalidationKey: () => `evlog-workspace-v3:${agentBrowserRevalidationKey()}`,
+  revalidationKey: () => `evlog-workspace-v3:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
@@ -20,7 +23,7 @@ export default defineSandbox({
     // Browser tooling is template-scoped: Chromium and the capture CLI are
     // paid once per template build, never per session.
     await installAgentBrowser(sandbox)
-    await sandbox.run({ command: 'npm install -g @vercel/before-and-after' })
+    await sandbox.run({ command: `npm install -g ${BEFORE_AFTER_CLI}` })
   },
   async onSession({ use }) {
     const sandbox = await use()
