@@ -1,5 +1,12 @@
 # @evlog/cli
 
+## 0.5.1
+
+### Patch Changes
+
+- Updated dependencies [[`16d5323`](https://github.com/HugoRCD/evlog/commit/16d5323efb132fead23643bc002d2411d1f48124), [`f8fb677`](https://github.com/HugoRCD/evlog/commit/f8fb677d5a267d2a25bca52bff2453b5f0c1bdf2), [`1838d60`](https://github.com/HugoRCD/evlog/commit/1838d609ed41f973a48ebf62dc0557a16117221d), [`8ffba92`](https://github.com/HugoRCD/evlog/commit/8ffba925f5fedb94cce782aa173011cde0245ace), [`68b05fa`](https://github.com/HugoRCD/evlog/commit/68b05fa1456ee3b7d6cfe9e34abe3175c74cb5d0), [`2dfde11`](https://github.com/HugoRCD/evlog/commit/2dfde11d5c79a2b119a5c64110dc25d0e2f43656)]:
+  - evlog@2.25.0
+
 ## 0.5.0
 
 ### Minor Changes
