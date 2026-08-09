@@ -18,16 +18,17 @@ export function calledAnyTool(t: EveEvalContext, label: string, names: readonly 
   )
 }
 
-/** Every GitHub tool that writes. A read-only turn must call none of them. */
+/** Every tool that writes to the repository. A read-only turn must call none of them. */
 export const GITHUB_WRITE_TOOLS = [
-  'github__createOrUpdateFile',
-  'github__createBranch',
+  'git__push',
   'github__createIssue',
   'github__updateIssue',
   'github__closeIssue',
   'github__addIssueComment',
   'github__updateIssueComment',
   'github__deleteIssueComment',
+  'github__createLabel',
+  'github__updateLabel',
   'github__addLabels',
   'github__removeLabel',
   'github__addAssignees',

@@ -49,6 +49,17 @@ pnpm --filter evlog exec vitest run test/path/to/file
 
 If you could not run the checks, say so plainly in the pull request body instead of implying a green build.
 
+## Shipping a change
+
+The whole flow runs in `/workspace/repo`; nothing ships through the GitHub file API.
+
+1. Branch off the current `main` the session starts on: `git checkout -b <branch>`.
+2. Edit, then run the checks above. A bug fix commits its failing regression test first, then the fix.
+3. When a consumer of evlog would notice the change, add a changeset: write `.changeset/<some-name>.md` by hand with the `---` frontmatter naming the package and bump plus a consumer-facing description (`pnpm changeset` is interactive and cannot run here). Look at an existing file in `.changeset/` for the exact shape.
+4. Commit with a Conventional Commits subject: lowercase, a registered scope or none.
+5. Push with `git__push`. It refuses `main` and `master`, and only maintainer sessions have it.
+6. Open the pull request with `github__createPullRequest`, report each check result in the body, and request `hugorcd` via `github__requestReviewers` unless it is a draft.
+
 `pnpm --filter @evlog/cli exec evlog map --json --no-write` scores an entry point's observability and is built for exactly this: it is the fastest way to ground a "should this be logged" answer in the tree you are working in. Run the workspace copy rather than `npx @evlog/cli`, which would fetch and execute whatever version the registry currently serves.
 
 ## Tests

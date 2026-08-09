@@ -114,9 +114,10 @@ this list keeps its approval too, for the reason below:
 `requestReviewers`, `addDiscussionComment`.
 
 Everything else keeps a real approval even for admin: `createIssue`, `closeIssue`,
-`deleteIssueComment`, `deletePullRequestComment`, `createBranch`,
-`createOrUpdateFile`, `createPullRequest`, `updatePullRequest`,
-`createPullRequestReview`.
+`deleteIssueComment`, `deletePullRequestComment`, `createPullRequest`,
+`updatePullRequest`, `createPullRequestReview`. Code itself never moves through
+the API: it ships from the sandbox via `git__push`, which is only mounted on
+maintainer sessions.
 
 Release writes are not on the list at all: `AGENTS.md` forbids an agent from
 creating one, so the tool set stops at reading them.
@@ -172,20 +173,12 @@ Everything above enforces at the approval layer, which means every tool still si
 in every caller's context — schemas cost roughly 7k tokens per turn for the
 maintainer surface — and a denied call burns a model step to learn it was refused.
 
-The clean fix is a tool surface that varies per caller, and the extension is one
-small change away from allowing it. It already resolves its tools inside a dynamic
-resolver, and simply ignores the context eve hands it:
-
-```js
-// dist/extension/tools/github.mjs
-defineDynamic({ events: { "session.started": async () => { … } } })
-```
-
-eve passes `(event, ctx)` there, with `ctx.session.auth.current` available. If
-`include` / `exclude` / `preset` accepted a resolver of that context alongside a
-static value, an agent could hand admins the full surface and everyone else the
-read-only one, with the schemas to match. Worth proposing upstream — it is useful
-to any agent on a public repository, not just this one.
+The clean fix is a tool surface that varies per caller. The extension already
+resolves tools inside a dynamic resolver on `step.started`, and simply ignores the
+context eve hands it. If `include` / `exclude` / `preset` accepted a resolver of
+that context alongside a static value, an agent could hand admins the full surface
+and everyone else the read-only one, with the schemas to match. Worth proposing
+upstream — it is useful to any agent on a public repository, not just this one.
 
 ## Still open
 

@@ -71,5 +71,4 @@ minimumReleaseAgeExclude:
   - '@iconify/*'
 
 patchedDependencies:
-  '@github-tools/eve-extension@0.3.0': patches/@github-tools__eve-extension@0.3.0.patch
-  eve@0.31.3: patches/eve@0.31.3.patch
+  eve@0.30.8: patches/eve@0.30.8.patch
