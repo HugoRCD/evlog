@@ -42,5 +42,13 @@ export function isAutonomous(auth: SessionAuthContext | null): boolean {
  * which carry no user identity. The weekly self-review runs from a schedule.
  */
 export function canAccessAdminTools(auth: SessionAuthContext | null): boolean {
-  return isMaintainer(auth) || auth?.principalType === 'app'
+  return isMaintainer(auth) || isScheduleAppAuth(auth)
+}
+
+/** The app principal eve stamps on schedule-dispatched turns (eve `channel/schedule-auth`). */
+function isScheduleAppAuth(auth: SessionAuthContext | null): boolean {
+  return auth !== null
+    && auth.authenticator === 'app'
+    && auth.principalId === 'eve:app'
+    && auth.principalType === 'runtime'
 }
