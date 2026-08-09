@@ -111,7 +111,11 @@ this list keeps its approval too, for the reason below:
 `addIssueComment`, `updateIssueComment`, `addPullRequestComment`,
 `updatePullRequestComment`, `addIssueReaction`, `addCommentReaction`,
 `addLabels`, `removeLabel`, `addAssignees`, `removeAssignees`,
-`requestReviewers`, `addDiscussionComment`.
+`addDiscussionComment`.
+
+`requestReviewers` is approval-free on every kind of run, not only admin:
+requesting a review is reversible and grants nothing, and the instructions
+require it on every non-draft PR.
 
 Everything else keeps a real approval even for admin: `createIssue`, `closeIssue`,
 `deleteIssueComment`, `deletePullRequestComment`, `createPullRequest`,
