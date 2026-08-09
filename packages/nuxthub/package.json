@@ -43,12 +43,12 @@
     "dev:prepare": "nuxt-module-build build --stub && nuxt-module-build prepare"
   },
   "devDependencies": {
-    "@nuxt/module-builder": "^1.0.2",
+    "@nuxt/module-builder": "^1.0.3",
     "evlog": "workspace:*",
     "typescript": "^6.0.3"
   },
   "peerDependencies": {
-    "evlog": "^2.14.0",
+    "evlog": "^2.24.0",
     "@nuxthub/core": "^0.10.8",
     "drizzle-orm": ">=0.45.2"
   },

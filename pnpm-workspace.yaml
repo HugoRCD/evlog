@@ -23,16 +23,21 @@ overrides:
   # A second @types/react copy makes React.Key incompatible with itself in
   # examples/eve; a second rolldown splits @nuxt/icon into two peer variants
   # that shamefullyHoist then refuses to hoist, breaking apps/playground.
-  '@types/react': 19.2.17
-  tsdown@0.22.8>rolldown: 1.2.0
+  '@types/react': 19.2.18
+  tsdown@0.22.8>rolldown: 1.2.3
   minimark: 0.2.0
-  '@nuxtjs/mcp-toolkit': ^0.18.0
+  '@nuxtjs/mcp-toolkit': ^0.18.1
   # eve 0.12 requires AI SDK 7 when resolved from the example package tree.
-  eve>ai: ^7.0.28
+  eve>ai: ^7.0.57
+  # streamdown's d.ts types against the hoisted shiki; 4.4.x adds languages
+  # that @streamdown/code's shiki 3 union rejects, breaking the eve example
+  # build. Cap the v4 line at the 4.3.1 just-use already pins until
+  # @streamdown/code catches up.
+  'shiki@^4': 4.3.1
   # Nuxt 4.x requires @unhead/vue ^3.1.8 internally; some deps (e.g. @nuxt/ui)
   # declare a permissive `^2.0.5 || ^3.0.0` peer range that lets pnpm resolve
   # a stale v2, breaking Nuxt's `legacyPlugins` import at build time.
-  '@unhead/vue': ^3.2.1
+  '@unhead/vue': ^3.3.1
 
 minimumReleaseAge: 2880
 
@@ -59,6 +64,16 @@ minimumReleaseAgeExclude:
   - nitro
   - rolldown
   - workflow
+  # Fast-moving tooling that Renovate picks up weekly; their 48h age gate
+  # makes the all-minor-patch PR unable to write its lockfile.
+  - happy-dom
+  - tsx
+  - '@comark/*'
+  - comark
+  - '@orpc/*'
+  - '@tanstack/*'
+  - '@turbo/*'
+  - '@iconify/*'
 
 patchedDependencies:
-  eve@0.30.6: patches/eve@0.30.6.patch
+  eve@0.30.8: patches/eve@0.30.8.patch
