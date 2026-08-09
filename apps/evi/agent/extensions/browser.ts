@@ -6,8 +6,10 @@ import browser from '@agent-browser/eve'
  * `*.vercel.app` is the narrowest bound that keeps hash-named preview
  * deployments reachable; a protected preview's redirect to vercel.com falls
  * outside the list and is blocked. Loopback is allowed because the sandbox
- * runs no listener Evi did not start herself. No credential ever lives in the
- * browser: the extension exposes no cookie/storage/auth-state commands.
+ * runs no listener Evi did not start herself. The extension exposes no
+ * cookie/storage/auth-state commands, so session state is never readable
+ * through the tool surface; pages can still set runtime cookies while a
+ * session lives.
  */
 export default browser({
   allowedDomains: ['evlog.dev', '*.evlog.dev', 'evlog.cloud', '*.evlog.cloud', '*.vercel.app', 'localhost', '127.0.0.1'],
