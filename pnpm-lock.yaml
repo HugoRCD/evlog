@@ -14,7 +14,7 @@ overrides:
 
 patchedDependencies:
   '@github-tools/eve-extension@0.3.0': 00c552fdde422b1102e916b7d4f64cfb7964f16bec7cb02392e30d74b40db223
-  eve@0.30.6: 044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619
+  eve@0.30.6: d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e
 
 importers:
 
@@ -119,16 +119,16 @@ importers:
     dependencies:
       '@github-tools/eve-extension':
         specifier: ^0.3.0
-        version: 0.3.0(patch_hash=00c552fdde422b1102e916b7d4f64cfb7964f16bec7cb02392e30d74b40db223)(9d77d46f217400761fb524643f767bf6)
+        version: 0.3.0(patch_hash=00c552fdde422b1102e916b7d4f64cfb7964f16bec7cb02392e30d74b40db223)(b3ea8ee8156bf7b627e407f2b1440c53)
       '@vercel/connect':
         specifier: ^0.6.1
-        version: 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
+        version: 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
       ai:
         specifier: ^7.0.38
         version: 7.0.51(zod@4.4.3)
       eve:
         specifier: ^0.30.6
-        version: 0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
+        version: 0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
       evlog:
         specifier: workspace:*
         version: link:../../packages/evlog
@@ -19531,27 +19531,27 @@ snapshots:
       - '@vue/composition-api'
       - vue
 
-  '@github-tools/eve-extension@0.3.0(patch_hash=00c552fdde422b1102e916b7d4f64cfb7964f16bec7cb02392e30d74b40db223)(9d77d46f217400761fb524643f767bf6)':
+  '@github-tools/eve-extension@0.3.0(patch_hash=00c552fdde422b1102e916b7d4f64cfb7964f16bec7cb02392e30d74b40db223)(b3ea8ee8156bf7b627e407f2b1440c53)':
     dependencies:
-      '@github-tools/sdk': 1.10.0(3945b51ea78eb0ae1b1e0344487018b0)
-      eve: 0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
+      '@github-tools/sdk': 1.10.0(18170ff63bf7361b7954dd7c9e1192bc)
+      eve: 0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
       zod: 4.4.3
     optionalDependencies:
-      '@vercel/connect': 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
+      '@vercel/connect': 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
     transitivePeerDependencies:
       - '@ai-sdk/workflow'
       - '@workflow/ai'
       - ai
       - workflow
 
-  '@github-tools/sdk@1.10.0(3945b51ea78eb0ae1b1e0344487018b0)':
+  '@github-tools/sdk@1.10.0(18170ff63bf7361b7954dd7c9e1192bc)':
     dependencies:
       ai: 7.0.51(zod@4.4.3)
       octokit: 5.0.5
       zod: 4.4.3
     optionalDependencies:
-      '@vercel/connect': 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
-      eve: 0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
+      '@vercel/connect': 0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))
+      eve: 0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
 
   '@hono/node-server@1.19.14(hono@4.12.16)':
     dependencies:
@@ -30181,14 +30181,14 @@ snapshots:
       better-auth: 1.6.23(8f830602169c0404c0bce3e45117e35b)
       eve: 0.30.8(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.15(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(vite@8.1.4(@types/node@22.19.17)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
 
-  '@vercel/connect@0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))':
+  '@vercel/connect@0.6.1(@ai-sdk/mcp@1.0.62(zod@4.4.3))(ai@7.0.51(zod@4.4.3))(better-auth@1.6.23(032c2f464d92f824949e29df2eaed1d4))(eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))':
     dependencies:
       '@vercel/oidc': 3.8.2
     optionalDependencies:
       '@ai-sdk/mcp': 1.0.62(zod@4.4.3)
       ai: 7.0.51(zod@4.4.3)
       better-auth: 1.6.23(032c2f464d92f824949e29df2eaed1d4)
-      eve: 0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
+      eve: 0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
 
   '@vercel/nft@1.5.0(rollup@4.60.2)':
     dependencies:
@@ -33473,7 +33473,7 @@ snapshots:
 
   etag@1.8.1: {}
 
-  eve@0.30.6(patch_hash=044bc86c86d043ed36eb75491e0d41fb734fca98a4dd78b413bd1201bf874619)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)):
+  eve@0.30.6(patch_hash=d6d8cc1c0818ab0fa87d96e212deb242d46b12a85fbb0f7745b1af3517a3f48e)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.51(zod@4.4.3))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(microsandbox@0.6.8)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)):
     dependencies:
       ai: 7.0.51(zod@4.4.3)
       nitro: 3.0.260610-beta(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.4)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.3.14)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(vite@8.1.4(@types/node@24.13.3)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0))
