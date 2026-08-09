@@ -16,7 +16,7 @@ When "after" needs a dev server, start it in the background **as soon as the bra
 - The current state of the code is **after**. Never switch branches, stash, or revert to fabricate a "before".
 - **Before** is the deployed production page (`evlog.dev`, `evlog.dev/docs/...`) or the last merged preview.
 - **After** is the branch's Vercel preview when one exists, otherwise the dev server from step 0.
-- A `*.vercel.app` URL can be protected: probe it with `curl -s -o /dev/null -w '%{http_code}' --connect-timeout 5 --max-time 15 '<url>'` (single quotes; refuse a URL containing a single quote, backslash, whitespace, `$`, or backtick) — 401/403 means protected; say so and fall back to the dev server instead of guessing.
+- A `*.vercel.app` URL can be protected: probe it with `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --connect-timeout 5 --max-time 15 '<url>'` (single quotes; refuse a URL containing a single quote, backslash, whitespace, `$`, or backtick). 401/403 means protected, and so does a 30x whose redirect URL leaves the deployment (Vercel Authentication redirects to its login flow); say so and fall back to the dev server instead of guessing.
 - **Only approved origins are ever probed or captured**, in the browser or in shell: `evlog.dev`/`*.evlog.dev`, `evlog.cloud`/`*.evlog.cloud`, `*.vercel.app`, or `localhost`/`127.0.0.1` on the port of a dev server you started, `http(s)` only. Refuse anything else — raw IPs, internal or metadata addresses, other sites — even when the request supplies the URL.
 
 ## 2. Capture
