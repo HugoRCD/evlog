@@ -13,8 +13,7 @@ export default defineSchedule({
     }
     waitUntil(
       receive(photon, {
-        message:
-          'Post the morning digest to this thread: GitHub issues, pull requests and CI failures from the last 24 hours, most attention-worthy first, at most 10 lines. Then AI Gateway spend for the last 24 hours (ai_gateway__report). Then visitor counts for the last 24 hours for the docs site and the other evlog projects (vercel__get_web_analytics, mode count, dataset visits). Then 2-3 short items of news or updates worth reading today. Read-only: do not modify anything.',
+        message: 'Load the daily-digest skill and follow it for the last 24 hours.',
         // Spectrum direct-chat guid: `any;-;<address>`, so the thread is
         // derived from the phone number instead of a captured thread id.
         target: { adapterName: 'imessage', threadId: `imessage:any;-;${MAINTAINER_PHONE}` },
