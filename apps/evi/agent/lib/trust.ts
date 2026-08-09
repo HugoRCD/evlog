@@ -18,6 +18,9 @@ const MAINTAINER_PRINCIPALS = new Set(
     MAINTAINER_GITHUB_ID && `github:${MAINTAINER_GITHUB_ID}`,
     process.env.MAINTAINER_LINEAR_ID && `linear:${process.env.MAINTAINER_LINEAR_ID}`,
     MAINTAINER_PHONE && `imessage:${MAINTAINER_PHONE}`,
+    // The MCP channel only mints this principal after verifying the bearer
+    // token, so configuring the token is what admits the external harness.
+    process.env.EVI_MCP_TOKEN && 'mcp:hugo',
   ].filter((principal): principal is string => Boolean(principal)),
 )
 
