@@ -1,5 +1,5 @@
 import { defaultGitHubAuth, githubChannel } from 'eve/channels/github'
-import { connectGitHubCredentials } from '@vercel/connect/eve'
+import { githubCredentials } from '../lib/github/credentials'
 import { AUTONOMOUS_GITHUB_PRINCIPAL, MAINTAINER_GITHUB_ID } from '../lib/trust'
 
 const botName = 'evlogai'
@@ -10,7 +10,7 @@ const mentionPattern = new RegExp(
 
 export default githubChannel({
   botName,
-  credentials: connectGitHubCredentials('github/evi-github-production'),
+  credentials: githubCredentials,
   onComment: (ctx, comment) => {
     if (ctx.sender.login.toLowerCase() !== 'hugorcd') return null
     if (!mentionPattern.test(comment.body)) return null

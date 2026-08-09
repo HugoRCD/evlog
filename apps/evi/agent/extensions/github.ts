@@ -1,5 +1,6 @@
 import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
+import { GITHUB_CONNECTOR } from '../lib/github/credentials'
 import { isAutonomous, isMaintainer, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 const TOOLS = [
@@ -13,8 +14,6 @@ const TOOLS = [
   'listCommits',
   'getCommit',
   'compareCommits',
-  'createBranch',
-  'createOrUpdateFile',
 
   // Issues
   'searchIssues',
@@ -64,8 +63,6 @@ const TOOLS = [
   'getCiFailureContext',
 ] as const
 
-const PROTECTED_BRANCHES = new Set(['main', 'master'])
-
 function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
   return isMaintainer(ctx.session.auth.current) ? 'not-applicable' : 'user-approval'
 }
@@ -101,7 +98,7 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
 }
 
 export default githubExtension({
-  connector: 'github/evi-github-production',
+  connector: GITHUB_CONNECTOR,
   connect: {
     scopes: [
       'metadata:read',
@@ -122,14 +119,6 @@ export default githubExtension({
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
   // deletePullRequestComment, createPullRequestReview, requestReviewers.
   requireApproval: {
-    createBranch: policy,
-    createOrUpdateFile: (ctx: ApprovalContext): ApprovalStatus => {
-      const branch = (ctx.toolInput as { branch?: string } | undefined)?.branch
-      if (branch !== undefined && PROTECTED_BRANCHES.has(branch)) {
-        return { type: 'denied', reason: `Direct writes to ${branch} are not allowed. Use a feature branch and a pull request.` }
-      }
-      return policy(ctx)
-    },
     createPullRequest: policy,
     updatePullRequest: policy,
     createIssue: autonomousWrite,
