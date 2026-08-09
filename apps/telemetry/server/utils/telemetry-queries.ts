@@ -384,7 +384,7 @@ export async function getAdoptionForFilter(filter: RunsFilter): Promise<Adoption
       bucketKey => ({ bucket: bucketKey, active: 0, new: 0 }),
     ),
     punchcard: punchcard.map(r => ({ weekday: Number(r.weekday), hour: Number(r.hour), count: Number(r.count) })),
-    flags: toFieldStats(flagRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) }))),
+    flags: toFieldStats(normalizeFlagRows(flagRows.map(r => ({ key: r.key, value: r.value, count: Number(r.count), errors: Number(r.errors) })))),
     custom: customFields,
     dimensions,
     frameworks: frameworkTimeline.series,

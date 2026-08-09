@@ -91,6 +91,65 @@ describe('runDoctor', () => {
     expect(logs?.message).toContain('1 file')
   })
 
+  it('reports an empty sink as present once the directory exists', async () => {
+    /* The fs drain only writes `.jsonl` files on first emit; an empty sink
+       directory is still a sink. */
+    const cwd = await makeProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { evlog: '^2.0.0' } }),
+      'node_modules/evlog/package.json': JSON.stringify({ name: 'evlog', version: '2.22.0' }),
+    })
+    await mkdir(join(cwd, '.evlog', 'logs'), { recursive: true })
+
+    const result = await runDoctor(fakeContext(cwd))
+    const logs = result.checks.find(c => c.id === 'logs')
+    expect(logs?.status).toBe('ok')
+    expect(logs?.message).toContain('empty sink')
+  })
+
+  it('treats a wired fs drain as a sink before the first event', async () => {
+    /* `evlog init` writes the drain plugin; the fs drain creates `.evlog/logs`
+       lazily on first write, so a wired drain is a sink even with no files. */
+    const cwd = await makeProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { evlog: '^2.0.0' } }),
+      'node_modules/evlog/package.json': JSON.stringify({ name: 'evlog', version: '2.22.0' }),
+      'server/plugins/evlog-drain.ts': `import { createFsDrain } from 'evlog/fs'
+export default defineNitroPlugin((nitroApp) => {
+  nitroApp.hooks.hook('evlog:drain', createFsDrain())
+})
+`,
+    })
+
+    const result = await runDoctor(fakeContext(cwd))
+    const logs = result.checks.find(c => c.id === 'logs')
+    expect(logs?.status).toBe('ok')
+    expect(logs?.message).toContain('empty sink')
+  })
+
+  it('omits the logs check when no local drain is wired', async () => {
+    /* The fs drain is optional: a project with no local sink and no drain
+       wiring gets no `logs` check, not a warning. */
+    const cwd = await makeProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { evlog: '^2.0.0' } }),
+      'node_modules/evlog/package.json': JSON.stringify({ name: 'evlog', version: '2.22.0' }),
+    })
+
+    const result = await runDoctor(fakeContext(cwd))
+    expect(result.checks.find(c => c.id === 'logs')).toBeUndefined()
+    expect(result.summary.warn).toBe(0)
+  })
+
+  it('reads the fs drain directory from the environment', async () => {
+    const cwd = await makeProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { evlog: '^2.0.0' } }),
+      'node_modules/evlog/package.json': JSON.stringify({ name: 'evlog', version: '2.22.0' }),
+    })
+
+    const result = await runDoctor(fakeContext(cwd, { env: { EVLOG_FS_DIR: 'var/evlog' } }))
+    const logs = result.checks.find(c => c.id === 'logs')
+    expect(logs?.status).toBe('ok')
+    expect(logs?.message).toContain('var/evlog')
+  })
+
   it('fails on unsupported Node versions', async () => {
     const cwd = await makeProject({ 'package.json': '{}' })
     const result = await runDoctor(fakeContext(cwd, { nodeVersion: 'v18.19.0' }))
@@ -118,7 +177,8 @@ describe('runDoctor', () => {
 
     const findings = ctx.findings as Array<{ code: string }> | undefined
     expect(findings?.some(f => f.code === 'cli.EVLOG_DECLARED_NOT_INSTALLED')).toBe(true)
-    expect(findings?.some(f => f.code === 'cli.LOGS_SINK_MISSING')).toBe(true)
+    /* No drain wiring, no local sink required: the logs check stays silent. */
+    expect(findings?.some(f => f.code === 'cli.LOGS_SINK_MISSING')).toBe(false)
   })
 
   it('warns outside a Node project', async () => {
