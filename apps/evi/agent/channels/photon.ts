@@ -43,6 +43,7 @@ export default photonIMessageChannel({
           const options = request.options ?? []
           if (options.length > 0) {
             lines.push('', ...options.map((option) => `· ${option.label}: reply "${option.id}"`))
+            lines.push('Or answer in your own words.')
           }
 
           return lines.join('\n')
