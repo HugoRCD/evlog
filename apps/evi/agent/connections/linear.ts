@@ -45,7 +45,7 @@ const ALLOWED_TOOLS: string[] = [
  */
 export default defineMcpClientConnection({
   url: 'https://mcp.linear.app/mcp',
-  description: "Hugo's Linear workspace (admin only): the authority on what is planned, in progress, or decided. Read issues, projects, initiatives, milestones, cycles, documents, and status updates; write via save_issue (create or update an issue), save_comment, and save_document — documents are the home for recurring reports like weekly digests, where formatting beats a chat message. No deletes and no structural writes.",
+  description: 'Hugo\'s Linear workspace (admin only): the authority on what is planned, in progress, or decided. Read issues, projects, initiatives, milestones, cycles, documents, and status updates; write via save_issue (create or update an issue), save_comment, and save_document — documents are the home for recurring reports like weekly digests, where formatting beats a chat message. No deletes and no structural writes.',
   tools: { allow: ALLOWED_TOOLS },
   auth: adminOnlyAppConnection('linear/mcp'),
 })
