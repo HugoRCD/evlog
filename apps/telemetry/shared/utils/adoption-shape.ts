@@ -101,6 +101,37 @@ export interface FieldValueRow {
   errors: number
 }
 
+/** citty's positional bucket — a count of it says nothing about flags. */
+const POSITIONAL_KEY = '_'
+
+/** `min-score` → `minScore`, matching `@evlog/telemetry`'s client-side sanitizer. */
+export function normalizeFlagKey(key: string): string | null {
+  if (key === POSITIONAL_KEY) return null
+  return key.replace(/-([a-z0-9])/gi, (_, char: string) => char.toUpperCase())
+}
+
+/**
+ * Legacy clients sent raw citty args, so one flag arrived under both spellings
+ * (`no-header` and `noHeader`) and the `_` positional bucket leaked through.
+ * Collapse rows into the normalized names before tallying.
+ */
+export function normalizeFlagRows(rows: FieldValueRow[]): FieldValueRow[] {
+  const merged = new Map<string, FieldValueRow>()
+  for (const row of rows) {
+    const key = normalizeFlagKey(row.key)
+    if (key === null) continue
+    const id = `${key}\u0000${row.value}`
+    const existing = merged.get(id)
+    if (existing) {
+      existing.count += row.count
+      existing.errors += row.errors
+    } else {
+      merged.set(id, { key, value: row.value, count: row.count, errors: row.errors })
+    }
+  }
+  return [...merged.values()]
+}
+
 /** Flat `(key, value)` rows into per-key stats, unsorted and uncapped. */
 function tallyByKey(rows: FieldValueRow[]): FieldStat[] {
   const byKey = new Map<string, FieldStat>()

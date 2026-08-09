@@ -196,9 +196,7 @@ describe('normalizeFlagRows', () => {
     expect(normalizeFlagRows([
       { key: '_', value: 'src/api', count: 4, errors: 0 },
       { key: 'json', value: 'true', count: 2, errors: 0 },
-    ])).toEqual([
-      { key: 'json', value: 'true', count: 2, errors: 0 },
-    ])
+    ])).toEqual([{ key: 'json', value: 'true', count: 2, errors: 0 }])
   })
 
   it('spells any kebab-case key back as its camelCase name', () => {

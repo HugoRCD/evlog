@@ -134,7 +134,7 @@ async function checkLogs(project: ProjectInfo): Promise<Check> {
       id: 'logs',
       status: 'warn',
       message: 'no local sink yet',
-      hint: 'created on first write by the fs drain (evlog/fs) → .evlog/logs',
+      hint: 'evlog init creates it; the fs drain (evlog/fs) writes it on first event → .evlog/logs',
     }
   }
   const loc = prettyPath(project.cwd, sink.dir)

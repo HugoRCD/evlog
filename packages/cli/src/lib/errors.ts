@@ -44,7 +44,7 @@ export const cliErrors = defineErrorCatalog('cli', {
     status: 404,
     message: 'No local .evlog/logs sink yet',
     why: 'The fs drain has not written any local logs yet',
-    fix: 'Enable the fs drain (evlog/fs); the sink is created on first write',
+    fix: 'Run evlog init to create the sink; the fs drain (evlog/fs) writes it on first event',
     tags: ['doctor', 'logs'],
   },
   COMMAND_FAILED: {

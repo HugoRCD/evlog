@@ -1,5 +1,5 @@
 import { mkdir, writeFile } from 'node:fs/promises'
-import { dirname } from 'node:path'
+import { dirname, join } from 'node:path'
 import { runDoctor } from '../../commands/doctor'
 import type { CliContext } from '../../core/context'
 import { planAgents } from '../agents/plan'
@@ -334,6 +334,11 @@ export async function runInit(
       for (const action of plan.actions) {
         await mkdir(dirname(action.path), { recursive: true })
         await writeFile(action.path, action.contents, 'utf8')
+      }
+      /* The fs drain makes its directory lazily on first write; create it now
+         so `evlog doctor` sees the sink before the first event. */
+      if (answers.devDrain === 'fs') {
+        await mkdir(join(project.packageDir, '.evlog', 'logs'), { recursive: true })
       }
       return plan.actions.length
     })
