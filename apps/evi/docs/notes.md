@@ -104,6 +104,15 @@ assuming the agent simply answers without that connection is wrong.
 **`vercel connect token` from the CLI proves nothing about app-scoped auth** — it
 resolves through your own Vercel identity, the user-scoped path.
 
+## Telemetry
+
+**The agent's telemetry MCP uses a static bearer token, not Connect.** The
+telemetry app's `/mcp` endpoint mirrors the dashboard's soft auth: with
+`ANALYTICS_PASSWORD` unset it is open, so an absent `TELEMETRY_MCP_TOKEN` in the
+evi app still works against a local dashboard. Once production sets a password,
+the evi app must carry the same value as `TELEMETRY_MCP_TOKEN`; a missing token
+then 403s every telemetry call loudly.
+
 ## evlog
 
 **The fs drain guards neither its `mkdir` nor its `appendFile`.** On Vercel,
