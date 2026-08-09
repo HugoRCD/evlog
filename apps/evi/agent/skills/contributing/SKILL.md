@@ -54,7 +54,7 @@ If you could not run the checks, say so plainly in the pull request body instead
 The whole flow runs in `/workspace/repo`; nothing ships through the GitHub file API.
 
 1. Branch off the current `main` the session starts on: `git checkout -b <branch>`.
-2. Edit, then run the checks above. A bug fix commits its failing regression test first, then the fix.
+2. Edit, then run the checks above. A bug fix commits its failing regression test first, then the fix. For a visual change, start the dev server in the background before the checks (see `before-after`, step 0) so it warms while they run. Before the first check of the session, call `turbo__enable_remote_cache` once, then prefix each check with `TURBO_REMOTE_CACHE_READ_ONLY=true`: turbo reuses the artifacts CI already built, and the template cache covers the rest, so only what the diff affects actually runs.
 3. When a consumer of evlog would notice the change, add a changeset: write `.changeset/<some-name>.md` by hand with the `---` frontmatter naming the package and bump plus a consumer-facing description (`pnpm changeset` is interactive and cannot run here). Look at an existing file in `.changeset/` for the exact shape.
 4. Commit with a Conventional Commits subject: lowercase, a registered scope or none.
 5. Push with `git__push`. It refuses `main` and `master`, and only maintainer sessions have it.
