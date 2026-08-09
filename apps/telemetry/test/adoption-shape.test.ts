@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { OTHER_VERSION, mergeFieldValues, splitFieldStats, toFieldStats, toVersionAdoption } from '../shared/utils/adoption-shape'
+import { OTHER_VERSION, mergeFieldValues, normalizeFlagKey, normalizeFlagRows, splitFieldStats, toFieldStats, toVersionAdoption } from '../shared/utils/adoption-shape'
 import { PROMOTED_FIELD_KEYS } from '../shared/utils/field-dimensions'
 
 describe('toVersionAdoption', () => {
@@ -175,5 +175,34 @@ describe('mergeFieldValues', () => {
 
   it('is empty when no key reported anything', () => {
     expect(mergeFieldValues([])).toEqual([])
+  })
+})
+
+describe('normalizeFlagRows', () => {
+  it('merges the kebab-case twin legacy clients reported under both spellings', () => {
+    /* `@evlog/cli` < 0.5.0 sent raw citty args, so one flag arrived as both
+       `no-header` and `noHeader`. The tally must add them up, not show twice. */
+    expect(normalizeFlagRows([
+      { key: 'no-header', value: 'true', count: 930, errors: 10 },
+      { key: 'noHeader', value: 'true', count: 938, errors: 8 },
+      { key: 'dryRun', value: 'true', count: 5, errors: 0 },
+    ])).toEqual([
+      { key: 'noHeader', value: 'true', count: 1868, errors: 18 },
+      { key: 'dryRun', value: 'true', count: 5, errors: 0 },
+    ])
+  })
+
+  it('drops the positional bucket a legacy client recorded as `_`', () => {
+    expect(normalizeFlagRows([
+      { key: '_', value: 'src/api', count: 4, errors: 0 },
+      { key: 'json', value: 'true', count: 2, errors: 0 },
+    ])).toEqual([
+      { key: 'json', value: 'true', count: 2, errors: 0 },
+    ])
+  })
+
+  it('spells any kebab-case key back as its camelCase name', () => {
+    expect(normalizeFlagKey('min-score')).toBe('minScore')
+    expect(normalizeFlagKey('no-header')).toBe('noHeader')
   })
 })

@@ -91,6 +91,21 @@ describe('runDoctor', () => {
     expect(logs?.message).toContain('1 file')
   })
 
+  it('reports the sink as present on a fresh project that has never written an event', async () => {
+    /* `evlog init` creates `.evlog/logs` eagerly; the fs drain only writes
+       `.jsonl` files on first emit. An empty sink is still a sink. */
+    const cwd = await makeProject({
+      'package.json': JSON.stringify({ name: 'app', dependencies: { evlog: '^2.0.0' } }),
+      'node_modules/evlog/package.json': JSON.stringify({ name: 'evlog', version: '2.22.0' }),
+    })
+    await mkdir(join(cwd, '.evlog', 'logs'), { recursive: true })
+
+    const result = await runDoctor(fakeContext(cwd))
+    const logs = result.checks.find(c => c.id === 'logs')
+    expect(logs?.status).toBe('ok')
+    expect(logs?.message).toContain('empty sink')
+  })
+
   it('fails on unsupported Node versions', async () => {
     const cwd = await makeProject({ 'package.json': '{}' })
     const result = await runDoctor(fakeContext(cwd, { nodeVersion: 'v18.19.0' }))
