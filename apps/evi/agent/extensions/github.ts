@@ -100,6 +100,37 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
   return policy(ctx)
 }
 
+const LABEL_NAME_MAX = 50
+const LABEL_DESCRIPTION_MAX = 100
+const LABEL_COLOR = /^[0-9a-fA-F]{6}$/
+
+/**
+ * Autonomous createLabel may grow the triage taxonomy, but only with a short
+ * single-line name, a 6-digit hex color, and an optional short description —
+ * not a free-form dump into the repo label set.
+ */
+function createLabelPolicy(ctx: ApprovalContext): ApprovalStatus {
+  if (!isAutonomous(ctx.session.auth.current)) return policy(ctx)
+
+  const input = ctx.toolInput as { name?: unknown, color?: unknown, description?: unknown } | undefined
+  const name = typeof input?.name === 'string' ? input.name.trim() : ''
+  const color = typeof input?.color === 'string' ? input.color.trim() : ''
+  const description = input?.description === undefined || input?.description === null
+    ? undefined
+    : typeof input.description === 'string' ? input.description.trim() : null
+
+  if (!name || name.length > LABEL_NAME_MAX || /[\n\r]/.test(name)) {
+    return { type: 'denied', reason: 'Autonomous createLabel requires a short single-line name.' }
+  }
+  if (!LABEL_COLOR.test(color)) {
+    return { type: 'denied', reason: 'Autonomous createLabel requires a 6-digit hex color.' }
+  }
+  if (description === null || (description !== undefined && (description.length > LABEL_DESCRIPTION_MAX || /[\n\r]/.test(description)))) {
+    return { type: 'denied', reason: 'Autonomous createLabel description must be a short single line.' }
+  }
+  return 'not-applicable'
+}
+
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
   context: { owner: 'HugoRCD', repo: 'evlog' },
@@ -121,8 +152,8 @@ export default githubExtension({
     addIssueReaction: policy,
     addCommentReaction: policy,
     addLabels: autonomousWrite,
-    removeLabel: autonomousWrite,
-    createLabel: autonomousWrite,
+    removeLabel: policy,
+    createLabel: createLabelPolicy,
     updateLabel: policy,
   },
 })

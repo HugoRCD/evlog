@@ -4,7 +4,6 @@ import { GITHUB_WRITE_TOOLS } from '../helpers'
 
 const ALLOWED = new Set([
   'github__addLabels',
-  'github__removeLabel',
   'github__createLabel',
   'github__createIssue',
   'github__addAssignees',
