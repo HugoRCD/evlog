@@ -15,8 +15,10 @@ const REPO_DIR = '/workspace/repo'
 const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
 
 function gitTools() {
+  // Dynamic map keys are bare tool names (no file-slug prefix), so the
+  // namespace is spelled out here to match every git__push reference.
   return {
-    push: defineTool({
+    git__push: defineTool({
       description: `Push a local branch of the ${REPO_DIR} checkout to origin (HugoRCD/evlog). The branch must already exist there with the work committed and the checks run; main and master are refused. The credential is brokered at the sandbox firewall and never enters the sandbox. After a successful push, open the pull request with github__createPullRequest.`,
       inputSchema: z.object({
         branch: z.string().min(1).describe('Branch name in /workspace/repo to push, e.g. fix/pipeline-flush'),
@@ -57,9 +59,15 @@ function gitTools() {
   }
 }
 
-/** Visible only to maintainer sessions; community and autonomous turns never see a push surface. */
+/**
+ * Visible only when the current caller is the maintainer; community and
+ * autonomous turns never see a push surface. Re-resolved every turn so the
+ * gate follows the turn's actual caller and survives a session resumed on a
+ * fresh deployment, where session.started never fires again.
+ */
 export default defineDynamic({
   events: {
     'session.started': (_event, ctx) => (isMaintainer(ctx.session.auth.current) ? gitTools() : null),
+    'turn.started': (_event, ctx) => (isMaintainer(ctx.session.auth.current) ? gitTools() : null),
   },
 })
