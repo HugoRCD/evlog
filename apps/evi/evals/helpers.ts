@@ -27,6 +27,8 @@ export const GITHUB_WRITE_TOOLS = [
   'github__addIssueComment',
   'github__updateIssueComment',
   'github__deleteIssueComment',
+  'github__createLabel',
+  'github__updateLabel',
   'github__addLabels',
   'github__removeLabel',
   'github__addAssignees',

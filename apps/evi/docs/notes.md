@@ -64,9 +64,6 @@ decimals, which is how the overspend was found.
 
 ## github-tools
 
-**`include` without `preset` requests the union of every preset's scopes**,
-`administration:write` included. Pin `connect.scopes` to what the tools call.
-
 **The `maintainer` preset ships gist tools that always 403 over Connect** — the
 Gists API rejects installation tokens — plus repo creation and merge.
 

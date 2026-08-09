@@ -1,7 +1,8 @@
 import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
 import { GITHUB_CONNECTOR } from '../lib/github/credentials'
-import { isAutonomous, isMaintainer, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
+import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
+import { isAutonomous, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -19,6 +20,7 @@ const TOOLS = [
   'searchIssues',
   'listIssues',
   'getIssueContext',
+  'listIssueComments',
   'createIssue',
   'updateIssue',
   'closeIssue',
@@ -28,6 +30,8 @@ const TOOLS = [
 
   // Triage
   'listLabels',
+  'createLabel',
+  'updateLabel',
   'addLabels',
   'removeLabel',
   'addAssignees',
@@ -63,21 +67,14 @@ const TOOLS = [
   'getCiFailureContext',
 ] as const
 
-function maintainerWrite(ctx: ApprovalContext): ApprovalStatus {
-  return isMaintainer(ctx.session.auth.current) ? 'not-applicable' : 'user-approval'
-}
-
 /**
- * Autonomous first-responder turns may label the issue, open a doc-gap issue,
+ * Autonomous first-responder turns may create/apply labels, open a doc-gap issue,
  * or assign the maintainer, and nothing else. Everything else is denied
  * outright: the turn runs unattended, so an approval request would park
  * forever, and its reply is posted by the channel.
  */
 function policy(ctx: ApprovalContext): ApprovalStatus {
-  if (isAutonomous(ctx.session.auth.current)) {
-    return { type: 'denied', reason: 'Autonomous turns may only label the issue, open a doc-gap issue, or assign the maintainer.' }
-  }
-  return maintainerWrite(ctx)
+  return writePolicy(ctx.session.auth.current)
 }
 
 /** The writes an autonomous turn may reach: reversible and low blast radius. */
@@ -99,25 +96,11 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
 
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
-  connect: {
-    scopes: [
-      'metadata:read',
-      'contents:read',
-      'contents:write',
-      'issues:read',
-      'issues:write',
-      'pull_requests:read',
-      'pull_requests:write',
-      'discussions:read',
-      'discussions:write',
-      'checks:read',
-      'actions:read',
-    ],
-  },
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
-  // deletePullRequestComment, createPullRequestReview, requestReviewers.
+  // deletePullRequestComment, createPullRequestReview, requestReviewers, deleteLabel.
+  // Connect scopes are derived from `include` (createLabel → issues:write) in sdk ≥ 1.11.1.
   requireApproval: {
     createPullRequest: policy,
     updatePullRequest: policy,
@@ -133,6 +116,8 @@ export default githubExtension({
     addIssueReaction: policy,
     addCommentReaction: policy,
     addLabels: autonomousWrite,
-    removeLabel: autonomousWrite,
+    removeLabel: policy,
+    createLabel: (ctx) => createLabelPolicy(ctx.session.auth.current, ctx.toolInput),
+    updateLabel: policy,
   },
 })
