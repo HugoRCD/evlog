@@ -5,16 +5,6 @@ import { canAccessAdminTools } from '../lib/trust'
 /** Production evlog telemetry, mirrored from the dashboard's own MCP endpoint. */
 const TELEMETRY_MCP_URL = 'https://telemetry.evlog.cloud/mcp'
 
-/**
- * The telemetry app's `/mcp` endpoint mirrors the dashboard's soft auth: with
- * `ANALYTICS_PASSWORD` unset it is open, so a blank token (absent
- * `TELEMETRY_MCP_TOKEN`) still works against a local dashboard. Once
- * production sets a password, the evi app must carry the same value as
- * `TELEMETRY_MCP_TOKEN`; a missing token then 403s every call loudly instead
- * of failing silently.
- */
-const TELEMETRY_MCP_TOKEN = process.env.TELEMETRY_MCP_TOKEN
-
 const ALLOWED_TOOLS: string[] = [
   'telemetry-stats',
   'telemetry-adoption',
@@ -26,6 +16,12 @@ const ALLOWED_TOOLS: string[] = [
  * Read-only production telemetry, gated to maintainer and app-principal
  * sessions (the same set as the Vercel connection). A blocked caller gets a
  * terminal error instead of a silent authorization challenge.
+ *
+ * The bearer token is the deployment's own Vercel OIDC token (the same one
+ * the turbo remote-cache tool sends), which the telemetry app verifies
+ * against Vercel's JWKS. Locally there is no OIDC token, and the dashboard's
+ * soft auth accepts a blank token when `ANALYTICS_PASSWORD` is unset, so a
+ * password-less local dashboard still works.
  */
 function telemetryAuth() {
   return (ctx: SessionContext) => {
@@ -38,7 +34,7 @@ function telemetryAuth() {
       }
     }
     return {
-      getToken: async () => ({ token: TELEMETRY_MCP_TOKEN ?? '' }),
+      getToken: async () => ({ token: process.env.VERCEL_OIDC_TOKEN ?? '' }),
     }
   }
 }

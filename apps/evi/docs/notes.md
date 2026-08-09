@@ -106,12 +106,14 @@ resolves through your own Vercel identity, the user-scoped path.
 
 ## Telemetry
 
-**The agent's telemetry MCP uses a static bearer token, not Connect.** The
-telemetry app's `/mcp` endpoint mirrors the dashboard's soft auth: with
-`ANALYTICS_PASSWORD` unset it is open, so an absent `TELEMETRY_MCP_TOKEN` in the
-evi app still works against a local dashboard. Once production sets a password,
-the evi app must carry the same value as `TELEMETRY_MCP_TOKEN`; a missing token
-then 403s every telemetry call loudly.
+**The agent's telemetry MCP authenticates with its Vercel OIDC token, not a
+shared password.** The connection sends `process.env.VERCEL_OIDC_TOKEN` (the
+same token the turbo remote-cache tool uses); the telemetry app verifies it
+against Vercel's team JWKS and trusts only the `evi` project's production
+environment (`apps/telemetry/server/utils/vercel-oidc.ts`). Locally there is no
+OIDC token, and the dashboard's soft auth means a password-less local dashboard
+stays open. If the evi project's OIDC issuer mode ever changes, the constants in
+`vercel-oidc.ts` move with it.
 
 ## evlog
 

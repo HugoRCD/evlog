@@ -137,6 +137,9 @@ importers:
       evlog:
         specifier: workspace:*
         version: link:../../packages/evlog
+      jose:
+        specifier: ^6.2.3
+        version: 6.2.3
       zod:
         specifier: ^4.4.3
         version: 4.4.3
