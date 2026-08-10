@@ -76,6 +76,7 @@ const matched = computed(() => props.options.some(option => option.value === pro
         v-for="option in options"
         :key="option.value"
         type="button"
+        data-cuelume-press
         class="border px-2 transition-colors"
         :class="[
           cards ? 'py-1.5 text-left' : 'min-w-14 flex-1 py-[5px] text-center',

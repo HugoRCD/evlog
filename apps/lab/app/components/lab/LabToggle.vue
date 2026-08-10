@@ -6,6 +6,7 @@ const model = defineModel<boolean>({ required: true })
 <template>
   <button
     type="button"
+    data-cuelume-toggle
     class="group flex w-full items-center justify-between gap-3 py-[3px] text-left"
     role="switch"
     :aria-checked="model"

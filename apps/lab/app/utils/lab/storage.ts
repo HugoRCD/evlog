@@ -14,14 +14,34 @@ import { createComponentLayer, sanitizeLayers } from './layers'
 import type { Layer } from './layers'
 import { sanitizeEffects } from './effects'
 import type { LayerEffect } from './effects'
-import { LOOK_PARAM, applyLookEntry, decodeLook } from './looks'
 
 const KEY = 'render-labs:settings'
 /** Query key carrying the overlay layers in a share link. */
 const LAYERS_PARAM = 'layers'
 const CAMERA_PARAM = 'camera'
+const MODE_PARAM = 'mode'
+
+/**
+ * What a document is for, and the one thing about it that cannot be changed by
+ * dragging a slider.
+ *
+ * A shot is a single frame: no timeline, every layer simply present, and the
+ * only export is a still. A video is a take over time. They share every other
+ * part of the model — the same layers, the same camera, the same grade — which
+ * is what makes switching between them lossless rather than a conversion.
+ *
+ * It lives on the document rather than in the settings because it is not a
+ * property of how something is filmed. It decides which tool you are holding,
+ * and the whole reason it exists is that opening the app used to drop you back
+ * into whatever the last take was — usually a video, usually with a timeline
+ * full of clips, when what you wanted was one picture.
+ */
+export const LAB_MODES = ['shot', 'video'] as const
+
+export type LabMode = typeof LAB_MODES[number]
 
 export interface LabDocument {
+  mode: LabMode
   settings: LabSettings
   layers: Layer[]
   /** Camera moves over the take — a travelling is a dolly pointed at the shot. */
@@ -47,6 +67,7 @@ export function serializeDocument(document: LabDocument): Record<string, unknown
   // this is the cheap fix rather than the expensive one.
   return JSON.parse(JSON.stringify({
     ...settingsToQuery(document.settings),
+    [MODE_PARAM]: document.mode,
     [LAYERS_PARAM]: document.layers,
     [CAMERA_PARAM]: document.camera,
   })) as Record<string, unknown>
@@ -61,6 +82,10 @@ export function serializeDocument(document: LabDocument): Record<string, unknown
  */
 export function deserializeDocument(record: Record<string, unknown>): LabDocument {
   return {
+    // Anything written before modes existed is a take on a timeline, because
+    // that is all there was. Defaulting the other way would open every saved
+    // project as a single frame and hide the clips it was made of.
+    mode: record[MODE_PARAM] === 'shot' ? 'shot' : 'video',
     settings: settingsFromQuery(record),
     layers: withMigratedComponent(sanitizeLayers(record[LAYERS_PARAM]), record),
     camera: sanitizeEffects(record[CAMERA_PARAM]),
@@ -152,41 +177,27 @@ function parseLayersParam(value: unknown): Layer[] {
   }
 }
 
+/** A blank document of a given kind, which is what every "new" path starts from. */
+export function createDocument(mode: LabMode): LabDocument {
+  return { mode, settings: { ...DEFAULT_SETTINGS }, layers: [], camera: [] }
+}
+
 /**
- * Resolve the document a session should open with.
+ * Resolve the document a session should open with, or null to ask.
  *
  * A link wins over the working copy — following someone's URL has to show their
  * shot, not yours — and is then written to storage so a refresh keeps it.
+ *
+ * Null is the answer when there is neither: nothing has been made yet, and
+ * there is no honest default. Opening straight into an empty video was the
+ * quiet assumption that every session is a take, which is exactly what made
+ * reaching for a single picture feel like undoing somebody else's work.
  */
-export function resolveInitialDocument(query: Record<string, unknown>): LabDocument & { fromLink: boolean } {
-  const keys = Object.keys(query)
-
-  /**
-   * A look link is not a document link.
-   *
-   * Somebody sending you a grade they like should not replace the shot you were
-   * working on — so a URL carrying nothing but a look keeps the stored document
-   * and puts the look on it. Treated as a full link it would have opened an empty
-   * timeline and quietly discarded the session.
-   */
-  if (keys.length === 1 && keys[0] === LOOK_PARAM) {
-    const stored = loadStored()
-    const document: LabDocument = {
-      settings: stored?.settings ?? { ...DEFAULT_SETTINGS },
-      layers: stored?.layers ?? [],
-      camera: stored?.camera ?? [],
-    }
-    const entry = decodeLook(String(query[LOOK_PARAM] ?? ''))
-    if (entry) document.settings = applyLookEntry(document.settings, entry, document.settings.lookAmount)
-    // `fromLink` so the query is dropped from the address bar, exactly as a
-    // document link is — but the look is saved as part of the working copy.
-    saveStored(document)
-    return { ...document, fromLink: true }
-  }
-
-  const fromLink = keys.length > 0
+export function resolveInitialDocument(query: Record<string, unknown>): (LabDocument & { fromLink: boolean }) | null {
+  const fromLink = Object.keys(query).length > 0
   if (fromLink) {
     const document: LabDocument = {
+      mode: query[MODE_PARAM] === 'shot' ? 'shot' : 'video',
       settings: settingsFromQuery(query),
       layers: withMigratedComponent(parseLayersParam(query[LAYERS_PARAM]), query),
       camera: parseEffectsParam(query[CAMERA_PARAM]),
@@ -194,13 +205,9 @@ export function resolveInitialDocument(query: Record<string, unknown>): LabDocum
     saveStored(document)
     return { ...document, fromLink }
   }
+
   const stored = loadStored()
-  return {
-    settings: stored?.settings ?? { ...DEFAULT_SETTINGS },
-    layers: stored?.layers ?? [],
-    camera: stored?.camera ?? [],
-    fromLink,
-  }
+  return stored ? { ...stored, fromLink } : null
 }
 
 /**

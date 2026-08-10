@@ -2,7 +2,7 @@
  * GLSL for the Render labs pipeline.
  *
  * The chain is: stage (DOM plane in 3D) → DOF → bloom (down/up mip chain) →
- * composite (aberration, tonemap, grade, vignette, grain).
+ * composite (lens, tonemap, grade, vignette, grain) → stylize.
  *
  * Everything between the stage and the composite runs in linear light. The DOM
  * texture is sRGB, so the stage decodes on read and the composite encodes on
@@ -162,10 +162,53 @@ uniform sampler2D uCocMap;
 uniform vec2 uTexel;
 uniform float uMaxRadius;   // in pixels
 uniform int uSamples;
+uniform float uBlades;      // 0 for a disc, 3..9 for an iris
+uniform float uCatEye;
 
 ${COMMON}
 
 const float GOLDEN_ANGLE = 2.39996323;
+const float TAU = 6.28318530718;
+
+/**
+ * Push a unit-disc sample out to the edge of a regular polygon.
+ *
+ * A circular kernel is what every naive depth of field produces, and it is why
+ * they all read as the same blur. A real iris is a polygon, and its corners are
+ * the whole reason an out-of-focus highlight looks photographed.
+ *
+ * Normalised by the apothem so the polygon is inscribed in the unit disc, which
+ * keeps the blur the width the radius says it is rather than widening it by the
+ * ratio of circumradius to inradius.
+ */
+vec2 bladed(vec2 offset, float angle) {
+  if (uBlades < 3.0) return offset;
+  float segment = TAU / uBlades;
+  return offset * (cos(segment * 0.5) / cos(mod(angle, segment) - segment * 0.5));
+}
+
+/**
+ * Optical vignetting.
+ *
+ * The lens barrel occludes rays arriving off-axis, so a highlight away from the
+ * middle of the frame is clipped between two circles and comes out as an almond
+ * — the cat's eye. Squeezed along the radius and left alone across it, which is
+ * the direction the tube actually cuts.
+ */
+vec2 catEye(vec2 offset, vec2 centred, float cornerRadius) {
+  if (uCatEye <= 0.0) return offset;
+  // Normalised against the corner, so full squeeze happens at the corner and
+  // nowhere else. Against a fixed radius it saturated across most of the frame
+  // and collapsed the kernel to a line everywhere but the middle — which is not
+  // a cat's eye, it is a broken blur.
+  float distance = clamp(length(centred) / cornerRadius, 0.0, 1.0);
+  if (distance < 1e-4) return offset;
+
+  vec2 direction = normalize(centred);
+  float along = dot(offset, direction);
+  vec2 across = offset - direction * along;
+  return direction * along * (1.0 - uCatEye * distance * 0.6) + across;
+}
 
 void main() {
   vec4 centre = texture(uSource, vUv);
@@ -181,6 +224,11 @@ void main() {
   vec3 sum = centre.rgb;
   float weightSum = 1.0;
   float count = float(uSamples);
+  // Corrected for the frame's shape, so the cat's eye opens along the real
+  // radius rather than along a stretched one on a wide format.
+  float aspect = uTexel.y / uTexel.x;
+  vec2 centred = (vUv - 0.5) * vec2(aspect, 1.0);
+  float cornerRadius = 0.5 * sqrt(aspect * aspect + 1.0);
 
   for (int i = 1; i < 256; i++) {
     if (i >= uSamples) break;
@@ -188,12 +236,15 @@ void main() {
     // sqrt keeps the spiral area-uniform instead of clustering at the centre.
     float radius = sqrt(fi / count);
     float angle = fi * GOLDEN_ANGLE;
-    vec2 offset = vec2(cos(angle), sin(angle)) * radius;
+    vec2 offset = catEye(bladed(vec2(cos(angle), sin(angle)) * radius, angle), centred, cornerRadius);
 
     vec2 uv = vUv + offset * centreRadius * uTexel;
     vec4 tap = texture(uSource, uv);
     float tapRadius = abs(unpackCoc(texture(uCocMap, uv).r)) * uMaxRadius;
-    float distance = radius * centreRadius;
+    // Measured on the shaped offset, not on the spiral's own radius: the weight
+    // test asks whether a tap can reach this pixel, and a blade or a cat's eye
+    // has moved it somewhere else.
+    float distance = length(offset) * centreRadius;
 
     // Accept the tap when its own blur disc covers this pixel, or when this
     // pixel is itself blurred enough to be gathering that far.
@@ -224,6 +275,7 @@ out vec4 fragColor;
 uniform sampler2D uSource;
 uniform float uThreshold;
 uniform float uKnee;
+uniform float uBleed;
 
 void main() {
   vec3 colour = texture(uSource, vUv).rgb;
@@ -237,7 +289,11 @@ void main() {
   soft = soft * soft / (4.0 * uKnee + 1e-5);
   float contribution = max(soft, brightness - uThreshold) / max(brightness, 1e-5);
 
-  fragColor = vec4(colour * contribution, 1.0);
+  // Veiling glare, which has no threshold: glass scatters a little of
+  // everything, not only what is bright. A floor here rather than a second blur
+  // chain — the mips are already the right diffusion, and the only thing
+  // separating halation from bloom is what was allowed into them.
+  fragColor = vec4(colour * max(contribution, uBleed), 1.0);
 }`
 
 /**
@@ -274,6 +330,42 @@ void main() {
   fragColor = vec4(result, 1.0);
 }`
 
+/**
+ * One octave of an anamorphic streak.
+ *
+ * Run several times with the stride growing by a factor of the tap count, which
+ * is what turns a handful of samples into a streak hundreds of pixels long: each
+ * pass spreads what the last one already spread, so the reach multiplies where a
+ * single wide kernel would only add.
+ *
+ * Horizontal only. The squeeze in an anamorphic lens is horizontal, so its
+ * highlights flare along one axis and that asymmetry is the entire signature —
+ * blurred in both directions it is just more bloom.
+ */
+export const STREAK_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;
+uniform vec2 uTexel;
+uniform float uStride;
+
+void main() {
+  vec3 sum = vec3(0.0);
+  float weightSum = 0.0;
+
+  for (int i = -4; i <= 4; i++) {
+    float offset = float(i) * uStride;
+    // Falls off with distance so the streak tapers instead of ending in a bar.
+    float weight = exp(-abs(float(i)) * 0.45);
+    sum += texture(uSource, vUv + vec2(offset * uTexel.x, 0.0)).rgb * weight;
+    weightSum += weight;
+  }
+
+  fragColor = vec4(sum / weightSum, 1.0);
+}`
+
 /** 9-tap tent upsample, accumulated additively back up the mip chain. */
 export const BLOOM_UP_FRAG = `#version 300 es
 precision highp float;
@@ -297,8 +389,8 @@ void main() {
 }`
 
 /**
- * Final composite: chromatic aberration, bloom, exposure, tonemap, grade,
- * vignette, grain, and an ordered dither on the way out.
+ * Final composite: lens, bloom, exposure, tonemap, grade, vignette,
+ * grain, and an ordered dither on the way out.
  */
 export const COMPOSITE_FRAG = `#version 300 es
 precision highp float;
@@ -307,14 +399,24 @@ out vec4 fragColor;
 
 uniform sampler2D uScene;
 uniform sampler2D uBloom;
+uniform sampler2D uStreak;
 uniform vec2 uResolution;
 uniform float uBloomIntensity;
+uniform float uStreaks;
+uniform float uGhosts;
+uniform float uTanHalfFov;
+uniform float uDistortion;
 uniform float uAberration;
+uniform float uDispersion;
+uniform float uLensNoise;
 uniform float uExposure;
 uniform float uContrast;
 uniform float uSaturation;
 uniform float uVignette;
 uniform float uGrain;
+uniform float uDuotone;
+uniform vec3 uDuotoneShadow;
+uniform vec3 uDuotoneHighlight;
 uniform float uTime;
 uniform bool uTonemap;
 
@@ -343,34 +445,173 @@ float hash(vec2 p) {
   return fract((p3.x + p3.y) * p3.z);
 }
 
+/**
+ * Where a fragment reads the frame, once the lens has had its way with it.
+ *
+ * The scale is the magnification for one wavelength: glass focuses short and long
+ * wavelengths at slightly different sizes, and that difference is the whole of
+ * lateral chromatic aberration. The bulge multiplies into the same coordinate
+ * rather than being a second pass over the result, so the two compose the way
+ * they do in a real lens instead of one distorting the other's output.
+ */
+vec2 lensUv(vec2 centred, float aspect, float scale) {
+  vec2 radial = centred * vec2(aspect, 1.0);
+  // Brown–Conrady, first term only. Subtracted, so a positive amount samples
+  // nearer the middle at the edges and the picture bulges towards the viewer —
+  // which is the direction anyone reaching for "fisheye" means.
+  float bulge = 1.0 - uDistortion * dot(radial, radial);
+  return 0.5 + centred * bulge * scale;
+}
+
+const int SPECTRAL_TAPS = 12;
+
+/**
+ * Three overlapping responses standing in for a sensor's.
+ *
+ * Triangular rather than gaussian, and each channel is normalised by its own
+ * total afterwards — so integrating a frame that had no fringe in it gives that
+ * frame back, rather than a version of it tinted by whichever lobe happened to
+ * carry more weight.
+ */
+vec3 spectralWeight(float t) {
+  return max(vec3(0.0), 1.0 - abs(vec3(t) - vec3(0.15, 0.5, 0.85)) * 2.5);
+}
+
+vec3 sampleScene(vec2 centred, float aspect, float jitter) {
+  float spread = uAberration * 0.01 * (1.0 + jitter);
+
+  if (spread <= 0.0) return texture(uScene, lensUv(centred, aspect, 1.0)).rgb;
+
+  if (uDispersion <= 0.0) {
+    // One magnification per channel: the split grows towards the edges and
+    // stays clean in the middle, the way a real lens misbehaves.
+    return vec3(
+      texture(uScene, lensUv(centred, aspect, 1.0 - spread)).r,
+      texture(uScene, lensUv(centred, aspect, 1.0)).g,
+      texture(uScene, lensUv(centred, aspect, 1.0 + spread)).b
+    );
+  }
+
+  // Integrated across a band of wavelengths instead of read at three of them.
+  // That is the difference between a fringe and a prism: the channels stop
+  // being three places the frame is sampled and become three responses to a
+  // continuum, so the split smears rather than banding.
+  float band = spread * (1.0 + uDispersion * 3.0);
+  vec3 sum = vec3(0.0);
+  vec3 weightSum = vec3(0.0);
+  for (int i = 0; i < SPECTRAL_TAPS; i++) {
+    float t = (float(i) + 0.5) / float(SPECTRAL_TAPS);
+    vec3 weight = spectralWeight(t);
+    vec3 tap = texture(uScene, lensUv(centred, aspect, 1.0 + (t - 0.5) * 2.0 * band)).rgb;
+    sum += tap * weight;
+    weightSum += weight;
+  }
+  return sum / max(weightSum, vec3(1e-4));
+}
+
+/**
+ * Internal reflections.
+ *
+ * Light that made it through the front element bounces back off the sensor and
+ * again off a later surface, and arrives inverted through the optical axis. So
+ * each ghost is the frame's bright parts thrown across the centre at its own
+ * scale — which is why they march in a line through the middle of the shot and
+ * not outward from the highlight that produced them.
+ */
+vec3 lensGhosts(vec2 uv) {
+  vec3 sum = vec3(0.0);
+  vec2 toCentre = 0.5 - uv;
+
+  for (int i = 1; i <= 4; i++) {
+    // Alternating sides of the centre, at scales that are not multiples of each
+    // other — evenly spaced ghosts read as a repeating pattern rather than as
+    // reflections off surfaces at different depths.
+    float scale = 0.4 + float(i) * 0.63;
+    if (i == 2 || i == 4) scale = -scale * 0.55;
+    vec2 ghost = 0.5 + toCentre * scale;
+
+    // The aperture stops these before they reach the edge of the frame.
+    float falloff = 1.0 - clamp(length(ghost - 0.5) * 2.0, 0.0, 1.0);
+    // Each surface has its own coating, so each ghost has its own cast.
+    vec3 tint = 0.55 + 0.45 * cos(vec3(0.0, 2.1, 4.2) + float(i) * 1.3);
+    sum += texture(uBloom, ghost).rgb * falloff * falloff * tint;
+  }
+  return sum;
+}
+
 void main() {
   vec2 centred = vUv - 0.5;
+  float aspect = uResolution.x / uResolution.y;
 
-  // Lateral chromatic aberration: the three channels are sampled at slightly
-  // different magnifications, so the split grows towards the edges and stays
-  // clean in the middle — the way a real lens misbehaves.
-  vec3 scene;
-  if (uAberration > 0.0) {
-    float amount = uAberration * 0.01;
-    scene.r = texture(uScene, 0.5 + centred * (1.0 - amount)).r;
-    scene.g = texture(uScene, vUv).g;
-    scene.b = texture(uScene, 0.5 + centred * (1.0 + amount)).b;
-  }
-  else {
-    scene = texture(uScene, vUv).rgb;
-  }
+  /*
+   * Grain, scatter and the output dither are noise, and noise has to be measured
+   * against the frame rather than against the buffer.
+   *
+   * Seeded from raw pixel coordinates, every one of them changes character with
+   * the render size: the same shot previewed at 1920 and exported at 3840 gets
+   * grain at half the relative size, and a grade judged on one is wrong for the
+   * other. Referenced to a 1080-high frame — the same convention the bokeh radius
+   * and the screen cell already use — the texture is a property of the shot.
+   */
+  vec2 grainUv = vUv * vec2(aspect * 1080.0, 1080.0);
 
-  vec3 colour = scene + texture(uBloom, vUv).rgb * uBloomIntensity;
+  // Scattered rather than refracted: a jitter on the split breaks the fringe
+  // into speckle, which is what stops a wide spread from reading as three flat
+  // bands laid over the edge of the frame.
+  float jitter = uLensNoise > 0.0
+    ? (hash(grainUv + uTime * 331.0) - 0.5) * uLensNoise * 2.0
+    : 0.0;
+
+  vec3 scene = sampleScene(centred, aspect, jitter);
+  // The glow follows the geometry it came from. Sampled straight it would stay
+  // put while the picture under it bent, and every highlight near an edge would
+  // separate from the thing that was glowing.
+  vec2 lensed = lensUv(centred, aspect, 1.0);
+  vec3 colour = scene;
+
+  colour += texture(uBloom, lensed).rgb * uBloomIntensity;
+  if (uStreaks > 0.0) {
+    // Cooler than the glow it came from: the coating on an anamorphic front
+    // element is what produces the flare, and it is what makes it blue.
+    colour += texture(uStreak, lensed).rgb * uStreaks * vec3(0.55, 0.75, 1.0);
+  }
+  if (uGhosts > 0.0) colour += lensGhosts(lensed) * uGhosts;
 
   colour *= uExposure;
   if (uTonemap) colour = aces(colour);
 
   float luma = dot(colour, vec3(0.2126, 0.7152, 0.0722));
+
+  // Duotone before saturation, not after: this replaces the picture's hue with
+  // a ramp, and saturation is then a control over how far that ramp is taken —
+  // which is the one adjustment anyone wants once they have picked two colours.
+  if (uDuotone > 0.0) {
+    // The ramp already carries the brightness — a dark shadow colour and a
+    // bright highlight one — so it replaces the picture rather than tinting it.
+    // Multiplying by luma on top of that darkens everything twice and leaves a
+    // duotone that only reads at the very top of the range.
+    vec3 ramp = mix(uDuotoneShadow, uDuotoneHighlight, smoothstep(0.0, 1.0, luma));
+    colour = mix(colour, ramp, uDuotone);
+    luma = dot(colour, vec3(0.2126, 0.7152, 0.0722));
+  }
+
   colour = mix(vec3(luma), colour, uSaturation);
 
-  // Vignette in a corrected aspect so it stays circular on a 16:9 frame.
-  vec2 vig = centred * vec2(uResolution.x / uResolution.y, 1.0);
-  colour *= mix(1.0, smoothstep(1.05, 0.25, length(vig)), uVignette);
+  /*
+   * Natural illumination falloff, in a corrected aspect so it stays circular.
+   *
+   * cos⁴ of the angle a point subtends at the lens — the real law, rather than
+   * the arbitrary smoothstep this used to be. Written as a rational function of
+   * the tangent because that is what it reduces to and it avoids a trig call.
+   *
+   * Tying it to the field of view is the point: a wide lens darkens its corners
+   * hard and a long one barely at all, so the vignette now tightens when the
+   * lens is opened instead of staying the same ring at every focal length.
+   */
+  vec2 vig = centred * vec2(aspect, 1.0);
+  float tangent = length(vig) * 2.0 * uTanHalfFov;
+  float natural = 1.0 / ((1.0 + tangent * tangent) * (1.0 + tangent * tangent));
+  colour *= mix(1.0, natural, uVignette);
 
   colour = toSrgb(max(colour, 0.0));
 
@@ -396,15 +637,216 @@ void main() {
 
   if (uGrain > 0.0) {
     // Signed noise, so grain does not lift the blacks the way additive noise does.
-    float noise = hash(vUv * uResolution + uTime * 977.0) - 0.5;
+    float noise = hash(grainUv + uTime * 977.0) - 0.5;
     colour += noise * uGrain;
   }
 
   // A sub-LSB dither. The near-black backdrops these shots use would otherwise
   // band into visible steps once the video codec quantises them.
-  colour += (hash(vUv * uResolution + 17.0) - 0.5) / 255.0;
+  colour += (hash(grainUv + 17.0) - 0.5) / 255.0;
 
   fragColor = vec4(clamp(colour, 0.0, 1.0), 1.0);
+}`
+
+/**
+ * The screen the scene is redrawn through.
+ *
+ * Everything here works in cells rather than in pixels, and reads the picture
+ * once per cell rather than once per fragment — that is what makes it a screen
+ * and not a filter. A dither that sampled every fragment would quantize detail
+ * finer than its own grid and come out as noise; one that samples the cell
+ * centre commits to a value and draws it.
+ *
+ * It runs *before* the light, not after the grade, and that ordering is the
+ * whole look. A screen is a thing that emits — an LED panel, a tube, ink under a
+ * lamp — so it belongs where the scene is, in front of the lens, with the glow
+ * and the streak and the bokeh happening to it. Run last it was a filter laid
+ * over a finished picture: the glyphs could not glow, nothing bled between
+ * cells, and the result read as a texture stamped on the frame rather than as
+ * something being filmed.
+ *
+ * The tone decisions are still taken in display space. Quantizing in linear
+ * light puts every step in the highlights, where nobody can see them, and none
+ * in the shadows, which is where the whole picture lives. So each cell is
+ * converted, decided, and converted back — and anything that was brighter than
+ * white keeps that headroom on the way out, or the panel would have nothing left
+ * above the bloom threshold and could not light its own neighbours.
+ */
+export const STYLIZE_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;
+uniform sampler2D uGlyphs;
+uniform vec2 uResolution;
+uniform vec2 uCell;        // cell size in pixels; letter cells are taller than wide
+uniform float uGlyphCount;
+uniform float uGlyphGain;
+uniform float uLevels;
+uniform float uColour;
+uniform float uAngle;      // radians
+uniform int uMode;         // 1 dither, 2 ascii, 3 halftone, 4 posterize, 5 crt
+
+${COMMON}
+
+const vec3 LUMA = vec3(0.2126, 0.7152, 0.0722);
+const float TAU = 6.28318530718;
+
+/**
+ * How lit a cell is before anything is drawn in it.
+ *
+ * A panel's dark cells are not absent, they are unlit — the glyph is still
+ * physically there catching whatever light is in the room, and it is what makes
+ * the grid read as a surface across the black parts of a shot instead of the
+ * picture simply stopping. Without it the darks go empty and the whole thing
+ * looks like sparse noise on a void rather than like a screen.
+ */
+const float PANEL_FLOOR = 0.022;
+
+/**
+ * The 8×8 ordered dither matrix, built rather than tabulated.
+ *
+ * Bit reversal interleaved with x^y — the standard recursive construction,
+ * which folds into a handful of integer ops. A 64-entry array would have to be
+ * indexed by a value the compiler cannot see, and a dynamically indexed array
+ * in a fragment shader becomes a branch tree on several drivers.
+ */
+float bayer8(vec2 cell) {
+  ivec2 c = ivec2(cell) & 7;
+  int a = c.x ^ c.y;
+  int v = ((a >> 2) & 1)
+    | (((c.y >> 2) & 1) << 1)
+    | (((a >> 1) & 1) << 2)
+    | (((c.y >> 1) & 1) << 3)
+    | ((a & 1) << 4)
+    | ((c.y & 1) << 5);
+  return float(v) / 64.0;
+}
+
+/** The scene at the centre of a cell, in linear light, so a screen reads one value per cell. */
+vec3 cellLinear(vec2 cell) {
+  return max(texture(uSource, (cell + 0.5) * uCell / uResolution).rgb, 0.0);
+}
+
+/** What the screen draws with: brightness alone, or the colour it came in with. */
+vec3 ink(vec3 c) {
+  return mix(vec3(dot(c, LUMA)), c, uColour);
+}
+
+/** Whatever this cell had above white, kept so the panel can still light the room. */
+float headroom(vec3 linear) {
+  return max(1.0, max(linear.r, max(linear.g, linear.b)));
+}
+
+void main() {
+  vec2 pixel = vUv * uResolution;
+  float steps = max(uLevels - 1.0, 1.0);
+  vec3 result;
+  float boost = 1.0;
+
+  if (uMode == 1) {
+    vec2 cell = floor(pixel / uCell);
+    vec3 linear = cellLinear(cell);
+    boost = headroom(linear);
+    vec3 c = ink(toSrgb(linear));
+    result = floor(c * steps + bayer8(cell)) / steps;
+  }
+  else if (uMode == 2) {
+    vec2 cell = floor(pixel / uCell);
+    vec2 inCell = fract(pixel / uCell);
+    vec3 linear = cellLinear(cell);
+    boost = headroom(linear);
+    vec3 c = toSrgb(linear);
+    float luma = clamp(dot(c, LUMA), 0.0, 1.0);
+
+    // Dithered before it is quantized to a glyph. Without it a slow gradient
+    // lands on the same character across a wide band, and the picture reads as
+    // contour lines rather than as tone.
+    float offset = (bayer8(cell) - 0.5) / uGlyphCount;
+    float index = floor(clamp(luma + offset, 0.0, 0.999) * uGlyphCount);
+    // Held a little inside the cell, so the linear filter cannot drag the
+    // neighbouring glyph in across the seam.
+    float u = (index + clamp(inCell.x, 0.02, 0.98)) / uGlyphCount;
+
+    /*
+     * Re-sharpened after sampling.
+     *
+     * The atlas is rasterized far larger than a cell is drawn, so the filter is
+     * minifying hard and every glyph comes back soft and grey-edged — which is
+     * what made this read as smudge rather than as type. A hard threshold across
+     * the coverage puts the edge back; smoothstep rather than step so it is
+     * still antialiased at exactly the width of one sample.
+     */
+    float cover = smoothstep(0.35, 0.62, texture(uGlyphs, vec2(u, inCell.y)).a);
+    // Divided by the ramp's gain because it is multiplied back by it below.
+    // Ambient on a dark cell is a property of the panel, not of how dense the
+    // glyphs happen to be — left un-divided, a sparse ramp with a 3x gain drew
+    // its unlit grid three times brighter than a dense one and the texture
+    // stopped reading as a surface and started reading as a screen door.
+    result = (ink(c) + vec3(PANEL_FLOOR / uGlyphGain)) * cover;
+
+    /*
+     * The ramp's own density, paid in light rather than in display value.
+     *
+     * A letter covers a fraction of its cell where a block covers all of it, so
+     * without this the same shot is dimmer drawn as type than drawn as blocks.
+     * Folding it into the headroom instead of into the colour is what keeps the
+     * hue: multiplied before the clamp, every lit cell simply saturated to white
+     * and the picture came back monochrome.
+     */
+    boost *= uGlyphGain;
+  }
+  else if (uMode == 3) {
+    float s = sin(uAngle), co = cos(uAngle);
+    mat2 screen = mat2(co, -s, s, co);
+    vec2 rotated = screen * pixel;
+    vec2 cell = floor(rotated / uCell);
+    vec2 inCell = fract(rotated / uCell) - 0.5;
+
+    // Back out of the screen's own frame to read the picture where the dot sits.
+    vec3 linear = max(texture(uSource, (transpose(screen) * ((cell + 0.5) * uCell)) / uResolution).rgb, 0.0);
+    boost = headroom(linear);
+    vec3 c = toSrgb(linear);
+    float luma = clamp(dot(c, LUMA), 0.0, 1.0);
+
+    // Area proportional to brightness, hence the square root. A radius that
+    // tracked brightness directly would put a mid grey at a quarter of its
+    // coverage and darken every midtone in the frame.
+    float radius = sqrt(luma) * 0.71;
+    float edge = 0.7071 / min(uCell.x, uCell.y);
+    result = ink(c) * (1.0 - smoothstep(radius - edge, radius + edge, length(inCell)));
+  }
+  else if (uMode == 4) {
+    vec3 linear = cellLinear(floor(pixel / uCell));
+    boost = headroom(linear);
+    vec3 c = ink(toSrgb(linear));
+    result = floor(c * steps + 0.5) / steps;
+  }
+  else {
+    vec3 linear = max(texture(uSource, vUv).rgb, 0.0);
+    boost = headroom(linear);
+    vec3 c = ink(toSrgb(linear));
+    float scan = 0.5 + 0.5 * cos(TAU * pixel.y / uCell.y);
+    // An aperture grille: each cell split into three vertical stripes, which is
+    // where a tube's colour comes from in the first place.
+    float stripe = mod(floor(pixel.x * 3.0 / uCell.x), 3.0);
+    vec3 mask = vec3(
+      stripe < 0.5 ? 1.0 : 0.35,
+      abs(stripe - 1.0) < 0.5 ? 1.0 : 0.35,
+      stripe > 1.5 ? 1.0 : 0.35
+    );
+    // The mask and the scanline together throw away most of the light. Putting
+    // it back is what keeps a crt shot from arriving two stops under; the
+    // highlights clip in the process, which is also what a tube does.
+    result = c * mask * mix(1.0, scan, 0.5) * 2.35;
+  }
+
+  // Back to linear, carrying whatever the cell had above white. Everything
+  // downstream — the glow, the streak, the lens, the grade — is expecting light,
+  // and a screen that clipped itself at 1.0 here would be a panel that cannot
+  // illuminate anything, including its own neighbouring cells.
+  fragColor = vec4(toLinear(clamp(result, 0.0, 1.0)) * boost, 1.0);
 }`
 
 /**

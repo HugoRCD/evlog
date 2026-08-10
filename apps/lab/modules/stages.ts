@@ -107,21 +107,41 @@ ${entries.join('\n')}
 
     nuxt.options.alias['#render-labs/stages'] = generated
 
-    // Tailwind scans the importing project only, and every utility a staged
-    // component uses lives outside it. Declared here so a source brings its own
-    // styling with it rather than needing a second edit in the stylesheet.
-    const scanned = sources.map(source => source.source).filter((path): path is string => Boolean(path))
-    if (scanned.length) {
+    /*
+     * The stylesheets and the scan paths, in one file, and it has to be one.
+     *
+     * `@source` only means anything inside the stylesheet that imports Tailwind,
+     * and the file that does that is the source's own — so the directive has to
+     * sit in the same import graph, not beside it. Pushed as two entries in
+     * `nuxt.options.css` they are two unrelated roots: the scan paths land in a
+     * file Tailwind never treats as a root, the directive is silently dropped,
+     * and no utility used only by a staged component is ever generated.
+     *
+     * That failure is quiet and looks like something else entirely. The layout
+     * is right, the tokens resolve, and anything the lab's own chrome happens to
+     * use also works — so a plate comes back with its accent colour intact and
+     * every other colour and icon missing, which reads as a capture problem
+     * rather than as a stylesheet that was never built.
+     */
+    const stylesheets = sources.flatMap(source => (source.css ? [resolve(root, source.css)] : []))
+    const scanned = sources.flatMap(source => (source.source ? [resolve(root, source.source)] : []))
+
+    if (stylesheets.length || scanned.length) {
       const sheet = addTemplate({
         filename: 'render-labs-stage-sources.css',
         write: true,
-        getContents: () => `${scanned.map(path => `@source ${JSON.stringify(resolve(root, path))};`).join('\n')}\n`,
+        getContents: () => [
+          // Relative to the project root rather than to this file or to the
+          // filesystem. An `@import` inside a Nuxt CSS entry is resolved from
+          // the root whatever directory the entry itself was written to, so an
+          // absolute path is read as root-relative and a path relative to the
+          // build directory lands a level too high.
+          ...stylesheets.map(path => `@import ${JSON.stringify(withLeadingDot(relative(root, path)))};`),
+          ...scanned.map(path => `@source ${JSON.stringify(path)};`),
+          '',
+        ].join('\n'),
       })
       nuxt.options.css.push(sheet.dst)
-    }
-
-    for (const source of sources) {
-      if (source.css) nuxt.options.css.push(resolve(root, source.css))
     }
 
     // The sources sit outside the project root, which Vite refuses to serve from

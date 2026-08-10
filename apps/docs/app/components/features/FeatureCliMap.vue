@@ -55,7 +55,6 @@ function barTone(value: number): string {
   return 'bg-primary'
 }
 
-const timers: ReturnType<typeof setTimeout>[] = []
 let frame: number | undefined
 let observer: IntersectionObserver | undefined
 
@@ -79,24 +78,39 @@ function countUp() {
   frame = requestAnimationFrame(step)
 }
 
+/*
+ * On the frame clock, like every other demo here.
+ *
+ * This ran on `setTimeout` and the counter beside it ran on `requestAnimationFrame`,
+ * which is two clocks for one animation. On the site they agree closely enough;
+ * anywhere that drives frames by hand — Render labs stepping a take, or a tab
+ * throttled in the background — they do not, and the score finished counting
+ * while the rows it belongs to were still waiting on a wall-clock timer.
+ */
+const RAISED_AT = 2600 + loop.length * 620
+
+const sequence = useTimedSequence({
+  events: [
+    { at: 400, run: countUp },
+    ...gaps.map((_, i) => ({ at: 1600 + i * 260, run: () => {
+      visibleGaps.value = i + 1 
+    } })),
+    ...loop.map((_, i) => ({ at: 2600 + i * 620, run: () => {
+      visibleSteps.value = i + 1 
+    } })),
+    { at: RAISED_AT, run: () => {
+      raised.value = true 
+    } },
+  ],
+  // A beat past the last event, so a clip cut to this length lands on the
+  // finished state instead of on the frame that completes it.
+  totalDuration: RAISED_AT + 900,
+})
+
 function start() {
   if (started.value) return
   started.value = true
-
-  timers.push(setTimeout(countUp, 400))
-  gaps.forEach((_, i) => {
-    timers.push(setTimeout(() => {
-      visibleGaps.value = i + 1
-    }, 1600 + i * 260))
-  })
-  loop.forEach((_, i) => {
-    timers.push(setTimeout(() => {
-      visibleSteps.value = i + 1
-    }, 2600 + i * 620))
-  })
-  timers.push(setTimeout(() => {
-    raised.value = true
-  }, 2600 + loop.length * 620))
+  sequence.start()
 }
 
 onMounted(() => {
@@ -120,7 +134,6 @@ onMounted(() => {
 
 onBeforeUnmount(() => {
   observer?.disconnect()
-  timers.forEach(clearTimeout)
   if (frame !== undefined) cancelAnimationFrame(frame)
 })
 </script>

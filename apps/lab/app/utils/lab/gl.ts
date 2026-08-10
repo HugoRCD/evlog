@@ -277,8 +277,15 @@ export class Renderer {
     return target
   }
 
-  /** Create a texture fed from a DOM source (the serialized stage image). */
-  createSourceTexture(): WebGLTexture {
+  /**
+   * Create a texture fed from a DOM source (the serialized stage image).
+   *
+   * `mipmap` is off for anything sampled at its own scale rather than through a
+   * camera — the glyph atlas being the one such source. Its cells sit edge to
+   * edge in a single row, so a lower mip is a blend of neighbouring characters,
+   * and every glyph in the ramp bleeds into the two beside it.
+   */
+  createSourceTexture(mipmap = true): WebGLTexture {
     const { gl } = this
     const texture = gl.createTexture()
     if (!texture) throw new Error('Failed to allocate a source texture.')
@@ -294,14 +301,16 @@ export class Renderer {
     // mush, because the minification is anisotropic: heavy along the direction
     // of recession, light across it. Anisotropic filtering is what keeps the
     // far edge both stable and legible.
-    gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
-    if (this.anisotropy) {
-      gl.texParameterf(gl.TEXTURE_2D, this.anisotropy.pname, this.anisotropy.max)
+    if (mipmap) {
+      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR_MIPMAP_LINEAR)
+      if (this.anisotropy) {
+        gl.texParameterf(gl.TEXTURE_2D, this.anisotropy.pname, this.anisotropy.max)
+      }
     }
     return texture
   }
 
-  upload(texture: WebGLTexture, source: TexImageSource) {
+  upload(texture: WebGLTexture, source: TexImageSource, mipmap = true) {
     const { gl } = this
     gl.bindTexture(gl.TEXTURE_2D, texture)
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, true)
@@ -310,7 +319,7 @@ export class Renderer {
     gl.pixelStorei(gl.UNPACK_FLIP_Y_WEBGL, false)
     // WebGL2 allows mipmaps on non-power-of-two textures, so the plate can keep
     // the stage's exact dimensions instead of being padded to a power of two.
-    gl.generateMipmap(gl.TEXTURE_2D)
+    if (mipmap) gl.generateMipmap(gl.TEXTURE_2D)
   }
 
   /** Bind a target (or the canvas when `null`) and set the viewport to match. */

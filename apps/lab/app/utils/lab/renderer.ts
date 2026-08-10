@@ -1,11 +1,15 @@
 /**
  * The post-processing pipeline.
  *
- * stage → depth of field → bloom (mip chain) → composite. Every intermediate
- * target is half-float where the driver allows it, because bloom needs values
- * above 1.0 to survive between passes — clamped at 8 bits, a highlight is just
- * white and the glow it should have thrown away is gone before the threshold
- * ever sees it.
+ * stage → depth of field → stylize → bloom (mip chain) → streak → composite.
+ *
+ * The screen sits where the scene does, not at the end: it is a thing that
+ * emits, so everything the lens does happens to it rather than over it.
+ *
+ * Every intermediate target is half-float where the driver allows it, because
+ * bloom needs values above 1.0 to survive between passes — clamped at 8 bits, a
+ * highlight is just white and the glow it should have thrown away is gone before
+ * the threshold ever sees it.
  */
 
 import { Renderer } from './gl'
@@ -19,9 +23,12 @@ import {
   DOF_FRAG,
   OVERLAY_FRAG,
   STAGE_FRAG,
+  STREAK_FRAG,
+  STYLIZE_FRAG,
 } from './shaders'
-import { hexToLinearRgb } from './settings'
-import type { LabSettings } from './settings'
+import { bloomKneeFor, dofSamplesFor, hexToLinearRgb } from './settings'
+import type { LabSettings, StylizeMode } from './settings'
+import { asciiCellAspect } from './ascii'
 
 /** Half-height of the staged plane in world units; width follows the source aspect. */
 const PLANE_HALF_HEIGHT = 1
@@ -55,7 +62,24 @@ export interface LayerPlane {
   emission: number
 }
 
+/** The part of a plane that decides where it lands on screen. */
+export type PlaneGeometry = Pick<LayerPlane, 'offsetX' | 'offsetY' | 'depth' | 'halfWidth' | 'halfHeight' | 'rotation'>
+
 const DEGREES = Math.PI / 180
+
+/**
+ * Which branch of the stylize shader each mode selects.
+ *
+ * `none` is absent rather than mapped to zero: the pass does not run at all,
+ * which is what keeps the default pipeline exactly as long as it was.
+ */
+const STYLIZE_BRANCH: Partial<Record<StylizeMode, number>> = {
+  dither: 1,
+  ascii: 2,
+  halftone: 3,
+  posterize: 4,
+  crt: 5,
+}
 
 export class LabRenderer {
   private renderer: Renderer
@@ -68,15 +92,23 @@ export class LabRenderer {
   private down: Program
   private up: Program
   private composite: Program
+  private streak: Program
+  private stylize: Program
   private overlay: Program
   private blit: Program
 
   private layerTextures = new Map<string, WebGLTexture>()
   private sceneTarget: Target
   private dofTarget: Target
+  private screenTarget: Target
   private bloomChain: Target[] = []
+  /** Ping-pong pair for the streak, at the first bloom mip's size. */
+  private streakTargets: [Target, Target] | null = null
   private width = 0
   private height = 0
+
+  /** The ascii ramp, and how many glyphs are in it. Null until one is handed over. */
+  private glyphs: { texture: WebGLTexture, count: number, gain: number } | null = null
 
   constructor(canvas: HTMLCanvasElement) {
     this.renderer = new Renderer(canvas)
@@ -87,12 +119,32 @@ export class LabRenderer {
     this.down = this.renderer.fragment(BLOOM_DOWN_FRAG, 'bloom-down')
     this.up = this.renderer.fragment(BLOOM_UP_FRAG, 'bloom-up')
     this.composite = this.renderer.fragment(COMPOSITE_FRAG, 'composite')
+    this.streak = this.renderer.fragment(STREAK_FRAG, 'streak')
+    this.stylize = this.renderer.fragment(STYLIZE_FRAG, 'stylize')
     this.overlay = this.renderer.fragment(OVERLAY_FRAG, 'overlay')
     this.blit = this.renderer.fragment(BLIT_FRAG, 'blit')
 
     // Two attachments: colour, and the circle of confusion kept out of its alpha.
     this.sceneTarget = this.renderer.createTarget(2, 2, { attachments: 2 })
     this.dofTarget = this.renderer.createTarget(2, 2)
+    // Half-float like the rest of the chain, and for the same reason: a screen
+    // is a light source, so its hot cells carry values above 1.0 that the bloom
+    // threshold has to still be able to see.
+    this.screenTarget = this.renderer.createTarget(2, 2)
+  }
+
+  /**
+   * Hand over the glyph ramp the ascii screen draws with.
+   *
+   * Built outside the renderer because it is a rasterization job, not a GL one —
+   * and because it has to wait for the fonts to load, which the renderer has no
+   * business knowing about. See `ascii.ts`.
+   */
+  setGlyphAtlas(image: TexImageSource, count: number, gain: number) {
+    let texture = this.glyphs?.texture
+    if (!texture) texture = this.renderer.createSourceTexture(false)
+    this.renderer.upload(texture, image, false)
+    this.glyphs = { texture, count, gain }
   }
 
   get canvas() {
@@ -136,6 +188,7 @@ export class LabRenderer {
     this.renderer.canvas.height = h
     this.sceneTarget.resize(w, h)
     this.dofTarget.resize(w, h)
+    this.screenTarget.resize(w, h)
     this.rebuildBloomChain()
   }
 
@@ -158,14 +211,87 @@ export class LabRenderer {
     }
     // Degenerate output sizes still need one level for the composite to sample.
     if (!this.bloomChain.length) this.bloomChain.push(this.renderer.createTarget(8, 8))
+
+    for (const target of this.streakTargets ?? []) target.dispose()
+    const [first] = this.bloomChain
+    this.streakTargets = first
+      ? [
+        this.renderer.createTarget(first.width, first.height),
+        this.renderer.createTarget(first.width, first.height),
+      ]
+      : null
   }
 
   render(settings: LabSettings, time: number, planes: LayerPlane[] = [], overlays: OverlayQuad[] = []) {
     this.renderStage(settings, planes.filter(plane => !plane.overlay))
-    const scene = this.renderDof(settings)
+
+    // The screen stands in for the scene from here on. It emits light like
+    // anything else in front of the lens, so the glow, the streak and the whole
+    // grade run on it rather than over it.
+    const branch = this.stylizeBranch(settings)
+    const scene = branch ? this.renderStylize(settings, branch) : this.renderDof(settings)
+
     const bloom = this.renderBloom(settings, scene)
-    this.renderComposite(settings, scene, bloom, time)
+    const streak = this.renderStreak(settings, bloom)
+    this.renderComposite(settings, time, { scene, bloom, streak })
+
     this.renderOverlays(overlays)
+  }
+
+  /**
+   * The shader branch a shot's screen selects, or null for no screen at all.
+   *
+   * Ascii also needs its ramp, and the atlas is built asynchronously — a shot
+   * that opens with ascii already set would otherwise draw one frame of solid
+   * black while the fonts load. Falling through to no screen for that frame is
+   * the honest answer: the picture is simply not stylized yet.
+   */
+  private stylizeBranch(settings: LabSettings): number | null {
+    const branch = STYLIZE_BRANCH[settings.stylize]
+    if (!branch) return null
+    if (settings.stylize === 'ascii' && !this.glyphs) return null
+    return branch
+  }
+
+  /**
+   * Redraw the scene through a screen, into the target the rest of the chain reads.
+   *
+   * Fed the depth of field's output rather than the raw stage, so the bokeh is
+   * part of what the cells sample: a defocused region resolves to soft cells
+   * rather than to sharp cells full of noise.
+   *
+   * The cell size is authored against a 1080p frame and scaled to whatever is
+   * being rendered, for the same reason the bokeh radius is: left in device
+   * pixels the cells would be a different size in the preview than in the
+   * export, and would change every time the window was resized.
+   */
+  private renderStylize(settings: LabSettings, branch: number): Target {
+    const { renderer } = this
+    const source = this.renderDof(settings)
+    const cell = Math.max(2, settings.stylizeScale * (this.height / 1080))
+
+    renderer.bind(this.screenTarget)
+    this.stylize.use()
+    this.stylize.set('uSource', source.texture)
+    if (this.glyphs) this.stylize.set('uGlyphs', this.glyphs.texture)
+    this.stylize.set('uGlyphCount', this.glyphs?.count ?? 1)
+    this.stylize.set('uGlyphGain', this.glyphs?.gain ?? 1)
+    this.stylize.set('uResolution', [this.width, this.height])
+    // Letters are about twice as tall as they are wide, so a ramp made of them
+    // is laid out in cells that shape — a square cell stretches every glyph and
+    // squashes the picture. A ramp of blocks and marks has no such bias and gets
+    // square cells, which is what makes it read as a matrix rather than as type.
+    this.stylize.set('uCell', [cell, cell * this.cellAspect(settings)])
+    this.stylize.set('uLevels', settings.stylizeLevels)
+    this.stylize.set('uColour', settings.stylizeColour)
+    this.stylize.set('uAngle', settings.stylizeAngle * DEGREES)
+    this.stylize.set('uMode', branch)
+    renderer.draw()
+    return this.screenTarget
+  }
+
+  private cellAspect(settings: LabSettings): number {
+    return settings.stylize === 'ascii' ? asciiCellAspect(settings.asciiSet) : 1
   }
 
   /**
@@ -296,6 +422,70 @@ export class LabRenderer {
     return this.camera(settings).distance
   }
 
+  /**
+   * Where a plane's four corners land on the frame, as fractions with y down.
+   *
+   * The same projection the stage shader does, on the CPU, because a selection
+   * box has to sit exactly on the thing it selects — and under a tilt that
+   * outline is a general quadrilateral, not a rectangle. Anything drawn from a
+   * centre and a size would be square to the screen while the layer it claims to
+   * be around is not.
+   *
+   * Fractions rather than pixels so the caller can place handles against the
+   * frame element without knowing the render resolution.
+   *
+   * Null when any corner is level with or behind the camera: the projection is
+   * meaningless there, and half a box drawn from the corners that did resolve
+   * would point somewhere the layer is not.
+   */
+  projectPlane(settings: LabSettings, plane: PlaneGeometry): [number, number][] | null {
+    const { distance } = this.camera(settings)
+    const tanHalfFov = Math.tan((settings.fov * DEGREES) / 2)
+    const aspect = this.width / this.height
+
+    const basis = rotationMatrix(
+      settings.pitch * DEGREES,
+      settings.yaw * DEGREES,
+      (settings.roll + plane.rotation) * DEGREES,
+    )
+    const right: Vec3 = [basis[0] ?? 0, basis[1] ?? 0, basis[2] ?? 0]
+    const up: Vec3 = [basis[3] ?? 0, basis[4] ?? 0, basis[5] ?? 0]
+    const centre: Vec3 = [
+      settings.panX + plane.offsetX,
+      settings.panY + plane.offsetY,
+      -(distance + plane.depth),
+    ]
+
+    const corners: [number, number][] = []
+    for (const [u, v] of [[-1, 1], [1, 1], [1, -1], [-1, -1]] as const) {
+      const x = centre[0] + right[0] * u * plane.halfWidth + up[0] * v * plane.halfHeight
+      const y = centre[1] + right[1] * u * plane.halfWidth + up[1] * v * plane.halfHeight
+      const z = centre[2] + right[2] * u * plane.halfWidth + up[2] * v * plane.halfHeight
+      if (-z <= 1e-3) return null
+
+      const ndcX = x / (-z * tanHalfFov * aspect)
+      const ndcY = y / (-z * tanHalfFov)
+      corners.push([ndcX * 0.5 + 0.5, 0.5 - ndcY * 0.5])
+    }
+    return corners
+  }
+
+  /**
+   * How much world a whole frame covers at a given depth.
+   *
+   * What turns a drag across the frame into a displacement of the thing being
+   * dragged. It falls off with depth because perspective does: a layer pushed
+   * back has to travel further in world units to cross the same distance on
+   * screen, and a drag that ignored that would slide a distant layer under the
+   * pointer instead of with it.
+   */
+  worldPerFrame(settings: LabSettings, depth: number): { x: number, y: number } {
+    const { distance } = this.camera(settings)
+    const tanHalfFov = Math.tan((settings.fov * DEGREES) / 2)
+    const height = 2 * tanHalfFov * Math.max(distance + depth, 1e-3)
+    return { x: height * (this.width / this.height), y: height }
+  }
+
   private renderStage(settings: LabSettings, planes: LayerPlane[]) {
     const { renderer } = this
     const { gl } = renderer
@@ -306,6 +496,7 @@ export class LabRenderer {
     // every plane — the component included — composites the same way.
     const [r, g, b] = hexToLinearRgb(settings.background)
     renderer.clearAttachment(0, [r, g, b, 1])
+    // 0.5 unpacks to a circle of confusion of zero: the backdrop is in focus.
     // 0.5 unpacks to a circle of confusion of zero: the backdrop is in focus.
     renderer.clearAttachment(1, [0.5, 0.5, 0.5, 1])
 
@@ -376,7 +567,9 @@ export class LabRenderer {
     this.dof.set('uMaxRadius', settings.blurRadius * (this.height / 1080))
     // The shader loop is bounded at 256; the UI caps lower, but a hand-edited
     // URL should not be able to hang the GPU.
-    this.dof.set('uSamples', Math.min(256, Math.round(settings.dofSamples)))
+    this.dof.set('uSamples', dofSamplesFor(settings.blurRadius))
+    this.dof.set('uBlades', settings.bokehBlades)
+    this.dof.set('uCatEye', settings.bokehCatEye)
     renderer.draw()
     return this.dofTarget
   }
@@ -394,7 +587,8 @@ export class LabRenderer {
     this.prefilter.use()
     this.prefilter.set('uSource', scene.texture)
     this.prefilter.set('uThreshold', settings.bloomThreshold)
-    this.prefilter.set('uKnee', settings.bloomKnee)
+    this.prefilter.set('uKnee', bloomKneeFor(settings.bloomThreshold))
+    this.prefilter.set('uBleed', settings.bleed)
     renderer.draw()
 
     for (let i = 1; i < this.bloomChain.length; i++) {
@@ -428,15 +622,60 @@ export class LabRenderer {
     return first
   }
 
-  private renderComposite(settings: LabSettings, scene: Target, bloom: Target, time: number) {
+  /**
+   * The anamorphic streak, spread horizontally out of the thresholded bloom.
+   *
+   * Three passes with the stride multiplied by the tap count each time, so the
+   * reach compounds: nine taps at strides of 1, 9 and 81 cover eight hundred
+   * pixels between them, where one kernel wide enough to do that alone would
+   * cost a hundred times as many samples.
+   */
+  private renderStreak(settings: LabSettings, bloom: Target): Target | null {
+    if (settings.streaks <= 0 || !this.streakTargets) return null
+
     const { renderer } = this
+    const [a, b] = this.streakTargets
+    let source = bloom
+    // Authored against a 1080-high frame, like the bokeh radius and the screen
+    // cell. Left in raw texels the streak covered a fixed number of pixels of
+    // whatever buffer it ran on, so the same shot flared a third of the way
+    // across a 1080 export and half as far across a 4K one.
+    let stride = Math.max(1, this.height / 1080)
+
+    for (let pass = 0; pass < 3; pass++) {
+      const target = pass % 2 === 0 ? a : b
+      renderer.bind(target)
+      this.streak.use()
+      this.streak.set('uSource', source.texture)
+      this.streak.set('uTexel', [1 / target.width, 1 / target.height])
+      this.streak.set('uStride', stride)
+      renderer.draw()
+      source = target
+      stride *= 9
+    }
+    return source
+  }
+
+  private renderComposite(settings: LabSettings, time: number, pass: { scene: Target, bloom: Target, streak: Target | null }) {
+    const { renderer } = this
+    const { scene, bloom, streak } = pass
     renderer.bind(null)
     this.composite.use()
     this.composite.set('uScene', scene.texture)
     this.composite.set('uBloom', bloom.texture)
+    this.composite.set('uStreak', (streak ?? bloom).texture)
+    this.composite.set('uStreaks', streak ? settings.streaks : 0)
+    this.composite.set('uGhosts', settings.ghosts)
+    this.composite.set('uTanHalfFov', Math.tan((settings.fov * DEGREES) / 2))
     this.composite.set('uResolution', [this.width, this.height])
     this.composite.set('uBloomIntensity', settings.bloomIntensity)
+    this.composite.set('uDistortion', settings.distortion)
     this.composite.set('uAberration', settings.aberration)
+    this.composite.set('uDispersion', settings.dispersion)
+    this.composite.set('uLensNoise', settings.lensNoise)
+    this.composite.set('uDuotone', settings.duotone)
+    this.composite.set('uDuotoneShadow', hexToLinearRgb(settings.duotoneShadow))
+    this.composite.set('uDuotoneHighlight', hexToLinearRgb(settings.duotoneHighlight))
     this.composite.set('uExposure', settings.exposure)
     this.composite.set('uContrast', settings.contrast)
     this.composite.set('uSaturation', settings.saturation)
@@ -459,11 +698,12 @@ export class LabRenderer {
   }
 
   dispose() {
-    for (const program of [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.overlay, this.blit]) {
-      program.dispose()
-    }
-    for (const target of [this.sceneTarget, this.dofTarget, ...this.bloomChain]) target.dispose()
+    const programs = [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.streak, this.stylize, this.overlay, this.blit]
+    for (const program of programs) program.dispose()
+    const targets = [this.sceneTarget, this.dofTarget, this.screenTarget, ...this.bloomChain, ...this.streakTargets ?? []]
+    for (const target of targets) target.dispose()
     for (const texture of this.layerTextures.values()) this.renderer.gl.deleteTexture(texture)
+    if (this.glyphs) this.renderer.gl.deleteTexture(this.glyphs.texture)
     this.layerTextures.clear()
     this.renderer.dispose()
   }
@@ -520,89 +760,4 @@ export function distanceToFit(fov: number, outputAspect: number, sourceAspect: n
   const byHeight = PLANE_HALF_HEIGHT / tanHalf
   const byWidth = (PLANE_HALF_HEIGHT * sourceAspect) / (tanHalf * outputAspect)
   return Math.max(byHeight, byWidth)
-}
-
-export interface Framing {
-  fov: number
-  pitch: number
-  yaw: number
-  roll: number
-  panX: number
-  panY: number
-  /** Output frame aspect. */
-  outputAspect: number
-  /** Stage aspect — the shape of what is being filmed. */
-  sourceAspect: number
-}
-
-/**
- * How much of the frame the plate covers at a given zoom, as a fraction.
- *
- * 1 means a corner sits exactly on an edge. Above 1 the plate is cropped, which
- * is legitimate for a push-in and fatal for a hero shot — the caller decides.
- *
- * `distanceToFit` only answers this for a plate square to the sensor. Rotate it
- * and the projected outline grows by an amount that depends on the angles *and*
- * on the plate's own aspect: the same 20° yaw overflows a wide panel and barely
- * touches a tall one. That interaction is the whole reason a stored zoom cannot
- * travel between shots.
- */
-export function frameCoverage(framing: Framing, zoom: number): number {
-  const { fov, pitch, yaw, roll, panX, panY, outputAspect, sourceAspect } = framing
-
-  const tanHalf = Math.tan((fov * DEGREES) / 2)
-  const distance = distanceToFit(fov, outputAspect, sourceAspect) / Math.max(zoom, 0.05)
-
-  const basis = rotationMatrix(pitch * DEGREES, yaw * DEGREES, roll * DEGREES)
-  const halfWidth = PLANE_HALF_HEIGHT * sourceAspect
-  const halfHeight = PLANE_HALF_HEIGHT
-
-  let extent = 0
-  for (const u of [-1, 1]) {
-    for (const v of [-1, 1]) {
-      // Same convention as `camera()`: the plate's centre sits at +distance and
-      // the rotated corner offset is subtracted in depth.
-      const x = (basis[0] ?? 0) * u * halfWidth + (basis[3] ?? 0) * v * halfHeight + panX
-      const y = (basis[1] ?? 0) * u * halfWidth + (basis[4] ?? 0) * v * halfHeight + panY
-      const z = distance - ((basis[2] ?? 0) * u * halfWidth + (basis[5] ?? 0) * v * halfHeight)
-
-      // Behind or level with the camera: the projection is meaningless, and the
-      // framing is unusable at any zoom. Report it as overflowing so a solver
-      // backs off rather than converging on a degenerate answer.
-      if (z <= 1e-3) return Infinity
-
-      extent = Math.max(extent, Math.abs(x / (z * tanHalf * outputAspect)), Math.abs(y / (z * tanHalf)))
-    }
-  }
-  return extent
-}
-
-/**
- * The zoom at which the rotated plate covers exactly `fill` of the frame.
- *
- * Bisected rather than solved: coverage is not linear in zoom, because each
- * corner sits at its own depth once the plate is tilted and perspective divides
- * by that depth. Forty iterations over four corners is nothing next to a single
- * frame of bokeh, and this runs when a look is applied, not per frame.
- *
- * This is what lets a look state an intent — "a 3/4 angle that fills the frame"
- * — instead of a number that was only ever right for the plate it was found on.
- */
-export function zoomToFill(framing: Framing, fill: number): number {
-  const min = 0.05
-  const max = 4
-
-  // Coverage falls as zoom falls, so a bisection needs the bracket that way
-  // round: `lo` overflows less than the target, `hi` more.
-  let lo = min
-  let hi = max
-  if (frameCoverage(framing, min) > fill) return min
-  if (frameCoverage(framing, max) < fill) return max
-
-  for (let i = 0; i < 40; i++) {
-    const mid = (lo + hi) / 2
-    if (frameCoverage(framing, mid) > fill) hi = mid
-    else lo = mid
-  }
-  return Number(((lo + hi) / 2).toFixed(3))
 }

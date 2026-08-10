@@ -13,7 +13,7 @@
  */
 
 import { PROJECTS, all, get, put, remove } from './db'
-import type { LabDocument } from './storage'
+import type { LabDocument, LabMode } from './storage'
 import { deserializeDocument, serializeDocument } from './storage'
 import { collectAssetIds, getAsset, pruneAssets, putAssetWithId } from './assets'
 import { readArchive, writeArchive } from './project-file'
@@ -26,6 +26,13 @@ const MAX_NAME = 60
 export interface ProjectSummary {
   id: string
   name: string
+  /**
+   * Whether this project is a still or a take.
+   *
+   * Kept on the summary rather than read out of the document, so a list can say
+   * which of the two it is without deserializing every record it shows.
+   */
+  mode: LabMode
   savedAt: number
   /** Media the project points at, for the list to say what it costs. */
   bytes: number
@@ -78,7 +85,17 @@ export async function listProjects(): Promise<ProjectSummary[]> {
   try {
     const records = await all<ProjectRecord>(PROJECTS)
     return records
-      .map(({ id, name, savedAt, bytes, layers, poster }) => ({ id, name, savedAt, bytes, layers, poster }))
+      .map(({ id, name, mode, savedAt, bytes, layers, poster }) => ({
+        id,
+        name,
+        // Written before modes existed, so it is a take — the same reading
+        // `deserializeDocument` takes of a record with no mode on it.
+        mode: mode === 'shot' ? 'shot' : 'video',
+        savedAt,
+        bytes,
+        layers,
+        poster,
+      }))
       .sort((a, b) => b.savedAt - a.savedAt)
   } catch {
     // No storage at all — private browsing, or a blocked upgrade. The lab still
@@ -106,6 +123,7 @@ export async function saveProject(
   const summary: ProjectSummary = {
     id: id ?? nextId(),
     name: normalizeName(name) || 'Untitled',
+    mode: document.mode,
     savedAt: Date.now(),
     bytes: await weigh(document.layers),
     layers: document.layers.length,

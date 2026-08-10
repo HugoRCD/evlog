@@ -15,6 +15,8 @@
  */
 
 import { useResizable } from '~/composables/useResizable'
+import { glyphAtlas } from '~/utils/lab/ascii'
+import type { GlyphAtlas } from '~/utils/lab/ascii'
 import { createClock } from '~/utils/lab/clock'
 import { createDomTexture, invalidateStyles } from '~/utils/lab/dom-texture'
 import type { PlateMarkup } from '~/utils/lab/dom-texture'
@@ -24,7 +26,9 @@ import type { Container } from '~/utils/lab/record'
 import { DEFAULT_COMPONENT, resolveEntry } from '~/utils/lab/registry'
 import { DEFAULT_SETTINGS, PLATE_SCALE, frameCountFor, frameStep, outputDuration } from '~/utils/lab/settings'
 import { useSequenceDurations } from '~/utils/lab/sequence'
-import { MAX_SHARE_URL, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
+import { MAX_SHARE_URL, createDocument, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
+import type { LabDocument, LabMode } from '~/utils/lab/storage'
+import type { LayerGrab } from '~/composables/useLayerGestures'
 import {
   cloneLayer,
   constrainToTimeline,
@@ -33,6 +37,7 @@ import {
   isTimeVarying,
   createTextLayer,
   layerDepth,
+  layerAtRest,
   layerStateAt,
   layerTextureKey, layerEnd, layerOrigin, canJoin
 } from '~/utils/lab/layers'
@@ -64,14 +69,23 @@ import type { ProjectSummary } from '~/utils/lab/projects'
 const route = useRoute()
 const router = useRouter()
 
-// A link wins over the stored working copy; anything else resumes where the
-// last session left off.
+// A link wins over the stored working copy. With neither, there is nothing to
+// resume and the launcher asks what to make rather than guessing.
 const initial = resolveInitialDocument(route.query)
-const settings = ref(initial.settings)
-const layers = ref<Layer[]>(initial.layers)
+const blank = createDocument('shot')
+const mode = ref<LabMode>(initial?.mode ?? blank.mode)
+/** True until a document exists — the launcher covers the frame while it is. */
+const launching = ref(!initial)
+const settings = ref((initial ?? blank).settings)
+const layers = ref<Layer[]>((initial ?? blank).layers)
 const selectedId = ref<string | null>(null)
 /** Camera moves over the take. */
-const camera = ref(initial.camera)
+const camera = ref((initial ?? blank).camera)
+
+/** A shot is one frame, so nothing in it is ever part-way through an entrance. */
+const stateOf = (layer: Layer) => (
+  mode.value === 'shot' ? layerAtRest(layer) : layerStateAt(layer, playhead.value)
+)
 /**
  * Clips whose length is still a guess, waiting on the animation to state its own.
  *
@@ -84,9 +98,13 @@ const camera = ref(initial.camera)
  */
 const awaitingFit = new Set<string>()
 
-// A fresh session opens on a built-in animation rather than an empty frame:
-// it is the fastest way to see what the lab does.
-if (!layers.value.length) {
+// An opened document that came in empty gets the built-in animation, because a
+// blank frame is the one state this tool cannot show you anything with.
+//
+// Never while the launcher is up: seeding there would write a document nobody
+// asked for, and the next reload would find it and skip the question entirely —
+// which is the exact behaviour the launcher exists to end.
+if (!launching.value && !layers.value.length) {
   const first = createComponentLayer(DEFAULT_COMPONENT, 0, settings.value.timelineLength)
   awaitingFit.add(first.id)
   layers.value = [first]
@@ -98,9 +116,8 @@ if (!layers.value.length) {
 // Having adopted the link, drop its query. The address bar then only ever holds
 // a URL somebody deliberately produced, and never a running log of every slider
 // that happened to be touched.
-if (initial.fromLink) router.replace({ query: {} })
+if (initial?.fromLink) router.replace({ query: {} })
 
-const showSource = ref(false)
 const panelVisible = ref(true)
 const shortcutsOpen = ref(false)
 
@@ -109,29 +126,51 @@ const guides = ref(false)
 /** Pointer over the frame, 0..1, for the crosshair readout. */
 const framePointer = ref<{ x: number, y: number } | null>(null)
 
+/** Where a pointer event sits on the frame, as a fraction with y down. */
+function framePointAt(event: PointerEvent, element: HTMLElement): { x: number, y: number } {
+  const box = element.getBoundingClientRect()
+  return {
+    x: (event.clientX - box.left) / box.width,
+    y: (event.clientY - box.top) / box.height,
+  }
+}
+
 function onFramePointer(event: PointerEvent) {
-  // Only tracked while the reticle needs it. Nothing else reads this, and
-  // recomputing a rectangle on every pointer move over the frame is a cost with
-  // nothing to show for it the rest of the time.
+  const element = event.currentTarget as HTMLElement
+  // Dragging a layer needs this on every move; the reticle needs it only while
+  // it is up. Outside both, recomputing a rectangle for every pointer move over
+  // the frame is a cost with nothing to show for it.
+  if (layerGestures.active.value) {
+    layerGestures.move(framePointAt(event, element))
+    return
+  }
   if (!picking.value) {
     framePointer.value = null
     return
   }
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  framePointer.value = {
-    x: (event.clientX - box.left) / box.width,
-    y: (event.clientY - box.top) / box.height,
-  }
+  framePointer.value = framePointAt(event, element)
 }
 const timeline = useTemplateRef('timeline')
 /** Armed by the crosshair button; the next click on the frame sets the focal plane. */
 const picking = ref(false)
 
 const canvas = useTemplateRef('canvas')
+/** The frame box, which is the coordinate space every layer gesture works in. */
+const frame = useTemplateRef('frame')
 const stagesRoot = useTemplateRef('stagesRoot')
 
 // Only to put the theme on the chrome; nothing here reads it.
 const { isDark } = useLabTheme()
+
+/**
+ * The chrome, which is the only part of this page that is an interface.
+ *
+ * The delegated sound listeners are attached here rather than to the document
+ * so the stage — a live subtree being rasterized every frame — is never in
+ * scope. Nothing being filmed should be able to make a noise.
+ */
+const chrome = useTemplateRef('chrome')
+const { enabled: cuesEnabled, install: installCues, setCuesEnabled, cue } = useCues()
 
 /** Bumped to remount every staged component, restarting their sequences at zero. */
 const stageKey = ref(0)
@@ -247,7 +286,7 @@ watch([layers, () => settings.value.tail], () => {
 
 const stageAspect = computed(() => settings.value.stageWidth / settings.value.stageHeight)
 function currentDocument() {
-  return { settings: settings.value, layers: layers.value, camera: camera.value }
+  return { mode: mode.value, settings: settings.value, layers: layers.value, camera: camera.value }
 }
 
 /**
@@ -258,6 +297,7 @@ function currentDocument() {
  * ever shown.
  */
 const { undo, redo, canUndo, canRedo } = useLabHistory(currentDocument, (state) => {
+  mode.value = state.mode
   settings.value = state.settings
   layers.value = state.layers
   camera.value = state.camera
@@ -649,6 +689,7 @@ onMounted(async () => {
 
   highPrecision.value = renderer.highPrecision
   renderer.setStageAspect(stageAspect.value)
+  handOverGlyphs()
   clock = createClock()
   // Virtual from the start: the preview is then the same function of time the
   // export is, so a shot cannot look different once rendered.
@@ -674,6 +715,11 @@ onMounted(async () => {
   // so without this the take opened on the top of a sequence the timeline says
   // was already part-way through — and stayed wrong until the playhead moved.
   if (stageOrigin.value < 0) await seekTo(playhead.value)
+
+  // The launcher lists them, so they have to be in hand before it is shown.
+  await refreshProjects()
+
+  if (chrome.value) installCues(chrome.value)
 })
 
 onBeforeUnmount(() => {
@@ -690,6 +736,39 @@ watch(previewSize, (size) => {
 })
 
 watch(stageAspect, aspect => renderer?.setStageAspect(aspect))
+
+/**
+ * The ascii ramp in hand, kept rather than handed straight to the renderer.
+ *
+ * Building one waits on the fonts and the renderer is built on mount, so the two
+ * arrive in either order — and on a shot that opens with ascii already set, the
+ * atlas usually wins. Holding it here lets whichever is second do the handover,
+ * instead of the first one being dropped into a renderer that does not exist yet
+ * and never being offered again.
+ */
+let glyphs: GlyphAtlas | null = null
+
+function handOverGlyphs() {
+  if (glyphs) renderer?.setGlyphAtlas(glyphs.canvas, glyphs.count, glyphs.gain)
+}
+
+/**
+ * Keep that ramp in step with what the shot asks for.
+ *
+ * Only once something actually asks: building one measures every glyph in it
+ * against the loaded fonts, and a shot that never turns the screen on should not
+ * pay for four of them. The frame that lands before the atlas does draws
+ * unstylized — the render loop picks the screen up on the next one.
+ */
+watch(
+  () => [shotSettings.value.stylize, shotSettings.value.asciiSet] as const,
+  async ([mode, set]) => {
+    if (mode !== 'ascii') return
+    glyphs = await glyphAtlas(set)
+    handOverGlyphs()
+  },
+  { immediate: true },
+)
 
 /**
  * Remount only when a layer changes which component it stages.
@@ -766,6 +845,7 @@ function replay() {
 
 function togglePlay() {
   playing.value = !playing.value
+  cue(playing.value ? 'press' : 'release')
   // Resuming past the end would sit on a frame where every layer has finished,
   // which is simply black; drop back to the top instead.
   if (playing.value && playhead.value >= settings.value.timelineLength) void seekTo(0)
@@ -869,7 +949,7 @@ const overlayQuads = computed<OverlayQuad[]>(() => {
   const frameAspect = settings.value.outputWidth / settings.value.outputHeight
   return layers.value.flatMap((layer) => {
     if (layer.space !== 'overlay') return []
-    const state = layerStateAt(layer, playhead.value)
+    const state = stateOf(layer)
     const aspect = layerAspects.value.get(layer.id)
     if (!state || !aspect) return []
 
@@ -898,7 +978,7 @@ const layerPlanes = computed<LayerPlane[]>(() => {
 
   return layers.value.flatMap((layer) => {
     if (layer.space === 'overlay') return []
-    const state = layerStateAt(layer, playhead.value)
+    const state = stateOf(layer)
     const aspect = layerAspects.value.get(layer.id)
     if (!state || !aspect) return []
 
@@ -1139,6 +1219,13 @@ function reorderLayers(from: number, to: number) {
   if (!moved) return
   next.splice(Math.max(0, Math.min(to, next.length)), 0, moved)
   layers.value = next
+}
+
+/** One step forward or back in the stack, from the layers list. */
+function shiftLayer(id: string, direction: -1 | 1) {
+  const from = layers.value.findIndex(layer => layer.id === id)
+  if (from === -1) return
+  reorderLayers(from, from + direction)
 }
 
 function copyLayer(id: string) {
@@ -1444,6 +1531,71 @@ function saveCurrentProject(name: string, overwrite: string | null) {
   })
 }
 
+/**
+ * Put a document on screen, whatever it came from.
+ *
+ * The launcher, opening a project and importing a file all land here, so the
+ * things that have to happen alongside the swap — dropping the selection,
+ * throwing away the cached plate, remounting the stage — are stated once rather
+ * than remembered three times.
+ */
+function applyDocument(document: LabDocument) {
+  mode.value = document.mode
+  settings.value = document.settings
+  layers.value = document.layers
+  camera.value = document.camera
+  selectedId.value = null
+  launching.value = false
+  // Everything staged is new, so nothing on screen belongs to it.
+  invalidateStageMarkup()
+  stageKey.value++
+}
+
+/**
+ * Start something, from the launcher.
+ *
+ * A take opens on the default animation; a shot opens on nothing.
+ *
+ * The asymmetry is the point. A video is a thing made of clips, so the first
+ * clip is the errand — starting with one is starting. A shot is very often a
+ * photograph somebody is about to drop in, and handing them an animation they
+ * did not ask for means deleting it before they can begin. An empty frame is
+ * not a missing default here; it is the canvas, and it says what to put on it.
+ *
+ * Written to storage immediately, and that is not an optimisation: the launcher
+ * only shows when there is no working copy, so a document that exists on screen
+ * but not on disk sends the next reload straight back to the question.
+ */
+function startDocument(kind: LabMode) {
+  cue('arrival')
+  const document = createDocument(kind)
+  if (kind === 'video' && DEFAULT_COMPONENT) {
+    const first = createComponentLayer(DEFAULT_COMPONENT, 0, document.settings.timelineLength)
+    awaitingFit.add(first.id)
+    document.layers = [first]
+  }
+  applyDocument(document)
+  setActiveProject(null)
+  saveStored(document)
+  void seekTo(0)
+}
+
+/**
+ * Turn the document from one kind into the other.
+ *
+ * A conversion rather than a new document: the two kinds share every part of
+ * the model, so this only changes which parts are being read. A shot carries
+ * the spans it is ignoring and a take keeps its clips, which is what makes
+ * going back and forth free rather than a decision.
+ */
+function setMode(kind: LabMode) {
+  if (mode.value === kind) return
+  mode.value = kind
+  // A shot is taken at the instant the playhead is on; a take has to start
+  // somewhere, and it is never part-way through.
+  if (kind === 'video') void seekTo(0)
+}
+
 function openStoredProject(id: string) {
   void runProjectAction(async () => {
     const document = await openProject(id)
@@ -1451,15 +1603,9 @@ function openStoredProject(id: string) {
       error.value = 'That project could not be read.'
       return
     }
-    settings.value = document.settings
-    layers.value = document.layers
-    camera.value = document.camera
-    selectedId.value = null
+    applyDocument(document)
     setActiveProject(id)
     projectsOpen.value = false
-    // Everything on the timeline is new, so nothing on screen belongs to it.
-    invalidateStageMarkup()
-    stageKey.value++
     await seekTo(0)
   })
 }
@@ -1561,20 +1707,116 @@ async function primeVirtualStage() {
   await captureStage()
 }
 
+/**
+ * How much larger than the output a still is rendered before being resolved down.
+ *
+ * The preview always looked better than the export, and the reason turned out to
+ * be nothing in the pipeline: the canvas is displayed smaller than it is
+ * rendered, so the browser was averaging the frame on its way to the screen.
+ * That averaging is real anti-aliasing, and everything this thing makes is built
+ * out of exactly the high-frequency detail it helps — cell edges, glyph strokes,
+ * dither, grain, the ragged rim of a bokeh disc.
+ *
+ * So the export does it deliberately instead of the display doing it by
+ * accident. Two is the whole of the useful range: it turns each output pixel
+ * into an average of four, and past it the returns fall off far faster than the
+ * fill rate does.
+ */
+const EXPORT_SUPERSAMPLE = 2
+
+/**
+ * Ceiling on the rendered edge, in pixels.
+ *
+ * Supersampling a 4K delivery would ask for an 8K buffer, which is past what a
+ * good many drivers will allocate as a render target — and a still that fails to
+ * export is worse than one that is merely not supersampled.
+ */
+const MAX_RENDER_EDGE = 4096
+
+/**
+ * One frame at the export size, as bytes.
+ *
+ * Rendered large, resolved down by the 2D context — a single downscale of an
+ * exact power of two is a box filter, which is the correct resolve and is what
+ * the GPU would do anyway.
+ *
+ * The renderer is put back to the preview size before this returns, so the frame
+ * on screen does not stay stretched at the output resolution while a blob is
+ * being encoded.
+ */
+async function renderPng(): Promise<Blob> {
+  if (!renderer) throw new Error('The renderer is not ready.')
+  const { outputWidth, outputHeight } = settings.value
+  const scale = Math.max(1, Math.min(EXPORT_SUPERSAMPLE, MAX_RENDER_EDGE / Math.max(outputWidth, outputHeight)))
+
+  try {
+    renderer.resize(outputWidth * scale, outputHeight * scale)
+    await captureStage()
+    renderer.render(shotSettings.value, performance.now(), layerPlanes.value, overlayQuads.value)
+    if (scale === 1) return await canvasToBlob(renderer.canvas)
+
+    const resolved = document.createElement('canvas')
+    resolved.width = outputWidth
+    resolved.height = outputHeight
+    const context = resolved.getContext('2d')
+    if (!context) throw new Error('Failed to allocate a context to resolve the frame into.')
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(renderer.canvas, 0, 0, outputWidth, outputHeight)
+    return await canvasToBlob(resolved)
+  } finally {
+    renderer.resize(previewSize.value.width, previewSize.value.height)
+  }
+}
+
 async function exportPng() {
   if (!renderer || busy.value) return
   busy.value = true
   error.value = ''
   try {
-    const { outputWidth, outputHeight } = settings.value
-    renderer.resize(outputWidth, outputHeight)
-    await captureStage()
-    renderer.render(shotSettings.value, performance.now(), layerPlanes.value, overlayQuads.value)
-    download(await canvasToBlob(renderer.canvas), takeName(takeSubject.value, 'png'))
+    download(await renderPng(), takeName(takeSubject.value, 'png'))
+    cue('success')
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+    cue('error')
+  } finally {
+    busy.value = false
+  }
+}
+
+const pngCopied = ref(false)
+let pngCopiedTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * The frame straight onto the clipboard, for pasting rather than filing.
+ *
+ * The `ClipboardItem` is built around the pending blob rather than awaited
+ * first, and that is the whole reason this works: writing to the clipboard needs
+ * the user gesture that started it, and rendering a frame at the output size
+ * takes long enough to lose it. Handed a promise, the browser keeps the gesture
+ * alive until it settles.
+ */
+async function copyPng() {
+  if (!renderer || busy.value) return
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    error.value = 'This browser cannot write images to the clipboard. Use the menu to download instead.'
+    return
+  }
+
+  busy.value = true
+  error.value = ''
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderPng() })])
+    // The shutter, on the one action that is literally taking a picture.
+    cue('chime')
+    pngCopied.value = true
+    if (pngCopiedTimer) clearTimeout(pngCopiedTimer)
+    pngCopiedTimer = setTimeout(() => {
+      pngCopied.value = false
+    }, 1600)
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : String(cause)
   } finally {
-    renderer.resize(previewSize.value.width, previewSize.value.height)
     busy.value = false
   }
 }
@@ -1664,9 +1906,167 @@ const dock = useResizable({ key: 'timeline-height', initial: 232, min: 140, max:
 
 const gestures = useCameraGestures(
   settings,
-  () => !picking.value && !busy.value,
+  // Never while a layer is being dragged: one pointer, and whichever gesture
+  // claimed it keeps it. Orbiting the camera under a layer being placed would
+  // move the thing and the frame it is being placed against at once.
+  () => !picking.value && !busy.value && !layerGestures.active.value,
   () => renderer?.distanceFor(shotSettings.value) ?? 1,
 )
+
+const layerGestures = useLayerGestures({
+  settings,
+  worldPerFrame: depth => renderer?.worldPerFrame(shotSettings.value, depth) ?? null,
+  stageAspect,
+  apply: (id, patch) => updateLayer(id, patch),
+})
+
+/**
+ * The selected layer's outline on the frame, or null when there is nothing to
+ * draw one around.
+ *
+ * Recomputed from the same plane the renderer is about to draw, so the box
+ * cannot drift from the picture: every input it takes — the camera, the layer's
+ * placement, the instant — is already a dependency of that plane.
+ */
+const selectionCorners = computed<[number, number][] | null>(() => {
+  const layer = selectedLayer.value
+  if (!layer || !renderer) return null
+
+  if (layer.space === 'overlay') {
+    const quad = overlayQuads.value.find(entry => entry.id === layer.id)
+    if (!quad) return null
+    // Overlays are already frame fractions; only the y axis has to be turned
+    // over, because the frame runs down and the renderer's overlay runs up.
+    const left = quad.x - quad.halfWidth
+    const right = quad.x + quad.halfWidth
+    const top = 1 - (quad.y + quad.halfHeight)
+    const bottom = 1 - (quad.y - quad.halfHeight)
+    return [[left, top], [right, top], [right, bottom], [left, bottom]]
+  }
+
+  const plane = layerPlanes.value.find(entry => entry.id === layer.id)
+  return plane ? renderer.projectPlane(shotSettings.value, plane) : null
+})
+
+const selectionCentre = computed(() => {
+  const corners = selectionCorners.value
+  if (!corners?.length) return null
+  const sum = corners.reduce(([x, y], [cx, cy]) => [x + cx, y + cy], [0, 0])
+  return { x: sum[0] / corners.length, y: sum[1] / corners.length }
+})
+
+/**
+ * Which layer a point on the frame lands on, topmost first.
+ *
+ * Tested against the projected outline rather than against a rectangle, so a
+ * tilted layer is grabbed where it looks like it is. Reversed because the last
+ * layer in the list is drawn over the others, and clicking a stack has to reach
+ * the one on top.
+ */
+function layerAt(point: { x: number, y: number }): Layer | null {
+  for (let index = layers.value.length - 1; index >= 0; index--) {
+    const layer = layers.value[index]
+    if (!layer || !renderer) continue
+    const corners = cornersFor(layer)
+    if (corners && containsPoint(corners, point)) return layer
+  }
+  return null
+}
+
+function cornersFor(layer: Layer): [number, number][] | null {
+  if (layer.space === 'overlay') {
+    const quad = overlayQuads.value.find(entry => entry.id === layer.id)
+    if (!quad) return null
+    const left = quad.x - quad.halfWidth
+    const right = quad.x + quad.halfWidth
+    const top = 1 - (quad.y + quad.halfHeight)
+    const bottom = 1 - (quad.y - quad.halfHeight)
+    return [[left, top], [right, top], [right, bottom], [left, bottom]]
+  }
+  const plane = layerPlanes.value.find(entry => entry.id === layer.id)
+  return plane && renderer ? renderer.projectPlane(shotSettings.value, plane) : null
+}
+
+/** Winding test over a convex quad — every cross product on the same side. */
+function containsPoint(corners: [number, number][], point: { x: number, y: number }): boolean {
+  let sign = 0
+  for (let index = 0; index < corners.length; index++) {
+    const a = corners[index]!
+    const b = corners[(index + 1) % corners.length]!
+    const cross = (b[0] - a[0]) * (point.y - a[1]) - (b[1] - a[1]) * (point.x - a[0])
+    if (Math.abs(cross) < 1e-9) continue
+    const side = cross > 0 ? 1 : -1
+    if (sign === 0) sign = side
+    else if (side !== sign) return false
+  }
+  return true
+}
+
+/**
+ * A press on the frame: take the layer under it, or hand the drag to the camera.
+ *
+ * Selecting and starting to move are the same gesture on purpose. Requiring a
+ * click to select and then a second drag to move is the interaction every
+ * canvas tool abandoned years ago, and it costs a round trip on every single
+ * placement.
+ */
+function onFramePointerDown(event: PointerEvent) {
+  if (picking.value || busy.value) return
+  // The instruments sit inside the frame, and this handler is on the frame. A
+  // press on one of them was being read as a press on the picture behind it,
+  // which took the pointer capture the button needed to receive its own click —
+  // so the guides and the reticle simply stopped toggling.
+  if (event.target !== canvas.value) return
+  const element = event.currentTarget as HTMLElement
+  const point = framePointAt(event, element)
+  const hit = layerAt(point)
+
+  if (!hit) {
+    selectedId.value = null
+    gestures.onPointerDown(event)
+    return
+  }
+
+  selectedId.value = hit.id
+  const centre = selectionCentre.value ?? point
+  layerGestures.begin(hit, { kind: 'move' }, point, centre)
+  element.setPointerCapture(event.pointerId)
+}
+
+function onFrameGrab(grab: LayerGrab, event: PointerEvent) {
+  const layer = selectedLayer.value
+  const centre = selectionCentre.value
+  const element = frame.value
+  if (!layer || !centre || !element) return
+  layerGestures.begin(layer, grab, framePointAt(event, element), centre)
+  element.setPointerCapture(event.pointerId)
+}
+
+/** True while files are being dragged over the frame, for the drop affordance. */
+const dropping = ref(false)
+
+/**
+ * Files dropped straight onto the picture.
+ *
+ * The timeline already accepted a drop, which is the right place in a take —
+ * you are dropping a clip at a time. A shot has no timeline, and the frame is
+ * the only thing on screen to aim at, so it has to be a target too.
+ */
+function onFrameDrop(event: DragEvent) {
+  dropping.value = false
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (!files.length) return
+  cue('droplet')
+  void importFiles(files, playhead.value)
+}
+
+function onFramePointerUp(event: PointerEvent) {
+  if (layerGestures.active.value) {
+    layerGestures.end()
+    return
+  }
+  gestures.onPointerUp(event)
+}
 
 defineShortcuts({
   r: replay,
@@ -1813,6 +2213,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     which is deliberately not inside it.
   -->
   <div
+    ref="chrome"
     class="lab-chrome fixed inset-0 flex overflow-hidden bg-default"
     :data-theme="isDark ? 'dark' : 'light'"
   >
@@ -1822,28 +2223,87 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         class="relative flex min-h-0 flex-1 items-center justify-center p-8"
         @pointerdown.self="selectedId = null"
       >
+        <!--
+          The pointer is arbitrated here rather than on the canvas, because a
+          drag that starts on a layer has to keep receiving moves after it
+          leaves that layer — and the handles sit outside the canvas element.
+        -->
         <div
+          ref="frame"
           class="relative max-h-full max-w-full"
           :style="{ aspectRatio: `${settings.outputWidth} / ${settings.outputHeight}` }"
-          @pointermove="onFramePointer($event); onFocusHover($event)"
+          @dragover.prevent="dropping = true"
+          @dragleave="dropping = false"
+          @drop.prevent="onFrameDrop"
+          @pointerdown="onFramePointerDown"
+          @pointermove="onFramePointer($event); onFocusHover($event); gestures.onPointerMove($event)"
+          @pointerup="onFramePointerUp"
+          @pointercancel="onFramePointerUp"
           @pointerleave="framePointer = null"
         >
           <canvas
             ref="canvas"
             class="block h-full w-full touch-none border border-default"
-            :class="picking ? 'cursor-crosshair border-primary-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
+            :class="picking
+              ? 'cursor-crosshair border-primary-500/50'
+              : layerGestures.active.value
+                ? 'cursor-grabbing'
+                : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
             @click="onFrameClick"
-            @pointerdown="gestures.onPointerDown"
-            @pointermove="gestures.onPointerMove"
-            @pointerup="gestures.onPointerUp"
-            @pointercancel="gestures.onPointerUp"
             @wheel="gestures.onWheel"
+          />
+
+          <!--
+            Only while there is a selection and nothing else owns the pointer.
+            Handles over a frame being focused would take the click the reticle
+            exists to receive.
+          -->
+          <LabHandles
+            v-if="selectionCorners && !picking"
+            :corners="selectionCorners"
+            @grab-corner="(index, event) => onFrameGrab({ kind: 'resize', corner: index }, event)"
+            @grab-rotate="event => onFrameGrab({ kind: 'rotate' }, event)"
           />
           <LabGuides
             v-if="guides"
             :width="settings.outputWidth"
             :height="settings.outputHeight"
           />
+
+          <!--
+            The empty canvas, which is a state a shot now opens in on purpose.
+            A black rectangle with no affordance reads as something that failed
+            to load; the same rectangle saying what goes on it is the start of
+            the job. Gone the moment there is a layer, because from then on the
+            frame is the picture and anything over it is in the way.
+          -->
+          <div
+            v-if="!layers.length"
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 border border-dashed transition-colors"
+            :class="dropping ? 'border-blue-400/80 bg-blue-500/10' : 'border-white/15'"
+          >
+            <p class="font-mono text-[11px] text-white/45">
+              Drop an image or a video here
+            </p>
+            <div class="pointer-events-auto flex items-center gap-1">
+              <button
+                type="button"
+                data-cuelume-press
+                class="border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white/60 transition-colors hover:border-white/35 hover:text-white/90"
+                @click="addMedia"
+              >
+                choose a file
+              </button>
+              <button
+                type="button"
+                data-cuelume-press
+                class="border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white/60 transition-colors hover:border-white/35 hover:text-white/90"
+                @click="addComponent"
+              >
+                stage a component
+              </button>
+            </div>
+          </div>
 
           <!--
             From here to the end of the frame, the colours are literal and stay
@@ -1890,6 +2350,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               ]"
               :key="tool.key"
               type="button"
+              data-cuelume-toggle
               class="flex size-6 items-center justify-center border backdrop-blur-[2px] transition-colors"
               :class="tool.on
                 ? 'border-blue-500/60 bg-blue-500/15 text-blue-300'
@@ -1930,7 +2391,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         enough to read as a divider and a target thin enough to be fiddly.
       -->
       <div
-        v-show="panelVisible"
+        v-show="panelVisible && mode === 'video'"
         class="group/split relative h-1.5 shrink-0 cursor-ns-resize"
         @pointerdown="dock.onPointerDown"
       >
@@ -1939,7 +2400,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :class="dock.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
         />
       </div>
+      <LabShotBar
+        v-if="mode === 'shot'"
+        v-show="panelVisible"
+        :layers
+        :selected-id
+        :moment="playhead"
+        :length="settings.timelineLength"
+        :has-component="Boolean(componentLayers.length)"
+        @seek="onScrub"
+        @select="selectedId = $event"
+        @add-text="addText"
+        @add-image="addMedia"
+        @remove="selectedId = $event; removeSelected()"
+      />
       <LabTimeline
+        v-if="mode === 'video'"
         v-show="panelVisible"
         ref="timeline"
         v-model:layers="layers"
@@ -1991,6 +2467,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         :class="panel.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
       />
     </div>
+    <!--
+      Over everything, including the panel: until a document exists there is
+      nothing for those controls to act on, and a panel full of live sliders
+      beside a question that has not been answered invites you to grade a shot
+      that is not there.
+    -->
+    <LabLauncher
+      v-if="launching"
+      :recent="projects"
+      :dismissable="layers.length > 0"
+      @create="startDocument"
+      @open="openStoredProject"
+      @browse="launching = false; projectsOpen = true"
+      @dismiss="launching = false"
+    />
+
     <LabShortcuts v-model="shortcutsOpen" />
 
     <LabProjects
@@ -2013,10 +2505,13 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <LabPanel
       v-show="panelVisible"
       v-model:settings="settings"
-      v-model:show-source="showSource"
       v-model:picking="picking"
       v-model:camera="camera"
       :style="{ width: `${panel.size.value}px` }"
+      :mode
+      :cues-enabled
+      :layers
+      :selected-layer-id="selectedId"
       :link-copied
       :busy
       :progress
@@ -2026,6 +2521,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :sequence-ms="selectedSequenceMs"
       :can-undo
       :can-redo
+      :png-copied
       @undo="undo"
       @redo="redo"
       @update-layer="updateLayer"
@@ -2036,6 +2532,15 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @replay="replay"
       @export-video="exportVideo"
       @export-png="exportPng"
+      @copy-png="copyPng"
+      @new-document="launching = true"
+      @set-mode="setMode"
+      @select-layer="selectedId = $event"
+      @shift-layer="shiftLayer"
+      @remove-layer-by-id="selectedId = $event; removeSelected()"
+      @add-image="addMedia"
+      @add-text="addText"
+      @set-cues="setCuesEnabled"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"
       @projects="projectsOpen = true"
@@ -2071,8 +2576,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   <div
     ref="stagesRoot"
     data-lab-stage
-    class="pointer-events-none fixed left-0 top-0"
-    :class="showSource ? 'z-50 opacity-100' : 'z-0 opacity-[0.002]'"
+    class="pointer-events-none fixed left-0 top-0 z-0 opacity-[0.002]"
   >
     <!--
       Each instance is mounted at its clip's origin, not at the top of the

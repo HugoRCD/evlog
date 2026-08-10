@@ -7,6 +7,23 @@
  * video needs a reshoot.
  */
 
+/**
+ * Screens the finished frame can be redrawn through.
+ *
+ * One at a time rather than a stack of toggles: these all resample the picture
+ * onto a grid of cells, and two of them fighting over the same cell produces
+ * mush rather than a combination. Everything that *does* combine — the lens, the
+ * grade, the lens — stays a separate control.
+ */
+export const STYLIZE_MODES = ['none', 'dither', 'ascii', 'halftone', 'posterize', 'crt'] as const
+
+export type StylizeMode = typeof STYLIZE_MODES[number]
+
+/** Glyph ramps for the ascii screen. The strings themselves live in `ascii.ts`. */
+export const ASCII_SETS = ['ascii', 'blocks', 'shades', 'code'] as const
+
+export type AsciiSet = typeof ASCII_SETS[number]
+
 export interface LabSettings {
   /**
    * The viewport the component is laid out in, in CSS pixels.
@@ -65,13 +82,50 @@ export interface LabSettings {
   /** Maximum bokeh radius, in pixels of a 1080p frame; scaled to the real one. */
   aperture: number
   blurRadius: number
-  dofSamples: number
+  /**
+   * Sides of the aperture. 0 is a perfect disc; 5 or 6 is what a real iris does.
+   *
+   * The one thing that makes an out-of-focus highlight read as photographed
+   * rather than as a blur: a circular kernel is what every naive depth-of-field
+   * produces, and it is the reason they all look like the same effect.
+   */
+  bokehBlades: number
+  /**
+   * Optical vignetting: how far the bokeh is clipped into a lens shape towards
+   * the corners. A real barrel occludes off-axis rays, so a round highlight at
+   * the edge of the frame is squeezed into a lens — the cat's eye.
+   */
+  bokehCatEye: number
 
   // Bloom
   bloomIntensity: number
   bloomThreshold: number
-  bloomKnee: number
   bloomRadius: number
+  /** Horizontal flare across the highlights, the way an anamorphic lens streaks. */
+  streaks: number
+  /** Internal reflections thrown back across the centre from what is bright. */
+  ghosts: number
+
+  // Lens
+  /**
+   * Barrel (positive) or pincushion (negative) distortion.
+   *
+   * Geometric, so it bends the whole picture rather than tinting it — a fisheye
+   * at the top of the range, and the curvature a CRT needs at a tenth of it.
+   */
+  distortion: number
+  /** How far the colour channels are pulled apart towards the edges. */
+  aberration: number
+  /**
+   * Whether that split is three channels or a continuous spectrum.
+   *
+   * At zero the frame is sampled once per channel, which is what a lens does and
+   * what reads as a clean fringe. Above it the split is integrated across a band
+   * of wavelengths instead, which smears the fringe into a prism.
+   */
+  dispersion: number
+  /** Jitters each sample along the split, so the fringe breaks up rather than banding. */
+  lensNoise: number
 
   // Grade
   emission: number
@@ -79,23 +133,36 @@ export interface LabSettings {
   contrast: number
   saturation: number
   tonemap: boolean
-  aberration: number
   vignette: number
   grain: number
   attenuation: number
   background: string
 
+  /** How far to push the picture onto the two-colour ramp below. */
+  duotone: number
+  duotoneShadow: string
+  duotoneHighlight: string
+
   /**
-   * Name of the look in force, or empty for none.
-   *
-   * The values it produced are written into the fields above rather than being
-   * resolved from here on every frame — the renderer reads one flat set of
-   * numbers, and a look is only ever a way of filling them in. This is kept so
-   * the amount dial knows what to re-blend from, and so a chip can be lit.
+   * Veiling glare: a floor under the bloom threshold, so every pixel diffuses a
+   * little rather than only the ones bright enough to glow.
    */
-  look: string
-  /** Strength of that look, 0 = neutral, 1 = as authored. See `looks.ts`. */
-  lookAmount: number
+  bleed: number
+
+  // Stylize
+  /** Which screen the finished frame is redrawn through, or `none`. */
+  stylize: StylizeMode
+  /** Cell size of that screen, in pixels of a 1080p frame. */
+  stylizeScale: number
+  /** Steps the colour is quantized to. */
+  stylizeLevels: number
+  /** 0 keeps only the brightness, 1 keeps the colour it came in with. */
+  stylizeColour: number
+  /** Screen angle, for the modes that have one. */
+  stylizeAngle: number
+  /** Which ramp of glyphs the ascii screen draws with. */
+  asciiSet: AsciiSet
+
 }
 
 export const DEFAULT_SETTINGS: LabSettings = {
@@ -121,30 +188,45 @@ export const DEFAULT_SETTINGS: LabSettings = {
   focusRange: 0.35,
   aperture: 0,
   blurRadius: 12,
-  dofSamples: 32,
+  bokehBlades: 0,
+  bokehCatEye: 0,
 
   bloomIntensity: 0.35,
   bloomThreshold: 0.75,
-  bloomKnee: 0.35,
   bloomRadius: 1,
+  streaks: 0,
+  ghosts: 0,
+
+  distortion: 0,
+  aberration: 0,
+  dispersion: 0,
+  lensNoise: 0,
 
   emission: 1,
   exposure: 1,
   contrast: 1,
   saturation: 1,
   tonemap: true,
-  aberration: 0,
   vignette: 0.35,
   grain: 0.015,
   attenuation: 0,
   background: '#000000',
 
-  // No look selected, and the grade above is left exactly as it was. Seeding a
-  // look here would have shifted the look values, and every document already
-  // stored omits whatever matches a default — so old shots would have silently
-  // re-graded themselves on the next load.
-  look: '',
-  lookAmount: 1,
+  duotone: 0,
+  // Only ever seen once `duotone` is dialled up, so these are the ramp somebody
+  // arriving at the control should find already on it: a cold shadow and a warm
+  // highlight, which is the split that reads as a duotone rather than as a tint.
+  duotoneShadow: '#1a1b3a',
+  duotoneHighlight: '#ffd9a8',
+
+  bleed: 0,
+
+  stylize: 'none',
+  stylizeScale: 8,
+  stylizeLevels: 4,
+  stylizeColour: 0,
+  stylizeAngle: 15,
+  asciiSet: 'ascii',
 }
 
 /** Bounds and step for every numeric control, driving both the UI and URL clamping. */
@@ -162,13 +244,23 @@ export const HINTS: Partial<Record<string, string>> = {
   focusRange: 'How thick the sharp band is. Small leaves only a slice in focus.',
   aperture: 'How strongly out-of-focus areas blur. Zero turns depth of field off.',
   blurRadius: 'Widest the bokeh can grow, measured on a 1080p frame.',
-  dofSamples: 'Taps per pixel in the bokeh. Higher is smoother and slower.',
+  bokehBlades: 'Sides of the aperture. Zero is a perfect disc; six is what an iris gives.',
+  bokehCatEye: 'Squeezes the bokeh into a lens shape towards the corners, the way a barrel does.',
+  streaks: 'Stretches the highlights sideways, the way an anamorphic lens flares.',
+  ghosts: 'Reflections thrown back across the centre from whatever is bright.',
   emission: 'How bright the picture is before it glows. Raise it to give bloom something to catch; it is what feeds the glow, not the glow itself.',
   attenuation: 'Darkens the scene as it recedes, which reads as depth.',
   bloomThreshold: 'Brightness a pixel must reach before it glows.',
-  bloomKnee: 'Softness of that threshold, so glow fades in instead of popping.',
   bloomRadius: 'How far the glow spreads.',
+  distortion: 'Bends the frame. Positive bulges it towards you, negative pinches it in.',
   aberration: 'Splits the colour channels towards the edges, the way a real lens does.',
+  dispersion: 'Smears that split into a spectrum instead of three clean channels.',
+  lensNoise: 'Breaks the split up, so it reads as scattered light rather than as a band.',
+  duotone: 'Maps the picture onto two colours by brightness. The grade still applies on top.',
+  bleed: 'Diffuses the whole picture, not only what is bright enough to glow. Halation.',
+  stylizeScale: 'Cell size of the screen, measured on a 1080p frame.',
+  stylizeLevels: 'Steps the brightness is quantized to before the screen draws it.',
+  stylizeColour: 'Zero draws in brightness alone; one keeps the colour underneath.',
   tail: 'Black held after the last clip ends, so a shot can land instead of cutting.',
   speed: 'Playback rate. Below 1 the animation is stepped in smaller increments — real slow motion.',
   lookAmount: 'How far towards the look to go. Past 1 it is pushed beyond what it was authored at.',
@@ -187,21 +279,42 @@ export const RANGES = {
   focusRange: { min: 0.02, max: 1, step: 0.005 },
   aperture: { min: 0, max: 1.5, step: 0.005 },
   blurRadius: { min: 1, max: 90, step: 1, unit: 'px' },
-  dofSamples: { min: 4, max: 128, step: 4 },
+  // Below three there is no polygon to draw, so the step from 0 lands straight
+  // on a triangle and everything between is skipped rather than clamped.
+  bokehBlades: { min: 0, max: 9, step: 1 },
+  bokehCatEye: { min: 0, max: 1, step: 0.005 },
 
   bloomIntensity: { min: 0, max: 3, step: 0.005 },
   bloomThreshold: { min: 0, max: 2, step: 0.005 },
-  bloomKnee: { min: 0.01, max: 1, step: 0.005 },
   bloomRadius: { min: 0.2, max: 4, step: 0.01 },
+  streaks: { min: 0, max: 1.5, step: 0.005 },
+  ghosts: { min: 0, max: 1.5, step: 0.005 },
 
   emission: { min: 0.2, max: 4, step: 0.005 },
   exposure: { min: 0.05, max: 4, step: 0.005 },
   contrast: { min: 0.5, max: 2, step: 0.005 },
   saturation: { min: 0, max: 2, step: 0.005 },
+  // Past ±0.6 the corners fold back over themselves, which is a mirror rather
+  // than a lens. The range stops where the map is still monotonic.
+  distortion: { min: -0.6, max: 0.6, step: 0.005 },
   aberration: { min: 0, max: 3, step: 0.005 },
+  dispersion: { min: 0, max: 1, step: 0.005 },
+  lensNoise: { min: 0, max: 1, step: 0.005 },
+
   vignette: { min: 0, max: 1, step: 0.005 },
   grain: { min: 0, max: 0.12, step: 0.001 },
   attenuation: { min: 0, max: 1, step: 0.005 },
+
+  duotone: { min: 0, max: 1, step: 0.005 },
+  bleed: { min: 0, max: 1, step: 0.005 },
+
+  // Authored against a 1080p frame and scaled to the real one, like `blurRadius`
+  // — otherwise the cells would be a different size in the preview than in the
+  // export, and would change every time the window was resized.
+  stylizeScale: { min: 3, max: 48, step: 1, unit: 'px' },
+  stylizeLevels: { min: 2, max: 16, step: 1 },
+  stylizeColour: { min: 0, max: 1, step: 0.005 },
+  stylizeAngle: { min: 0, max: 90, step: 1, unit: '°' },
 
   stageWidth: { min: 320, max: 2400, step: 10, unit: 'px' },
   stageHeight: { min: 240, max: 1600, step: 10, unit: 'px' },
@@ -212,8 +325,6 @@ export const RANGES = {
   tail: { min: 0, max: 10000, step: 50, unit: 'ms' },
   fps: { min: 12, max: 60, step: 1, unit: 'fps' },
   speed: { min: 0.1, max: 2, step: 0.05, unit: '×' },
-  // Past 1 the look is extrapolated rather than reached — see MAX_LOOK_AMOUNT.
-  lookAmount: { min: 0, max: 1.5, step: 0.01, unit: '×' },
 } as const satisfies Record<string, { min: number, max: number, step: number, unit?: string }>
 
 export type RangedKey = keyof typeof RANGES
@@ -268,7 +379,26 @@ export const FRAME_RATES = [24, 30, 60] as const
 export const SPEEDS = [0.25, 0.5, 1, 2] as const
 
 const BOOLEAN_KEYS = ['tonemap'] as const
-const STRING_KEYS = ['background', 'container', 'look'] as const
+const STRING_KEYS = [
+  'background',
+  'container',
+  'duotoneShadow',
+  'duotoneHighlight',
+  'stylize',
+  'asciiSet',
+] as const
+
+/**
+ * String settings drawn from a closed set.
+ *
+ * `background` is free text and `look` is a name, but a screen mode is an index
+ * into a shader's switch — a hand-edited URL holding `stylize=fisheye` would
+ * otherwise select whatever that fell through to.
+ */
+const ENUM_KEYS: Partial<Record<keyof LabSettings, readonly string[]>> = {
+  stylize: STYLIZE_MODES,
+  asciiSet: ASCII_SETS,
+}
 
 function clampRanged(key: string, value: number): number {
   const range = (RANGES as Record<string, { min: number, max: number } | undefined>)[key]
@@ -323,6 +453,8 @@ export function settingsFromQuery(query: Record<string, unknown>): LabSettings {
     const value = String(raw)
 
     if ((STRING_KEYS as readonly string[]).includes(key)) {
+      const allowed = ENUM_KEYS[key]
+      if (allowed && !allowed.includes(value)) continue
       Object.assign(settings, { [key]: value })
     } else if ((BOOLEAN_KEYS as readonly string[]).includes(key)) {
       Object.assign(settings, { [key]: value === '1' || value === 'true' })
@@ -361,6 +493,32 @@ export function frameStep(settings: LabSettings): number {
 /** Frames the current segment will produce. */
 export function frameCountFor(settings: LabSettings): number {
   return Math.max(1, Math.round((outputDuration(settings) / 1000) * settings.fps))
+}
+
+/**
+ * Softness of the bloom threshold, derived rather than dialled.
+ *
+ * The prefilter's knee reaches *down* from the threshold, so a knee wider than
+ * the threshold hands a bloom multiplier to near-black pixels: at 0.5 against a
+ * 0.25 threshold the backdrop picked up a 3.4× gain and the frame came out a
+ * grey slab. As a control it had one correct answer and a range full of wrong
+ * ones, which is not a control — it is a trap with a slider on it.
+ */
+export function bloomKneeFor(threshold: number): number {
+  return Math.min(0.35, Math.max(0.02, threshold * 0.5))
+}
+
+/**
+ * Taps per pixel in the bokeh, derived from how wide it is allowed to grow.
+ *
+ * A quality dial rather than a look dial: there is no radius at which fewer taps
+ * is the better picture, only one past which more of them stop being visible. So
+ * it follows the radius — a 90px disc no longer has to be gathered at the same
+ * 32 taps that were plenty for a 12px one, which is what left wide apertures
+ * banded into rings.
+ */
+export function dofSamplesFor(blurRadius: number): number {
+  return Math.min(96, Math.round(24 + blurRadius * 0.8))
 }
 
 export function hexToLinearRgb(hex: string): [number, number, number] {

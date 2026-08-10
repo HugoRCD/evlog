@@ -11,9 +11,17 @@
  * actually took to produce, so a 60fps export stays smooth even when a single
  * frame needs 200ms of serialization and blur.
  *
- * Known limit: timers are not virtualized. Patching `setTimeout` globally is a
- * good way to deadlock an export on some unrelated library awaiting one, and
- * nothing in the docs animates off a timer.
+ * Known limit: timers are not virtualized, and patching `setTimeout` globally is
+ * a good way to deadlock an export on some unrelated library awaiting one — the
+ * panel's own popovers and copy confirmations run off timers too, and freezing
+ * those with the playhead would make the interface look broken.
+ *
+ * So a staged component has to animate off frames rather than off timers. Most
+ * of them go through `useTimedSequence`, which does. One that reaches for
+ * `setTimeout` keeps running while the playhead is still, restarts nothing when
+ * a take is replayed, and drifts from anything beside it that is on the frame
+ * clock — which is not a limitation of this file so much as the contract it
+ * asks of what it films.
  */
 
 type ClockMode = 'live' | 'virtual'
@@ -242,7 +250,28 @@ export function createClock(): Clock {
     flush() {
       // Zero delta: anything integrating between timestamps sees no elapsed
       // time and holds its pose, so draining is free of side effects on the shot.
-      if (mode === 'virtual') runBatch(0)
+      if (mode !== 'virtual') return
+      runBatch(0)
+
+      /*
+       * Adopt whatever started since the last frame, even while time is still.
+       *
+       * This used to run only from the two methods that move the clock, which
+       * meant a CSS animation was left on the real document timeline for as long
+       * as nobody was playing — and that is most of a session. A component mounts
+       * and starts transitioning the moment the page loads, so a shot appeared to
+       * play by itself before anything had been pressed, and pausing did not stop
+       * it: pausing is precisely when the clock stops advancing, so the next
+       * animation to start was never caught either.
+       *
+       * The same gap desynchronised a take. Values driven from rAF ran on the
+       * virtual clock while a sibling transition ran on the wall clock, so a
+       * counter and the bars beside it disagreed about how far through they were.
+       *
+       * Free while paused: the clock has not moved, so every animation already
+       * adopted is seeked to the time it is already at.
+       */
+      syncAnimations()
     },
 
     raf: callback => natives.requestAnimationFrame(callback),

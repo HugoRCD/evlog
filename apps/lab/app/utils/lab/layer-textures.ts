@@ -53,32 +53,58 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
   measure.font = font
   measure.letterSpacing = tracking
 
-  // Wrap on the layer's width, so the box in the panel is what constrains the
-  // type rather than an invisible canvas edge.
+  /*
+   * Either the box constrains the type, or the type decides the box.
+   *
+   * Wrapping is only right for a column of prose. On a caption it produced a
+   * texture far wider than the words in it — the selection box stretched off
+   * past the type it belonged to — and dragging a corner narrowed the column
+   * until the line broke, which reads as the text being cut rather than sized.
+   */
+  const hugs = (layer.textFit ?? 'auto') === 'auto'
   const lines: string[] = []
-  for (const paragraph of text.split('\n')) {
-    let line = ''
-    for (const word of paragraph.split(' ')) {
-      const candidate = line ? `${line} ${word}` : word
-      if (measure.measureText(candidate).width > boxWidth && line) {
-        lines.push(line)
-        line = word
-      } else {
-        line = candidate
+
+  if (hugs) {
+    // Only where the author put a break. Nothing else may split a line.
+    lines.push(...text.split('\n'))
+  } else {
+    for (const paragraph of text.split('\n')) {
+      let line = ''
+      for (const word of paragraph.split(' ')) {
+        const candidate = line ? `${line} ${word}` : word
+        if (measure.measureText(candidate).width > boxWidth && line) {
+          lines.push(line)
+          line = word
+        } else {
+          line = candidate
+        }
       }
+      lines.push(line)
     }
-    lines.push(line)
   }
+
+  const contentWidth = hugs
+    ? Math.max(1, ...lines.map(line => measure.measureText(line).width))
+    : boxWidth
 
   const lineHeight = fontSize * (layer.lineHeight ?? 1.15)
   const glow = Math.max(0, layer.glow ?? 0)
   const stroke = Math.max(0, layer.stroke ?? 0)
   // The padding has to cover whatever is drawn outside the glyphs, or a halo
   // gets a square edge where the texture stops.
-  const padding = fontSize * (TEXT_PADDING + glow * 0.75 + stroke * 0.5)
+  const decoration = layer.decoration ?? 'none'
+  const shadow = Math.max(0, layer.shadow ?? 0)
+  const shadowX = (layer.shadowX ?? 0) * fontSize
+  const shadowY = (layer.shadowY ?? 0) * fontSize
+  // The cast shadow reaches further than the glyphs by its blur plus its offset,
+  // and anything the texture does not make room for is cut off square.
+  const shadowReach = shadow > 0
+    ? shadow * 1.2 + Math.max(Math.abs(layer.shadowX ?? 0), Math.abs(layer.shadowY ?? 0))
+    : 0
+  const padding = fontSize * (TEXT_PADDING + glow * 0.75 + stroke * 0.5 + shadowReach)
 
   const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil(boxWidth + padding * 2)
+  canvas.width = Math.ceil(contentWidth + padding * 2)
   canvas.height = Math.ceil(lines.length * lineHeight + padding * 2)
 
   const ctx = canvas.getContext('2d')
@@ -96,6 +122,25 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
 
   lines.forEach((line, index) => {
     const y = padding + lineHeight * (index + 0.5)
+
+    /*
+     * The cast shadow before anything else, so every later pass lands on top.
+     *
+     * One call rather than the glow's three: a shadow is a single soft copy
+     * offset from the type, and stacking passes would darken it towards opaque
+     * instead of softening it.
+     */
+    if (shadow > 0) {
+      ctx.shadowColor = layer.shadowColor ?? '#000000cc'
+      ctx.shadowBlur = shadow * fontSize
+      ctx.shadowOffsetX = shadowX
+      ctx.shadowOffsetY = shadowY
+      ctx.fillText(line, anchor, y)
+      ctx.shadowBlur = 0
+      ctx.shadowOffsetX = 0
+      ctx.shadowOffsetY = 0
+      ctx.shadowColor = 'transparent'
+    }
 
     // The halo first, as its own passes. Canvas shadows are drawn per call, so
     // repeating a faint one builds a soft falloff where a single wide blur is
@@ -121,6 +166,30 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
     }
 
     ctx.fillText(line, anchor, y)
+
+    /*
+     * The rule, drawn rather than declared.
+     *
+     * Canvas has no text decoration, so it is a rectangle sized from the line's
+     * own measurement — which is also the only way to get it right under
+     * tracking, where the drawn width is not the sum of the glyph advances.
+     *
+     * The offsets come from the font's metrics rather than from a fraction of
+     * the size: an underline placed at a fixed ratio sits through the
+     * descenders of one face and below the box of another.
+     */
+    if (decoration !== 'none') {
+      const metrics = ctx.measureText(line)
+      const { width } = metrics
+      const left = layer.align === 'left'
+        ? anchor
+        : layer.align === 'right' ? anchor - width : anchor - width / 2
+      const thickness = Math.max(1, fontSize * 0.06)
+      const offset = decoration === 'underline'
+        ? (metrics.actualBoundingBoxDescent || fontSize * 0.2) * 0.6
+        : -(metrics.actualBoundingBoxAscent || fontSize * 0.7) * 0.32
+      ctx.fillRect(left, y + offset, width, thickness)
+    }
   })
 
   return { source: canvas, aspect: canvas.width / canvas.height }

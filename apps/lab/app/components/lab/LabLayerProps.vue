@@ -7,6 +7,7 @@
  * camera is expressed as a zoom rather than a distance.
  */
 
+import { FONT_CATALOGUE } from '~/utils/lab/layers'
 import type { Layer } from '~/utils/lab/layers'
 import { ENTRIES } from '~/utils/lab/registry'
 
@@ -47,11 +48,15 @@ const KINDS = {
   text: { label: 'text', icon: 'i-lucide-type' },
 } as const
 
-const FONTS = [
-  { value: 'pixel', label: 'pixel' },
-  { value: 'sans', label: 'sans' },
-  { value: 'mono', label: 'mono' },
-] as const
+/**
+ * Every face, each written in itself.
+ *
+ * A list of names set in the panel's own font is a list of words you have to
+ * try one by one. Set in the face they name, the list is the specimen — which
+ * is how every editor that takes type seriously presents this, and the only
+ * way to pick one without a round trip through the canvas.
+ */
+const FONTS = FONT_CATALOGUE
 
 /**
  * Ceiling for a clip's own span.
@@ -77,6 +82,17 @@ const groupedEntries = computed(() => {
   }
   return Array.from(groups, ([group, entries]) => ({ group, entries }))
 })
+
+const TEXT_FITS = [
+  { value: 'auto' as const, label: 'auto width', hint: 'The box hugs the words. Drag a corner to size the type.' },
+  { value: 'fixed' as const, label: 'column', hint: 'The width is set and the text wraps into it.' },
+]
+
+const DECORATIONS = [
+  { value: 'none' as const, label: 'none', style: '' },
+  { value: 'underline' as const, label: 'underline', style: 'underline' },
+  { value: 'strikethrough' as const, label: 'strike', style: 'line-through' },
+]
 
 const ALIGNMENTS = [
   { value: 'left', icon: 'i-lucide-align-left' },
@@ -141,15 +157,18 @@ const TEXT_TOGGLES = [
         @input="emit('update', { text: ($event.target as HTMLTextAreaElement).value })"
       />
 
-      <div class="mb-2 flex gap-1">
+      <div class="mb-2 grid grid-cols-2 gap-1 @min-[320px]:grid-cols-3">
         <button
           v-for="font in FONTS"
           :key="font.value"
           type="button"
-          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          data-cuelume-press
+          class="truncate border px-1.5 py-1 text-[11px] leading-tight transition-colors"
           :class="(layer.font ?? 'pixel') === font.value
             ? 'border-primary-500/60 text-primary'
             : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
+          :style="{ fontFamily: `var(${font.variable}, ${font.fallback})` }"
+          :title="font.label"
           @click="emit('update', { font: font.value })"
         >
           {{ font.label }}
@@ -169,15 +188,44 @@ const TEXT_TOGGLES = [
         >
           <UIcon :name="alignment.icon" class="size-3" />
         </button>
-        <input
-          :value="layer.color ?? '#ffffff'"
-          type="color"
-          class="h-6 w-12 shrink-0 cursor-pointer border border-muted bg-transparent"
-          @input="emit('update', { color: ($event.target as HTMLInputElement).value })"
-        >
       </div>
 
+      <div class="mb-2">
+        <LabColour
+          label="Colour"
+          :model-value="layer.color ?? '#ffffff'"
+          @update:model-value="emit('update', { color: $event })"
+        />
+      </div>
+
+      <!--
+        Which of the two decides the other. Auto hugs the words and the box is
+        dragged to size them; fixed sets a column and the type flows into it.
+      -->
+      <div class="mb-2 flex gap-1">
+        <button
+          v-for="fit in TEXT_FITS"
+          :key="fit.value"
+          type="button"
+          data-cuelume-press
+          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          :class="(layer.textFit ?? 'auto') === fit.value
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
+          :title="fit.hint"
+          @click="emit('update', { textFit: fit.value })"
+        >
+          {{ fit.label }}
+        </button>
+      </div>
+
+      <!--
+        Only in a column. Hugging text takes its size from the box, so a second
+        size control would be a slider that moves nothing you can see — the
+        width below is the one that sizes it.
+      -->
       <LabNumber
+        v-if="(layer.textFit ?? 'auto') === 'fixed'"
         :model-value="layer.fontSize ?? 0.12"
         label="Size"
         :min="0.01"
@@ -233,6 +281,66 @@ const TEXT_TOGGLES = [
         </button>
       </div>
 
+      <div class="mb-2 flex gap-1">
+        <button
+          v-for="rule in DECORATIONS"
+          :key="rule.value"
+          type="button"
+          data-cuelume-press
+          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          :class="[
+            (layer.decoration ?? 'none') === rule.value
+              ? 'border-primary-500/60 text-primary'
+              : 'border-muted text-dimmed hover:border-accented hover:text-toned',
+            rule.style,
+          ]"
+          @click="emit('update', { decoration: rule.value })"
+        >
+          {{ rule.label }}
+        </button>
+      </div>
+
+      <!--
+        A cast shadow, which the glow cannot be: glow is centred on the glyphs
+        by construction. The offsets only appear once there is a shadow to move.
+      -->
+      <LabNumber
+        :model-value="layer.shadow ?? 0"
+        label="Shadow"
+        :min="0"
+        :max="1"
+        :step="0.005"
+        :default="0"
+        @update:model-value="emit('update', { shadow: $event })"
+      />
+      <template v-if="(layer.shadow ?? 0) > 0">
+        <LabNumber
+          :model-value="layer.shadowX ?? 0"
+          label="Shadow X"
+          :min="-1"
+          :max="1"
+          :step="0.005"
+          :default="0"
+          @update:model-value="emit('update', { shadowX: $event })"
+        />
+        <LabNumber
+          :model-value="layer.shadowY ?? 0"
+          label="Shadow Y"
+          :min="-1"
+          :max="1"
+          :step="0.005"
+          :default="0"
+          @update:model-value="emit('update', { shadowY: $event })"
+        />
+        <div class="mb-2">
+          <LabColour
+            label="Shadow colour"
+            :model-value="layer.shadowColor ?? '#000000cc'"
+            @update:model-value="emit('update', { shadowColor: $event })"
+          />
+        </div>
+      </template>
+
       <LabNumber
         :model-value="layer.glow ?? 0"
         label="Glow"
@@ -253,14 +361,12 @@ const TEXT_TOGGLES = [
         :default="0"
         @update:model-value="emit('update', { stroke: $event })"
       />
-      <div v-if="(layer.stroke ?? 0) > 0" class="mb-2 flex items-center gap-2">
-        <span class="font-mono text-[10px] text-dimmed">Outline colour</span>
-        <input
-          :value="layer.strokeColor ?? '#000000'"
-          type="color"
-          class="ml-auto h-6 w-12 shrink-0 border border-muted bg-transparent"
-          @input="emit('update', { strokeColor: ($event.target as HTMLInputElement).value })"
-        >
+      <div v-if="(layer.stroke ?? 0) > 0" class="mb-2">
+        <LabColour
+          label="Outline colour"
+          :model-value="layer.strokeColor ?? '#000000'"
+          @update:model-value="emit('update', { strokeColor: $event })"
+        />
       </div>
     </template>
 

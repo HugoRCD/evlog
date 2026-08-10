@@ -55,6 +55,14 @@ export interface Layer {
   width: number
   rotation: number
   opacity: number
+  /**
+   * Taken out of the picture without being taken out of the document.
+   *
+   * Distinct from an opacity of zero, and the difference is what makes it
+   * useful: hiding is a thing you do to look at what is underneath, and it has
+   * to be undoable without remembering what the opacity used to be.
+   */
+  hidden?: boolean
 
   // Text
   text?: string
@@ -62,7 +70,7 @@ export interface Layer {
   fontSize?: number
   color?: string
   weight?: number
-  font?: 'sans' | 'mono' | 'pixel'
+  font?: LayerFont
   align?: 'left' | 'center' | 'right'
   /** Line box as a multiple of the size — the one control that sets a block's texture. */
   lineHeight?: number
@@ -70,6 +78,30 @@ export interface Layer {
   letterSpacing?: number
   italic?: boolean
   uppercase?: boolean
+  /** A rule through or under the words, drawn from the font's own metrics. */
+  decoration?: 'none' | 'underline' | 'strikethrough'
+  /**
+   * A cast shadow, which `glow` cannot be.
+   *
+   * Glow is centred on the glyphs by construction — it is a halo. An offset one
+   * is what lifts type off a busy plate, and the two are worth having at once.
+   */
+  shadow?: number
+  shadowX?: number
+  shadowY?: number
+  shadowColor?: string
+  /**
+   * Whether the box follows the type or the type wraps into the box.
+   *
+   * `auto` hugs: the texture is exactly as wide as the longest line, and a
+   * corner drag scales the type. `fixed` is a column: the width is set and the
+   * text wraps into it, which is what a paragraph wants and what a caption
+   * never did.
+   *
+   * Absent means auto. A caption is what this is nearly always used for and a
+   * paragraph is the exception, so the exception is the one that says so.
+   */
+  textFit?: 'auto' | 'fixed'
   /**
    * Halo around the glyphs, as a fraction of the size, in the text's own colour.
    *
@@ -251,7 +283,24 @@ export function canJoin(a: Layer, b: Layer): boolean {
  * Returns null outside the clip's span so the renderer can skip it entirely
  * rather than issue a draw call for something nobody can see.
  */
+/**
+ * Where a layer is when nothing is animating it.
+ *
+ * A shot has no timeline, so a layer has no span to be inside or outside of and
+ * no ramp to be part-way through — it is simply there, at the placement it was
+ * given. Entrances and exits are kept on the layer rather than stripped, so a
+ * document carried into a video still has them; they just describe nothing a
+ * single frame can show.
+ */
+export function layerAtRest(layer: Layer): EffectResult | null {
+  if (layer.hidden) return null
+  const opacity = Math.max(0, Math.min(1, layer.opacity))
+  if (opacity <= 0.001) return null
+  return { opacity, offsetX: 0, offsetY: 0, depth: 0, scale: 1, rotation: 0 }
+}
+
 export function layerStateAt(layer: Layer, time: number): EffectResult | null {
+  if (layer.hidden) return null
   if (time < layer.start || time > layerEnd(layer)) return null
 
   const effects = evaluateEffects(layer.effects, time - layer.start, layer.duration)
@@ -261,15 +310,45 @@ export function layerStateAt(layer: Layer, time: number): EffectResult | null {
   return { ...effects, opacity }
 }
 
-const FONT_STACK: Record<NonNullable<Layer['font']>, string> = {
-  sans: 'var(--font-sans, sans-serif)',
-  mono: 'var(--font-mono, monospace)',
-  pixel: 'var(--font-pixel, monospace)',
-}
+/**
+ * The typefaces a text layer can be set in.
+ *
+ * Every one is declared in `nuxt.config` and downloaded by `@nuxt/fonts`, which
+ * serves the files from this origin under `/_fonts/`. That detail is the whole
+ * reason a face can be offered at all: the plate is rasterized through a sealed
+ * SVG that resolves nothing, so `dom-texture` inlines each `@font-face` as a
+ * data URI — and it can only do that for a file it is allowed to read. A face
+ * loaded from a third-party CDN would look right in the panel and come out of
+ * the render in the fallback.
+ *
+ * The variable is its own name rather than the source's `--font-sans`, so
+ * adding a face here cannot change what the staged component is drawn in.
+ */
+export const FONT_CATALOGUE = [
+  { value: 'pixel', label: 'Geist Pixel', variable: '--font-pixel', fallback: 'monospace' },
+  { value: 'sans', label: 'Geist', variable: '--font-sans', fallback: 'sans-serif' },
+  { value: 'mono', label: 'Geist Mono', variable: '--font-mono', fallback: 'monospace' },
+  { value: 'inter', label: 'Inter', variable: '--lab-font-inter', fallback: 'sans-serif' },
+  { value: 'grotesk', label: 'Space Grotesk', variable: '--lab-font-grotesk', fallback: 'sans-serif' },
+  { value: 'bricolage', label: 'Bricolage', variable: '--lab-font-bricolage', fallback: 'sans-serif' },
+  { value: 'archivo', label: 'Archivo', variable: '--lab-font-archivo', fallback: 'sans-serif' },
+  { value: 'serif', label: 'Instrument', variable: '--lab-font-serif', fallback: 'serif' },
+  { value: 'playfair', label: 'Playfair', variable: '--lab-font-playfair', fallback: 'serif' },
+  { value: 'jetbrains', label: 'JetBrains', variable: '--lab-font-jetbrains', fallback: 'monospace' },
+] as const
+
+export type LayerFont = typeof FONT_CATALOGUE[number]['value']
+
+const FONT_STACK = Object.fromEntries(
+  FONT_CATALOGUE.map(font => [font.value, `var(${font.variable}, ${font.fallback})`]),
+) as Record<LayerFont, string>
 
 /** Font family for a layer, resolved against the fonts the app already loads. */
 export function layerFontFamily(layer: Layer): string {
-  return FONT_STACK[layer.font ?? 'pixel']
+  // A face dropped from the catalogue leaves documents pointing at a name that
+  // no longer resolves, and a text layer that renders as nothing reads as lost
+  // rather than as restyled.
+  return FONT_STACK[layer.font ?? 'pixel'] ?? FONT_STACK.pixel
 }
 
 /**
@@ -300,6 +379,12 @@ export function layerTextureKey(layer: Layer, stage: { width: number, height: nu
     layer.letterSpacing,
     layer.italic,
     layer.uppercase,
+    layer.textFit,
+    layer.decoration,
+    layer.shadow,
+    layer.shadowX,
+    layer.shadowY,
+    layer.shadowColor,
     layer.glow,
     layer.stroke,
     layer.strokeColor,
@@ -343,6 +428,7 @@ export function sanitizeLayers(value: unknown): Layer[] {
         effects: layer.effects ? sanitizeEffects(layer.effects) : migrated,
         depth: Number.isFinite(layer.depth) ? layer.depth : 0,
         space: ['plate', 'scene', 'overlay'].includes(layer.space ?? '') ? layer.space : 'scene',
+        hidden: layer.hidden === true,
         start: Number.isFinite(layer.start) ? Math.max(0, layer.start) : 0,
         duration: Number.isFinite(layer.duration) ? Math.max(100, layer.duration) : 1000,
       }

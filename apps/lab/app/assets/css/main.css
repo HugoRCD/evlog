@@ -256,3 +256,25 @@ textarea,
 button:focus:not(:focus-visible) {
   outline: none;
 }
+
+/*
+ * The typefaces a text layer can be set in, as custom properties on the root.
+ *
+ * On `:root` and not on `.lab-chrome`, which is where every other token in this
+ * file lives — deliberately, and for one reason: the text rasterizer reads these
+ * off `document.documentElement` to build a canvas font string, and a value
+ * scoped to the panel is invisible from there.
+ *
+ * Safe in a way the colour tokens are not, because these are new names. The
+ * stage inherits the source stylesheet's `--font-sans` untouched; nothing here
+ * can restyle the thing being filmed.
+ */
+:root {
+  --lab-font-inter: "Inter", sans-serif;
+  --lab-font-grotesk: "Space Grotesk", sans-serif;
+  --lab-font-bricolage: "Bricolage Grotesque", sans-serif;
+  --lab-font-archivo: "Archivo", sans-serif;
+  --lab-font-serif: "Instrument Serif", serif;
+  --lab-font-playfair: "Playfair Display", serif;
+  --lab-font-jetbrains: "JetBrains Mono", monospace;
+}
