@@ -74,6 +74,7 @@ const KIND_ICON: Record<string, string> = {
         v-for="layer in layers"
         :key="layer.id"
         type="button"
+        data-cuelume-press
         class="flex shrink-0 items-center gap-1.5 border px-2 py-1 transition-colors"
         :class="selectedId === layer.id
           ? 'border-primary-500/60 text-primary'
@@ -94,6 +95,7 @@ const KIND_ICON: Record<string, string> = {
     <div class="flex shrink-0 items-center gap-1">
       <button
         type="button"
+        data-cuelume-press
         class="border border-muted px-2 py-1 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         @click="emit('addImage')"
       >
@@ -101,6 +103,7 @@ const KIND_ICON: Record<string, string> = {
       </button>
       <button
         type="button"
+        data-cuelume-press
         class="border border-muted px-2 py-1 font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
         @click="emit('addText')"
       >

@@ -57,11 +57,25 @@ const defaultFraction = computed(() => {
   return value > 0.02 && value < 0.98 ? value : null
 })
 
+const { cue } = useCues()
+
+/**
+ * A tick per step crossed, not per pointer move.
+ *
+ * A drag emits a value on every frame, and most of those land on the step the
+ * last one did — a slider with a fine step passes through hundreds of them
+ * across a track. Firing on the committed value only when it actually changes
+ * turns that into what a physical detent sounds like: silence while the knob
+ * travels within a notch, a tick as it leaves one. The throttle inside `cue`
+ * catches what is left on a coarse range dragged quickly.
+ */
 function commit(value: number) {
   const stepped = Math.round(value / props.step) * props.step
   const clamped = Math.min(props.max, Math.max(props.min, stepped))
   // Re-round after clamping: min/max are not always on the step grid.
-  model.value = Number(clamped.toFixed(precision.value))
+  const next = Number(clamped.toFixed(precision.value))
+  if (next !== model.value) cue('tick')
+  model.value = next
 }
 
 function valueAtClientX(clientX: number): number {

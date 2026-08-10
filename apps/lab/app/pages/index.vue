@@ -162,6 +162,16 @@ const stagesRoot = useTemplateRef('stagesRoot')
 // Only to put the theme on the chrome; nothing here reads it.
 const { isDark } = useLabTheme()
 
+/**
+ * The chrome, which is the only part of this page that is an interface.
+ *
+ * The delegated sound listeners are attached here rather than to the document
+ * so the stage — a live subtree being rasterized every frame — is never in
+ * scope. Nothing being filmed should be able to make a noise.
+ */
+const chrome = useTemplateRef('chrome')
+const { enabled: cuesEnabled, install: installCues, setCuesEnabled, cue } = useCues()
+
 /** Bumped to remount every staged component, restarting their sequences at zero. */
 const stageKey = ref(0)
 
@@ -708,6 +718,8 @@ onMounted(async () => {
 
   // The launcher lists them, so they have to be in hand before it is shown.
   await refreshProjects()
+
+  if (chrome.value) installCues(chrome.value)
 })
 
 onBeforeUnmount(() => {
@@ -833,6 +845,7 @@ function replay() {
 
 function togglePlay() {
   playing.value = !playing.value
+  cue(playing.value ? 'press' : 'release')
   // Resuming past the end would sit on a frame where every layer has finished,
   // which is simply black; drop back to the top instead.
   if (playing.value && playhead.value >= settings.value.timelineLength) void seekTo(0)
@@ -1544,6 +1557,7 @@ function applyDocument(document: LabDocument) {
  * but not on disk sends the next reload straight back to the question.
  */
 function startDocument(kind: LabMode) {
+  cue('arrival')
   const document = createDocument(kind)
   if (DEFAULT_COMPONENT) {
     const first = createComponentLayer(DEFAULT_COMPONENT, 0, document.settings.timelineLength)
@@ -1751,8 +1765,10 @@ async function exportPng() {
   error.value = ''
   try {
     download(await renderPng(), takeName(takeSubject.value, 'png'))
+    cue('success')
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : String(cause)
+    cue('error')
   } finally {
     busy.value = false
   }
@@ -1781,6 +1797,8 @@ async function copyPng() {
   error.value = ''
   try {
     await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderPng() })])
+    // The shutter, on the one action that is literally taking a picture.
+    cue('chime')
     pngCopied.value = true
     if (pngCopiedTimer) clearTimeout(pngCopiedTimer)
     pngCopiedTimer = setTimeout(() => {
@@ -2167,6 +2185,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     which is deliberately not inside it.
   -->
   <div
+    ref="chrome"
     class="lab-chrome fixed inset-0 flex overflow-hidden bg-default"
     :data-theme="isDark ? 'dark' : 'light'"
   >
@@ -2265,6 +2284,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
               ]"
               :key="tool.key"
               type="button"
+              data-cuelume-toggle
               class="flex size-6 items-center justify-center border backdrop-blur-[2px] transition-colors"
               :class="tool.on
                 ? 'border-blue-500/60 bg-blue-500/15 text-blue-300'
@@ -2423,6 +2443,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       v-model:camera="camera"
       :style="{ width: `${panel.size.value}px` }"
       :mode
+      :cues-enabled
       :link-copied
       :busy
       :progress
@@ -2446,6 +2467,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @copy-png="copyPng"
       @new-document="launching = true"
       @set-mode="setMode"
+      @set-cues="setCuesEnabled"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"
       @projects="projectsOpen = true"

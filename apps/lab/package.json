@@ -17,6 +17,7 @@
     "@nuxt/ui": "^4.10.0",
     "@nuxtjs/color-mode": "^4.0.1",
     "@vercel/analytics": "^2.0.1",
+    "cuelume": "^0.2.2",
     "motion-v": "^2.3.0",
     "nuxt": "^4.4.4"
   },

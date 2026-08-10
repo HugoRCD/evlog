@@ -20,6 +20,8 @@ const props = defineProps<{
   pngCopied: boolean
   /** A shot has no timeline, so everything about timing is moot in one. */
   mode: LabMode
+  /** Whether interaction sounds are on. Shown in the header, not down a panel. */
+  cuesEnabled: boolean
   selectedLayer: Layer | null
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
@@ -38,6 +40,7 @@ const emit = defineEmits<{
   copyPng: []
   newDocument: []
   setMode: [mode: LabMode]
+  setCues: [enabled: boolean]
   copyLink: []
   projects: []
   shortcuts: []
@@ -312,6 +315,7 @@ const CONTAINERS = [
         -->
         <button
           type="button"
+          data-cuelume-press
           class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
           aria-label="Projects"
           title="Projects — save, open, export (⌘O)"
@@ -331,6 +335,7 @@ const CONTAINERS = [
         -->
         <button
           type="button"
+          data-cuelume-press
           class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
           :aria-label="isDark ? 'Switch the panel to light' : 'Switch the panel to dark'"
           :title="isDark ? 'Light panel — the shot is unaffected' : 'Dark panel — the shot is unaffected'"
@@ -339,11 +344,29 @@ const CONTAINERS = [
           <UIcon :name="isDark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-3" />
         </button>
         <!--
+          In the header, beside the light switch, and not behind the ellipsis.
+          This tool is used while its user is recording a screen: a lab that
+          chirps under a take being narrated has to be silenceable without a
+          hunt, and the state has to be readable at a glance before recording
+          starts rather than discovered in the edit.
+        -->
+        <button
+          type="button"
+          data-cuelume-press
+          class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
+          :aria-label="cuesEnabled ? 'Mute the interface' : 'Unmute the interface'"
+          :title="cuesEnabled ? 'Sound on — mute before recording your screen' : 'Sound off'"
+          @click="emit('setCues', !cuesEnabled)"
+        >
+          <UIcon :name="cuesEnabled ? 'i-lucide-volume-2' : 'i-lucide-volume-off'" class="size-3" />
+        </button>
+        <!--
           Sized to be found. At sixteen pixels this read as punctuation after the
           title rather than as the way into the only documentation the tool has.
         -->
         <button
           type="button"
+          data-cuelume-press
           class="flex size-5 items-center justify-center rounded-full border border-muted font-mono text-[11px] leading-none text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
           aria-label="Keyboard shortcuts"
           title="Keyboard shortcuts (?)"
@@ -419,6 +442,7 @@ const CONTAINERS = [
         <div class="grid grid-cols-1 gap-1 @min-[300px]:grid-cols-2">
           <button
             type="button"
+            data-cuelume-press
             class="border border-muted py-[5px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
             title="Trim the viewport height to what the component actually occupies, so the camera has no dead frame to compose around."
             @click="emit('fitStage')"
@@ -427,6 +451,7 @@ const CONTAINERS = [
           </button>
           <button
             type="button"
+            data-cuelume-press
             class="border border-muted py-[5px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
             title="Restart the staged animation from its first frame."
             @click="emit('replay')"
@@ -443,6 +468,7 @@ const CONTAINERS = [
         -->
         <button
           type="button"
+          data-cuelume-press
           class="mb-2 w-full border border-muted py-[5px] font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
           title="Back to a square-on, edge-to-edge framing. The grade is left alone."
           @click="emit('fit')"
@@ -479,6 +505,7 @@ const CONTAINERS = [
           </div>
           <button
             type="button"
+            data-cuelume-press
             class="shrink-0 border p-[5px] transition-colors"
             :class="picking
               ? 'border-primary-500/60 text-primary'
@@ -726,6 +753,7 @@ const CONTAINERS = [
           <span class="font-mono text-[10px] text-dimmed">{{ Math.round(progress * 100) }}%</span>
           <button
             type="button"
+            data-cuelume-press
             class="font-mono text-[10px] text-dimmed hover:text-error transition-colors"
             @click="emit('cancel')"
           >
@@ -742,6 +770,7 @@ const CONTAINERS = [
         <button
           v-if="mode === 'video'"
           type="button"
+          data-cuelume-press
           class="flex-1 border border-primary-500/50 bg-primary-500/10 py-[7px] font-mono text-[10px] text-primary hover:bg-primary-500/20 transition-colors"
           @click="emit('exportVideo')"
         >
@@ -756,6 +785,7 @@ const CONTAINERS = [
         -->
         <button
           type="button"
+          data-cuelume-press
           class="border px-3 py-[7px] font-mono text-[10px] transition-colors"
           :class="[
             mode === 'shot' ? 'flex-1' : '',
@@ -770,6 +800,7 @@ const CONTAINERS = [
         </button>
         <button
           type="button"
+          data-cuelume-press
           class="flex items-center border border-muted px-2 py-[7px] text-muted transition-colors hover:border-accented hover:text-default"
           aria-label="Download the frame as a PNG"
           title="Download the frame as a PNG"

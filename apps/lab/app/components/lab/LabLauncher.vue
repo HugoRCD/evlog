@@ -71,6 +71,7 @@ const RECENT_LIMIT = 4
         <button
           v-if="dismissable"
           type="button"
+          data-cuelume-press
           class="font-mono text-[10px] text-dimmed transition-colors hover:text-primary"
           @click="emit('dismiss')"
         >
@@ -86,6 +87,7 @@ const RECENT_LIMIT = 4
           v-for="kind in KINDS"
           :key="kind.mode"
           type="button"
+          data-cuelume-press
           class="group border border-muted p-4 text-left transition-colors hover:border-primary-500/60 hover:bg-primary-500/5"
           @click="emit('create', kind.mode)"
         >
@@ -110,6 +112,7 @@ const RECENT_LIMIT = 4
           </span>
           <button
             type="button"
+            data-cuelume-press
             class="font-mono text-[10px] text-dimmed transition-colors hover:text-primary"
             @click="emit('browse')"
           >
@@ -122,6 +125,7 @@ const RECENT_LIMIT = 4
             v-for="project in recent.slice(0, RECENT_LIMIT)"
             :key="project.id"
             type="button"
+            data-cuelume-press
             class="flex items-center gap-2 border-b border-default py-2 text-left transition-colors hover:text-primary"
             @click="emit('open', project.id)"
           >
