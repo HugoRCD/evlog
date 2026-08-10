@@ -1221,6 +1221,13 @@ function reorderLayers(from: number, to: number) {
   layers.value = next
 }
 
+/** One step forward or back in the stack, from the layers list. */
+function shiftLayer(id: string, direction: -1 | 1) {
+  const from = layers.value.findIndex(layer => layer.id === id)
+  if (from === -1) return
+  reorderLayers(from, from + direction)
+}
+
 function copyLayer(id: string) {
   const layer = layers.value.find(entry => entry.id === id)
   if (layer) clipboard = { ...layer }
@@ -1547,10 +1554,13 @@ function applyDocument(document: LabDocument) {
 /**
  * Start something, from the launcher.
  *
- * Either kind opens on the default animation rather than on an empty frame. The
- * one thing this tool is for is filming what the docs already have, and a black
- * rectangle asks a second question before anything can happen — in a video it
- * is also the only clip there is to trim, which is where a take starts anyway.
+ * A take opens on the default animation; a shot opens on nothing.
+ *
+ * The asymmetry is the point. A video is a thing made of clips, so the first
+ * clip is the errand — starting with one is starting. A shot is very often a
+ * photograph somebody is about to drop in, and handing them an animation they
+ * did not ask for means deleting it before they can begin. An empty frame is
+ * not a missing default here; it is the canvas, and it says what to put on it.
  *
  * Written to storage immediately, and that is not an optimisation: the launcher
  * only shows when there is no working copy, so a document that exists on screen
@@ -1559,7 +1569,7 @@ function applyDocument(document: LabDocument) {
 function startDocument(kind: LabMode) {
   cue('arrival')
   const document = createDocument(kind)
-  if (DEFAULT_COMPONENT) {
+  if (kind === 'video' && DEFAULT_COMPONENT) {
     const first = createComponentLayer(DEFAULT_COMPONENT, 0, document.settings.timelineLength)
     awaitingFit.add(first.id)
     document.layers = [first]
@@ -2032,6 +2042,24 @@ function onFrameGrab(grab: LayerGrab, event: PointerEvent) {
   element.setPointerCapture(event.pointerId)
 }
 
+/** True while files are being dragged over the frame, for the drop affordance. */
+const dropping = ref(false)
+
+/**
+ * Files dropped straight onto the picture.
+ *
+ * The timeline already accepted a drop, which is the right place in a take —
+ * you are dropping a clip at a time. A shot has no timeline, and the frame is
+ * the only thing on screen to aim at, so it has to be a target too.
+ */
+function onFrameDrop(event: DragEvent) {
+  dropping.value = false
+  const files = Array.from(event.dataTransfer?.files ?? [])
+  if (!files.length) return
+  cue('droplet')
+  void importFiles(files, playhead.value)
+}
+
 function onFramePointerUp(event: PointerEvent) {
   if (layerGestures.active.value) {
     layerGestures.end()
@@ -2204,6 +2232,9 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           ref="frame"
           class="relative max-h-full max-w-full"
           :style="{ aspectRatio: `${settings.outputWidth} / ${settings.outputHeight}` }"
+          @dragover.prevent="dropping = true"
+          @dragleave="dropping = false"
+          @drop.prevent="onFrameDrop"
           @pointerdown="onFramePointerDown"
           @pointermove="onFramePointer($event); onFocusHover($event); gestures.onPointerMove($event)"
           @pointerup="onFramePointerUp"
@@ -2238,6 +2269,41 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             :width="settings.outputWidth"
             :height="settings.outputHeight"
           />
+
+          <!--
+            The empty canvas, which is a state a shot now opens in on purpose.
+            A black rectangle with no affordance reads as something that failed
+            to load; the same rectangle saying what goes on it is the start of
+            the job. Gone the moment there is a layer, because from then on the
+            frame is the picture and anything over it is in the way.
+          -->
+          <div
+            v-if="!layers.length"
+            class="pointer-events-none absolute inset-0 flex flex-col items-center justify-center gap-3 border border-dashed transition-colors"
+            :class="dropping ? 'border-blue-400/80 bg-blue-500/10' : 'border-white/15'"
+          >
+            <p class="font-mono text-[11px] text-white/45">
+              Drop an image or a video here
+            </p>
+            <div class="pointer-events-auto flex items-center gap-1">
+              <button
+                type="button"
+                data-cuelume-press
+                class="border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white/60 transition-colors hover:border-white/35 hover:text-white/90"
+                @click="addMedia"
+              >
+                choose a file
+              </button>
+              <button
+                type="button"
+                data-cuelume-press
+                class="border border-white/15 bg-black/40 px-2.5 py-1 font-mono text-[10px] text-white/60 transition-colors hover:border-white/35 hover:text-white/90"
+                @click="addComponent"
+              >
+                stage a component
+              </button>
+            </div>
+          </div>
 
           <!--
             From here to the end of the frame, the colours are literal and stay
@@ -2444,6 +2510,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :style="{ width: `${panel.size.value}px` }"
       :mode
       :cues-enabled
+      :layers
+      :selected-layer-id="selectedId"
       :link-copied
       :busy
       :progress
@@ -2467,6 +2535,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @copy-png="copyPng"
       @new-document="launching = true"
       @set-mode="setMode"
+      @select-layer="selectedId = $event"
+      @shift-layer="shiftLayer"
+      @remove-layer-by-id="selectedId = $event; removeSelected()"
+      @add-image="addMedia"
+      @add-text="addText"
       @set-cues="setCuesEnabled"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"

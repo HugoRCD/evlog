@@ -22,6 +22,9 @@ const props = defineProps<{
   mode: LabMode
   /** Whether interaction sounds are on. Shown in the header, not down a panel. */
   cuesEnabled: boolean
+  /** The whole stack, for the layers list. */
+  layers: Layer[]
+  selectedLayerId: string | null
   selectedLayer: Layer | null
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
@@ -40,6 +43,11 @@ const emit = defineEmits<{
   copyPng: []
   newDocument: []
   setMode: [mode: LabMode]
+  selectLayer: [id: string | null]
+  shiftLayer: [id: string, direction: -1 | 1]
+  removeLayerById: [id: string]
+  addImage: []
+  addText: []
   setCues: [enabled: boolean]
   copyLink: []
   projects: []
@@ -313,6 +321,22 @@ const CONTAINERS = [
           work was three characters wide and looked like a preference — the one
           action in the app that decides whether anything survives the tab.
         -->
+        <!--
+          Beside Projects, and not inside the menu with it. Starting something is
+          the first thing anyone does here and the last thing that should need
+          finding — it was one item down an ellipsis, which is where actions go
+          to be used once and forgotten.
+        -->
+        <button
+          type="button"
+          data-cuelume-press
+          class="flex size-5 items-center justify-center rounded-full border border-muted text-dimmed transition-colors hover:border-primary-500/60 hover:bg-primary-500/10 hover:text-primary"
+          aria-label="New shot or video"
+          title="New — a shot or a take, from the top"
+          @click="emit('newDocument')"
+        >
+          <UIcon name="i-lucide-plus" class="size-3" />
+        </button>
         <button
           type="button"
           data-cuelume-press
@@ -388,6 +412,43 @@ const CONTAINERS = [
       clip, so the panel states what is being edited instead of leaving it to be
       inferred from the fields.
     -->
+
+    <!--
+    Above the tabs, not inside them. It is the list of what is in the picture,
+      and everything below it is a way of treating one of these — reaching a
+      layer used to mean finding it on a timeline or in a row of chips at the
+      other end of the window.
+    -->
+    <LabSection title="Layers">
+      <LabLayers
+        :layers
+        :selected-id="selectedLayerId"
+        @select="emit('selectLayer', $event)"
+        @update="(id, patch) => emit('updateLayer', id, patch)"
+        @reorder="(id, direction) => emit('shiftLayer', id, direction)"
+        @remove="emit('removeLayerById', $event)"
+      />
+
+      <div class="mt-2 grid grid-cols-2 gap-1">
+        <button
+          type="button"
+          data-cuelume-press
+          class="border border-muted py-[5px] font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
+          @click="emit('addImage')"
+        >
+          + media
+        </button>
+        <button
+          type="button"
+          data-cuelume-press
+          class="border border-muted py-[5px] font-mono text-[10px] text-muted transition-colors hover:border-accented hover:text-default"
+          @click="emit('addText')"
+        >
+          + text
+        </button>
+      </div>
+    </LabSection>
+
     <div v-if="selectedLayer" class="flex shrink-0 border-b border-default">
       <button
         v-for="tab in TABS"

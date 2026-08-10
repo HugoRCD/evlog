@@ -55,6 +55,14 @@ export interface Layer {
   width: number
   rotation: number
   opacity: number
+  /**
+   * Taken out of the picture without being taken out of the document.
+   *
+   * Distinct from an opacity of zero, and the difference is what makes it
+   * useful: hiding is a thing you do to look at what is underneath, and it has
+   * to be undoable without remembering what the opacity used to be.
+   */
+  hidden?: boolean
 
   // Text
   text?: string
@@ -261,12 +269,14 @@ export function canJoin(a: Layer, b: Layer): boolean {
  * single frame can show.
  */
 export function layerAtRest(layer: Layer): EffectResult | null {
+  if (layer.hidden) return null
   const opacity = Math.max(0, Math.min(1, layer.opacity))
   if (opacity <= 0.001) return null
   return { opacity, offsetX: 0, offsetY: 0, depth: 0, scale: 1, rotation: 0 }
 }
 
 export function layerStateAt(layer: Layer, time: number): EffectResult | null {
+  if (layer.hidden) return null
   if (time < layer.start || time > layerEnd(layer)) return null
 
   const effects = evaluateEffects(layer.effects, time - layer.start, layer.duration)
@@ -358,6 +368,7 @@ export function sanitizeLayers(value: unknown): Layer[] {
         effects: layer.effects ? sanitizeEffects(layer.effects) : migrated,
         depth: Number.isFinite(layer.depth) ? layer.depth : 0,
         space: ['plate', 'scene', 'overlay'].includes(layer.space ?? '') ? layer.space : 'scene',
+        hidden: layer.hidden === true,
         start: Number.isFinite(layer.start) ? Math.max(0, layer.start) : 0,
         duration: Number.isFinite(layer.duration) ? Math.max(100, layer.duration) : 1000,
       }

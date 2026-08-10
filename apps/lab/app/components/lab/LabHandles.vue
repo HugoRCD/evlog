@@ -31,6 +31,26 @@ const centre = computed(() => {
 })
 
 /**
+ * The cursor each grip should wear, from where it actually sits.
+ *
+ * Not from its index: a corner's index says which of the layer's own corners it
+ * is, and the layer turns. The top-left grip of a layer rotated ninety degrees
+ * is on screen at the top-right, and an arrow pointing the wrong way across the
+ * shape is worse than no arrow — it tells you the drag will do something it
+ * will not.
+ *
+ * So it is read off the angle from the centre, quantised to the four diagonal
+ * cursors the platform actually has.
+ */
+const cursors = computed(() => props.corners.map(([x, y]) => {
+  const angle = Math.atan2(y - centre.value.y, x - centre.value.x)
+  // Eight sectors of 45°, mapped onto the four resize cursors — opposite
+  // sectors share one, because a resize arrow is a line, not a direction.
+  const sector = ((Math.round((angle * 4) / Math.PI) % 8) + 8) % 8
+  return ['cursor-ew-resize', 'cursor-nwse-resize', 'cursor-ns-resize', 'cursor-nesw-resize'][sector % 4]
+}))
+
+/**
  * The rotate grip, pushed off the top edge along its own outward normal.
  *
  * Perpendicular to the edge rather than straight up the screen, so it stays
@@ -87,7 +107,8 @@ const rotateGrip = computed(() => {
     v-for="(corner, index) in corners"
     :key="index"
     type="button"
-    class="absolute size-2 -translate-x-1/2 -translate-y-1/2 cursor-nwse-resize border border-blue-400 bg-black"
+    class="absolute size-2 -translate-x-1/2 -translate-y-1/2 border border-blue-400 bg-black"
+    :class="cursors[index]"
     :style="{ left: `${corner[0] * 100}%`, top: `${corner[1] * 100}%` }"
     :aria-label="`Resize from corner ${index + 1}`"
     @pointerdown.stop="emit('grabCorner', index, $event)"
