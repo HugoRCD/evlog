@@ -136,6 +136,12 @@ describe('posthog adapter', () => {
       expect(attributesOf(fetchSpy.mock.calls[0]!).sessionId).toBe('sess_abc')
     })
 
+    it('stringifies a numeric userId', async () => {
+      await sendToPostHog(createTestEvent({ userId: 42 }), { apiKey: 'phc_test' })
+
+      expect(attributesOf(fetchSpy.mock.calls[0]!).posthogDistinctId).toBe('42')
+    })
+
     it('reads the identity from the configured dot path', async () => {
       await sendToPostHog(createTestEvent({ user: { id: 'usr_456' } }), {
         apiKey: 'phc_test',
@@ -211,12 +217,17 @@ describe('posthog adapter', () => {
       event: createTestEvent(overrides),
     })
 
-    afterEach(() => {
+    // Cleared before as well as after: a POSTHOG_HOST in the developer's own
+    // environment resolves into the adapter and moves the expected endpoint.
+    const clearPostHogEnv = () => {
       delete process.env.NUXT_POSTHOG_API_KEY
       delete process.env.POSTHOG_API_KEY
       delete process.env.NUXT_POSTHOG_HOST
       delete process.env.POSTHOG_HOST
-    })
+    }
+
+    beforeEach(clearPostHogEnv)
+    afterEach(clearPostHogEnv)
 
     it('sends to correct OTLP endpoint', async () => {
       const drain = createPostHogDrain({ apiKey: 'phc_test' })

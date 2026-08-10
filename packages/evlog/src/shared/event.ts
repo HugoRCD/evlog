@@ -7,10 +7,9 @@ import type { WideEvent } from '../types'
 /**
  * One-line summary of a wide event — `POST /api/checkout (500)`.
  *
- * Backends that cluster log messages into templates need the variable parts of
- * an event in attributes, not in the message, so this stays limited to the
- * request shape and its outcome. Returns an empty string when the event carries
- * neither, leaving the caller to pick its own fallback.
+ * Limited to the request shape and its outcome: `method`, `path`, `status`.
+ * Returns an empty string when the event carries none of them, leaving the
+ * caller to pick its own fallback.
  */
 export function formatEventSummary(event: WideEvent): string {
   const method = typeof event.method === 'string' ? event.method : ''
