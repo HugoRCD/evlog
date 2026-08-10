@@ -2,10 +2,11 @@ import { defineMcpClientConnection } from 'eve/connections'
 import { adminOnlyAppConnection } from '../lib/connect'
 
 /**
- * The full read surface plus the three writes Evi's workflows need: issues,
- * comments, and documents (`save_*` creates and updates). Deletes, diffs,
- * attachments, and structural writes (projects, initiatives, releases) stay
- * excluded. One list, maintained here.
+ * The full read surface plus the writes Evi's workflows need: issues,
+ * comments, documents (`save_*` creates and updates), and initiatives
+ * (`save_initiative` creates and edits, `save_initiative_update` posts a
+ * status update). Deletes, diffs, attachments, and structural writes
+ * (projects, releases) stay excluded. One list, maintained here.
  */
 const ALLOWED_TOOLS: string[] = [
   // Reads
@@ -35,6 +36,8 @@ const ALLOWED_TOOLS: string[] = [
   // Writes
   'save_comment',
   'save_document',
+  'save_initiative',
+  'save_initiative_update',
   'save_issue',
 ]
 
@@ -45,7 +48,7 @@ const ALLOWED_TOOLS: string[] = [
  */
 export default defineMcpClientConnection({
   url: 'https://mcp.linear.app/mcp',
-  description: 'Hugo\'s Linear workspace (admin only): the authority on what is planned, in progress, or decided. Read issues, projects, initiatives, milestones, cycles, documents, and status updates; write via save_issue (create or update an issue), save_comment, and save_document — documents are the home for recurring reports like weekly digests, where formatting beats a chat message. No deletes and no structural writes.',
+  description: 'Hugo\'s Linear workspace (admin only): the authority on what is planned, in progress, or decided. Read issues, projects, initiatives, milestones, cycles, documents, and status updates; write via save_issue (create or update an issue), save_comment, save_document, save_initiative (create or edit an initiative), and save_initiative_update (post an initiative status update). Documents are the home for recurring reports like weekly digests, where formatting beats a chat message. Deletes and structural writes for projects and releases stay excluded.',
   tools: { allow: ALLOWED_TOOLS },
   auth: adminOnlyAppConnection('linear/mcp'),
 })
