@@ -74,6 +74,40 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
 const toAttributeValue = toOtlpAttributeValue
 
 /**
+ * Only plain objects are walked. A `Date`, a `Map`, or a class instance has no
+ * useful own keys and would flatten into nothing, so it is serialized whole.
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+/**
+ * Flatten a nested event field into dotted attribute keys — `ai.costUsd`,
+ * `error.message`. Backends treat attributes as facets, and a serialized
+ * object is one opaque string they cannot filter or break down by.
+ *
+ * Arrays stay serialized: indexing them into `tools.0.name` turns a list into
+ * unbounded distinct attribute keys, which is worse than one readable value.
+ */
+function collectAttributes(
+  value: Record<string, unknown>,
+  prefix: string,
+  out: OTLPLogRecord['attributes'],
+): void {
+  for (const [key, child] of Object.entries(value)) {
+    if (child === undefined || child === null) continue
+    const path = prefix ? `${prefix}.${key}` : key
+    if (isPlainObject(child)) {
+      collectAttributes(child, path, out)
+      continue
+    }
+    out.push({ key: path, value: toAttributeValue(child) })
+  }
+}
+
+/**
  * Convert an evlog WideEvent to an OTLP LogRecord.
  *
  * Every field of the event becomes an attribute; the body is a one-line
@@ -95,16 +129,7 @@ export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
   delete (rest as Record<string, unknown>).region
 
   const attributes: OTLPLogRecord['attributes'] = []
-
-  // Add all remaining event fields as attributes
-  for (const [key, value] of Object.entries(rest)) {
-    if (value !== undefined && value !== null) {
-      attributes.push({
-        key,
-        value: toAttributeValue(value),
-      })
-    }
-  }
+  collectAttributes(rest, '', attributes)
 
   const record: OTLPLogRecord = {
     timeUnixNano: String(timestamp),
@@ -285,7 +310,7 @@ function buildOTLPPayload(events: WideEvent[], config: OTLPConfig): ExportLogsSe
       resource: { attributes: buildResourceAttributes(groupEvents[0]!, config) },
       scopeLogs: [
         {
-          scope: { name: 'evlog', version: '1.0.0' },
+          scope: { name: 'evlog' },
           logRecords: groupEvents.map(toOTLPLogRecord),
         },
       ],

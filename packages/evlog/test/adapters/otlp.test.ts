@@ -110,12 +110,38 @@ describe('otlp adapter', () => {
       expect(successAttr?.value).toEqual({ boolValue: true })
     })
 
-    it('converts complex objects to JSON strings', () => {
+    it('flattens nested objects into dotted attributes', () => {
       const event = createTestEvent({ user: { id: '123', name: 'Alice' } })
       const record = toOTLPLogRecord(event)
 
-      const userAttr = record.attributes.find(a => a.key === 'user')
-      expect(userAttr?.value).toEqual({ stringValue: '{"id":"123","name":"Alice"}' })
+      expect(record.attributes.find(a => a.key === 'user.id')?.value).toEqual({ stringValue: '123' })
+      expect(record.attributes.find(a => a.key === 'user.name')?.value).toEqual({ stringValue: 'Alice' })
+      expect(record.attributes.find(a => a.key === 'user')).toBeUndefined()
+    })
+
+    it('flattens through several levels and keeps value types', () => {
+      const event = createTestEvent({ eve: { caller: { principalId: 'github:1' } }, ai: { calls: 1 } })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.attributes.find(a => a.key === 'eve.caller.principalId')?.value)
+        .toEqual({ stringValue: 'github:1' })
+      expect(record.attributes.find(a => a.key === 'ai.calls')?.value).toEqual({ intValue: '1' })
+    })
+
+    it('serializes arrays rather than indexing them into distinct keys', () => {
+      const event = createTestEvent({ ai: { tools: [{ name: 'search' }] } })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.attributes.find(a => a.key === 'ai.tools')?.value)
+        .toEqual({ stringValue: '[{"name":"search"}]' })
+    })
+
+    it('serializes non-plain objects instead of flattening them away', () => {
+      const event = createTestEvent({ startedAt: new Date('2024-01-01T12:00:00.000Z') })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.attributes.find(a => a.key === 'startedAt')?.value)
+        .toEqual({ stringValue: '"2024-01-01T12:00:00.000Z"' })
     })
 
     it('includes traceId when present', () => {
@@ -310,7 +336,7 @@ describe('otlp adapter', () => {
       const [{ scope }] = payload.resourceLogs[0].scopeLogs
 
       expect(scope.name).toBe('evlog')
-      expect(scope.version).toBe('1.0.0')
+      expect(scope.version).toBeUndefined()
     })
 
     it('throws error on non-OK response', async () => {
