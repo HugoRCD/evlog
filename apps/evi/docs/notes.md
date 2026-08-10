@@ -38,6 +38,15 @@ work grows every run and obscures real failures in the output.
 **`sessionEvent` has never been observed firing.** It emits on session
 completion, which the eval runner never reaches.
 
+### Dynamic tools: executes stay inline
+
+eve's bundler transform registers a dynamic tool's `execute` as a durable step
+function only when the function sits inline in the resolver body. A tool map
+built by a factory (`return myTools()`) type-checks and works on a fresh
+session, then fails on any resumed session with `references step function
+"..." which is not registered`. Every `agent/tools/*.ts` dynamic file
+therefore defines its tools inline in a single `turn.started` resolver.
+
 ## Schedules
 
 **Chat-sdk channels target a provider-native `threadId` from a schedule.**
