@@ -31,7 +31,13 @@ export default defineDynamic({
             catch (error) {
               return { success: false as const, error: `No Vercel OIDC token available: ${error instanceof Error ? error.message : String(error)}` }
             }
-            const token = await exchangeTurboToken(oidc, teamSlug)
+            let token: string
+        try {
+          token = await exchangeTurboToken(oidc, teamSlug)
+        }
+        catch {
+          return { success: false as const, error: 'Turborepo token exchange failed; remote caching is unavailable for this run.' }
+        }
             const sandbox = await toolCtx.getSandbox()
             const write = await sandbox.run({ command: turboConfigCommand(token, teamId, teamSlug) })
             if (write.exitCode !== 0) {

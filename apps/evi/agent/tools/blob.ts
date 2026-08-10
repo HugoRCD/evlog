@@ -17,6 +17,9 @@ export default defineDynamic({
             path: z.string().min(1).describe('Sandbox path of the image, e.g. /workspace/screenshots/after.png'),
           }),
           async execute(input, toolCtx) {
+            if (!canAccessAdminTools(toolCtx.session.auth.current)) {
+              return { success: false as const, error: 'Image upload is not available in this session.' }
+            }
             const contentType = imageContentType(input.path)
             if (!contentType) {
               return { success: false as const, error: `"${input.path}" is not a supported image (png/jpg/webp/gif).` }
