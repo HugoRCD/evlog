@@ -1,24 +1,38 @@
 name: evi evals
 
-# Behavioural tests for the Evi agent. They spend real gateway tokens on every
-# run, so they are NOT part of `ci`:
-#   - PRs touching apps/evi run the `fast` subset, and only from this repo
-#     (fork PRs get no secrets)
-#   - a nightly cron runs the whole suite, which is what the cost and latency
-#     trends in PostHog are built from
-#   - workflow_dispatch takes a model, to compare a candidate against the
-#     current one before swapping it in agent.ts
+# Behavioural tests for the Evi agent. Every run spends real gateway tokens on
+# a live model, so this is deliberately NOT part of `ci` and never runs just
+# because a file under apps/evi changed.
 #
-# Every run reports to PostHog as `evi_eval` / `evi_eval_run` events, joined to
-# the agent's LLM traces by the eve session id.
+# What triggers a run, and what it costs:
+#   - a PR labelled `evals`, from this repo only — the 12 `fast` evals. Opt-in,
+#     the same shape as the `e2e` label, because the author is the one who
+#     knows a change alters behaviour rather than wording.
+#   - a push to main that touched the agent itself (instructions, tools,
+#     skills, model) — the full 20. One trend point per behaviour change that
+#     actually shipped, which is what makes cost and latency comparable over
+#     time. Test-only edits are excluded.
+#   - a weekly cron — the full 20, to catch drift that lands without a commit
+#     (a provider silently updating the model behind the id).
+#   - workflow_dispatch with a model — the full 20 against a candidate, to
+#     compare cost, latency and pass rate before swapping agent.ts.
+#
+# Results reach PostHog as `evi_eval` / `evi_eval_run`, joined to the agent's
+# LLM traces by the eve session id. Spend is tagged `evi:env:eval` on the
+# gateway, so an eval bill is never confused with production traffic.
 
 on:
   schedule:
-    - cron: '0 4 * * *'
-  pull_request:
+    - cron: '0 4 * * 1'
+  push:
+    branches:
+      - main
     paths:
-      - 'apps/evi/**'
+      - 'apps/evi/agent/**'
+      - '!apps/evi/agent/**/*.test.ts'
       - '.github/workflows/evi-evals.yml'
+  pull_request:
+    types: [labeled, synchronize, opened]
   workflow_dispatch:
     inputs:
       model:
@@ -35,7 +49,12 @@ concurrency:
 
 jobs:
   evals:
-    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    # Unlabelled and fork PRs never spend anything.
+    if: |
+      github.event_name != 'pull_request' || (
+        contains(github.event.pull_request.labels.*.name, 'evals')
+        && github.event.pull_request.head.repo.full_name == github.repository
+      )
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
