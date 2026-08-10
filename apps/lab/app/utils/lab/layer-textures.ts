@@ -53,22 +53,39 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
   measure.font = font
   measure.letterSpacing = tracking
 
-  // Wrap on the layer's width, so the box in the panel is what constrains the
-  // type rather than an invisible canvas edge.
+  /*
+   * Either the box constrains the type, or the type decides the box.
+   *
+   * Wrapping is only right for a column of prose. On a caption it produced a
+   * texture far wider than the words in it — the selection box stretched off
+   * past the type it belonged to — and dragging a corner narrowed the column
+   * until the line broke, which reads as the text being cut rather than sized.
+   */
+  const hugs = layer.textFit === 'auto'
   const lines: string[] = []
-  for (const paragraph of text.split('\n')) {
-    let line = ''
-    for (const word of paragraph.split(' ')) {
-      const candidate = line ? `${line} ${word}` : word
-      if (measure.measureText(candidate).width > boxWidth && line) {
-        lines.push(line)
-        line = word
-      } else {
-        line = candidate
+
+  if (hugs) {
+    // Only where the author put a break. Nothing else may split a line.
+    lines.push(...text.split('\n'))
+  } else {
+    for (const paragraph of text.split('\n')) {
+      let line = ''
+      for (const word of paragraph.split(' ')) {
+        const candidate = line ? `${line} ${word}` : word
+        if (measure.measureText(candidate).width > boxWidth && line) {
+          lines.push(line)
+          line = word
+        } else {
+          line = candidate
+        }
       }
+      lines.push(line)
     }
-    lines.push(line)
   }
+
+  const contentWidth = hugs
+    ? Math.max(1, ...lines.map(line => measure.measureText(line).width))
+    : boxWidth
 
   const lineHeight = fontSize * (layer.lineHeight ?? 1.15)
   const glow = Math.max(0, layer.glow ?? 0)
@@ -78,7 +95,7 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
   const padding = fontSize * (TEXT_PADDING + glow * 0.75 + stroke * 0.5)
 
   const canvas = document.createElement('canvas')
-  canvas.width = Math.ceil(boxWidth + padding * 2)
+  canvas.width = Math.ceil(contentWidth + padding * 2)
   canvas.height = Math.ceil(lines.length * lineHeight + padding * 2)
 
   const ctx = canvas.getContext('2d')

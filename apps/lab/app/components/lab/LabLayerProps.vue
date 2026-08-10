@@ -78,6 +78,11 @@ const groupedEntries = computed(() => {
   return Array.from(groups, ([group, entries]) => ({ group, entries }))
 })
 
+const TEXT_FITS = [
+  { value: 'auto' as const, label: 'auto width', hint: 'The box hugs the words. Drag a corner to size the type.' },
+  { value: 'fixed' as const, label: 'column', hint: 'The width is set and the text wraps into it.' },
+]
+
 const ALIGNMENTS = [
   { value: 'left', icon: 'i-lucide-align-left' },
   { value: 'center', icon: 'i-lucide-align-center' },
@@ -177,7 +182,34 @@ const TEXT_TOGGLES = [
         >
       </div>
 
+      <!--
+        Which of the two decides the other. Auto hugs the words and the box is
+        dragged to size them; fixed sets a column and the type flows into it.
+      -->
+      <div class="mb-2 flex gap-1">
+        <button
+          v-for="fit in TEXT_FITS"
+          :key="fit.value"
+          type="button"
+          data-cuelume-press
+          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          :class="(layer.textFit ?? 'fixed') === fit.value
+            ? 'border-primary-500/60 text-primary'
+            : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
+          :title="fit.hint"
+          @click="emit('update', { textFit: fit.value })"
+        >
+          {{ fit.label }}
+        </button>
+      </div>
+
+      <!--
+        Only in a column. Hugging text takes its size from the box, so a second
+        size control would be a slider that moves nothing you can see — the
+        width below is the one that sizes it.
+      -->
       <LabNumber
+        v-if="(layer.textFit ?? 'fixed') === 'fixed'"
         :model-value="layer.fontSize ?? 0.12"
         label="Size"
         :min="0.01"

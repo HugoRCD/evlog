@@ -39,16 +39,34 @@ const centre = computed(() => {
  * shape is worse than no arrow — it tells you the drag will do something it
  * will not.
  *
- * So it is read off the angle from the centre, quantised to the four diagonal
- * cursors the platform actually has.
+ * Taken from the corner's own diagonal turned by however far the box is turned
+ * on screen — not from where the corner sits relative to the centre.
+ *
+ * Those are the same thing only on a square. On the wide, short box a caption
+ * makes, both bottom corners sit within a few degrees of horizontal, so reading
+ * their polar angle handed them a left-right arrow — the odd cursor on a corner
+ * that plainly wants a diagonal one. A corner's direction is a property of which
+ * corner it is, and the aspect ratio has nothing to say about it.
  */
-const cursors = computed(() => props.corners.map(([x, y]) => {
-  const angle = Math.atan2(y - centre.value.y, x - centre.value.x)
-  // Eight sectors of 45°, mapped onto the four resize cursors — opposite
-  // sectors share one, because a resize arrow is a line, not a direction.
-  const sector = ((Math.round((angle * 4) / Math.PI) % 8) + 8) % 8
-  return ['cursor-ew-resize', 'cursor-nwse-resize', 'cursor-ns-resize', 'cursor-nesw-resize'][sector % 4]
-}))
+const CURSORS = ['cursor-ew-resize', 'cursor-nwse-resize', 'cursor-ns-resize', 'cursor-nesw-resize']
+
+/** Each corner's outward diagonal in the box's own frame, in radians. */
+const LOCAL_DIAGONAL = [-2.356, -0.785, 0.785, 2.356]
+
+const cursors = computed(() => {
+  const [a, b] = props.corners
+  if (!a || !b) return props.corners.map(() => CURSORS[1])
+  // The top edge states the box's rotation on screen, sign and all.
+  const edge = Math.atan2(b[1] - a[1], b[0] - a[0])
+
+  return props.corners.map((_, index) => {
+    const angle = edge + (LOCAL_DIAGONAL[index] ?? 0)
+    // Eight sectors of 45°; opposite sectors share a cursor, because a resize
+    // arrow is a line rather than a direction.
+    const sector = ((Math.round((angle * 4) / Math.PI) % 8) + 8) % 8
+    return CURSORS[sector % 4]
+  })
+})
 
 /**
  * The rotate grip, pushed off the top edge along its own outward normal.

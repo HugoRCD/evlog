@@ -79,6 +79,19 @@ export interface Layer {
   italic?: boolean
   uppercase?: boolean
   /**
+   * Whether the box follows the type or the type wraps into the box.
+   *
+   * `auto` hugs: the texture is exactly as wide as the longest line, and a
+   * corner drag scales the type. `fixed` is a column: the width is set and the
+   * text wraps into it, which is what a paragraph wants and what a caption
+   * never did.
+   *
+   * Absent means fixed, because that is what every text layer written before
+   * this was, and re-flowing somebody's finished shot to introduce a default is
+   * not a default — it is an edit nobody asked for.
+   */
+  textFit?: 'auto' | 'fixed'
+  /**
    * Halo around the glyphs, as a fraction of the size, in the text's own colour.
    *
    * The docs theme leans on glow, so a title that carries some belongs to the
@@ -137,6 +150,9 @@ export function createTextLayer(start: number, duration: number): Layer {
     rotation: 0,
     opacity: 1,
     text: 'evlog',
+    // New type hugs. A caption is the common case and a paragraph is the rare
+    // one, and only one of the two is annoying to discover by accident.
+    textFit: 'auto',
     fontSize: 0.12,
     color: '#ffffff',
     weight: 500,
@@ -325,6 +341,7 @@ export function layerTextureKey(layer: Layer, stage: { width: number, height: nu
     layer.letterSpacing,
     layer.italic,
     layer.uppercase,
+    layer.textFit,
     layer.glow,
     layer.stroke,
     layer.strokeColor,
