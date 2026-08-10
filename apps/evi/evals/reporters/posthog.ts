@@ -3,11 +3,11 @@ import type { EvalReporter } from 'eve/evals/reporters'
 import type { WideEvent } from 'evlog'
 import { sendBatchToPostHogEvents } from 'evlog/posthog'
 
-/** Where a run came from, recorded on every event so runs stay comparable. */
+/** Recorded on every event so runs stay comparable. */
 export interface EvalRunIdentity {
   /** Groups one `eve eval` invocation. */
   runId: string
-  /** Model under test — the breakdown that answers "did the swap cost us?". */
+  /** Model the suite ran against. */
   model: string
   commit?: string
   branch?: string
@@ -83,9 +83,8 @@ export function toRunEvent(summary: EveEvalRunSummary, identity: EvalRunIdentity
  * Without `POSTHOG_API_KEY` the reporter stays silent, so a local run needs no
  * setup and CI without the secret still runs the evals.
  */
-export function PostHogReporter(identity = resolveRunIdentity()): EvalReporter {
+export function PostHogReporter(identity?: EvalRunIdentity): EvalReporter {
   const results: EveEvalResult[] = []
-  const apiKey = process.env.POSTHOG_API_KEY
 
   return {
     onRunStart() {},
@@ -93,7 +92,11 @@ export function PostHogReporter(identity = resolveRunIdentity()): EvalReporter {
       results.push(result)
     },
     async onRunComplete(summary) {
+      // Read at report time, not at construction: eve loads the environment
+      // files after it imports `evals.config.ts`.
+      const apiKey = process.env.POSTHOG_API_KEY
       if (!apiKey) return
+      const runIdentity = identity ?? resolveRunIdentity()
       const config = {
         apiKey,
         ...(process.env.POSTHOG_HOST ? { host: process.env.POSTHOG_HOST } : {}),
@@ -102,11 +105,11 @@ export function PostHogReporter(identity = resolveRunIdentity()): EvalReporter {
       // worth a line on stderr and nothing more.
       try {
         await sendBatchToPostHogEvents(
-          results.map(result => toEvalEvent(result, identity)),
+          results.map(result => toEvalEvent(result, runIdentity)),
           { ...config, eventName: 'evi_eval' },
         )
         await sendBatchToPostHogEvents(
-          [toRunEvent(summary, identity)],
+          [toRunEvent(summary, runIdentity)],
           { ...config, eventName: 'evi_eval_run' },
         )
       } catch (error) {

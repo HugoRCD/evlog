@@ -1,6 +1,11 @@
 import type { EveEvalResult, EveEvalRunSummary } from 'eve/evals'
-import { describe, expect, it } from 'vitest'
-import { resolveRunIdentity, toEvalEvent, toRunEvent } from './posthog'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { sendBatchToPostHogEvents } from 'evlog/posthog'
+import { PostHogReporter, resolveRunIdentity, toEvalEvent, toRunEvent } from './posthog'
+
+vi.mock('evlog/posthog', () => ({ sendBatchToPostHogEvents: vi.fn() }))
+
+const send = vi.mocked(sendBatchToPostHogEvents)
 
 const identity = { runId: '42', model: 'deepseek/deepseek-v4-flash', commit: 'abc1234', branch: 'main' }
 
@@ -84,6 +89,68 @@ describe('toRunEvent', () => {
   it('reports a run with failures as an error', () => {
     expect(toRunEvent(summary, identity).level).toBe('error')
     expect(toRunEvent({ ...summary, failed: 0 }, identity).level).toBe('info')
+  })
+})
+
+describe('PostHogReporter', () => {
+  const summary = {
+    target: { kind: 'local', url: 'http://localhost:3000', capabilities: { devRoutes: true } },
+    results: [],
+    startedAt: '2026-08-10T12:00:00.000Z',
+    completedAt: '2026-08-10T12:01:00.000Z',
+    passed: 1,
+    failed: 0,
+    scored: 0,
+    skipped: 0,
+    errored: 0,
+  } as EveEvalRunSummary
+
+  beforeEach(() => {
+    send.mockReset()
+    send.mockResolvedValue(undefined)
+    process.env.POSTHOG_API_KEY = 'phc_test'
+  })
+
+  afterEach(() => {
+    delete process.env.POSTHOG_API_KEY
+    vi.restoreAllMocks()
+  })
+
+  async function run() {
+    const reporter = PostHogReporter(identity)
+    await reporter.onRunStart([], summary.target)
+    await reporter.onEvalComplete(evalResult())
+    await reporter.onEvalComplete(evalResult({ id: 'safety/no-push-to-main' }))
+    await reporter.onRunComplete(summary)
+  }
+
+  it('sends the evals it collected, then the run rollup', async () => {
+    await run()
+
+    expect(send).toHaveBeenCalledTimes(2)
+    const [evals, evalConfig] = send.mock.calls[0]!
+    expect(evals.map(event => event.evalId)).toEqual(['budget/no-fan-out', 'safety/no-push-to-main'])
+    expect(evalConfig).toMatchObject({ apiKey: 'phc_test', eventName: 'evi_eval' })
+
+    const [runEvents, runConfig] = send.mock.calls[1]!
+    expect(runEvents).toHaveLength(1)
+    expect(runConfig).toMatchObject({ eventName: 'evi_eval_run' })
+  })
+
+  it('stays silent without an api key', async () => {
+    delete process.env.POSTHOG_API_KEY
+
+    await run()
+
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('never lets a failed upload fail the run', async () => {
+    send.mockRejectedValue(new Error('posthog down'))
+    const error = vi.spyOn(console, 'error').mockImplementation(() => {})
+
+    await expect(run()).resolves.toBeUndefined()
+    expect(error).toHaveBeenCalled()
   })
 })
 

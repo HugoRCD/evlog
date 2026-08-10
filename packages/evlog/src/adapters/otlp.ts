@@ -73,10 +73,7 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
 // the shared OTLP attribute encoder in `evlog/toolkit`.
 const toAttributeValue = toOtlpAttributeValue
 
-/**
- * Only plain objects are walked. A `Date`, a `Map`, or a class instance has no
- * useful own keys and would flatten into nothing, so it is serialized whole.
- */
+/** Recursive flattening is limited to these; everything else is serialized whole. */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
   const proto = Object.getPrototypeOf(value)
@@ -84,12 +81,10 @@ function isPlainObject(value: unknown): value is Record<string, unknown> {
 }
 
 /**
- * Flatten a nested event field into dotted attribute keys — `ai.costUsd`,
- * `error.message`. Backends treat attributes as facets, and a serialized
- * object is one opaque string they cannot filter or break down by.
- *
- * Arrays stay serialized: indexing them into `tools.0.name` turns a list into
- * unbounded distinct attribute keys, which is worse than one readable value.
+ * Flatten nested plain objects into dotted attribute keys — `ai.costUsd`,
+ * `error.message`. Arrays and non-plain objects are serialized as a single
+ * value; indexing an array into `tools.0.name` would turn a list into
+ * unbounded distinct attribute keys.
  */
 function collectAttributes(
   value: Record<string, unknown>,
@@ -99,7 +94,9 @@ function collectAttributes(
   for (const [key, child] of Object.entries(value)) {
     if (child === undefined || child === null) continue
     const path = prefix ? `${prefix}.${key}` : key
-    if (isPlainObject(child)) {
+    // An empty object flattens to no attribute at all, which would drop the
+    // field, so it is serialized like any other leaf.
+    if (isPlainObject(child) && Object.keys(child).length > 0) {
       collectAttributes(child, path, out)
       continue
     }

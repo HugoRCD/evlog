@@ -136,6 +136,13 @@ describe('otlp adapter', () => {
         .toEqual({ stringValue: '[{"name":"search"}]' })
     })
 
+    it('keeps an empty object as a field rather than flattening it away', () => {
+      const event = createTestEvent({ user: {} })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.attributes.find(a => a.key === 'user')?.value).toEqual({ stringValue: '{}' })
+    })
+
     it('serializes non-plain objects instead of flattening them away', () => {
       const event = createTestEvent({ startedAt: new Date('2024-01-01T12:00:00.000Z') })
       const record = toOTLPLogRecord(event)

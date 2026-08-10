@@ -23,7 +23,8 @@ name: evi evals
 #     push. Marking it ready runs one.
 #   - `skip-evals` on the PR opts out when the author knows the change is inert
 #     but touched a watched path.
-#   - fork PRs never run: they get no secrets, and would fail anyway.
+#   - fork PRs and PRs from authors without write access never run: the job
+#     executes checked-out code with the gateway and PostHog secrets.
 #   - concurrency cancels the previous run on the same ref, so a burst of
 #     pushes costs one suite rather than one per push.
 #
@@ -67,12 +68,18 @@ concurrency:
 
 jobs:
   evals:
-    # Drafts, opt-outs and fork PRs never spend anything.
+    # Drafts, opt-outs, fork PRs and untrusted authors never spend anything,
+    # and never reach the gateway or PostHog secrets. Evi is allowed by login:
+    # a GitHub App carries no author association.
     if: |
       github.event_name != 'pull_request' || (
         github.event.pull_request.draft == false
         && !contains(github.event.pull_request.labels.*.name, 'skip-evals')
         && github.event.pull_request.head.repo.full_name == github.repository
+        && (
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+          || github.event.pull_request.user.login == 'evlogai[bot]'
+        )
       )
     runs-on: ubuntu-latest
     timeout-minutes: 30

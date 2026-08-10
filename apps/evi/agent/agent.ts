@@ -1,11 +1,7 @@
 import { defineAgent, defineDynamic } from 'eve'
 import { gatewayRouting, sessionTags } from './lib/gateway'
 
-/**
- * `EVI_MODEL` runs the eval suite against a candidate model without editing
- * this file, so a swap is compared on cost, latency and pass rate before it is
- * committed.
- */
+/** `EVI_MODEL` overrides the model, for running the eval suite on a candidate. */
 const MODEL = process.env.EVI_MODEL || 'deepseek/deepseek-v4-flash'
 
 export default defineAgent({
