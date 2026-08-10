@@ -3,7 +3,7 @@ import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
-import { toOtlpAttributeValue } from '../shared/event'
+import { formatEventSummary, toOtlpAttributeValue } from '../shared/event'
 import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from '../shared/severity'
 
 export interface OTLPConfig {
@@ -75,6 +75,11 @@ const toAttributeValue = toOtlpAttributeValue
 
 /**
  * Convert an evlog WideEvent to an OTLP LogRecord.
+ *
+ * Every field of the event becomes an attribute; the body is a one-line
+ * summary. Serializing the whole event into the body as well would double what
+ * the backend stores — and backends bill by volume, cluster bodies into
+ * message templates, and scrub PII per attribute.
  */
 export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
   const timestamp = new Date(event.timestamp).getTime() * 1_000_000 // Convert to nanoseconds
@@ -105,7 +110,7 @@ export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
     timeUnixNano: String(timestamp),
     severityNumber: OTEL_SEVERITY_NUMBER[level] ?? 9,
     severityText: OTEL_SEVERITY_TEXT[level] ?? 'INFO',
-    body: { stringValue: JSON.stringify(event) },
+    body: { stringValue: formatEventSummary(event) || event.service },
     attributes,
   }
 

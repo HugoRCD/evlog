@@ -34,10 +34,28 @@ export interface PostHogConfig {
    */
   eventName?: string
   /**
-   * Override `distinct_id` when `mode === 'events'`. Ignored otherwise.
-   * Defaults to `event.userId` (when set) or `event.service`.
+   * Static PostHog person identifier, used for every event. Overrides
+   * {@link PostHogConfig.distinctIdField}.
    */
   distinctId?: string
+  /**
+   * Wide-event field holding the PostHog person identifier, as a dot path
+   * (`userId`, `user.id`, `actor.id`). Default: `userId`.
+   *
+   * In `'logs'` mode it is sent as the `posthogDistinctId` log attribute — the
+   * attribute PostHog matches against a person's `distinct_id` to surface the
+   * log on their profile. In `'events'` mode it becomes `distinct_id`.
+   */
+  distinctIdField?: string
+  /**
+   * Wide-event field holding the PostHog session id, as a dot path. Default:
+   * `sessionId`.
+   *
+   * Sent as the `sessionId` log attribute in `'logs'` mode, which is what links
+   * a backend log to the user's session replay. Pass the id from the frontend
+   * (`posthog.get_session_id()`) and record it on the event.
+   */
+  sessionIdField?: string
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
   /** Number of retry attempts on transient failures. Default: 2 */
@@ -63,6 +81,8 @@ const POSTHOG_FIELDS: ConfigField<PostHogConfig>[] = [
   { key: 'mode' },
   { key: 'eventName' },
   { key: 'distinctId' },
+  { key: 'distinctIdField' },
+  { key: 'sessionIdField' },
   { key: 'timeout' },
   { key: 'retries' },
 ]
@@ -80,21 +100,66 @@ function toOTLPConfig(config: PostHogConfig): OTLPConfig {
   }
 }
 
+const DEFAULT_DISTINCT_ID_FIELD = 'userId'
+const DEFAULT_SESSION_ID_FIELD = 'sessionId'
+
+/** Read a dot path off a wide event, keeping only scalar identifiers. */
+function readIdentifier(event: WideEvent, path: string): string | undefined {
+  let current: unknown = event
+  for (const segment of path.split('.')) {
+    if (current === null || typeof current !== 'object') return undefined
+    current = (current as Record<string, unknown>)[segment]
+  }
+  if (typeof current === 'string') return current.length > 0 ? current : undefined
+  if (typeof current === 'number') return String(current)
+  return undefined
+}
+
+function resolveDistinctId(event: WideEvent, config: PostHogConfig): string | undefined {
+  if (config.distinctId) return config.distinctId
+  return readIdentifier(event, config.distinctIdField ?? DEFAULT_DISTINCT_ID_FIELD)
+}
+
+function resolveSessionId(event: WideEvent, config: PostHogConfig): string | undefined {
+  return readIdentifier(event, config.sessionIdField ?? DEFAULT_SESSION_ID_FIELD)
+}
+
+/**
+ * Add the attributes PostHog reads to link a log record to a person and to a
+ * session replay. Both are plain event fields so the OTLP encoder emits them
+ * as log attributes, where PostHog looks for them.
+ */
+function withPostHogIdentity(event: WideEvent, config: PostHogConfig): WideEvent {
+  const distinctId = resolveDistinctId(event, config)
+  const sessionId = resolveSessionId(event, config)
+  if (distinctId === undefined && sessionId === undefined) return event
+  return {
+    ...event,
+    ...(distinctId !== undefined ? { posthogDistinctId: distinctId } : {}),
+    ...(sessionId !== undefined ? { sessionId } : {}),
+  }
+}
+
 /**
  * Convert a WideEvent to a PostHog custom event.
+ *
+ * Events without a resolvable person identifier are sent as anonymous ones —
+ * `$process_person_profile: false` — rather than merged onto a person named
+ * after the service. PostHog bills those at a lower rate and keeps them out of
+ * person profiles.
  */
 export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHogEvent {
   const { timestamp, level, service, ...rest } = event
+  const distinctId = resolveDistinctId(event, config)
   return {
     event: config.eventName ?? 'evlog_wide_event',
-    distinct_id: config.distinctId
-      ?? (typeof event.userId === 'string' ? event.userId : undefined)
-      ?? service,
+    distinct_id: distinctId ?? service,
     timestamp,
     properties: {
       level,
       service,
       ...rest,
+      ...(distinctId === undefined ? { $process_person_profile: false } : {}),
     },
   }
 }
@@ -111,10 +176,18 @@ export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHog
  * 3. runtimeConfig.posthog
  * 4. Environment variables: POSTHOG_*
  *
+ * Events carrying `userId` are surfaced on that person's profile in PostHog,
+ * and those carrying `sessionId` link to their session replay. Point
+ * {@link PostHogConfig.distinctIdField} elsewhere when your identity lives
+ * under another field.
+ *
  * @example
  * ```ts
  * // Default: PostHog Logs (OTLP)
  * initLogger({ drain: createPostHogDrain() })
+ *
+ * // Identity under `user.id` rather than `userId`
+ * initLogger({ drain: createPostHogDrain({ distinctIdField: 'user.id' }) })
  *
  * // Custom events
  * initLogger({ drain: createPostHogDrain({ mode: 'events', eventName: 'server_request' }) })
@@ -150,8 +223,7 @@ export function createPostHogDrain(overrides?: Partial<PostHogConfig>) {
       return config as PostHogConfig
     },
     send: async (events, config) => {
-      if (events.length === 0) return
-      await sendBatchToOTLP(events, toOTLPConfig(config))
+      await sendBatchToPostHog(events, config)
     },
   })
 }
@@ -175,7 +247,10 @@ export async function sendToPostHog(event: WideEvent, config: PostHogConfig): Pr
  */
 export async function sendBatchToPostHog(events: WideEvent[], config: PostHogConfig): Promise<void> {
   if (events.length === 0) return
-  await sendBatchToOTLP(events, toOTLPConfig(config))
+  await sendBatchToOTLP(
+    events.map(event => withPostHogIdentity(event, config)),
+    toOTLPConfig(config),
+  )
 }
 
 /**

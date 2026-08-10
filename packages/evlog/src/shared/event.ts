@@ -2,6 +2,26 @@
  * Helpers for building / mutating wide events from inside enrichers and adapters.
  */
 
+import type { WideEvent } from '../types'
+
+/**
+ * One-line summary of a wide event — `POST /api/checkout (500)`.
+ *
+ * Backends that cluster log messages into templates need the variable parts of
+ * an event in attributes, not in the message, so this stays limited to the
+ * request shape and its outcome. Returns an empty string when the event carries
+ * neither, leaving the caller to pick its own fallback.
+ */
+export function formatEventSummary(event: WideEvent): string {
+  const method = typeof event.method === 'string' ? event.method : ''
+  const path = typeof event.path === 'string' ? event.path : ''
+  const status = typeof event.status === 'number' ? event.status : undefined
+
+  const head = [method, path].filter(part => part.length > 0).join(' ')
+  if (head) return status !== undefined ? `${head} (${status})` : head
+  return status !== undefined ? `(${status})` : ''
+}
+
 /**
  * Merge a computed value onto an existing event field. By default, existing
  * object values win over computed ones — so `log.set({ geo: ... })` keeps

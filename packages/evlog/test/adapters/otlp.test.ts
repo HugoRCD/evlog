@@ -64,11 +64,26 @@ describe('otlp adapter', () => {
       expect(record.severityText).toBe('ERROR')
     })
 
-    it('includes full event as JSON body', () => {
-      const event = createTestEvent({ action: 'test', userId: '123' })
+    it('summarizes the request in the body', () => {
+      const event = createTestEvent({ method: 'POST', path: '/api/checkout', status: 500 })
       const record = toOTLPLogRecord(event)
 
-      expect(record.body.stringValue).toBe(JSON.stringify(event))
+      expect(record.body.stringValue).toBe('POST /api/checkout (500)')
+    })
+
+    it('falls back to the service name when the event has no request shape', () => {
+      const event = createTestEvent({ action: 'test' })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.body.stringValue).toBe('test-service')
+    })
+
+    it('keeps event fields out of the body and in the attributes', () => {
+      const event = createTestEvent({ method: 'GET', path: '/api/me', userId: 'usr_123' })
+      const record = toOTLPLogRecord(event)
+
+      expect(record.body.stringValue).not.toContain('usr_123')
+      expect(record.attributes.find(a => a.key === 'userId')?.value).toEqual({ stringValue: 'usr_123' })
     })
 
     it('converts string attributes correctly', () => {

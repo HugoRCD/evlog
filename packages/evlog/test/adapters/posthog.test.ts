@@ -114,6 +114,55 @@ describe('posthog adapter', () => {
     })
   })
 
+  describe('person and session linking', () => {
+    const attributesOf = (call: unknown[]): Record<string, unknown> => {
+      const [, options] = call as [string, RequestInit]
+      const payload = JSON.parse(options.body as string)
+      const [record] = payload.resourceLogs[0].scopeLogs[0].logRecords
+      return Object.fromEntries(
+        record.attributes.map((a: { key: string, value: { stringValue?: string } }) => [a.key, a.value.stringValue]),
+      )
+    }
+
+    it('sends userId as the posthogDistinctId attribute', async () => {
+      await sendToPostHog(createTestEvent({ userId: 'usr_123' }), { apiKey: 'phc_test' })
+
+      expect(attributesOf(fetchSpy.mock.calls[0]!).posthogDistinctId).toBe('usr_123')
+    })
+
+    it('sends sessionId so the log links to a session replay', async () => {
+      await sendToPostHog(createTestEvent({ sessionId: 'sess_abc' }), { apiKey: 'phc_test' })
+
+      expect(attributesOf(fetchSpy.mock.calls[0]!).sessionId).toBe('sess_abc')
+    })
+
+    it('reads the identity from the configured dot path', async () => {
+      await sendToPostHog(createTestEvent({ user: { id: 'usr_456' } }), {
+        apiKey: 'phc_test',
+        distinctIdField: 'user.id',
+      })
+
+      expect(attributesOf(fetchSpy.mock.calls[0]!).posthogDistinctId).toBe('usr_456')
+    })
+
+    it('lets the static distinctId win over the event field', async () => {
+      await sendToPostHog(createTestEvent({ userId: 'usr_123' }), {
+        apiKey: 'phc_test',
+        distinctId: 'fixed-id',
+      })
+
+      expect(attributesOf(fetchSpy.mock.calls[0]!).posthogDistinctId).toBe('fixed-id')
+    })
+
+    it('omits both attributes when the event carries no identity', async () => {
+      await sendToPostHog(createTestEvent(), { apiKey: 'phc_test' })
+
+      const attributes = attributesOf(fetchSpy.mock.calls[0]!)
+      expect(attributes).not.toHaveProperty('posthogDistinctId')
+      expect(attributes).not.toHaveProperty('sessionId')
+    })
+  })
+
   describe('sendBatchToPostHog', () => {
     it('sends multiple events in a single request', async () => {
       const events = [
@@ -374,6 +423,27 @@ describe('posthog adapter', () => {
       expect(result.distinct_id).toBe('my-service')
     })
 
+    it('marks events without an identity as anonymous', () => {
+      const event = createTestEvent({ service: 'my-service' })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
+      expect(result.properties.$process_person_profile).toBe(false)
+    })
+
+    it('keeps identified events out of anonymous processing', () => {
+      const event = createTestEvent({ userId: 'usr_123' })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
+      expect(result.properties).not.toHaveProperty('$process_person_profile')
+    })
+
+    it('reads the identity from a dot path', () => {
+      const event = createTestEvent({ user: { id: 'usr_456' } })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test', distinctIdField: 'user.id' })
+
+      expect(result.distinct_id).toBe('usr_456')
+    })
+
     it('uses custom distinct_id from config', () => {
       const event = createTestEvent({ service: 'my-service' })
       const result = toPostHogEvent(event, { apiKey: 'phc_test', distinctId: 'user-123' })
@@ -395,11 +465,19 @@ describe('posthog adapter', () => {
       expect(result.distinct_id).toBe('config-id')
     })
 
-    it('falls back to service when userId is not a string', () => {
+    it('stringifies a numeric userId', () => {
       const event = createTestEvent({ userId: 42 })
       const result = toPostHogEvent(event, { apiKey: 'phc_test' })
 
+      expect(result.distinct_id).toBe('42')
+    })
+
+    it('falls back to service when userId is not a scalar', () => {
+      const event = createTestEvent({ userId: { id: 'nested' } })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
       expect(result.distinct_id).toBe('test-service')
+      expect(result.properties.$process_person_profile).toBe(false)
     })
 
     it('includes level and service in properties', () => {
