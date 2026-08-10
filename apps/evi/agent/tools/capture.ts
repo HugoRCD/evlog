@@ -45,9 +45,14 @@ async function hostFrame(sandbox: SandboxSession, path: string): Promise<string>
   return blob.url
 }
 
-function captureTools() {
-  return {
-    capture__before_after: defineTool({
+// Frames publish to public URLs the moment the tool runs: autonomous turns
+// never see it. Keep executes inline in the resolver (docs/notes.md).
+export default defineDynamic({
+  events: {
+    'turn.started': (_event, ctx) => {
+      if (!canAccessAdminTools(ctx.session.auth.current)) return null
+      return {
+        capture__before_after: defineTool({
       description: 'Capture a before/after comparison of an evlog surface in one call: for each URL, open it in the sandbox browser, wait 5s for animations to settle, screenshot (cropped to the selector when given), validate and upload both frames to the Blob store, and return the finished markdown table with an attestation receipt. Origins are restricted to evlog domains, Vercel previews, and sandbox dev servers. For surfaces that can show real user data (telemetry), review the pages with browser__screenshot before calling this: the returned URLs are public immediately.',
       inputSchema: z.object({
         beforeUrl: z.string().min(1).describe('URL of the before state, e.g. https://evlog.dev'),
@@ -59,8 +64,8 @@ function captureTools() {
       // Skill-level "review sensitive surfaces first" is not an enforceable
       // control; a capture of a surface that can show real user data parks on
       // an approval card before anything publishes.
-      approval(ctx) {
-        for (const raw of [ctx.toolInput?.beforeUrl, ctx.toolInput?.afterUrl]) {
+      approval(approvalCtx) {
+        for (const raw of [approvalCtx.toolInput?.beforeUrl, approvalCtx.toolInput?.afterUrl]) {
           if (typeof raw !== 'string') continue
           let reason: string | null
           try {
@@ -73,8 +78,8 @@ function captureTools() {
         }
         return 'not-applicable'
       },
-      async execute(input, ctx) {
-        if (!canAccessAdminTools(ctx.session.auth.current)) {
+      async execute(input, toolCtx) {
+        if (!canAccessAdminTools(toolCtx.session.auth.current)) {
           return { success: false as const, error: 'Captures are not available in this session.' }
         }
         for (const url of [input.beforeUrl, input.afterUrl]) {
@@ -86,10 +91,10 @@ function captureTools() {
         }
         const viewport = input.viewport ?? 'desktop'
         const selector = input.selector ?? null
-        const sandbox = await ctx.getSandbox()
+        const sandbox = await toolCtx.getSandbox()
         await sandbox.run({ command: `mkdir -p ${SCREENSHOT_DIR}` })
-        const beforePath = await captureFrame(ctx, 'before', input.beforeUrl, selector, viewport)
-        const afterPath = await captureFrame(ctx, 'after', input.afterUrl, selector, viewport)
+        const beforePath = await captureFrame(toolCtx, 'before', input.beforeUrl, selector, viewport)
+        const afterPath = await captureFrame(toolCtx, 'after', input.afterUrl, selector, viewport)
         const beforeImageUrl = await hostFrame(sandbox, beforePath)
         const afterImageUrl = await hostFrame(sandbox, afterPath)
         const capturedAt = new Date().toISOString()
@@ -110,17 +115,7 @@ function captureTools() {
         }
       },
     }),
-  }
-}
-
-/**
- * The frames publish to public URLs the moment the tool runs, so autonomous
- * turns never see it. Re-resolved every turn so the gate follows the turn's
- * actual caller and survives a session resumed on a fresh deployment.
- */
-export default defineDynamic({
-  events: {
-    'session.started': (_event, ctx) => (canAccessAdminTools(ctx.session.auth.current) ? captureTools() : null),
-    'turn.started': (_event, ctx) => (canAccessAdminTools(ctx.session.auth.current) ? captureTools() : null),
+      }
+    },
   },
 })

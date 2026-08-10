@@ -14,65 +14,52 @@ const REPO_DIR = '/workspace/repo'
  */
 const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
 
-function gitTools() {
-  // Dynamic map keys are bare tool names (no file-slug prefix), so the
-  // namespace is spelled out here to match every git__push reference.
-  return {
-    git__push: defineTool({
-      description: `Push a local branch of the ${REPO_DIR} checkout to origin (HugoRCD/evlog). The branch must already exist there with the work committed and the checks run; main and master are refused. The credential is brokered at the sandbox firewall and never enters the sandbox. After a successful push, open the pull request with github__createPullRequest.`,
-      inputSchema: z.object({
-        branch: z.string().min(1).describe('Branch name in /workspace/repo to push, e.g. fix/pipeline-flush'),
-      }),
-      async execute(input, ctx) {
-        if (!isMaintainer(ctx.session.auth.current) && !isScheduleAppAuth(ctx.session.auth.current)) {
-          return { success: false as const, error: 'Only maintainer and schedule-app sessions may push.' }
-        }
-        const refusal = validatePushBranch(input.branch)
-        if (refusal) return { success: false as const, error: refusal }
-        const sandbox = await ctx.getSandbox()
-        const token = await mintInstallationToken(githubCredentials)
-        await sandbox.setNetworkPolicy(pushBrokerPolicy(token))
-        try {
-          const push = await sandbox.run({
-            command: `git -C ${REPO_DIR} push ${PUSH_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
-          })
-          if (push.exitCode !== 0) {
-            return {
-              success: false as const,
-              error: `git push exited ${push.exitCode}: ${String(push.stderr || push.stdout).trim()}`,
-            }
-          }
-          const head = await sandbox.run({ command: `git -C ${REPO_DIR} rev-parse '${input.branch}'` })
-          return {
-            success: true as const,
-            branch: input.branch,
-            sha: String(head.stdout).trim(),
-            repository: 'HugoRCD/evlog',
-          }
-        }
-        finally {
-          // Drop the brokered credential; the channel checkout re-brokers its own when it needs to fetch.
-          await sandbox.setNetworkPolicy('allow-all')
-        }
-      },
-    }),
-  }
-}
-
-/**
- * Visible to maintainer sessions and to schedule-app turns (the upstream-sync
- * run pushes its feature branches); community and autonomous turns never see a
- * push surface. The push itself is inert: it only ever creates a feature
- * branch, and the PR that references it carries the approval card. Re-resolved
- * every turn so the gate follows the turn's actual caller and survives a
- * session resumed on a fresh deployment, where session.started never fires
- * again.
- */
+// Maintainer and schedule-app turns only; the push is inert (feature
+// branches only). Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
-    'session.started': (_event, ctx) =>
-      (isMaintainer(ctx.session.auth.current) || isScheduleAppAuth(ctx.session.auth.current) ? gitTools() : null),
-    'turn.started': (_event, ctx) =>
-      (isMaintainer(ctx.session.auth.current) || isScheduleAppAuth(ctx.session.auth.current) ? gitTools() : null),
+    'turn.started': (_event, ctx) => {
+      if (!isMaintainer(ctx.session.auth.current) && !isScheduleAppAuth(ctx.session.auth.current)) return null
+      return {
+        git__push: defineTool({
+          description: `Push a local branch of the ${REPO_DIR} checkout to origin (HugoRCD/evlog). The branch must already exist there with the work committed and the checks run; main and master are refused. The credential is brokered at the sandbox firewall and never enters the sandbox. After a successful push, open the pull request with github__createPullRequest.`,
+          inputSchema: z.object({
+            branch: z.string().min(1).describe('Branch name in /workspace/repo to push, e.g. fix/pipeline-flush'),
+          }),
+          async execute(input, toolCtx) {
+            if (!isMaintainer(toolCtx.session.auth.current) && !isScheduleAppAuth(toolCtx.session.auth.current)) {
+              return { success: false as const, error: 'Only maintainer and schedule-app sessions may push.' }
+            }
+            const refusal = validatePushBranch(input.branch)
+            if (refusal) return { success: false as const, error: refusal }
+            const sandbox = await toolCtx.getSandbox()
+            const token = await mintInstallationToken(githubCredentials)
+            await sandbox.setNetworkPolicy(pushBrokerPolicy(token))
+            try {
+              const push = await sandbox.run({
+                command: `git -C ${REPO_DIR} push ${PUSH_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
+              })
+              if (push.exitCode !== 0) {
+                return {
+                  success: false as const,
+                  error: `git push exited ${push.exitCode}: ${String(push.stderr || push.stdout).trim()}`,
+                }
+              }
+              const head = await sandbox.run({ command: `git -C ${REPO_DIR} rev-parse '${input.branch}'` })
+              return {
+                success: true as const,
+                branch: input.branch,
+                sha: String(head.stdout).trim(),
+                repository: 'HugoRCD/evlog',
+              }
+            }
+            finally {
+              // Drop the brokered credential; the channel checkout re-brokers its own when it needs to fetch.
+              await sandbox.setNetworkPolicy('allow-all')
+            }
+          },
+        }),
+      }
+    },
   },
 })

@@ -76,14 +76,20 @@ function filterReportByApiKeyName(payload: unknown, apiKeyName: string): {
   }
 }
 
-function aiGatewayTools() {
-  // Dynamic map keys are bare tool names (no file-slug prefix), so the
-  // namespace is spelled out here to match every ai_gateway__* reference.
-  return {
+// Admin-only spend observability. Keep executes inline in the resolver
+// (docs/notes.md); keys carry the ai_gateway__ namespace themselves.
+export default defineDynamic({
+  events: {
+    'turn.started': (_event, ctx) => {
+      if (!canAccessAdminTools(ctx.session.auth.current)) return null
+      return {
     ai_gateway__credits: defineTool({
       description: 'Admin: AI Gateway credit balance and lifetime spend for the entire team account (not Evi-scoped). Prefer ai_gateway__report for Evi digests.',
       inputSchema: z.object({}),
-      async execute() {
+      async execute(_input, toolCtx) {
+        if (!canAccessAdminTools(toolCtx.session.auth.current)) {
+          return { success: false as const, error: 'AI Gateway reporting is not available in this session.' }
+        }
         return await gatewayFetch('/credits')
       },
     }),
@@ -104,7 +110,10 @@ function aiGatewayTools() {
         message: 'startDate must not be later than endDate',
         path: ['startDate'],
       }),
-      async execute(input) {
+      async execute(input, toolCtx) {
+        if (!canAccessAdminTools(toolCtx.session.auth.current)) {
+          return { success: false as const, error: 'AI Gateway reporting is not available in this session.' }
+        }
         const configuredKeyName = reportApiKeyName()
         // Key-name scope covers historical untagged traffic on a dedicated Evi
         // key, but it spends the single `group_by` slot on `api_key_name` to do
@@ -166,24 +175,14 @@ function aiGatewayTools() {
       inputSchema: z.object({
         id: z.string().min(1).describe('Generation id, e.g. gen_01ARZ3NDEKTSV4RRFFQ69G5FAV'),
       }),
-      async execute(input) {
+      async execute(input, toolCtx) {
+        if (!canAccessAdminTools(toolCtx.session.auth.current)) {
+          return { success: false as const, error: 'AI Gateway reporting is not available in this session.' }
+        }
         return await gatewayFetch('/generation', { id: input.id })
       },
     }),
-  }
-}
-
-// Re-resolved every turn so the gate follows the turn's actual caller and
-// survives a session resumed on a fresh deployment.
-export default defineDynamic({
-  events: {
-    'session.started': async (_event, ctx) => {
-      if (!canAccessAdminTools(ctx.session.auth.current)) return null
-      return aiGatewayTools()
-    },
-    'turn.started': async (_event, ctx) => {
-      if (!canAccessAdminTools(ctx.session.auth.current)) return null
-      return aiGatewayTools()
+      }
     },
   },
 })

@@ -14,7 +14,7 @@ export default defineSchedule({
     waitUntil(
       receive(photon, {
         message:
-          'Load the upstream-sync skill and check the eve and Vercel Connect ecosystem for updates. Open draft PRs for anything warranted.',
+          'Load the upstream-sync skill and check the eve and Vercel Connect ecosystem for updates. Open draft PRs for anything warranted. This scheduled turn resumes a long-lived thread: ignore earlier conversation topics and stale pending requests, and do only this task.',
         // Spectrum direct-chat guid: `any;-;<address>`, so the thread is
         // derived from the phone number instead of a captured thread id.
         target: { adapterName: 'imessage', threadId: `imessage:any;-;${MAINTAINER_PHONE}` },

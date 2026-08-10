@@ -2,7 +2,7 @@ import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
 import { GITHUB_CONNECTOR } from '../lib/github/credentials'
 import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
-import { isAutonomous, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
+import { isAutonomous, isScheduleAppAuth, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 const TOOLS = [
   // Repository and code
@@ -104,7 +104,15 @@ export default githubExtension({
   requireApproval: {
     // Reversible and harmless on every kind of run; a card here only slows the PR flow down.
     requestReviewers: (): ApprovalStatus => 'not-applicable',
-    createPullRequest: policy,
+    createPullRequest: (ctx: ApprovalContext): ApprovalStatus => {
+      // A draft cannot merge: a schedule run delivering its PRs skips the
+      // card, and marking one ready stays a human act. Anything non-draft
+      // keeps the usual policy.
+      if (isScheduleAppAuth(ctx.session.auth.current) && (ctx.toolInput as { draft?: unknown } | undefined)?.draft === true) {
+        return 'not-applicable'
+      }
+      return policy(ctx)
+    },
     updatePullRequest: policy,
     createIssue: autonomousWrite,
     updateIssue: policy,
