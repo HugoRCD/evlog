@@ -76,8 +76,8 @@ function filterReportByApiKeyName(payload: unknown, apiKeyName: string): {
   }
 }
 
-// Admin-only spend observability. Executes sit inline in the resolver on
-// purpose (docs/notes.md); keys carry the ai_gateway__ namespace themselves.
+// Admin-only spend observability. Keep executes inline in the resolver
+// (docs/notes.md); keys carry the ai_gateway__ namespace themselves.
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

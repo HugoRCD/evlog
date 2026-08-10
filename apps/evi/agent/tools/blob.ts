@@ -5,7 +5,7 @@ import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType
 import { canAccessAdminTools } from '../lib/trust'
 
 // Public URLs the instant they exist: autonomous turns never see this tool.
-// Executes sit inline in the resolver on purpose (docs/notes.md).
+// Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

@@ -5,7 +5,7 @@ import { canAccessAdminTools } from '../lib/trust'
 import { exchangeTurboToken, turboConfigCommand } from '../lib/turbo'
 
 // The token only touches the remote cache, but never unattended: autonomous
-// turns don't see this tool. Executes sit inline in the resolver on purpose (docs/notes.md).
+// turns don't see this tool. Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

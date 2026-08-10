@@ -15,7 +15,7 @@ const REPO_DIR = '/workspace/repo'
 const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
 
 // Maintainer and schedule-app turns only; the push is inert (feature
-// branches only). Executes sit inline in the resolver on purpose (docs/notes.md).
+// branches only). Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

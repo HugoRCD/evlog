@@ -46,7 +46,7 @@ async function hostFrame(sandbox: SandboxSession, path: string): Promise<string>
 }
 
 // Frames publish to public URLs the moment the tool runs: autonomous turns
-// never see it. Executes sit inline in the resolver on purpose (docs/notes.md).
+// never see it. Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {
