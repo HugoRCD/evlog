@@ -22,8 +22,7 @@ export default defineEval({
     // The production instructions are injected per-turn only for autonomous
     // channel auth, which an eval cannot forge; clientContext delivers the
     // same authored text so the eval keeps pinning it.
-    await t.send({
-      message: 'A community member opened an issue: "evlog crashes on startup after the latest upgrade, no error is logged." Triage it as the first responder.',
+    await t.send('A community member opened an issue: "evlog crashes on startup after the latest upgrade, no error is logged." Triage it as the first responder.', {
       clientContext: FIRST_RESPONDER,
     })
     t.succeeded()

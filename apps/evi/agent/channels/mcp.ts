@@ -9,7 +9,7 @@ import { finalMessageFromStream, handleMcpRequest, mcpSessionAuth, verifyMcpBear
  * principal, which agent/lib/trust.ts trusts as the maintainer only while
  * EVI_MCP_TOKEN is configured. Protocol handling lives in agent/lib/mcp.ts.
  *
- * The mcp-session-id issued on initialize keys the eve continuation token,
+ * The mcp-session-id issued on initialize keys the eve continuation address,
  * so one Raycast chat maps to one Evi conversation.
  */
 
@@ -41,7 +41,7 @@ export default defineChannel({
     // Streamable HTTP: no server-initiated streams are offered, so GET is a
     // spec-compliant 405 instead of an SSE channel.
     GET('/eve/v1/mcp', async () => new Response(null, { status: 405, headers: { allow: 'POST' } })),
-    POST('/eve/v1/mcp', async (req, { send }) => {
+    POST('/eve/v1/mcp', async (req, { from }) => {
       if (!verifyMcpBearer(req.headers.get('authorization'), process.env.EVI_MCP_TOKEN?.trim())) {
         return unauthorized()
       }
@@ -56,9 +56,8 @@ export default defineChannel({
 
       const mcpSessionId = req.headers.get('mcp-session-id')?.trim() || randomUUID()
       const result = await handleMcpRequest(body, async (message) => {
-        const session = await send(message, {
+        const session = await from(`mcp:${mcpSessionId}`).send(message, {
           auth: mcpSessionAuth(),
-          continuationToken: `mcp:${mcpSessionId}`,
         })
         return await finalMessageFromStream(await session.getEventStream())
       })
