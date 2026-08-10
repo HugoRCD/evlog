@@ -118,7 +118,6 @@ if (!launching.value && !layers.value.length) {
 // that happened to be touched.
 if (initial?.fromLink) router.replace({ query: {} })
 
-const showSource = ref(false)
 const panelVisible = ref(true)
 const shortcutsOpen = ref(false)
 
@@ -2397,7 +2396,6 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <LabPanel
       v-show="panelVisible"
       v-model:settings="settings"
-      v-model:show-source="showSource"
       v-model:picking="picking"
       v-model:camera="camera"
       :style="{ width: `${panel.size.value}px` }"
@@ -2458,8 +2456,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
   <div
     ref="stagesRoot"
     data-lab-stage
-    class="pointer-events-none fixed left-0 top-0"
-    :class="showSource ? 'z-50 opacity-100' : 'z-0 opacity-[0.002]'"
+    class="pointer-events-none fixed left-0 top-0 z-0 opacity-[0.002]"
   >
     <!--
       Each instance is mounted at its clip's origin, not at the top of the

@@ -48,7 +48,6 @@ const emit = defineEmits<{
 }>()
 
 const settings = defineModel<LabSettings>('settings', { required: true })
-const showSource = defineModel<boolean>('showSource', { required: true })
 const picking = defineModel<boolean>('picking', { required: true })
 const camera = defineModel<LayerEffect[]>('camera', { required: true })
 
@@ -413,10 +412,6 @@ const CONTAINERS = [
           >
             replay
           </button>
-        </div>
-
-        <div class="mt-2">
-          <LabToggle v-model="showSource" label="Show the plain layout" />
         </div>
       </LabSection>
 
