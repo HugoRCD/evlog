@@ -1,7 +1,8 @@
 <script setup lang="ts">
 import type { LabMenuAction } from './LabMenu.vue'
 import { DEFAULT_SETTINGS, FRAME_RATES, HINTS, OUTPUT_PRESETS, RANGES, SPEEDS, VIEWPORTS, frameCountFor, outputDuration } from '~/utils/lab/settings'
-import type { LabSettings, RangedKey } from '~/utils/lab/settings'
+import type { AsciiSet, LabSettings, RangedKey, StylizeMode } from '~/utils/lab/settings'
+import { ASCII_MIN_CELL } from '~/utils/lab/ascii'
 import type { Layer } from '~/utils/lab/layers'
 import type { LayerEffect } from '~/utils/lab/effects'
 
@@ -14,6 +15,8 @@ const props = defineProps<{
   captureMs: number
   /** Briefly true after a share link is copied. */
   linkCopied: boolean
+  /** Briefly true after the frame is copied to the clipboard. */
+  pngCopied: boolean
   selectedLayer: Layer | null
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
@@ -29,6 +32,7 @@ const emit = defineEmits<{
   replay: []
   exportVideo: []
   exportPng: []
+  copyPng: []
   copyLink: []
   projects: []
   shortcuts: []
@@ -204,6 +208,54 @@ const hasDepth = computed(() =>
   Math.abs(settings.value.pitch) > 0.5 || Math.abs(settings.value.yaw) > 0.5,
 )
 
+/**
+ * Dispersion and scatter both scale the colour spread, so both are inert while
+ * it is zero. Said outright rather than by disabling them — a control that has
+ * gone grey never explains what would bring it back.
+ */
+const hasSpread = computed(() => settings.value.aberration > 0)
+
+/** Letters need more room than dots do — see `ASCII_MIN_CELL`. */
+const minCell = computed(() =>
+  settings.value.stylize === 'ascii' ? ASCII_MIN_CELL : RANGES.stylizeScale.min,
+)
+
+/**
+ * Picking a screen also drags the cell up to what that screen can draw in.
+ *
+ * Silently rendering at a size the slider does not show would leave the two
+ * disagreeing; moving the value is the honest half of enforcing a minimum.
+ */
+function setScreen(mode: StylizeMode) {
+  settings.value.stylize = mode
+  if (mode === 'ascii') {
+    settings.value.stylizeScale = Math.max(ASCII_MIN_CELL, settings.value.stylizeScale)
+  }
+}
+
+/**
+ * Named for what they do to the picture, with the technique underneath.
+ *
+ * "Ordered dither" is the name of the algorithm; "Two-tone, dithered" is what
+ * you get. The second line is where the technique goes, for anyone who came
+ * looking for it by name.
+ */
+const STYLIZE_OPTIONS = [
+  { value: 'none', label: 'None', note: 'The graded frame' },
+  { value: 'dither', label: 'Dither', note: 'Ordered, few steps' },
+  { value: 'ascii', label: 'Ascii', note: 'Redrawn as type' },
+  { value: 'halftone', label: 'Halftone', note: 'Dot screen, print' },
+  { value: 'posterize', label: 'Posterize', note: 'Pixelated, banded' },
+  { value: 'crt', label: 'CRT', note: 'Scanlines, grille' },
+] as const
+
+const ASCII_OPTIONS = [
+  { value: 'ascii', label: '.:-=+*#%@', title: 'Ten steps. The safe one.' },
+  { value: 'blocks', label: '░▒▓█', title: 'Five steps, solid. Coarse and graphic.' },
+  { value: 'shades', label: '·∴▪▦█', title: 'Eight steps of texture rather than of letters.' },
+  { value: 'code', label: 'Wgho*#', title: 'Seventy glyphs. The most tone, the least legible.' },
+] as const
+
 const CONTAINERS = [
   { value: 'mp4', label: 'mp4', note: 'h.264 · plays anywhere' },
   { value: 'webm', label: 'webm', note: 'vp9 · smaller file' },
@@ -365,10 +417,6 @@ const CONTAINERS = [
         </div>
       </LabSection>
 
-      <LabSection title="Look">
-        <LabLooks v-model:settings="settings" />
-      </LabSection>
-
       <LabSection title="Camera">
         <!--
           Framing lives with the framing controls. This sat in the stage section
@@ -425,7 +473,16 @@ const CONTAINERS = [
         <LabNumber v-model="settings.focusRange" label="Sharp band" v-bind="range('focusRange')" />
         <LabNumber v-model="settings.aperture" label="Bokeh strength" v-bind="range('aperture')" />
         <LabNumber v-model="settings.blurRadius" label="Max blur" v-bind="range('blurRadius')" />
-        <LabNumber v-model="settings.dofSamples" label="Bokeh samples" v-bind="range('dofSamples')" />
+
+        <!--
+          The shape of the aperture, which is what separates a photographed
+          highlight from a blur. Only offered once there is blur to shape: at
+          aperture zero these two set the geometry of something with no radius.
+        -->
+        <template v-if="settings.aperture > 0">
+          <LabNumber v-model="settings.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
+          <LabNumber v-model="settings.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
+        </template>
 
         <p v-if="!hasDepth" class="mt-2 font-mono text-[10px] leading-relaxed text-warning">
           The plate faces the camera square-on, so every point of it is the same
@@ -433,12 +490,48 @@ const CONTAINERS = [
         </p>
       </LabSection>
 
-      <LabSection title="Bloom">
+      <!--
+        Named for what it is rather than for the pass that makes it. Everything
+        in here is what happens to light too bright for the sensor to hold, and
+        the four things under the glow are the four ways a lens spills it.
+      -->
+      <LabSection title="Light">
         <LabNumber v-model="settings.emission" label="Source brightness" v-bind="range('emission')" />
-        <LabNumber v-model="settings.bloomIntensity" label="Intensity" v-bind="range('bloomIntensity')" />
+        <LabNumber v-model="settings.bloomIntensity" label="Glow" v-bind="range('bloomIntensity')" />
         <LabNumber v-model="settings.bloomThreshold" label="Threshold" v-bind="range('bloomThreshold')" />
-        <LabNumber v-model="settings.bloomKnee" label="Knee" v-bind="range('bloomKnee')" />
-        <LabNumber v-model="settings.bloomRadius" label="Radius" v-bind="range('bloomRadius')" />
+        <LabNumber v-model="settings.bloomRadius" label="Spread" v-bind="range('bloomRadius')" />
+        <!--
+          These three ride the same thresholded mip chain the glow does, so they
+          belong with it: dragging any of them with the glow at zero would appear
+          to do nothing, and there would be nothing on screen to say why.
+        -->
+        <LabNumber v-model="settings.bleed" label="Halation" v-bind="range('bleed')" />
+        <LabNumber v-model="settings.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
+        <LabNumber v-model="settings.ghosts" label="Ghosts" v-bind="range('ghosts')" />
+
+        <p v-if="settings.bloomIntensity <= 0" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
+          Everything below the glow is spilled light, so it needs some glow to
+          spill. Raise it above zero.
+        </p>
+      </LabSection>
+
+      <!--
+        Its own section, because these are the four things glass does to a
+        picture and they compose: the bulge bends where every channel is read
+        from, and the split, the spectrum and the scatter decide how far apart
+        those reads land. Chromatic aberration sat alone under the grade, where
+        it read as a colour adjustment rather than as a lens.
+      -->
+      <LabSection title="Lens">
+        <LabNumber v-model="settings.distortion" label="Bulge" v-bind="range('distortion')" />
+        <LabNumber v-model="settings.aberration" label="Colour spread" v-bind="range('aberration')" />
+        <LabNumber v-model="settings.dispersion" label="Dispersion" v-bind="range('dispersion')" />
+        <LabNumber v-model="settings.lensNoise" label="Scatter" v-bind="range('lensNoise')" />
+
+        <p v-if="!hasSpread" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
+          Dispersion and scatter both act on the colour spread, so they do
+          nothing until there is some.
+        </p>
       </LabSection>
 
       <LabSection title="Grade">
@@ -446,7 +539,6 @@ const CONTAINERS = [
         <LabNumber v-model="settings.contrast" label="Contrast" v-bind="range('contrast')" />
         <LabNumber v-model="settings.saturation" label="Saturation" v-bind="range('saturation')" />
         <LabNumber v-model="settings.attenuation" label="Distance falloff" v-bind="range('attenuation')" />
-        <LabNumber v-model="settings.aberration" label="Chromatic aberration" v-bind="range('aberration')" />
         <LabNumber v-model="settings.vignette" label="Vignette" v-bind="range('vignette')" />
         <LabNumber v-model="settings.grain" label="Grain" v-bind="range('grain')" />
         <LabToggle v-model="settings.tonemap" label="Filmic tonemap" />
@@ -459,6 +551,80 @@ const CONTAINERS = [
             class="h-[22px] w-[104px] cursor-pointer border border-muted bg-transparent"
           >
         </div>
+
+        <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
+          Duotone
+        </div>
+        <LabNumber v-model="settings.duotone" label="Amount" v-bind="range('duotone')" />
+        <!--
+          Only offered once there is something to colour. Two swatches above a
+          control set to zero are two decisions nobody has been asked to make.
+        -->
+        <div v-if="settings.duotone > 0" class="mt-2 flex items-center justify-between gap-3">
+          <span class="font-mono text-[11px] text-dimmed">Shadow · highlight</span>
+          <div class="flex shrink-0 gap-1">
+            <input
+              v-model="settings.duotoneShadow"
+              type="color"
+              class="h-[22px] w-[50px] cursor-pointer border border-muted bg-transparent"
+              title="The colour the darkest part of the picture becomes"
+            >
+            <input
+              v-model="settings.duotoneHighlight"
+              type="color"
+              class="h-[22px] w-[50px] cursor-pointer border border-muted bg-transparent"
+              title="The colour the brightest part becomes"
+            >
+          </div>
+        </div>
+
+      </LabSection>
+
+
+      <!--
+        Last, because it is the last thing that happens to the picture — and
+        because it is the one control here that can throw the rest away. Every
+        screen reads one value per cell, so a shot graded for its highlights and
+        then reduced to five glyphs has spent that grade on nothing.
+      -->
+      <LabSection title="Stylize">
+        <LabChoice
+          label="Screen"
+          hint="Redraws the finished frame on a grid. One at a time — two screens fighting over the same cell is mush."
+          :options="STYLIZE_OPTIONS"
+          :model-value="settings.stylize"
+          cards
+          @update:model-value="setScreen(String($event) as StylizeMode)"
+        />
+
+        <template v-if="settings.stylize !== 'none'">
+          <LabNumber
+            v-model="settings.stylizeScale"
+            label="Cell size"
+            v-bind="{ ...range('stylizeScale'), min: minCell }"
+          />
+          <LabNumber
+            v-if="settings.stylize === 'dither' || settings.stylize === 'posterize'"
+            v-model="settings.stylizeLevels"
+            label="Levels"
+            v-bind="range('stylizeLevels')"
+          />
+          <LabNumber
+            v-if="settings.stylize === 'halftone'"
+            v-model="settings.stylizeAngle"
+            label="Screen angle"
+            v-bind="range('stylizeAngle')"
+          />
+          <LabNumber v-model="settings.stylizeColour" label="Keep colour" v-bind="range('stylizeColour')" />
+
+          <LabChoice
+            v-if="settings.stylize === 'ascii'"
+            label="Glyphs"
+            :options="ASCII_OPTIONS"
+            :model-value="settings.asciiSet"
+            @update:model-value="settings.asciiSet = String($event) as AsciiSet"
+          />
+        </template>
       </LabSection>
 
       <LabSection title="Output">
@@ -543,12 +709,32 @@ const CONTAINERS = [
         >
           export {{ settings.container }}
         </button>
+        <!--
+          Copying is the wide one because a still off this thing is nearly always
+          on its way into a post or a message, and a file on disk is a detour
+          through the finder to get there. Saving one is still a real errand
+          though, so it keeps a button rather than a menu item — an action behind
+          an ellipsis is an action nobody finds twice.
+        -->
         <button
           type="button"
-          class="border border-muted px-3 py-[7px] font-mono text-[10px] text-muted hover:border-accented hover:text-default transition-colors"
+          class="border px-3 py-[7px] font-mono text-[10px] transition-colors"
+          :class="pngCopied
+            ? 'border-primary-500/50 text-primary'
+            : 'border-muted text-muted hover:border-accented hover:text-default'"
+          title="Copy the frame to the clipboard"
+          @click="emit('copyPng')"
+        >
+          {{ pngCopied ? 'copied' : 'copy png' }}
+        </button>
+        <button
+          type="button"
+          class="flex items-center border border-muted px-2 py-[7px] text-muted transition-colors hover:border-accented hover:text-default"
+          aria-label="Download the frame as a PNG"
+          title="Download the frame as a PNG"
           @click="emit('exportPng')"
         >
-          png
+          <UIcon name="i-lucide-download" class="block size-3" />
         </button>
       </div>
 

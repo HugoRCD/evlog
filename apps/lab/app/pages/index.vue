@@ -15,6 +15,8 @@
  */
 
 import { useResizable } from '~/composables/useResizable'
+import { glyphAtlas } from '~/utils/lab/ascii'
+import type { GlyphAtlas } from '~/utils/lab/ascii'
 import { createClock } from '~/utils/lab/clock'
 import { createDomTexture, invalidateStyles } from '~/utils/lab/dom-texture'
 import type { PlateMarkup } from '~/utils/lab/dom-texture'
@@ -649,6 +651,7 @@ onMounted(async () => {
 
   highPrecision.value = renderer.highPrecision
   renderer.setStageAspect(stageAspect.value)
+  handOverGlyphs()
   clock = createClock()
   // Virtual from the start: the preview is then the same function of time the
   // export is, so a shot cannot look different once rendered.
@@ -690,6 +693,39 @@ watch(previewSize, (size) => {
 })
 
 watch(stageAspect, aspect => renderer?.setStageAspect(aspect))
+
+/**
+ * The ascii ramp in hand, kept rather than handed straight to the renderer.
+ *
+ * Building one waits on the fonts and the renderer is built on mount, so the two
+ * arrive in either order — and on a shot that opens with ascii already set, the
+ * atlas usually wins. Holding it here lets whichever is second do the handover,
+ * instead of the first one being dropped into a renderer that does not exist yet
+ * and never being offered again.
+ */
+let glyphs: GlyphAtlas | null = null
+
+function handOverGlyphs() {
+  if (glyphs) renderer?.setGlyphAtlas(glyphs.canvas, glyphs.count, glyphs.gain)
+}
+
+/**
+ * Keep that ramp in step with what the shot asks for.
+ *
+ * Only once something actually asks: building one measures every glyph in it
+ * against the loaded fonts, and a shot that never turns the screen on should not
+ * pay for four of them. The frame that lands before the atlas does draws
+ * unstylized — the render loop picks the screen up on the next one.
+ */
+watch(
+  () => [shotSettings.value.stylize, shotSettings.value.asciiSet] as const,
+  async ([mode, set]) => {
+    if (mode !== 'ascii') return
+    glyphs = await glyphAtlas(set)
+    handOverGlyphs()
+  },
+  { immediate: true },
+)
 
 /**
  * Remount only when a layer changes which component it stages.
@@ -1561,20 +1597,112 @@ async function primeVirtualStage() {
   await captureStage()
 }
 
+/**
+ * How much larger than the output a still is rendered before being resolved down.
+ *
+ * The preview always looked better than the export, and the reason turned out to
+ * be nothing in the pipeline: the canvas is displayed smaller than it is
+ * rendered, so the browser was averaging the frame on its way to the screen.
+ * That averaging is real anti-aliasing, and everything this thing makes is built
+ * out of exactly the high-frequency detail it helps — cell edges, glyph strokes,
+ * dither, grain, the ragged rim of a bokeh disc.
+ *
+ * So the export does it deliberately instead of the display doing it by
+ * accident. Two is the whole of the useful range: it turns each output pixel
+ * into an average of four, and past it the returns fall off far faster than the
+ * fill rate does.
+ */
+const EXPORT_SUPERSAMPLE = 2
+
+/**
+ * Ceiling on the rendered edge, in pixels.
+ *
+ * Supersampling a 4K delivery would ask for an 8K buffer, which is past what a
+ * good many drivers will allocate as a render target — and a still that fails to
+ * export is worse than one that is merely not supersampled.
+ */
+const MAX_RENDER_EDGE = 4096
+
+/**
+ * One frame at the export size, as bytes.
+ *
+ * Rendered large, resolved down by the 2D context — a single downscale of an
+ * exact power of two is a box filter, which is the correct resolve and is what
+ * the GPU would do anyway.
+ *
+ * The renderer is put back to the preview size before this returns, so the frame
+ * on screen does not stay stretched at the output resolution while a blob is
+ * being encoded.
+ */
+async function renderPng(): Promise<Blob> {
+  if (!renderer) throw new Error('The renderer is not ready.')
+  const { outputWidth, outputHeight } = settings.value
+  const scale = Math.max(1, Math.min(EXPORT_SUPERSAMPLE, MAX_RENDER_EDGE / Math.max(outputWidth, outputHeight)))
+
+  try {
+    renderer.resize(outputWidth * scale, outputHeight * scale)
+    await captureStage()
+    renderer.render(shotSettings.value, performance.now(), layerPlanes.value, overlayQuads.value)
+    if (scale === 1) return await canvasToBlob(renderer.canvas)
+
+    const resolved = document.createElement('canvas')
+    resolved.width = outputWidth
+    resolved.height = outputHeight
+    const context = resolved.getContext('2d')
+    if (!context) throw new Error('Failed to allocate a context to resolve the frame into.')
+    context.imageSmoothingEnabled = true
+    context.imageSmoothingQuality = 'high'
+    context.drawImage(renderer.canvas, 0, 0, outputWidth, outputHeight)
+    return await canvasToBlob(resolved)
+  } finally {
+    renderer.resize(previewSize.value.width, previewSize.value.height)
+  }
+}
+
 async function exportPng() {
   if (!renderer || busy.value) return
   busy.value = true
   error.value = ''
   try {
-    const { outputWidth, outputHeight } = settings.value
-    renderer.resize(outputWidth, outputHeight)
-    await captureStage()
-    renderer.render(shotSettings.value, performance.now(), layerPlanes.value, overlayQuads.value)
-    download(await canvasToBlob(renderer.canvas), takeName(takeSubject.value, 'png'))
+    download(await renderPng(), takeName(takeSubject.value, 'png'))
   } catch (cause) {
     error.value = cause instanceof Error ? cause.message : String(cause)
   } finally {
-    renderer.resize(previewSize.value.width, previewSize.value.height)
+    busy.value = false
+  }
+}
+
+const pngCopied = ref(false)
+let pngCopiedTimer: ReturnType<typeof setTimeout> | null = null
+
+/**
+ * The frame straight onto the clipboard, for pasting rather than filing.
+ *
+ * The `ClipboardItem` is built around the pending blob rather than awaited
+ * first, and that is the whole reason this works: writing to the clipboard needs
+ * the user gesture that started it, and rendering a frame at the output size
+ * takes long enough to lose it. Handed a promise, the browser keeps the gesture
+ * alive until it settles.
+ */
+async function copyPng() {
+  if (!renderer || busy.value) return
+  if (!navigator.clipboard?.write || typeof ClipboardItem === 'undefined') {
+    error.value = 'This browser cannot write images to the clipboard. Use the menu to download instead.'
+    return
+  }
+
+  busy.value = true
+  error.value = ''
+  try {
+    await navigator.clipboard.write([new ClipboardItem({ 'image/png': renderPng() })])
+    pngCopied.value = true
+    if (pngCopiedTimer) clearTimeout(pngCopiedTimer)
+    pngCopiedTimer = setTimeout(() => {
+      pngCopied.value = false
+    }, 1600)
+  } catch (cause) {
+    error.value = cause instanceof Error ? cause.message : String(cause)
+  } finally {
     busy.value = false
   }
 }
@@ -2026,6 +2154,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       :sequence-ms="selectedSequenceMs"
       :can-undo
       :can-redo
+      :png-copied
       @undo="undo"
       @redo="redo"
       @update-layer="updateLayer"
@@ -2036,6 +2165,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @replay="replay"
       @export-video="exportVideo"
       @export-png="exportPng"
+      @copy-png="copyPng"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"
       @projects="projectsOpen = true"
