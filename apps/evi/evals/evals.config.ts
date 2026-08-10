@@ -1,6 +1,8 @@
 import { defineEvalConfig } from 'eve/evals'
+import { PostHogReporter } from './reporters/posthog'
 
 export default defineEvalConfig({
+  reporters: [PostHogReporter()],
   judge: {
     model: 'google/gemini-3.6-flash',
     // Judge calls bill to the same gateway key as the agent under test, so

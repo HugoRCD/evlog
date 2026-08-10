@@ -1,0 +1,75 @@
+name: evi evals
+
+# Behavioural tests for the Evi agent. They spend real gateway tokens on every
+# run, so they are NOT part of `ci`:
+#   - PRs touching apps/evi run the `fast` subset, and only from this repo
+#     (fork PRs get no secrets)
+#   - a nightly cron runs the whole suite, which is what the cost and latency
+#     trends in PostHog are built from
+#   - workflow_dispatch takes a model, to compare a candidate against the
+#     current one before swapping it in agent.ts
+#
+# Every run reports to PostHog as `evi_eval` / `evi_eval_run` events, joined to
+# the agent's LLM traces by the eve session id.
+
+on:
+  schedule:
+    - cron: '0 4 * * *'
+  pull_request:
+    paths:
+      - 'apps/evi/**'
+      - '.github/workflows/evi-evals.yml'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model to run the suite against (defaults to the one in agent.ts)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evi-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # eve requires Node >= 24; the repo pins 22 for everything else.
+      - uses: ./.github/actions/setup
+        with:
+          node-version: '24'
+          filters: '--filter=evi...'
+
+      # apps/evi resolves `evlog/eve` and `evlog/posthog` through the workspace
+      # link, which points at dist.
+      - name: Build evlog
+        run: pnpm --filter evlog run build
+
+      - name: Run evals
+        run: >
+          pnpm --filter evi exec eve eval
+          ${{ github.event_name == 'pull_request' && '--tag fast' || '' }}
+          --junit evi-evals.xml
+        env:
+          EVE_RUN_MODE: eval
+          EVI_MODEL: ${{ inputs.model }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evi-evals-${{ github.run_id }}
+          path: apps/evi/evi-evals.xml
+          if-no-files-found: ignore
