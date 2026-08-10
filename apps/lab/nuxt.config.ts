@@ -201,6 +201,25 @@ export default defineNuxtConfig({
         weights: [400, 500],
         global: true,
       },
+      /*
+       * The rest of the catalogue a text layer can be set in.
+       *
+       * Downloaded and served from this origin rather than linked, which is not
+       * a preference: the plate is rasterized through a sealed SVG, so every
+       * face has to be inlined as a data URI, and `dom-texture` will only read a
+       * file from the same origin. Linked from a CDN they would render in the
+       * panel and fall back in the export.
+       *
+       * Variable where the family has one, so the weight control means
+       * something across the whole range instead of snapping to two cuts.
+       */
+      { name: 'Inter', weights: ['100 900'], global: true },
+      { name: 'Space Grotesk', weights: ['300 700'], global: true },
+      { name: 'Bricolage Grotesque', weights: ['200 800'], global: true },
+      { name: 'Archivo', weights: ['100 900'], global: true },
+      { name: 'Instrument Serif', weights: [400], styles: ['normal', 'italic'], global: true },
+      { name: 'Playfair Display', weights: ['400 900'], global: true },
+      { name: 'JetBrains Mono', weights: ['100 800'], global: true },
     ],
   },
 

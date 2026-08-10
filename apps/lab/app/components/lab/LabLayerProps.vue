@@ -7,6 +7,7 @@
  * camera is expressed as a zoom rather than a distance.
  */
 
+import { FONT_CATALOGUE } from '~/utils/lab/layers'
 import type { Layer } from '~/utils/lab/layers'
 import { ENTRIES } from '~/utils/lab/registry'
 
@@ -47,11 +48,15 @@ const KINDS = {
   text: { label: 'text', icon: 'i-lucide-type' },
 } as const
 
-const FONTS = [
-  { value: 'pixel', label: 'pixel' },
-  { value: 'sans', label: 'sans' },
-  { value: 'mono', label: 'mono' },
-] as const
+/**
+ * Every face, each written in itself.
+ *
+ * A list of names set in the panel's own font is a list of words you have to
+ * try one by one. Set in the face they name, the list is the specimen — which
+ * is how every editor that takes type seriously presents this, and the only
+ * way to pick one without a round trip through the canvas.
+ */
+const FONTS = FONT_CATALOGUE
 
 /**
  * Ceiling for a clip's own span.
@@ -146,15 +151,18 @@ const TEXT_TOGGLES = [
         @input="emit('update', { text: ($event.target as HTMLTextAreaElement).value })"
       />
 
-      <div class="mb-2 flex gap-1">
+      <div class="mb-2 grid grid-cols-2 gap-1 @min-[320px]:grid-cols-3">
         <button
           v-for="font in FONTS"
           :key="font.value"
           type="button"
-          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          data-cuelume-press
+          class="truncate border px-1.5 py-1 text-[11px] leading-tight transition-colors"
           :class="(layer.font ?? 'pixel') === font.value
             ? 'border-primary-500/60 text-primary'
             : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
+          :style="{ fontFamily: `var(${font.variable}, ${font.fallback})` }"
+          :title="font.label"
           @click="emit('update', { font: font.value })"
         >
           {{ font.label }}

@@ -70,7 +70,7 @@ export interface Layer {
   fontSize?: number
   color?: string
   weight?: number
-  font?: 'sans' | 'mono' | 'pixel'
+  font?: LayerFont
   align?: 'left' | 'center' | 'right'
   /** Line box as a multiple of the size — the one control that sets a block's texture. */
   lineHeight?: number
@@ -302,15 +302,45 @@ export function layerStateAt(layer: Layer, time: number): EffectResult | null {
   return { ...effects, opacity }
 }
 
-const FONT_STACK: Record<NonNullable<Layer['font']>, string> = {
-  sans: 'var(--font-sans, sans-serif)',
-  mono: 'var(--font-mono, monospace)',
-  pixel: 'var(--font-pixel, monospace)',
-}
+/**
+ * The typefaces a text layer can be set in.
+ *
+ * Every one is declared in `nuxt.config` and downloaded by `@nuxt/fonts`, which
+ * serves the files from this origin under `/_fonts/`. That detail is the whole
+ * reason a face can be offered at all: the plate is rasterized through a sealed
+ * SVG that resolves nothing, so `dom-texture` inlines each `@font-face` as a
+ * data URI — and it can only do that for a file it is allowed to read. A face
+ * loaded from a third-party CDN would look right in the panel and come out of
+ * the render in the fallback.
+ *
+ * The variable is its own name rather than the source's `--font-sans`, so
+ * adding a face here cannot change what the staged component is drawn in.
+ */
+export const FONT_CATALOGUE = [
+  { value: 'pixel', label: 'Geist Pixel', variable: '--font-pixel', fallback: 'monospace' },
+  { value: 'sans', label: 'Geist', variable: '--font-sans', fallback: 'sans-serif' },
+  { value: 'mono', label: 'Geist Mono', variable: '--font-mono', fallback: 'monospace' },
+  { value: 'inter', label: 'Inter', variable: '--lab-font-inter', fallback: 'sans-serif' },
+  { value: 'grotesk', label: 'Space Grotesk', variable: '--lab-font-grotesk', fallback: 'sans-serif' },
+  { value: 'bricolage', label: 'Bricolage', variable: '--lab-font-bricolage', fallback: 'sans-serif' },
+  { value: 'archivo', label: 'Archivo', variable: '--lab-font-archivo', fallback: 'sans-serif' },
+  { value: 'serif', label: 'Instrument', variable: '--lab-font-serif', fallback: 'serif' },
+  { value: 'playfair', label: 'Playfair', variable: '--lab-font-playfair', fallback: 'serif' },
+  { value: 'jetbrains', label: 'JetBrains', variable: '--lab-font-jetbrains', fallback: 'monospace' },
+] as const
+
+export type LayerFont = typeof FONT_CATALOGUE[number]['value']
+
+const FONT_STACK = Object.fromEntries(
+  FONT_CATALOGUE.map(font => [font.value, `var(${font.variable}, ${font.fallback})`]),
+) as Record<LayerFont, string>
 
 /** Font family for a layer, resolved against the fonts the app already loads. */
 export function layerFontFamily(layer: Layer): string {
-  return FONT_STACK[layer.font ?? 'pixel']
+  // A face dropped from the catalogue leaves documents pointing at a name that
+  // no longer resolves, and a text layer that renders as nothing reads as lost
+  // rather than as restyled.
+  return FONT_STACK[layer.font ?? 'pixel'] ?? FONT_STACK.pixel
 }
 
 /**
