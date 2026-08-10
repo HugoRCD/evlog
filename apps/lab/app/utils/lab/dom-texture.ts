@@ -247,6 +247,63 @@ function bakeAnimatedStyles(source: HTMLElement, clone: HTMLElement) {
 }
 
 /**
+ * Redraw iconify's masked spans as real SVG.
+ *
+ * An icon on the page is an empty span carrying the glyph in `mask-image` and
+ * its colour in the background. A sealed SVG document resolves no image
+ * reference at all — a `data:` URI included — so the mask silently does nothing
+ * and every icon in a captured plate came back as a blank box while rendering
+ * perfectly on the page it was copied from.
+ *
+ * The glyph goes inside the span rather than replacing it: the span carries the
+ * size, the margins and whatever else its utility classes set, and none of that
+ * is recoverable from the icon alone.
+ *
+ * Iconify emits the mask shape in black by construction — the colour of a mask
+ * is meaningless, only its coverage is read — which is what makes recolouring it
+ * a substitution rather than a parse.
+ */
+function inlineIcons(source: HTMLElement, clone: HTMLElement) {
+  const originals = Array.from(source.querySelectorAll<HTMLElement>('.iconify'))
+  const clones = Array.from(clone.querySelectorAll<HTMLElement>('.iconify'))
+
+  originals.forEach((original, index) => {
+    const target = clones[index]
+    if (!target) return
+
+    const computed = getComputedStyle(original)
+    const mask = (computed.maskImage || computed.webkitMaskImage).trim()
+
+    // Sliced rather than matched. The payload is an SVG whose own attributes are
+    // single-quoted, so any pattern that stops at a quote stops inside the first
+    // `xmlns='...'` and hands the parser a fragment.
+    const PREFIX = 'data:image/svg+xml,'
+    const start = mask.indexOf(PREFIX)
+    if (start === -1) return
+    const encoded = mask.slice(start + PREFIX.length).replace(/["']?\)\s*$/, '')
+
+    let markup: string
+    try {
+      markup = decodeURIComponent(encoded)
+    } catch {
+      // A mask this cannot read is one icon missing, not a failed frame.
+      return
+    }
+
+    const svg = new DOMParser()
+      .parseFromString(markup.replace(/(['"])black\1/g, `$1${computed.backgroundColor}$1`), 'image/svg+xml')
+      .documentElement
+    if (svg.tagName.toLowerCase() !== 'svg') return
+
+    svg.setAttribute('style', 'width:100%;height:100%;display:block')
+    target.style.setProperty('mask-image', 'none')
+    target.style.setProperty('-webkit-mask-image', 'none')
+    target.style.setProperty('background-color', 'transparent')
+    target.appendChild(svg)
+  })
+}
+
+/**
  * Swap non-serializable nodes in the clone for static equivalents.
  *
  * A `<canvas>` carries its pixels in a context, not in markup, so a clone comes
@@ -254,6 +311,10 @@ function bakeAnimatedStyles(source: HTMLElement, clone: HTMLElement) {
  * images pointing at URLs the sealed SVG will not be allowed to fetch.
  */
 async function inlineNodes(source: HTMLElement, clone: HTMLElement, imageCache: Map<string, string | null>) {
+  // Before anything is substituted, while the two trees still line up node for
+  // node — replacing a canvas changes the clone's element list.
+  inlineIcons(source, clone)
+
   const sourceCanvases = Array.from(source.querySelectorAll('canvas'))
   const cloneCanvases = Array.from(clone.querySelectorAll('canvas'))
   cloneCanvases.forEach((canvasClone, index) => {
