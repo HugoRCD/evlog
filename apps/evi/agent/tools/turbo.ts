@@ -4,14 +4,8 @@ import { z } from 'zod'
 import { canAccessAdminTools } from '../lib/trust'
 import { exchangeTurboToken, turboConfigCommand } from '../lib/turbo'
 
-/**
- * The token can only touch the remote cache, but a sandbox that runs untrusted
- * repro code must not hold it unattended: autonomous turns never see this
- * tool. Resolved at turn.started with the tool defined inline: eve's bundler
- * registers `execute` as a step function only when it sits inline in the
- * handler body, and a factory-built map breaks tool execution on resumed
- * sessions.
- */
+// The token only touches the remote cache, but never unattended: autonomous
+// turns don't see this tool. Executes sit inline in the resolver on purpose (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

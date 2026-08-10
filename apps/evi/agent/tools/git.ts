@@ -14,15 +14,9 @@ const REPO_DIR = '/workspace/repo'
  */
 const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
 
-/**
- * Visible to maintainer sessions and to schedule-app turns (the upstream-sync
- * run pushes its feature branches); community and autonomous turns never see a
- * push surface. The push itself is inert: it only ever creates a feature
- * branch. Resolved at turn.started with the tools defined inline: eve's
- * bundler registers each `execute` as a step function only when it sits
- * inline in the handler body, and a factory-built map breaks tool execution
- * on resumed sessions.
- */
+// Maintainer and schedule-app turns only; the push is inert (feature
+// branches only). Executes sit inline in the resolver on purpose: a
+// factory-built map loses its step functions on resumed sessions (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

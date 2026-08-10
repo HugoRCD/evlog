@@ -45,13 +45,8 @@ async function hostFrame(sandbox: SandboxSession, path: string): Promise<string>
   return blob.url
 }
 
-/**
- * The frames publish to public URLs the moment the tool runs, so autonomous
- * turns never see it. Resolved at turn.started with the tool defined inline:
- * eve's bundler registers `execute` as a step function only when it sits
- * inline in the handler body, and a factory-built map breaks tool execution
- * on resumed sessions.
- */
+// Frames publish to public URLs the moment the tool runs: autonomous turns
+// never see it. Executes sit inline in the resolver on purpose (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

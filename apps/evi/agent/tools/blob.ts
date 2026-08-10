@@ -4,13 +4,8 @@ import { z } from 'zod'
 import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from '../lib/blob'
 import { canAccessAdminTools } from '../lib/trust'
 
-/**
- * The URL is public the instant it exists, so autonomous turns never see this
- * tool. Resolved at turn.started with the tool defined inline: eve's bundler
- * registers `execute` as a step function only when it sits inline in the
- * handler body, and a factory-built map breaks tool execution on resumed
- * sessions.
- */
+// Public URLs the instant they exist: autonomous turns never see this tool.
+// Executes sit inline in the resolver on purpose (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {

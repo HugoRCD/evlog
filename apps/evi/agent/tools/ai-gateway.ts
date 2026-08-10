@@ -76,14 +76,8 @@ function filterReportByApiKeyName(payload: unknown, apiKeyName: string): {
   }
 }
 
-/**
- * Admin-only spend observability. Resolved at turn.started with the tools
- * defined inline: eve's bundler registers each `execute` as a step function
- * only when it sits inline in the handler body, and a factory-built map
- * breaks tool execution on resumed sessions. Keys are bare tool names (no
- * file-slug prefix), so the namespace is spelled out to match every
- * ai_gateway__* reference.
- */
+// Admin-only spend observability. Executes sit inline in the resolver on
+// purpose (docs/notes.md); keys carry the ai_gateway__ namespace themselves.
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {
