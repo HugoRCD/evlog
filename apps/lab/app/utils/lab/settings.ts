@@ -311,7 +311,7 @@ export const RANGES = {
   // Authored against a 1080p frame and scaled to the real one, like `blurRadius`
   // — otherwise the cells would be a different size in the preview than in the
   // export, and would change every time the window was resized.
-  stylizeScale: { min: 4, max: 48, step: 1, unit: 'px' },
+  stylizeScale: { min: 3, max: 48, step: 1, unit: 'px' },
   stylizeLevels: { min: 2, max: 16, step: 1 },
   stylizeColour: { min: 0, max: 1, step: 0.005 },
   stylizeAngle: { min: 0, max: 90, step: 1, unit: '°' },

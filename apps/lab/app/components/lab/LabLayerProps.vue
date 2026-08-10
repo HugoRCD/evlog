@@ -88,6 +88,12 @@ const TEXT_FITS = [
   { value: 'fixed' as const, label: 'column', hint: 'The width is set and the text wraps into it.' },
 ]
 
+const DECORATIONS = [
+  { value: 'none' as const, label: 'none', style: '' },
+  { value: 'underline' as const, label: 'underline', style: 'underline' },
+  { value: 'strikethrough' as const, label: 'strike', style: 'line-through' },
+]
+
 const ALIGNMENTS = [
   { value: 'left', icon: 'i-lucide-align-left' },
   { value: 'center', icon: 'i-lucide-align-center' },
@@ -274,6 +280,66 @@ const TEXT_TOGGLES = [
           {{ toggle.label }}
         </button>
       </div>
+
+      <div class="mb-2 flex gap-1">
+        <button
+          v-for="rule in DECORATIONS"
+          :key="rule.value"
+          type="button"
+          data-cuelume-press
+          class="flex-1 border py-1 font-mono text-[10px] transition-colors"
+          :class="[
+            (layer.decoration ?? 'none') === rule.value
+              ? 'border-primary-500/60 text-primary'
+              : 'border-muted text-dimmed hover:border-accented hover:text-toned',
+            rule.style,
+          ]"
+          @click="emit('update', { decoration: rule.value })"
+        >
+          {{ rule.label }}
+        </button>
+      </div>
+
+      <!--
+        A cast shadow, which the glow cannot be: glow is centred on the glyphs
+        by construction. The offsets only appear once there is a shadow to move.
+      -->
+      <LabNumber
+        :model-value="layer.shadow ?? 0"
+        label="Shadow"
+        :min="0"
+        :max="1"
+        :step="0.005"
+        :default="0"
+        @update:model-value="emit('update', { shadow: $event })"
+      />
+      <template v-if="(layer.shadow ?? 0) > 0">
+        <LabNumber
+          :model-value="layer.shadowX ?? 0"
+          label="Shadow X"
+          :min="-1"
+          :max="1"
+          :step="0.005"
+          :default="0"
+          @update:model-value="emit('update', { shadowX: $event })"
+        />
+        <LabNumber
+          :model-value="layer.shadowY ?? 0"
+          label="Shadow Y"
+          :min="-1"
+          :max="1"
+          :step="0.005"
+          :default="0"
+          @update:model-value="emit('update', { shadowY: $event })"
+        />
+        <div class="mb-2">
+          <LabColour
+            label="Shadow colour"
+            :model-value="layer.shadowColor ?? '#000000cc'"
+            @update:model-value="emit('update', { shadowColor: $event })"
+          />
+        </div>
+      </template>
 
       <LabNumber
         :model-value="layer.glow ?? 0"

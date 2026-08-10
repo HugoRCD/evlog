@@ -78,6 +78,18 @@ export interface Layer {
   letterSpacing?: number
   italic?: boolean
   uppercase?: boolean
+  /** A rule through or under the words, drawn from the font's own metrics. */
+  decoration?: 'none' | 'underline' | 'strikethrough'
+  /**
+   * A cast shadow, which `glow` cannot be.
+   *
+   * Glow is centred on the glyphs by construction — it is a halo. An offset one
+   * is what lifts type off a busy plate, and the two are worth having at once.
+   */
+  shadow?: number
+  shadowX?: number
+  shadowY?: number
+  shadowColor?: string
   /**
    * Whether the box follows the type or the type wraps into the box.
    *
@@ -368,6 +380,11 @@ export function layerTextureKey(layer: Layer, stage: { width: number, height: nu
     layer.italic,
     layer.uppercase,
     layer.textFit,
+    layer.decoration,
+    layer.shadow,
+    layer.shadowX,
+    layer.shadowY,
+    layer.shadowColor,
     layer.glow,
     layer.stroke,
     layer.strokeColor,

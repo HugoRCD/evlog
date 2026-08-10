@@ -58,12 +58,12 @@ export function asciiCellAspect(set: AsciiSet): number {
 /**
  * Narrowest cell a glyph can still be a glyph in.
  *
- * Below this the ramp stops carrying anything: a character six pixels tall has
- * a couple of strokes, and the difference between the marks in a ramp is finer
- * than that. The screen keeps working — it just draws the same smear at every
- * brightness, which is a grid with no picture in it.
+ * Three, which is where a glyph stops being a glyph and becomes a dot. The ramp
+ * carries very little that fine — most of its marks resolve to the same smear —
+ * but a three-pixel cell is a legitimate texture rather than a mistake, and the
+ * screen is the one place in this tool where the grain is the point.
  */
-export const ASCII_MIN_CELL = 6
+export const ASCII_MIN_CELL = 3
 
 /**
  * Atlas cell size.
