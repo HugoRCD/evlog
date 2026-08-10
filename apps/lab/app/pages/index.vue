@@ -1556,6 +1556,22 @@ function startDocument(kind: LabMode) {
   void seekTo(0)
 }
 
+/**
+ * Turn the document from one kind into the other.
+ *
+ * A conversion rather than a new document: the two kinds share every part of
+ * the model, so this only changes which parts are being read. A shot carries
+ * the spans it is ignoring and a take keeps its clips, which is what makes
+ * going back and forth free rather than a decision.
+ */
+function setMode(kind: LabMode) {
+  if (mode.value === kind) return
+  mode.value = kind
+  // A shot is taken at the instant the playhead is on; a take has to start
+  // somewhere, and it is never part-way through.
+  if (kind === 'video') void seekTo(0)
+}
+
 function openStoredProject(id: string) {
   void runProjectAction(async () => {
     const document = await openProject(id)
@@ -1968,6 +1984,11 @@ function containsPoint(corners: [number, number][], point: { x: number, y: numbe
  */
 function onFramePointerDown(event: PointerEvent) {
   if (picking.value || busy.value) return
+  // The instruments sit inside the frame, and this handler is on the frame. A
+  // press on one of them was being read as a press on the picture behind it,
+  // which took the pointer capture the button needed to receive its own click —
+  // so the guides and the reticle simply stopped toggling.
+  if (event.target !== canvas.value) return
   const element = event.currentTarget as HTMLElement
   const point = framePointAt(event, element)
   const hit = layerAt(point)
@@ -2369,9 +2390,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
     <LabLauncher
       v-if="launching"
       :recent="projects"
+      :dismissable="layers.length > 0"
       @create="startDocument"
       @open="openStoredProject"
       @browse="launching = false; projectsOpen = true"
+      @dismiss="launching = false"
     />
 
     <LabShortcuts v-model="shortcutsOpen" />
@@ -2421,6 +2444,8 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       @export-video="exportVideo"
       @export-png="exportPng"
       @copy-png="copyPng"
+      @new-document="launching = true"
+      @set-mode="setMode"
       @copy-link="copyLink"
       @shortcuts="shortcutsOpen = true"
       @projects="projectsOpen = true"

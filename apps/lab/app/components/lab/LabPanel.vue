@@ -36,6 +36,8 @@ const emit = defineEmits<{
   exportVideo: []
   exportPng: []
   copyPng: []
+  newDocument: []
+  setMode: [mode: LabMode]
   copyLink: []
   projects: []
   shortcuts: []
@@ -166,6 +168,25 @@ const ACTIONS = computed<LabMenuAction[]>(() => [
     disabled: !props.canRedo,
     keepOpen: true,
     select: () => emit('redo'),
+  },
+  // First, and above Projects. The launcher is where a session starts, and it
+  // had no way back to it once a document existed — which made both modes
+  // unreachable to anyone who had ever used the tool before.
+  {
+    label: 'New…',
+    icon: 'i-lucide-plus',
+    hint: 'A shot or a take, from the top.',
+    select: () => emit('newDocument'),
+  },
+  {
+    label: props.mode === 'shot' ? 'Turn into a video' : 'Turn into a shot',
+    icon: props.mode === 'shot' ? 'i-lucide-film' : 'i-lucide-image',
+    // Nothing is thrown away either way: a shot keeps the spans it is ignoring,
+    // and a take keeps every layer it was made of.
+    hint: props.mode === 'shot'
+      ? 'Put this frame on a timeline. Nothing is lost.'
+      : 'Keep one frame of this take. The clips are kept.',
+    select: () => emit('setMode', props.mode === 'shot' ? 'video' : 'shot'),
   },
   {
     label: 'Projects',

@@ -19,12 +19,21 @@ import type { ProjectSummary } from '~/utils/lab/projects'
 defineProps<{
   /** Most recently saved first; the launcher shows only the first few. */
   recent: ProjectSummary[]
+  /**
+   * True when there is already a document to go back to.
+   *
+   * On a first run there is nothing behind this screen and no way out but
+   * forward, so offering one would be a door onto a black frame. Reached from
+   * the menu it is a dialog, and a dialog you cannot leave is a trap.
+   */
+  dismissable: boolean
 }>()
 
 const emit = defineEmits<{
   create: [mode: LabMode]
   open: [id: string]
   browse: []
+  dismiss: []
 }>()
 
 /**
@@ -55,9 +64,19 @@ const RECENT_LIMIT = 4
 <template>
   <div class="absolute inset-0 z-30 flex items-center justify-center bg-default p-8">
     <div class="w-full max-w-lg">
-      <span class="block font-pixel text-[11px] uppercase tracking-[0.2em] text-dimmed">
-        Render labs
-      </span>
+      <div class="flex items-baseline justify-between gap-3">
+        <span class="font-pixel text-[11px] uppercase tracking-[0.2em] text-dimmed">
+          Render labs
+        </span>
+        <button
+          v-if="dismissable"
+          type="button"
+          class="font-mono text-[10px] text-dimmed transition-colors hover:text-primary"
+          @click="emit('dismiss')"
+        >
+          keep editing
+        </button>
+      </div>
       <p class="mt-2 font-mono text-[11px] leading-relaxed text-muted">
         What are you making?
       </p>
