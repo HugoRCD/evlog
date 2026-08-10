@@ -64,23 +64,30 @@ describe('otlp adapter', () => {
       expect(record.severityText).toBe('ERROR')
     })
 
-    it('summarizes the request in the body', () => {
-      const event = createTestEvent({ method: 'POST', path: '/api/checkout', status: 500 })
+    it('serializes the whole event as the body by default', () => {
+      const event = createTestEvent({ action: 'test', userId: '123' })
       const record = toOTLPLogRecord(event)
+
+      expect(record.body.stringValue).toBe(JSON.stringify(event))
+    })
+
+    it('summarizes the request in the body in compact shape', () => {
+      const event = createTestEvent({ method: 'POST', path: '/api/checkout', status: 500 })
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.body.stringValue).toBe('POST /api/checkout (500)')
     })
 
     it('falls back to the service name when the event has no request shape', () => {
       const event = createTestEvent({ action: 'test' })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.body.stringValue).toBe('test-service')
     })
 
-    it('keeps event fields out of the body and in the attributes', () => {
+    it('keeps event fields out of the body and in the attributes in compact shape', () => {
       const event = createTestEvent({ method: 'GET', path: '/api/me', userId: 'usr_123' })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.body.stringValue).not.toContain('usr_123')
       expect(record.attributes.find(a => a.key === 'userId')?.value).toEqual({ stringValue: 'usr_123' })
@@ -110,9 +117,17 @@ describe('otlp adapter', () => {
       expect(successAttr?.value).toEqual({ boolValue: true })
     })
 
-    it('flattens nested objects into dotted attributes', () => {
+    it('keeps a nested object as one JSON attribute by default', () => {
       const event = createTestEvent({ user: { id: '123', name: 'Alice' } })
       const record = toOTLPLogRecord(event)
+
+      expect(record.attributes.find(a => a.key === 'user')?.value)
+        .toEqual({ stringValue: '{"id":"123","name":"Alice"}' })
+    })
+
+    it('flattens nested objects into dotted attributes in compact shape', () => {
+      const event = createTestEvent({ user: { id: '123', name: 'Alice' } })
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.attributes.find(a => a.key === 'user.id')?.value).toEqual({ stringValue: '123' })
       expect(record.attributes.find(a => a.key === 'user.name')?.value).toEqual({ stringValue: 'Alice' })
@@ -121,7 +136,7 @@ describe('otlp adapter', () => {
 
     it('flattens through several levels and keeps value types', () => {
       const event = createTestEvent({ eve: { caller: { principalId: 'github:1' } }, ai: { calls: 1 } })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.attributes.find(a => a.key === 'eve.caller.principalId')?.value)
         .toEqual({ stringValue: 'github:1' })
@@ -130,7 +145,7 @@ describe('otlp adapter', () => {
 
     it('serializes arrays rather than indexing them into distinct keys', () => {
       const event = createTestEvent({ ai: { tools: [{ name: 'search' }] } })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.attributes.find(a => a.key === 'ai.tools')?.value)
         .toEqual({ stringValue: '[{"name":"search"}]' })
@@ -138,14 +153,14 @@ describe('otlp adapter', () => {
 
     it('keeps an empty object as a field rather than flattening it away', () => {
       const event = createTestEvent({ user: {} })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.attributes.find(a => a.key === 'user')?.value).toEqual({ stringValue: '{}' })
     })
 
     it('serializes non-plain objects instead of flattening them away', () => {
       const event = createTestEvent({ startedAt: new Date('2024-01-01T12:00:00.000Z') })
-      const record = toOTLPLogRecord(event)
+      const record = toOTLPLogRecord(event, 'compact')
 
       expect(record.attributes.find(a => a.key === 'startedAt')?.value)
         .toEqual({ stringValue: '"2024-01-01T12:00:00.000Z"' })
@@ -344,6 +359,17 @@ describe('otlp adapter', () => {
 
       expect(scope.name).toBe('evlog')
       expect(scope.version).toBeUndefined()
+    })
+
+    it('sends the record shape through the drain config', async () => {
+      await sendToOTLP(
+        { timestamp: '2024-01-01T12:00:00.000Z', level: 'info', service: 'test-service', environment: 'test', user: { id: 'u1' } },
+        { endpoint: 'http://localhost:4318', recordShape: 'compact' },
+      )
+
+      const [, options] = fetchSpy.mock.calls[0] as [string, RequestInit]
+      const [record] = JSON.parse(options.body as string).resourceLogs[0].scopeLogs[0].logRecords
+      expect(record.attributes.find((a: { key: string }) => a.key === 'user.id')).toBeDefined()
     })
 
     it('throws error on non-OK response', async () => {

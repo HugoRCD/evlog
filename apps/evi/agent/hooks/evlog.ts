@@ -16,7 +16,12 @@ const drain = createFanOutDrain(
   [
     ...(process.env.VERCEL ? [] : [createFsDrain()]),
     ...(process.env.POSTHOG_API_KEY
-      ? [createPostHogDrain({ distinctIdField: 'eve.caller.principalId' })]
+      ? [createPostHogDrain({
+          distinctIdField: 'eve.caller.principalId',
+          // Flattened attributes are what PostHog facets on: `ai.costUsd` and
+          // `eve.sessionId` are filterable, a serialized `ai` object is not.
+          recordShape: 'compact',
+        })]
       : []),
   ],
   { batch: { size: 5, intervalMs: 2000 } },

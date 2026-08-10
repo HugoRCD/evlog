@@ -4,7 +4,7 @@ import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineDrain, defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
 import { sendBatchToOTLP } from './otlp'
-import type { OTLPConfig } from './otlp'
+import type { OTLPConfig, OTLPRecordShape } from './otlp'
 
 /**
  * Mode for {@link createPostHogDrain}.
@@ -56,6 +56,11 @@ export interface PostHogConfig {
    * (`posthog.get_session_id()`) and record it on the event.
    */
   sessionIdField?: string
+  /**
+   * Log record shape in `'logs'` mode. Default: `'json'`.
+   * @see {@link OTLPRecordShape}
+   */
+  recordShape?: OTLPRecordShape
   /** Request timeout in milliseconds. Default: 5000 */
   timeout?: number
   /** Number of retry attempts on transient failures. Default: 2 */
@@ -83,6 +88,7 @@ const POSTHOG_FIELDS: ConfigField<PostHogConfig>[] = [
   { key: 'distinctId' },
   { key: 'distinctIdField' },
   { key: 'sessionIdField' },
+  { key: 'recordShape' },
   { key: 'timeout' },
   { key: 'retries' },
 ]
@@ -94,6 +100,7 @@ function resolveHost(config: PostHogConfig): string {
 function toOTLPConfig(config: PostHogConfig): OTLPConfig {
   return {
     endpoint: `${resolveHost(config)}/i`,
+    ...(config.recordShape ? { recordShape: config.recordShape } : {}),
     headers: { Authorization: `Bearer ${config.apiKey}` },
     timeout: config.timeout,
     retries: config.retries,
