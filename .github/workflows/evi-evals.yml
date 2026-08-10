@@ -1,8 +1,9 @@
 name: evi evals
 
 # Behavioural tests for the Evi agent. Every run spends real gateway tokens on
-# a live model, so this is deliberately NOT part of `ci` and never runs just
-# because a file under apps/evi changed.
+# a live model, so this is deliberately NOT part of `ci`. Only four paths
+# trigger it: `apps/evi/agent/**` minus its tests, `apps/evi/evals/**/*.eval.ts`,
+# and this file. Everything else under apps/evi is inert.
 #
 # What triggers a run, and what it costs:
 #   - a PR that changes the agent itself or an eval — the 12 `fast` evals.
