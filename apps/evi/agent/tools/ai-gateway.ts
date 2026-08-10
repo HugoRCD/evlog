@@ -76,10 +76,19 @@ function filterReportByApiKeyName(payload: unknown, apiKeyName: string): {
   }
 }
 
-function aiGatewayTools() {
-  // Dynamic map keys are bare tool names (no file-slug prefix), so the
-  // namespace is spelled out here to match every ai_gateway__* reference.
-  return {
+/**
+ * Admin-only spend observability. Resolved at turn.started with the tools
+ * defined inline: eve's bundler registers each `execute` as a step function
+ * only when it sits inline in the handler body, and a factory-built map
+ * breaks tool execution on resumed sessions. Keys are bare tool names (no
+ * file-slug prefix), so the namespace is spelled out to match every
+ * ai_gateway__* reference.
+ */
+export default defineDynamic({
+  events: {
+    'turn.started': (_event, ctx) => {
+      if (!canAccessAdminTools(ctx.session.auth.current)) return null
+      return {
     ai_gateway__credits: defineTool({
       description: 'Admin: AI Gateway credit balance and lifetime spend for the entire team account (not Evi-scoped). Prefer ai_gateway__report for Evi digests.',
       inputSchema: z.object({}),
@@ -170,20 +179,7 @@ function aiGatewayTools() {
         return await gatewayFetch('/generation', { id: input.id })
       },
     }),
-  }
-}
-
-// Re-resolved every turn so the gate follows the turn's actual caller and
-// survives a session resumed on a fresh deployment.
-export default defineDynamic({
-  events: {
-    'session.started': async (_event, ctx) => {
-      if (!canAccessAdminTools(ctx.session.auth.current)) return null
-      return aiGatewayTools()
-    },
-    'turn.started': async (_event, ctx) => {
-      if (!canAccessAdminTools(ctx.session.auth.current)) return null
-      return aiGatewayTools()
+      }
     },
   },
 })

@@ -13,7 +13,7 @@ export default defineSchedule({
     }
     waitUntil(
       receive(photon, {
-        message: 'Load the daily-digest skill and follow it for the last 24 hours.',
+        message: 'Load the daily-digest skill and follow it for the last 24 hours. This scheduled turn resumes a long-lived thread: ignore earlier conversation topics and stale pending requests, and do only this task.',
         // Spectrum direct-chat guid: `any;-;<address>`, so the thread is
         // derived from the phone number instead of a captured thread id.
         target: { adapterName: 'imessage', threadId: `imessage:any;-;${MAINTAINER_PHONE}` },
