@@ -61,4 +61,4 @@ minimumReleaseAgeExclude:
   - workflow
 
 patchedDependencies:
-  eve@0.30.6: patches/eve@0.30.6.patch
+  eve@0.31.3: patches/eve@0.31.3.patch

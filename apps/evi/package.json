@@ -22,7 +22,7 @@
     "@vercel/connect": "^0.6.1",
     "@vercel/oidc": "^3.8.2",
     "ai": "^7.0.38",
-    "eve": "^0.30.6",
+    "eve": "^0.31.3",
     "evlog": "workspace:*",
     "zod": "^4.4.3"
   },

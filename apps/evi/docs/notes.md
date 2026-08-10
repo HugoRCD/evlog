@@ -50,7 +50,7 @@ therefore defines its tools inline in a single `turn.started` resolver.
 ## Schedules
 
 **Chat-sdk channels target a provider-native `threadId` from a schedule.**
-`receive(photon, { target })` takes `{ adapterName: 'imessage', threadId }`, not
+`to(photon, target).send(...)` takes `{ adapterName: 'imessage', threadId }`, not
 a session handle. For a direct chat the id is derivable, no capture needed:
 Spectrum direct-chat guids are `any;-;<address>`, so the thread is
 `imessage:any;-;<phone>`. The optional `~<phone>` suffix in the full format
