@@ -28,6 +28,7 @@ import { DEFAULT_SETTINGS, PLATE_SCALE, frameCountFor, frameStep, outputDuration
 import { useSequenceDurations } from '~/utils/lab/sequence'
 import { MAX_SHARE_URL, createDocument, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
 import type { LabDocument, LabMode } from '~/utils/lab/storage'
+import type { LayerGrab } from '~/composables/useLayerGestures'
 import {
   cloneLayer,
   constrainToTimeline,
@@ -126,25 +127,37 @@ const guides = ref(false)
 /** Pointer over the frame, 0..1, for the crosshair readout. */
 const framePointer = ref<{ x: number, y: number } | null>(null)
 
+/** Where a pointer event sits on the frame, as a fraction with y down. */
+function framePointAt(event: PointerEvent, element: HTMLElement): { x: number, y: number } {
+  const box = element.getBoundingClientRect()
+  return {
+    x: (event.clientX - box.left) / box.width,
+    y: (event.clientY - box.top) / box.height,
+  }
+}
+
 function onFramePointer(event: PointerEvent) {
-  // Only tracked while the reticle needs it. Nothing else reads this, and
-  // recomputing a rectangle on every pointer move over the frame is a cost with
-  // nothing to show for it the rest of the time.
+  const element = event.currentTarget as HTMLElement
+  // Dragging a layer needs this on every move; the reticle needs it only while
+  // it is up. Outside both, recomputing a rectangle for every pointer move over
+  // the frame is a cost with nothing to show for it.
+  if (layerGestures.active.value) {
+    layerGestures.move(framePointAt(event, element))
+    return
+  }
   if (!picking.value) {
     framePointer.value = null
     return
   }
-  const box = (event.currentTarget as HTMLElement).getBoundingClientRect()
-  framePointer.value = {
-    x: (event.clientX - box.left) / box.width,
-    y: (event.clientY - box.top) / box.height,
-  }
+  framePointer.value = framePointAt(event, element)
 }
 const timeline = useTemplateRef('timeline')
 /** Armed by the crosshair button; the next click on the frame sets the focal plane. */
 const picking = ref(false)
 
 const canvas = useTemplateRef('canvas')
+/** The frame box, which is the coordinate space every layer gesture works in. */
+const frame = useTemplateRef('frame')
 const stagesRoot = useTemplateRef('stagesRoot')
 
 // Only to put the theme on the chrome; nothing here reads it.
@@ -1850,9 +1863,144 @@ const dock = useResizable({ key: 'timeline-height', initial: 232, min: 140, max:
 
 const gestures = useCameraGestures(
   settings,
-  () => !picking.value && !busy.value,
+  // Never while a layer is being dragged: one pointer, and whichever gesture
+  // claimed it keeps it. Orbiting the camera under a layer being placed would
+  // move the thing and the frame it is being placed against at once.
+  () => !picking.value && !busy.value && !layerGestures.active.value,
   () => renderer?.distanceFor(shotSettings.value) ?? 1,
 )
+
+const layerGestures = useLayerGestures({
+  settings,
+  worldPerFrame: depth => renderer?.worldPerFrame(shotSettings.value, depth) ?? null,
+  stageAspect,
+  apply: (id, patch) => updateLayer(id, patch),
+})
+
+/**
+ * The selected layer's outline on the frame, or null when there is nothing to
+ * draw one around.
+ *
+ * Recomputed from the same plane the renderer is about to draw, so the box
+ * cannot drift from the picture: every input it takes — the camera, the layer's
+ * placement, the instant — is already a dependency of that plane.
+ */
+const selectionCorners = computed<[number, number][] | null>(() => {
+  const layer = selectedLayer.value
+  if (!layer || !renderer) return null
+
+  if (layer.space === 'overlay') {
+    const quad = overlayQuads.value.find(entry => entry.id === layer.id)
+    if (!quad) return null
+    // Overlays are already frame fractions; only the y axis has to be turned
+    // over, because the frame runs down and the renderer's overlay runs up.
+    const left = quad.x - quad.halfWidth
+    const right = quad.x + quad.halfWidth
+    const top = 1 - (quad.y + quad.halfHeight)
+    const bottom = 1 - (quad.y - quad.halfHeight)
+    return [[left, top], [right, top], [right, bottom], [left, bottom]]
+  }
+
+  const plane = layerPlanes.value.find(entry => entry.id === layer.id)
+  return plane ? renderer.projectPlane(shotSettings.value, plane) : null
+})
+
+const selectionCentre = computed(() => {
+  const corners = selectionCorners.value
+  if (!corners?.length) return null
+  const sum = corners.reduce(([x, y], [cx, cy]) => [x + cx, y + cy], [0, 0])
+  return { x: sum[0] / corners.length, y: sum[1] / corners.length }
+})
+
+/**
+ * Which layer a point on the frame lands on, topmost first.
+ *
+ * Tested against the projected outline rather than against a rectangle, so a
+ * tilted layer is grabbed where it looks like it is. Reversed because the last
+ * layer in the list is drawn over the others, and clicking a stack has to reach
+ * the one on top.
+ */
+function layerAt(point: { x: number, y: number }): Layer | null {
+  for (let index = layers.value.length - 1; index >= 0; index--) {
+    const layer = layers.value[index]
+    if (!layer || !renderer) continue
+    const corners = cornersFor(layer)
+    if (corners && containsPoint(corners, point)) return layer
+  }
+  return null
+}
+
+function cornersFor(layer: Layer): [number, number][] | null {
+  if (layer.space === 'overlay') {
+    const quad = overlayQuads.value.find(entry => entry.id === layer.id)
+    if (!quad) return null
+    const left = quad.x - quad.halfWidth
+    const right = quad.x + quad.halfWidth
+    const top = 1 - (quad.y + quad.halfHeight)
+    const bottom = 1 - (quad.y - quad.halfHeight)
+    return [[left, top], [right, top], [right, bottom], [left, bottom]]
+  }
+  const plane = layerPlanes.value.find(entry => entry.id === layer.id)
+  return plane && renderer ? renderer.projectPlane(shotSettings.value, plane) : null
+}
+
+/** Winding test over a convex quad — every cross product on the same side. */
+function containsPoint(corners: [number, number][], point: { x: number, y: number }): boolean {
+  let sign = 0
+  for (let index = 0; index < corners.length; index++) {
+    const a = corners[index]!
+    const b = corners[(index + 1) % corners.length]!
+    const cross = (b[0] - a[0]) * (point.y - a[1]) - (b[1] - a[1]) * (point.x - a[0])
+    if (Math.abs(cross) < 1e-9) continue
+    const side = cross > 0 ? 1 : -1
+    if (sign === 0) sign = side
+    else if (side !== sign) return false
+  }
+  return true
+}
+
+/**
+ * A press on the frame: take the layer under it, or hand the drag to the camera.
+ *
+ * Selecting and starting to move are the same gesture on purpose. Requiring a
+ * click to select and then a second drag to move is the interaction every
+ * canvas tool abandoned years ago, and it costs a round trip on every single
+ * placement.
+ */
+function onFramePointerDown(event: PointerEvent) {
+  if (picking.value || busy.value) return
+  const element = event.currentTarget as HTMLElement
+  const point = framePointAt(event, element)
+  const hit = layerAt(point)
+
+  if (!hit) {
+    selectedId.value = null
+    gestures.onPointerDown(event)
+    return
+  }
+
+  selectedId.value = hit.id
+  const centre = selectionCentre.value ?? point
+  layerGestures.begin(hit, { kind: 'move' }, point, centre)
+  element.setPointerCapture(event.pointerId)
+}
+
+function onFrameGrab(grab: LayerGrab, event: PointerEvent) {
+  const layer = selectedLayer.value
+  const centre = selectionCentre.value
+  const element = frame.value
+  if (!layer || !centre || !element) return
+  layerGestures.begin(layer, grab, framePointAt(event, element), centre)
+  element.setPointerCapture(event.pointerId)
+}
+
+function onFramePointerUp(event: PointerEvent) {
+  if (layerGestures.active.value) {
+    layerGestures.end()
+    return
+  }
+  gestures.onPointerUp(event)
+}
 
 defineShortcuts({
   r: replay,
@@ -2008,22 +2156,43 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         class="relative flex min-h-0 flex-1 items-center justify-center p-8"
         @pointerdown.self="selectedId = null"
       >
+        <!--
+          The pointer is arbitrated here rather than on the canvas, because a
+          drag that starts on a layer has to keep receiving moves after it
+          leaves that layer — and the handles sit outside the canvas element.
+        -->
         <div
+          ref="frame"
           class="relative max-h-full max-w-full"
           :style="{ aspectRatio: `${settings.outputWidth} / ${settings.outputHeight}` }"
-          @pointermove="onFramePointer($event); onFocusHover($event)"
+          @pointerdown="onFramePointerDown"
+          @pointermove="onFramePointer($event); onFocusHover($event); gestures.onPointerMove($event)"
+          @pointerup="onFramePointerUp"
+          @pointercancel="onFramePointerUp"
           @pointerleave="framePointer = null"
         >
           <canvas
             ref="canvas"
             class="block h-full w-full touch-none border border-default"
-            :class="picking ? 'cursor-crosshair border-primary-500/50' : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
+            :class="picking
+              ? 'cursor-crosshair border-primary-500/50'
+              : layerGestures.active.value
+                ? 'cursor-grabbing'
+                : gestures.active.value ? 'cursor-grabbing' : 'cursor-grab'"
             @click="onFrameClick"
-            @pointerdown="gestures.onPointerDown"
-            @pointermove="gestures.onPointerMove"
-            @pointerup="gestures.onPointerUp"
-            @pointercancel="gestures.onPointerUp"
             @wheel="gestures.onWheel"
+          />
+
+          <!--
+            Only while there is a selection and nothing else owns the pointer.
+            Handles over a frame being focused would take the click the reticle
+            exists to receive.
+          -->
+          <LabHandles
+            v-if="selectionCorners && !picking"
+            :corners="selectionCorners"
+            @grab-corner="(index, event) => onFrameGrab({ kind: 'resize', corner: index }, event)"
+            @grab-rotate="event => onFrameGrab({ kind: 'rotate' }, event)"
           />
           <LabGuides
             v-if="guides"

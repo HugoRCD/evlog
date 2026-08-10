@@ -1,6 +1,7 @@
 import type { LayerEffect } from '~/utils/lab/effects'
 import type { Layer } from '~/utils/lab/layers'
 import type { LabSettings } from '~/utils/lab/settings'
+import type { LabMode } from '~/utils/lab/storage'
 
 /**
  * Undo and redo, over the document rather than over the actions.
@@ -18,6 +19,8 @@ import type { LabSettings } from '~/utils/lab/settings'
  */
 
 export interface LabHistoryState {
+  /** Which kind of document this was — an undo must not change the tool. */
+  mode: LabMode
   settings: LabSettings
   layers: Layer[]
   camera: LayerEffect[]
@@ -45,6 +48,7 @@ const COMMIT_DELAY = 400
  */
 function snapshot(state: LabHistoryState): LabHistoryState {
   return {
+    mode: state.mode,
     settings: { ...state.settings },
     layers: state.layers.map(layer => ({ ...layer, effects: layer.effects.map(effect => ({ ...effect })) })),
     camera: state.camera.map(effect => ({ ...effect })),

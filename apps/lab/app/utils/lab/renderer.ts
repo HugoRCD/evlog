@@ -62,6 +62,9 @@ export interface LayerPlane {
   emission: number
 }
 
+/** The part of a plane that decides where it lands on screen. */
+export type PlaneGeometry = Pick<LayerPlane, 'offsetX' | 'offsetY' | 'depth' | 'halfWidth' | 'halfHeight' | 'rotation'>
+
 const DEGREES = Math.PI / 180
 
 /**
@@ -417,6 +420,70 @@ export class LabRenderer {
    */
   distanceFor(settings: LabSettings): number {
     return this.camera(settings).distance
+  }
+
+  /**
+   * Where a plane's four corners land on the frame, as fractions with y down.
+   *
+   * The same projection the stage shader does, on the CPU, because a selection
+   * box has to sit exactly on the thing it selects — and under a tilt that
+   * outline is a general quadrilateral, not a rectangle. Anything drawn from a
+   * centre and a size would be square to the screen while the layer it claims to
+   * be around is not.
+   *
+   * Fractions rather than pixels so the caller can place handles against the
+   * frame element without knowing the render resolution.
+   *
+   * Null when any corner is level with or behind the camera: the projection is
+   * meaningless there, and half a box drawn from the corners that did resolve
+   * would point somewhere the layer is not.
+   */
+  projectPlane(settings: LabSettings, plane: PlaneGeometry): [number, number][] | null {
+    const { distance } = this.camera(settings)
+    const tanHalfFov = Math.tan((settings.fov * DEGREES) / 2)
+    const aspect = this.width / this.height
+
+    const basis = rotationMatrix(
+      settings.pitch * DEGREES,
+      settings.yaw * DEGREES,
+      (settings.roll + plane.rotation) * DEGREES,
+    )
+    const right: Vec3 = [basis[0] ?? 0, basis[1] ?? 0, basis[2] ?? 0]
+    const up: Vec3 = [basis[3] ?? 0, basis[4] ?? 0, basis[5] ?? 0]
+    const centre: Vec3 = [
+      settings.panX + plane.offsetX,
+      settings.panY + plane.offsetY,
+      -(distance + plane.depth),
+    ]
+
+    const corners: [number, number][] = []
+    for (const [u, v] of [[-1, 1], [1, 1], [1, -1], [-1, -1]] as const) {
+      const x = centre[0] + right[0] * u * plane.halfWidth + up[0] * v * plane.halfHeight
+      const y = centre[1] + right[1] * u * plane.halfWidth + up[1] * v * plane.halfHeight
+      const z = centre[2] + right[2] * u * plane.halfWidth + up[2] * v * plane.halfHeight
+      if (-z <= 1e-3) return null
+
+      const ndcX = x / (-z * tanHalfFov * aspect)
+      const ndcY = y / (-z * tanHalfFov)
+      corners.push([ndcX * 0.5 + 0.5, 0.5 - ndcY * 0.5])
+    }
+    return corners
+  }
+
+  /**
+   * How much world a whole frame covers at a given depth.
+   *
+   * What turns a drag across the frame into a displacement of the thing being
+   * dragged. It falls off with depth because perspective does: a layer pushed
+   * back has to travel further in world units to cross the same distance on
+   * screen, and a drag that ignored that would slide a distant layer under the
+   * pointer instead of with it.
+   */
+  worldPerFrame(settings: LabSettings, depth: number): { x: number, y: number } {
+    const { distance } = this.camera(settings)
+    const tanHalfFov = Math.tan((settings.fov * DEGREES) / 2)
+    const height = 2 * tanHalfFov * Math.max(distance + depth, 1e-3)
+    return { x: height * (this.width / this.height), y: height }
   }
 
   private renderStage(settings: LabSettings, planes: LayerPlane[]) {
