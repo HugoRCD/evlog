@@ -163,6 +163,10 @@ describe('datadog adapter', () => {
     it('falls back to service when method and path are missing', () => {
       expect(formatDatadogMessageLine(createTestEvent())).toBe('INFO test-service')
     })
+
+    it('falls back to the level alone when there is no service either', () => {
+      expect(formatDatadogMessageLine(createTestEvent({ service: '' }))).toBe('INFO')
+    })
   })
 
   describe('toDatadogLog', () => {

@@ -1451,12 +1451,16 @@ export interface EvlogEveInstrumentationOptions {
  * export default defineInstrumentation({
  *   setup: ({ agentName }) => registerOTel({ serviceName: agentName }),
  *   events: {
- *     'step.started': input => ({
- *       runtimeContext: {
- *         ...evlogRuntimeContext(input),
- *         posthog_distinct_id: input.session.auth.current?.principalId ?? '',
- *       },
- *     }),
+ *     'step.started': (input) => {
+ *       const principalId = input.session.auth.current?.principalId
+ *       return {
+ *         runtimeContext: {
+ *           ...evlogRuntimeContext(input),
+ *           // Omitted rather than blank: a backend reads an empty id as an id.
+ *           ...(principalId ? { posthog_distinct_id: principalId } : {}),
+ *         },
+ *       }
+ *     },
  *   },
  * })
  * ```

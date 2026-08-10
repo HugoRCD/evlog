@@ -15,3 +15,19 @@ Before adding a capability (tool, connection, skill, schedule, subagent), read
 `docs/capability-placement.md`: it decides where the capability lives and holds
 the two-layer rule (files under `agent/` are wiring; logic goes in `agent/lib/`
 with a colocated test).
+
+## Evals cost real money
+
+`pnpm eval` runs the agent against a live model. Twenty evals is a real bill, so
+the CI triggers are narrow — see `.github/workflows/evi-evals.yml` for the full
+list and the guards.
+
+A PR touching `agent/` (excluding tests) or an `.eval.ts` file runs the `fast`
+subset automatically. That is deliberate: Evi opens PRs on her own behaviour,
+and an agent cannot be relied on to label its own regression risk. Keep the PR
+a draft while it is in flux — drafts never run — and add `skip-evals` when a
+watched path changed but the behaviour did not.
+
+Swapping the model goes through `EVI_MODEL`, not an edit to `agent.ts`: run the
+workflow manually against the candidate, compare cost, latency and pass rate in
+PostHog (`evi_eval_run`, broken down by `model`), then commit the swap.

@@ -3,6 +3,7 @@ import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
+import { formatEventSummary } from '../shared/event'
 
 export interface DatadogConfig {
   /** Datadog API key with Logs intake permission */
@@ -65,19 +66,9 @@ function deepRenameNumericHttpStatus(value: unknown): unknown {
  */
 export function formatDatadogMessageLine(event: WideEvent): string {
   const levelU = event.level.toUpperCase()
-  const method = typeof event.method === 'string' ? event.method : ''
-  const path = typeof event.path === 'string' ? event.path : ''
-  const code = typeof event.status === 'number' ? event.status : undefined
-
-  const head = [levelU, method, path].filter(p => p.length > 0).join(' ')
-  let line = code !== undefined
-    ? (head ? `${head} (${code})` : `${levelU} (${code})`)
-    : (head || levelU)
-
-  if (!method && !path && line === levelU && event.service) {
-    line = `${levelU} ${event.service}`
-  }
-  return line
+  const summary = formatEventSummary(event)
+  if (summary) return `${levelU} ${summary}`
+  return event.service ? `${levelU} ${event.service}` : levelU
 }
 
 /**

@@ -3,12 +3,29 @@ import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
-import { toOtlpAttributeValue } from '../shared/event'
+import { formatEventSummary, toOtlpAttributeValue } from '../shared/event'
 import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from '../shared/severity'
+
+/**
+ * Shape of the emitted log record.
+ *
+ * - `'json'` — body carries the serialized event; each top-level field becomes
+ *   one attribute, nested ones as a JSON string.
+ * - `'compact'` — body is a one-line summary; nested fields flatten to dotted
+ *   attributes (`user.id`), which is what backends facet and filter on.
+ *
+ * `'compact'` becomes the default in the next major.
+ */
+export type OTLPRecordShape = 'json' | 'compact'
 
 export interface OTLPConfig {
   /** OTLP HTTP endpoint (e.g., http://localhost:4318) */
   endpoint: string
+  /**
+   * Log record shape. Default: `'json'`.
+   * @see {@link OTLPRecordShape}
+   */
+  recordShape?: OTLPRecordShape
   /** Override service name (defaults to event.service) */
   serviceName?: string
   /** Additional resource attributes */
@@ -62,6 +79,7 @@ interface ExportLogsServiceRequest {
 
 const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
   { key: 'endpoint', env: ['NUXT_OTLP_ENDPOINT', 'OTEL_EXPORTER_OTLP_ENDPOINT', 'OTLP_ENDPOINT'] },
+  { key: 'recordShape' },
   { key: 'serviceName', env: ['NUXT_OTLP_SERVICE_NAME', 'OTEL_SERVICE_NAME'] },
   { key: 'headers' },
   { key: 'resourceAttributes' },
@@ -73,10 +91,43 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
 // the shared OTLP attribute encoder in `evlog/toolkit`.
 const toAttributeValue = toOtlpAttributeValue
 
+/** Recursive flattening is limited to these; everything else is serialized whole. */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+/**
+ * Flatten nested plain objects into dotted attribute keys — `ai.costUsd`,
+ * `error.message`. Arrays and non-plain objects are serialized as a single
+ * value; indexing an array into `tools.0.name` would turn a list into
+ * unbounded distinct attribute keys.
+ */
+function collectAttributes(
+  value: Record<string, unknown>,
+  prefix: string,
+  out: OTLPLogRecord['attributes'],
+): void {
+  for (const [key, child] of Object.entries(value)) {
+    if (child === undefined || child === null) continue
+    const path = prefix ? `${prefix}.${key}` : key
+    // An empty object flattens to no attribute at all, which would drop the
+    // field, so it is serialized like any other leaf.
+    if (isPlainObject(child) && Object.keys(child).length > 0) {
+      collectAttributes(child, path, out)
+      continue
+    }
+    out.push({ key: path, value: toAttributeValue(child) })
+  }
+}
+
 /**
  * Convert an evlog WideEvent to an OTLP LogRecord.
+ *
+ * @param shape See {@link OTLPRecordShape}. Defaults to `'json'`.
  */
-export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
+export function toOTLPLogRecord(event: WideEvent, shape: OTLPRecordShape = 'json'): OTLPLogRecord {
   const timestamp = new Date(event.timestamp).getTime() * 1_000_000 // Convert to nanoseconds
 
   // Extract known fields, rest goes to attributes
@@ -90,14 +141,13 @@ export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
   delete (rest as Record<string, unknown>).region
 
   const attributes: OTLPLogRecord['attributes'] = []
-
-  // Add all remaining event fields as attributes
-  for (const [key, value] of Object.entries(rest)) {
-    if (value !== undefined && value !== null) {
-      attributes.push({
-        key,
-        value: toAttributeValue(value),
-      })
+  if (shape === 'compact') {
+    collectAttributes(rest, '', attributes)
+  } else {
+    for (const [key, value] of Object.entries(rest)) {
+      if (value !== undefined && value !== null) {
+        attributes.push({ key, value: toAttributeValue(value) })
+      }
     }
   }
 
@@ -105,7 +155,11 @@ export function toOTLPLogRecord(event: WideEvent): OTLPLogRecord {
     timeUnixNano: String(timestamp),
     severityNumber: OTEL_SEVERITY_NUMBER[level] ?? 9,
     severityText: OTEL_SEVERITY_TEXT[level] ?? 'INFO',
-    body: { stringValue: JSON.stringify(event) },
+    body: {
+      stringValue: shape === 'compact'
+        ? formatEventSummary(event) || event.service
+        : JSON.stringify(event),
+    },
     attributes,
   }
 
@@ -280,8 +334,8 @@ function buildOTLPPayload(events: WideEvent[], config: OTLPConfig): ExportLogsSe
       resource: { attributes: buildResourceAttributes(groupEvents[0]!, config) },
       scopeLogs: [
         {
-          scope: { name: 'evlog', version: '1.0.0' },
-          logRecords: groupEvents.map(toOTLPLogRecord),
+          scope: { name: 'evlog' },
+          logRecords: groupEvents.map(event => toOTLPLogRecord(event, config.recordShape)),
         },
       ],
     })),

@@ -1,0 +1,121 @@
+name: evi evals
+
+# Behavioural tests for the Evi agent. Every run spends real gateway tokens on
+# a live model, so this is deliberately NOT part of `ci`. Only four paths
+# trigger it: `apps/evi/agent/**` minus its tests, `apps/evi/evals/**/*.eval.ts`,
+# and this file. Everything else under apps/evi is inert.
+#
+# What triggers a run, and what it costs:
+#   - a PR that changes the agent itself or an eval — the 12 `fast` evals.
+#     Automatic, because the PR author is often Evi: an agent opening a PR on
+#     its own behaviour cannot be trusted to remember a label.
+#   - a push to main touching the same paths — the full 20. One trend point per
+#     behaviour change that shipped, which is what makes cost and latency
+#     comparable over time.
+#   - a weekly cron — the full 20, to catch drift that lands without a commit
+#     (a provider silently updating the model behind the id).
+#   - workflow_dispatch with a model — the full 20 against a candidate, to
+#     compare cost, latency and pass rate before swapping agent.ts.
+#
+# The guards on the automatic path, in order of how much they save:
+#   - paths: wiring, instructions, tools, skills and evals only. Tests, docs
+#     and every other app never trigger a run.
+#   - drafts are skipped, so a work-in-progress branch does not buy a suite per
+#     push. Marking it ready runs one.
+#   - `skip-evals` on the PR opts out when the author knows the change is inert
+#     but touched a watched path.
+#   - fork PRs and PRs from authors without write access never run: the job
+#     executes checked-out code with the gateway and PostHog secrets.
+#   - concurrency cancels the previous run on the same ref, so a burst of
+#     pushes costs one suite rather than one per push.
+#
+# Results reach PostHog as `evi_eval` / `evi_eval_run`, joined to the agent's
+# LLM traces by the eve session id. Spend is tagged `evi:env:eval` on the
+# gateway, so an eval bill is never confused with production traffic.
+
+on:
+  schedule:
+    - cron: '0 4 * * 1'
+  push:
+    branches:
+      - main
+    paths:
+      - 'apps/evi/agent/**'
+      - '!apps/evi/agent/**/*.test.ts'
+      - 'apps/evi/evals/**/*.eval.ts'
+      - '.github/workflows/evi-evals.yml'
+  # Same list as above — GitHub Actions does not support YAML anchors, so the
+  # two must be kept in step by hand.
+  pull_request:
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/evi/agent/**'
+      - '!apps/evi/agent/**/*.test.ts'
+      - 'apps/evi/evals/**/*.eval.ts'
+      - '.github/workflows/evi-evals.yml'
+  workflow_dispatch:
+    inputs:
+      model:
+        description: Model to run the suite against (defaults to the one in agent.ts)
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: evi-evals-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  evals:
+    # Drafts, opt-outs, fork PRs and untrusted authors never spend anything,
+    # and never reach the gateway or PostHog secrets. Evi is allowed by login:
+    # a GitHub App carries no author association.
+    if: |
+      github.event_name != 'pull_request' || (
+        github.event.pull_request.draft == false
+        && !contains(github.event.pull_request.labels.*.name, 'skip-evals')
+        && github.event.pull_request.head.repo.full_name == github.repository
+        && (
+          contains(fromJSON('["OWNER","MEMBER","COLLABORATOR"]'), github.event.pull_request.author_association)
+          || github.event.pull_request.user.login == 'evlogai[bot]'
+        )
+      )
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
+        with:
+          persist-credentials: false
+
+      # eve requires Node >= 24; the repo pins 22 for everything else.
+      - uses: ./.github/actions/setup
+        with:
+          node-version: '24'
+          filters: '--filter=evi...'
+
+      # apps/evi resolves `evlog/eve` and `evlog/posthog` through the workspace
+      # link, which points at dist.
+      - name: Build evlog
+        run: pnpm --filter evlog run build
+
+      - name: Run evals
+        run: >
+          pnpm --filter evi exec eve eval
+          ${{ github.event_name == 'pull_request' && '--tag fast' || '' }}
+          --junit evi-evals.xml
+        env:
+          EVE_RUN_MODE: eval
+          EVI_MODEL: ${{ inputs.model }}
+          AI_GATEWAY_API_KEY: ${{ secrets.AI_GATEWAY_API_KEY }}
+          POSTHOG_API_KEY: ${{ secrets.POSTHOG_API_KEY }}
+          POSTHOG_HOST: ${{ secrets.POSTHOG_HOST }}
+
+      - name: Upload results
+        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: evi-evals-${{ github.run_id }}
+          path: apps/evi/evi-evals.xml
+          if-no-files-found: ignore
