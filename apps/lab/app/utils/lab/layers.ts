@@ -251,6 +251,21 @@ export function canJoin(a: Layer, b: Layer): boolean {
  * Returns null outside the clip's span so the renderer can skip it entirely
  * rather than issue a draw call for something nobody can see.
  */
+/**
+ * Where a layer is when nothing is animating it.
+ *
+ * A shot has no timeline, so a layer has no span to be inside or outside of and
+ * no ramp to be part-way through — it is simply there, at the placement it was
+ * given. Entrances and exits are kept on the layer rather than stripped, so a
+ * document carried into a video still has them; they just describe nothing a
+ * single frame can show.
+ */
+export function layerAtRest(layer: Layer): EffectResult | null {
+  const opacity = Math.max(0, Math.min(1, layer.opacity))
+  if (opacity <= 0.001) return null
+  return { opacity, offsetX: 0, offsetY: 0, depth: 0, scale: 1, rotation: 0 }
+}
+
 export function layerStateAt(layer: Layer, time: number): EffectResult | null {
   if (time < layer.start || time > layerEnd(layer)) return null
 

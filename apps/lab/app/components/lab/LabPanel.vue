@@ -3,6 +3,7 @@ import type { LabMenuAction } from './LabMenu.vue'
 import { DEFAULT_SETTINGS, FRAME_RATES, HINTS, OUTPUT_PRESETS, RANGES, SPEEDS, VIEWPORTS, frameCountFor, outputDuration } from '~/utils/lab/settings'
 import type { AsciiSet, LabSettings, RangedKey, StylizeMode } from '~/utils/lab/settings'
 import { ASCII_MIN_CELL } from '~/utils/lab/ascii'
+import type { LabMode } from '~/utils/lab/storage'
 import type { Layer } from '~/utils/lab/layers'
 import type { LayerEffect } from '~/utils/lab/effects'
 
@@ -17,6 +18,8 @@ const props = defineProps<{
   linkCopied: boolean
   /** Briefly true after the frame is copied to the clipboard. */
   pngCopied: boolean
+  /** A shot has no timeline, so everything about timing is moot in one. */
+  mode: LabMode
   selectedLayer: Layer | null
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
@@ -636,30 +639,38 @@ const CONTAINERS = [
           @update:model-value="setOutput(String($event))"
         />
 
-        <LabChoice
-          label="Frame rate"
-          :options="RATE_OPTIONS"
-          :model-value="settings.fps"
-          @update:model-value="settings.fps = Number($event)"
-        />
+        <!--
+          Everything about timing, and nothing else in this section. A shot is
+          one frame: it has no rate, no speed, no container and nothing to hold
+          after it ends, and four controls that decide nothing are four ways to
+          doubt that the panel is describing the thing on screen.
+        -->
+        <template v-if="mode === 'video'">
+          <LabChoice
+            label="Frame rate"
+            :options="RATE_OPTIONS"
+            :model-value="settings.fps"
+            @update:model-value="settings.fps = Number($event)"
+          />
 
-        <LabChoice
-          label="Speed"
-          :hint="HINTS.speed"
-          :options="SPEED_OPTIONS"
-          :model-value="settings.speed"
-          @update:model-value="settings.speed = Number($event)"
-        />
+          <LabChoice
+            label="Speed"
+            :hint="HINTS.speed"
+            :options="SPEED_OPTIONS"
+            :model-value="settings.speed"
+            @update:model-value="settings.speed = Number($event)"
+          />
 
-        <LabChoice
-          label="File"
-          :options="CONTAINERS"
-          :model-value="settings.container"
-          cards
-          @update:model-value="settings.container = String($event)"
-        />
+          <LabChoice
+            label="File"
+            :options="CONTAINERS"
+            :model-value="settings.container"
+            cards
+            @update:model-value="settings.container = String($event)"
+          />
 
-        <LabNumber v-model="settings.tail" label="Tail" v-bind="range('tail')" />
+          <LabNumber v-model="settings.tail" label="Tail" v-bind="range('tail')" />
+        </template>
 
         <!--
           The size is here rather than on a control: with the presets doing the
@@ -668,8 +679,14 @@ const CONTAINERS = [
           frame size out loud.
         -->
         <p class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
-          {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ frameCount }} frames ·
-          {{ segmentSeconds }}s of animation → {{ outputSeconds }}s of video
+          <template v-if="mode === 'video'">
+            {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ frameCount }} frames ·
+            {{ segmentSeconds }}s of animation → {{ outputSeconds }}s of video
+          </template>
+          <template v-else>
+            {{ settings.outputWidth }}×{{ settings.outputHeight }} · one frame, rendered at
+            twice that and resolved down
+          </template>
         </p>
       </LabSection>
     </div>
@@ -702,7 +719,12 @@ const CONTAINERS = [
       </div>
 
       <div v-else class="flex gap-1">
+        <!--
+          A shot exports one frame, so copying it is the whole of what this row
+          does and it takes the width the take's export would have had.
+        -->
         <button
+          v-if="mode === 'video'"
           type="button"
           class="flex-1 border border-primary-500/50 bg-primary-500/10 py-[7px] font-mono text-[10px] text-primary hover:bg-primary-500/20 transition-colors"
           @click="emit('exportVideo')"
@@ -719,9 +741,12 @@ const CONTAINERS = [
         <button
           type="button"
           class="border px-3 py-[7px] font-mono text-[10px] transition-colors"
-          :class="pngCopied
-            ? 'border-primary-500/50 text-primary'
-            : 'border-muted text-muted hover:border-accented hover:text-default'"
+          :class="[
+            mode === 'shot' ? 'flex-1' : '',
+            pngCopied
+              ? 'border-primary-500/50 text-primary'
+              : 'border-muted text-muted hover:border-accented hover:text-default',
+          ]"
           title="Copy the frame to the clipboard"
           @click="emit('copyPng')"
         >

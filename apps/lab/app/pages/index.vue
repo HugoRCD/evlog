@@ -26,7 +26,8 @@ import type { Container } from '~/utils/lab/record'
 import { DEFAULT_COMPONENT, resolveEntry } from '~/utils/lab/registry'
 import { DEFAULT_SETTINGS, PLATE_SCALE, frameCountFor, frameStep, outputDuration } from '~/utils/lab/settings'
 import { useSequenceDurations } from '~/utils/lab/sequence'
-import { MAX_SHARE_URL, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
+import { MAX_SHARE_URL, createDocument, resolveInitialDocument, saveStored, shareUrl } from '~/utils/lab/storage'
+import type { LabDocument, LabMode } from '~/utils/lab/storage'
 import {
   cloneLayer,
   constrainToTimeline,
@@ -35,6 +36,7 @@ import {
   isTimeVarying,
   createTextLayer,
   layerDepth,
+  layerAtRest,
   layerStateAt,
   layerTextureKey, layerEnd, layerOrigin, canJoin
 } from '~/utils/lab/layers'
@@ -66,14 +68,23 @@ import type { ProjectSummary } from '~/utils/lab/projects'
 const route = useRoute()
 const router = useRouter()
 
-// A link wins over the stored working copy; anything else resumes where the
-// last session left off.
+// A link wins over the stored working copy. With neither, there is nothing to
+// resume and the launcher asks what to make rather than guessing.
 const initial = resolveInitialDocument(route.query)
-const settings = ref(initial.settings)
-const layers = ref<Layer[]>(initial.layers)
+const blank = createDocument('shot')
+const mode = ref<LabMode>(initial?.mode ?? blank.mode)
+/** True until a document exists — the launcher covers the frame while it is. */
+const launching = ref(!initial)
+const settings = ref((initial ?? blank).settings)
+const layers = ref<Layer[]>((initial ?? blank).layers)
 const selectedId = ref<string | null>(null)
 /** Camera moves over the take. */
-const camera = ref(initial.camera)
+const camera = ref((initial ?? blank).camera)
+
+/** A shot is one frame, so nothing in it is ever part-way through an entrance. */
+const stateOf = (layer: Layer) => (
+  mode.value === 'shot' ? layerAtRest(layer) : layerStateAt(layer, playhead.value)
+)
 /**
  * Clips whose length is still a guess, waiting on the animation to state its own.
  *
@@ -86,9 +97,13 @@ const camera = ref(initial.camera)
  */
 const awaitingFit = new Set<string>()
 
-// A fresh session opens on a built-in animation rather than an empty frame:
-// it is the fastest way to see what the lab does.
-if (!layers.value.length) {
+// An opened document that came in empty gets the built-in animation, because a
+// blank frame is the one state this tool cannot show you anything with.
+//
+// Never while the launcher is up: seeding there would write a document nobody
+// asked for, and the next reload would find it and skip the question entirely —
+// which is the exact behaviour the launcher exists to end.
+if (!launching.value && !layers.value.length) {
   const first = createComponentLayer(DEFAULT_COMPONENT, 0, settings.value.timelineLength)
   awaitingFit.add(first.id)
   layers.value = [first]
@@ -100,7 +115,7 @@ if (!layers.value.length) {
 // Having adopted the link, drop its query. The address bar then only ever holds
 // a URL somebody deliberately produced, and never a running log of every slider
 // that happened to be touched.
-if (initial.fromLink) router.replace({ query: {} })
+if (initial?.fromLink) router.replace({ query: {} })
 
 const showSource = ref(false)
 const panelVisible = ref(true)
@@ -249,7 +264,7 @@ watch([layers, () => settings.value.tail], () => {
 
 const stageAspect = computed(() => settings.value.stageWidth / settings.value.stageHeight)
 function currentDocument() {
-  return { settings: settings.value, layers: layers.value, camera: camera.value }
+  return { mode: mode.value, settings: settings.value, layers: layers.value, camera: camera.value }
 }
 
 /**
@@ -260,6 +275,7 @@ function currentDocument() {
  * ever shown.
  */
 const { undo, redo, canUndo, canRedo } = useLabHistory(currentDocument, (state) => {
+  mode.value = state.mode
   settings.value = state.settings
   layers.value = state.layers
   camera.value = state.camera
@@ -677,6 +693,9 @@ onMounted(async () => {
   // so without this the take opened on the top of a sequence the timeline says
   // was already part-way through — and stayed wrong until the playhead moved.
   if (stageOrigin.value < 0) await seekTo(playhead.value)
+
+  // The launcher lists them, so they have to be in hand before it is shown.
+  await refreshProjects()
 })
 
 onBeforeUnmount(() => {
@@ -905,7 +924,7 @@ const overlayQuads = computed<OverlayQuad[]>(() => {
   const frameAspect = settings.value.outputWidth / settings.value.outputHeight
   return layers.value.flatMap((layer) => {
     if (layer.space !== 'overlay') return []
-    const state = layerStateAt(layer, playhead.value)
+    const state = stateOf(layer)
     const aspect = layerAspects.value.get(layer.id)
     if (!state || !aspect) return []
 
@@ -934,7 +953,7 @@ const layerPlanes = computed<LayerPlane[]>(() => {
 
   return layers.value.flatMap((layer) => {
     if (layer.space === 'overlay') return []
-    const state = layerStateAt(layer, playhead.value)
+    const state = stateOf(layer)
     const aspect = layerAspects.value.get(layer.id)
     if (!state || !aspect) return []
 
@@ -1480,6 +1499,51 @@ function saveCurrentProject(name: string, overwrite: string | null) {
   })
 }
 
+/**
+ * Put a document on screen, whatever it came from.
+ *
+ * The launcher, opening a project and importing a file all land here, so the
+ * things that have to happen alongside the swap — dropping the selection,
+ * throwing away the cached plate, remounting the stage — are stated once rather
+ * than remembered three times.
+ */
+function applyDocument(document: LabDocument) {
+  mode.value = document.mode
+  settings.value = document.settings
+  layers.value = document.layers
+  camera.value = document.camera
+  selectedId.value = null
+  launching.value = false
+  // Everything staged is new, so nothing on screen belongs to it.
+  invalidateStageMarkup()
+  stageKey.value++
+}
+
+/**
+ * Start something, from the launcher.
+ *
+ * Either kind opens on the default animation rather than on an empty frame. The
+ * one thing this tool is for is filming what the docs already have, and a black
+ * rectangle asks a second question before anything can happen — in a video it
+ * is also the only clip there is to trim, which is where a take starts anyway.
+ *
+ * Written to storage immediately, and that is not an optimisation: the launcher
+ * only shows when there is no working copy, so a document that exists on screen
+ * but not on disk sends the next reload straight back to the question.
+ */
+function startDocument(kind: LabMode) {
+  const document = createDocument(kind)
+  if (DEFAULT_COMPONENT) {
+    const first = createComponentLayer(DEFAULT_COMPONENT, 0, document.settings.timelineLength)
+    awaitingFit.add(first.id)
+    document.layers = [first]
+  }
+  applyDocument(document)
+  setActiveProject(null)
+  saveStored(document)
+  void seekTo(0)
+}
+
 function openStoredProject(id: string) {
   void runProjectAction(async () => {
     const document = await openProject(id)
@@ -1487,15 +1551,9 @@ function openStoredProject(id: string) {
       error.value = 'That project could not be read.'
       return
     }
-    settings.value = document.settings
-    layers.value = document.layers
-    camera.value = document.camera
-    selectedId.value = null
+    applyDocument(document)
     setActiveProject(id)
     projectsOpen.value = false
-    // Everything on the timeline is new, so nothing on screen belongs to it.
-    invalidateStageMarkup()
-    stageKey.value++
     await seekTo(0)
   })
 }
@@ -2058,7 +2116,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         enough to read as a divider and a target thin enough to be fiddly.
       -->
       <div
-        v-show="panelVisible"
+        v-show="panelVisible && mode === 'video'"
         class="group/split relative h-1.5 shrink-0 cursor-ns-resize"
         @pointerdown="dock.onPointerDown"
       >
@@ -2067,7 +2125,22 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
           :class="dock.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
         />
       </div>
+      <LabShotBar
+        v-if="mode === 'shot'"
+        v-show="panelVisible"
+        :layers
+        :selected-id
+        :moment="playhead"
+        :length="settings.timelineLength"
+        :has-component="Boolean(componentLayers.length)"
+        @seek="onScrub"
+        @select="selectedId = $event"
+        @add-text="addText"
+        @add-image="addMedia"
+        @remove="selectedId = $event; removeSelected()"
+      />
       <LabTimeline
+        v-if="mode === 'video'"
         v-show="panelVisible"
         ref="timeline"
         v-model:layers="layers"
@@ -2119,6 +2192,20 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
         :class="panel.dragging.value ? 'bg-primary-500' : 'bg-border group-hover/split:bg-primary-500/60'"
       />
     </div>
+    <!--
+      Over everything, including the panel: until a document exists there is
+      nothing for those controls to act on, and a panel full of live sliders
+      beside a question that has not been answered invites you to grade a shot
+      that is not there.
+    -->
+    <LabLauncher
+      v-if="launching"
+      :recent="projects"
+      @create="startDocument"
+      @open="openStoredProject"
+      @browse="launching = false; projectsOpen = true"
+    />
+
     <LabShortcuts v-model="shortcutsOpen" />
 
     <LabProjects
@@ -2145,6 +2232,7 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
       v-model:picking="picking"
       v-model:camera="camera"
       :style="{ width: `${panel.size.value}px` }"
+      :mode
       :link-copied
       :busy
       :progress
