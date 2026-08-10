@@ -24,6 +24,7 @@
     "drizzle-kit": "^0.31.10",
     "drizzle-orm": "^0.45.2",
     "evlog": "workspace:*",
+    "nostics": "^1.2.0",
     "nuxt": "^4.5.0",
     "nuxt-auth-utils": "^0.5.29",
     "nuxt-charts": "^2.2.0",

@@ -17,6 +17,7 @@
     "drizzle-orm": "^0.45.2",
     "evlog": "workspace:*",
     "mdc-syntax": "^1.0.0",
+    "nostics": "^1.2.0",
     "nuxt": "^4.4.2",
     "zod": "^4.4.3"
   }

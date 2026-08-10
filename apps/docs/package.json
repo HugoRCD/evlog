@@ -23,6 +23,7 @@
     "better-sqlite3": "^12.11.1",
     "docus": "^5.12.3",
     "motion-v": "^2.3.0",
+    "nostics": "^1.2.0",
     "nuxt": "^4.4.4",
     "nuxt-studio": "^1.7.0",
     "satori": "^0.28.0",
