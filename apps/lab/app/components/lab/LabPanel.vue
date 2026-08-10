@@ -650,13 +650,13 @@ const CONTAINERS = [
         <LabNumber v-model="settings.grain" label="Grain" v-bind="range('grain')" />
         <LabToggle v-model="settings.tonemap" label="Filmic tonemap" />
 
-        <div class="mt-2 flex items-center justify-between gap-3">
-          <span class="font-mono text-[11px] text-dimmed">Background</span>
-          <input
-            v-model="settings.background"
-            type="color"
-            class="h-[22px] w-[104px] cursor-pointer border border-muted bg-transparent"
-          >
+        <!--
+          No alpha here, and on the two duotone stops below. All three are read
+          by `hexToLinearRgb`, which takes six digits — and the backdrop of a
+          frame is not a thing that can be see-through anyway.
+        -->
+        <div class="mt-2">
+          <LabColour v-model="settings.background" label="Background" :alpha="false" />
         </div>
 
         <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
@@ -667,22 +667,9 @@ const CONTAINERS = [
           Only offered once there is something to colour. Two swatches above a
           control set to zero are two decisions nobody has been asked to make.
         -->
-        <div v-if="settings.duotone > 0" class="mt-2 flex items-center justify-between gap-3">
-          <span class="font-mono text-[11px] text-dimmed">Shadow · highlight</span>
-          <div class="flex shrink-0 gap-1">
-            <input
-              v-model="settings.duotoneShadow"
-              type="color"
-              class="h-[22px] w-[50px] cursor-pointer border border-muted bg-transparent"
-              title="The colour the darkest part of the picture becomes"
-            >
-            <input
-              v-model="settings.duotoneHighlight"
-              type="color"
-              class="h-[22px] w-[50px] cursor-pointer border border-muted bg-transparent"
-              title="The colour the brightest part becomes"
-            >
-          </div>
+        <div v-if="settings.duotone > 0" class="mt-2 flex flex-col gap-2">
+          <LabColour v-model="settings.duotoneShadow" label="Shadow" :alpha="false" />
+          <LabColour v-model="settings.duotoneHighlight" label="Highlight" :alpha="false" />
         </div>
 
       </LabSection>

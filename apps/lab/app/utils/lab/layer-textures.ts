@@ -61,7 +61,7 @@ function drawText(layer: Layer, stage: { width: number, height: number }, scale:
    * past the type it belonged to — and dragging a corner narrowed the column
    * until the line broke, which reads as the text being cut rather than sized.
    */
-  const hugs = layer.textFit === 'auto'
+  const hugs = (layer.textFit ?? 'auto') === 'auto'
   const lines: string[] = []
 
   if (hugs) {

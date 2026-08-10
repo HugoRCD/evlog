@@ -86,9 +86,8 @@ export interface Layer {
    * text wraps into it, which is what a paragraph wants and what a caption
    * never did.
    *
-   * Absent means fixed, because that is what every text layer written before
-   * this was, and re-flowing somebody's finished shot to introduce a default is
-   * not a default — it is an edit nobody asked for.
+   * Absent means auto. A caption is what this is nearly always used for and a
+   * paragraph is the exception, so the exception is the one that says so.
    */
   textFit?: 'auto' | 'fixed'
   /**
@@ -150,9 +149,6 @@ export function createTextLayer(start: number, duration: number): Layer {
     rotation: 0,
     opacity: 1,
     text: 'evlog',
-    // New type hugs. A caption is the common case and a paragraph is the rare
-    // one, and only one of the two is annoying to discover by accident.
-    textFit: 'auto',
     fontSize: 0.12,
     color: '#ffffff',
     weight: 500,

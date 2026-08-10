@@ -182,12 +182,14 @@ const TEXT_TOGGLES = [
         >
           <UIcon :name="alignment.icon" class="size-3" />
         </button>
-        <input
-          :value="layer.color ?? '#ffffff'"
-          type="color"
-          class="h-6 w-12 shrink-0 cursor-pointer border border-muted bg-transparent"
-          @input="emit('update', { color: ($event.target as HTMLInputElement).value })"
-        >
+      </div>
+
+      <div class="mb-2">
+        <LabColour
+          label="Colour"
+          :model-value="layer.color ?? '#ffffff'"
+          @update:model-value="emit('update', { color: $event })"
+        />
       </div>
 
       <!--
@@ -201,7 +203,7 @@ const TEXT_TOGGLES = [
           type="button"
           data-cuelume-press
           class="flex-1 border py-1 font-mono text-[10px] transition-colors"
-          :class="(layer.textFit ?? 'fixed') === fit.value
+          :class="(layer.textFit ?? 'auto') === fit.value
             ? 'border-primary-500/60 text-primary'
             : 'border-muted text-dimmed hover:border-accented hover:text-toned'"
           :title="fit.hint"
@@ -217,7 +219,7 @@ const TEXT_TOGGLES = [
         width below is the one that sizes it.
       -->
       <LabNumber
-        v-if="(layer.textFit ?? 'fixed') === 'fixed'"
+        v-if="(layer.textFit ?? 'auto') === 'fixed'"
         :model-value="layer.fontSize ?? 0.12"
         label="Size"
         :min="0.01"
@@ -293,14 +295,12 @@ const TEXT_TOGGLES = [
         :default="0"
         @update:model-value="emit('update', { stroke: $event })"
       />
-      <div v-if="(layer.stroke ?? 0) > 0" class="mb-2 flex items-center gap-2">
-        <span class="font-mono text-[10px] text-dimmed">Outline colour</span>
-        <input
-          :value="layer.strokeColor ?? '#000000'"
-          type="color"
-          class="ml-auto h-6 w-12 shrink-0 border border-muted bg-transparent"
-          @input="emit('update', { strokeColor: ($event.target as HTMLInputElement).value })"
-        >
+      <div v-if="(layer.stroke ?? 0) > 0" class="mb-2">
+        <LabColour
+          label="Outline colour"
+          :model-value="layer.strokeColor ?? '#000000'"
+          @update:model-value="emit('update', { strokeColor: $event })"
+        />
       </div>
     </template>
 
