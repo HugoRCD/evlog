@@ -60,8 +60,8 @@ selects the sending line; irrelevant while the Photon project has one number.
 summer (BST) and drifts to 05:00 in winter (GMT). `eve dev` never fires crons;
 `POST /eve/v1/dev/schedules/digest` triggers one locally.
 
-**The upstream-sync schedule turn pushes feature branches without an approval
-card.** The push is inert: it only creates a branch, `validatePushBranch`
+**The upstream-sync and self-review schedule turns push feature branches
+without an approval card.** The push is inert: it only creates a branch, `validatePushBranch`
 refuses `main`/`master`, and the draft PR referencing the branch carries the
 card. Schedule turns are `eve:app`, not the maintainer, so
 `github__createPullRequest` still posts an approval card to the thread.
