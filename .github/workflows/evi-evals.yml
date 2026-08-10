@@ -5,17 +5,27 @@ name: evi evals
 # because a file under apps/evi changed.
 #
 # What triggers a run, and what it costs:
-#   - a PR labelled `evals`, from this repo only — the 12 `fast` evals. Opt-in,
-#     the same shape as the `e2e` label, because the author is the one who
-#     knows a change alters behaviour rather than wording.
-#   - a push to main that touched the agent itself (instructions, tools,
-#     skills, model) — the full 20. One trend point per behaviour change that
-#     actually shipped, which is what makes cost and latency comparable over
-#     time. Test-only edits are excluded.
+#   - a PR that changes the agent itself or an eval — the 12 `fast` evals.
+#     Automatic, because the PR author is often Evi: an agent opening a PR on
+#     its own behaviour cannot be trusted to remember a label.
+#   - a push to main touching the same paths — the full 20. One trend point per
+#     behaviour change that shipped, which is what makes cost and latency
+#     comparable over time.
 #   - a weekly cron — the full 20, to catch drift that lands without a commit
 #     (a provider silently updating the model behind the id).
 #   - workflow_dispatch with a model — the full 20 against a candidate, to
 #     compare cost, latency and pass rate before swapping agent.ts.
+#
+# The guards on the automatic path, in order of how much they save:
+#   - paths: wiring, instructions, tools, skills and evals only. Tests, docs
+#     and every other app never trigger a run.
+#   - drafts are skipped, so a work-in-progress branch does not buy a suite per
+#     push. Marking it ready runs one.
+#   - `skip-evals` on the PR opts out when the author knows the change is inert
+#     but touched a watched path.
+#   - fork PRs never run: they get no secrets, and would fail anyway.
+#   - concurrency cancels the previous run on the same ref, so a burst of
+#     pushes costs one suite rather than one per push.
 #
 # Results reach PostHog as `evi_eval` / `evi_eval_run`, joined to the agent's
 # LLM traces by the eve session id. Spend is tagged `evi:env:eval` on the
@@ -30,9 +40,17 @@ on:
     paths:
       - 'apps/evi/agent/**'
       - '!apps/evi/agent/**/*.test.ts'
+      - 'apps/evi/evals/**/*.eval.ts'
       - '.github/workflows/evi-evals.yml'
+  # Same list as above — GitHub Actions does not support YAML anchors, so the
+  # two must be kept in step by hand.
   pull_request:
-    types: [labeled, synchronize, opened]
+    types: [opened, synchronize, reopened, ready_for_review]
+    paths:
+      - 'apps/evi/agent/**'
+      - '!apps/evi/agent/**/*.test.ts'
+      - 'apps/evi/evals/**/*.eval.ts'
+      - '.github/workflows/evi-evals.yml'
   workflow_dispatch:
     inputs:
       model:
@@ -49,10 +67,11 @@ concurrency:
 
 jobs:
   evals:
-    # Unlabelled and fork PRs never spend anything.
+    # Drafts, opt-outs and fork PRs never spend anything.
     if: |
       github.event_name != 'pull_request' || (
-        contains(github.event.pull_request.labels.*.name, 'evals')
+        github.event.pull_request.draft == false
+        && !contains(github.event.pull_request.labels.*.name, 'skip-evals')
         && github.event.pull_request.head.repo.full_name == github.repository
       )
     runs-on: ubuntu-latest

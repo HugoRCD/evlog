@@ -36,6 +36,7 @@ scope.
 - docs (the documentation site)
 - dx (developer experience improvements)
 - elysia (Elysia plugin)
+- evals (Evi eval suite)
 - eve (eve agent integration)
 - evi (Evi agent)
 - express (Express middleware)

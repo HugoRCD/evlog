@@ -45,6 +45,7 @@ jobs:
             docs
             dx
             elysia
+            evals
             eve
             evi
             express

@@ -19,14 +19,14 @@ with a colocated test).
 ## Evals cost real money
 
 `pnpm eval` runs the agent against a live model. Twenty evals is a real bill, so
-CI never runs them on its own initiative — see `.github/workflows/evi-evals.yml`
-for what triggers a run.
+the CI triggers are narrow — see `.github/workflows/evi-evals.yml` for the full
+list and the guards.
 
-Changing anything under `agent/` that alters behaviour, cost, or latency
-(instructions, tools, skills, model, reasoning effort) is what the suite exists
-to catch: label the PR `evals` to run the `fast` subset before merging. Wording
-and test-only changes do not need it — a push to main that touches `agent/`
-runs the full suite anyway.
+A PR touching `agent/` (excluding tests) or an `.eval.ts` file runs the `fast`
+subset automatically. That is deliberate: Evi opens PRs on her own behaviour,
+and an agent cannot be relied on to label its own regression risk. Keep the PR
+a draft while it is in flux — drafts never run — and add `skip-evals` when a
+watched path changed but the behaviour did not.
 
 Swapping the model goes through `EVI_MODEL`, not an edit to `agent.ts`: run the
 workflow manually against the candidate, compare cost, latency and pass rate in
