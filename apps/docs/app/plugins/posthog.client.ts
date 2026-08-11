@@ -17,12 +17,10 @@ export default defineNuxtPlugin(() => {
     api_host: '/_ph',
     ui_host: 'https://eu.posthog.com',
     cookieless_mode: 'always',
+    // Carries `capture_pageview: 'history_change'`, so posthog-js already
+    // captures every SPA navigation. A router hook on top of it counts each
+    // page twice.
     defaults: '2026-05-30',
     capture_exceptions: true,
-  })
-
-  const router = useRouter()
-  router.afterEach((to) => {
-    posthog.capture('$pageview', { $current_url: to.fullPath })
   })
 })
