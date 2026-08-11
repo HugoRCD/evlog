@@ -1,5 +1,38 @@
 # evlog
 
+## 2.26.0
+
+### Minor Changes
+
+- [#556](https://github.com/HugoRCD/evlog/pull/556) [`15b292d`](https://github.com/HugoRCD/evlog/commit/15b292d2e824f90738b69ccdfb3ba41da3710f16) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Link PostHog logs to people and session replays, and add a compact OTLP record shape.
+
+  The PostHog adapter now sends `posthogDistinctId` (from `userId`) and `sessionId` as log attributes, which is how PostHog surfaces a log on a person's profile and links it to their session replay. Both sources are configurable and accept dot paths:
+
+  ```ts
+  createPostHogDrain({
+    distinctIdField: "user.id",
+    sessionIdField: "session.id",
+  });
+  ```
+
+  In `mode: 'events'`, events without a resolvable identity are now sent as anonymous PostHog events (`$process_person_profile: false`) instead of being attributed to a person named after the service. A numeric `userId` is used as the identifier rather than discarded.
+
+  The `otlp`, `posthog`, and `hyperdx` adapters accept a new `recordShape` option. `'compact'` sends a one-line body (`POST /api/checkout (500)`) and flattens nested fields into dotted attributes (`user.id`, `ai.costUsd`) that backends can filter and break down by:
+
+  ```ts
+  createOTLPDrain({ recordShape: "compact" });
+  ```
+
+  In `mode: 'events'`, `'compact'` flattens the same way, so nested fields become properties the PostHog UI can filter and break down by rather than one opaque object.
+
+  The default stays `'json'` — the whole event in the body, one attribute per top-level field, nested properties untouched — so existing records and the queries built on them are unchanged. `'compact'` becomes the default in the next major.
+
+### Patch Changes
+
+- [`ebed9cf`](https://github.com/HugoRCD/evlog/commit/ebed9cf8936672552ebb2ed125f3722b53c183ba) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Qualify the eve turn `requestId` with its session id.
+
+  eve numbers turns within a session, so `turn_0` is the first turn of every session. Recording it as `requestId` made the field non-unique — every single-turn session produced the same value, which is unusable as a correlation key in a drain. The wide event now reports `<sessionId>:<turnId>`, and `evlogRuntimeContext` stamps the same value on the model-call spans so a trace still joins to the event it belongs to. `eve.sessionId` and `eve.turnId` are unchanged.
+
 ## 2.25.0
 
 ### Minor Changes
