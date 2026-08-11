@@ -91,7 +91,7 @@ export function sensitivityBadge(sensitivity: Sensitivity): string {
 const BADGES: Record<string, string> = { money: '$', auth: 'A', pii: 'o' }
 
 /** What makes this entry point sensitive — `money`, `auth`, `pii`, or nothing. */
-export function sensitivityLabel(sensitivity: Sensitivity): string {
+export function sensitivityLabel(sensitivity: Sensitivity): 'money' | 'auth' | 'pii' | '' {
   if (sensitivity.reasons.some(reason => reason.startsWith('money:'))) return 'money'
   if (sensitivity.reasons.some(reason => reason.startsWith('auth:'))) return 'auth'
   if (sensitivity.level === 'medium') return 'pii'
