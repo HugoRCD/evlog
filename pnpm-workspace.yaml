@@ -24,6 +24,9 @@ overrides:
   # A second @types/react copy makes React.Key incompatible with itself in
   # examples/eve; a second rolldown splits @nuxt/icon into two peer variants
   # that shamefullyHoist then refuses to hoist, breaking apps/playground.
+  # A second vue copy leaves the Vercel bundle without vue/server-renderer,
+  # so every request reaching the docs SSR function exits 1.
+  vue: 3.5.40
   '@types/react': 19.2.17
   tsdown@0.22.8>rolldown: 1.2.0
   minimark: 0.2.0
