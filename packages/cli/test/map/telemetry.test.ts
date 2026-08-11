@@ -3,12 +3,14 @@ import type { BaselineComparison } from '../../src/lib/map/baseline'
 import { RULES } from '../../src/lib/map/rules/index'
 import {
   MAP_TELEMETRY_FIELDS,
+  kindField,
   mapTelemetryFieldNames,
   mapTelemetryFields,
   resolveGate,
   ruleField,
+  sensitiveField,
 } from '../../src/lib/map/telemetry'
-import type { RouteEntry, ScanResult } from '../../src/lib/map/types'
+import type { RouteEntry, RouteKind, ScanResult } from '../../src/lib/map/types'
 
 function route(overrides: Partial<RouteEntry> = {}): RouteEntry {
   return {
@@ -143,5 +145,115 @@ describe('map telemetry', () => {
        break loudly. */
     expect(MAP_TELEMETRY_FIELDS.mapFramework).toContain('tanstack-start')
     expect(MAP_TELEMETRY_FIELDS.mapGrade).toContain('at-risk')
+  })
+
+  it('counts entry points and dark entry points per kind', () => {
+    const out = fields({
+      scan: scan({
+        map: {
+          version: 1,
+          generatedAt: '',
+          framework: 'nuxt',
+          projectName: 'shop',
+          score: 50,
+          routes: [
+            route({ id: 'a', kind: 'page', checks: { 'page-error-handling': { status: 'fail' } } }),
+            route({ id: 'b', kind: 'page', checks: { 'page-error-handling': { status: 'pass' } } }),
+            route({ id: 'c', kind: 'api', checks: {} }),
+            route({ id: 'd', kind: 'cron', checks: {} }),
+          ],
+        },
+      }),
+    })
+
+    expect(out.mapKindPage).toBe(2)
+    expect(out.mapDarkPage).toBe(1)
+    expect(out.mapKindApi).toBe(1)
+    expect(out.mapDarkApi).toBe(1)
+    expect(out.mapKindCron).toBe(1)
+    expect(out.mapDarkCron).toBe(1)
+  })
+
+  it('omits kinds absent from the project instead of sending zero', () => {
+    const out = fields({
+      scan: scan({
+        map: {
+          version: 1,
+          generatedAt: '',
+          framework: 'nuxt',
+          projectName: 'shop',
+          score: 50,
+          routes: [route({ id: 'a', kind: 'cron' })],
+        },
+      }),
+    })
+
+    expect(out.mapKindCron).toBe(1)
+    expect(out.mapDarkCron).toBe(0)
+    expect('mapKindPage' in out).toBe(false)
+    expect('mapDarkPage' in out).toBe(false)
+    expect('mapKindWebsocket' in out).toBe(false)
+  })
+
+  it('reports a dark count of zero for a kind that is fully covered', () => {
+    const out = fields({
+      scan: scan({
+        map: {
+          version: 1,
+          generatedAt: '',
+          framework: 'nuxt',
+          projectName: 'shop',
+          score: 100,
+          routes: [route({ id: 'a', checks: { 'wide-event': { status: 'pass' }, 'context': { status: 'pass' } } })],
+        },
+      }),
+    })
+
+    expect(out.mapKindApi).toBe(1)
+    expect(out.mapDarkApi).toBe(0)
+  })
+
+  it('counts sensitive entry points and dark sensitive entry points by label', () => {
+    const out = fields({
+      scan: scan({
+        map: {
+          version: 1,
+          generatedAt: '',
+          framework: 'nuxt',
+          projectName: 'shop',
+          score: 50,
+          routes: [
+            route({ id: 'a', checks: {}, sensitivity: { level: 'high', reasons: ['money: imports stripe'] } }),
+            route({
+              id: 'b',
+              checks: { 'wide-event': { status: 'pass' }, 'context': { status: 'pass' } },
+              sensitivity: { level: 'high', reasons: ['auth: imports better-auth'] },
+            }),
+            route({ id: 'c', checks: {}, sensitivity: { level: 'medium', reasons: ['pii: write operation with sensitive fields'] } }),
+          ],
+        },
+      }),
+    })
+
+    expect(out.mapSensitiveMoney).toBe(1)
+    expect(out.mapDarkMoney).toBe(1)
+    expect(out.mapSensitiveAuth).toBe(1)
+    expect(out.mapDarkAuth).toBe(0)
+    expect(out.mapSensitivePii).toBe(1)
+    expect(out.mapDarkPii).toBe(1)
+    expect('mapSensitiveNone' in out).toBe(false)
+  })
+
+  it('discloses a total and a dark field for every kind and sensitivity label', () => {
+    const names = mapTelemetryFieldNames()
+    const kinds: readonly RouteKind[] = ['api', 'page', 'middleware', 'server-action', 'cron', 'websocket']
+    for (const kind of kinds) {
+      expect(names).toContain(kindField('Kind', kind))
+      expect(names).toContain(kindField('Dark', kind))
+    }
+    for (const label of ['money', 'auth', 'pii'] as const) {
+      expect(names).toContain(sensitiveField('Sensitive', label))
+      expect(names).toContain(sensitiveField('Dark', label))
+    }
   })
 })
