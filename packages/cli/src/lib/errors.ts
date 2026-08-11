@@ -168,6 +168,24 @@ export const cliErrors = defineErrorCatalog('cli', {
     link: 'https://evlog.dev/cli/ci',
     tags: ['map', 'baseline'],
   },
+  MAP_BASELINE_REF_NOT_FOUND: {
+    status: 404,
+    message: ({ ref }: { ref: string }) =>
+      `No git ref ${ref}`,
+    why: '--baseline git:<ref> reads the committed evlog.map.json from that ref, and the ref does not exist',
+    fix: 'Point --baseline at a branch or tag that exists, e.g. git:origin/main',
+    link: 'https://evlog.dev/cli/ci',
+    tags: ['map', 'baseline'],
+  },
+  MAP_BASELINE_NOT_COMMITTED: {
+    status: 404,
+    message: ({ ref }: { ref: string }) =>
+      `No evlog.map.json in ${ref}, and the ratchet needs a committed map`,
+    why: 'The ratchet compares against a committed evlog.map.json, so a file that was never tracked cannot be read through git',
+    fix: 'Commit one from the base branch: evlog map && git add -f evlog.map.json',
+    link: 'https://evlog.dev/cli/ci',
+    tags: ['map', 'baseline'],
+  },
   MAP_BASELINE_INVALID: {
     status: 400,
     message: ({ source, reason }: { source: string, reason: string }) =>

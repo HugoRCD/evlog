@@ -67,6 +67,18 @@ export interface BaselineComparison {
   removed: { path: string, method: string | null }[]
 }
 
+/** Whether a git ref resolves to a commit in this repository. */
+function refExists(cwd: string, ref: string): boolean {
+  try {
+    execFileSync('git', ['-C', cwd, 'rev-parse', '--verify', '--quiet', ref], {
+      stdio: ['ignore', 'ignore', 'ignore'],
+    })
+    return true
+  } catch {
+    return false
+  }
+}
+
 function readGitBaseline(cwd: string, ref: string): string | null {
   try {
     const prefix = execFileSync('git', ['-C', cwd, 'rev-parse', '--show-prefix'], {
@@ -107,8 +119,9 @@ function parseMapFile(raw: string, label: string): MapFile {
 export function loadBaseline(projectRoot: string, spec?: string): { map: MapFile, source: BaselineSource } {
   if (spec?.startsWith('git:')) {
     const ref = spec.slice(4) || 'HEAD'
+    if (!refExists(projectRoot, ref)) throw cliErrors.MAP_BASELINE_REF_NOT_FOUND({ ref })
     const raw = readGitBaseline(projectRoot, ref)
-    if (raw === null) throw cliErrors.MAP_BASELINE_NOT_FOUND({ source: spec })
+    if (raw === null) throw cliErrors.MAP_BASELINE_NOT_COMMITTED({ ref })
     return { map: parseMapFile(raw, spec), source: { kind: 'git', label: spec } }
   }
 
