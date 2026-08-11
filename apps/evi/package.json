@@ -13,7 +13,9 @@
     "eval": "EVE_RUN_MODE=eval eve eval",
     "start": "eve start",
     "typecheck": "tsc",
-    "test": "vitest run"
+    "test": "vitest run",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate": "drizzle-kit migrate"
   },
   "dependencies": {
     "@agent-browser/eve": "^0.33.2",
@@ -27,12 +29,15 @@
     "@vercel/oidc": "^3.8.2",
     "@vercel/otel": "^2.1.3",
     "ai": "^7.0.38",
+    "drizzle-orm": "^0.45.2",
     "eve": "^0.31.3",
     "evlog": "workspace:*",
+    "postgres": "^3.4.9",
     "zod": "^4.4.3"
   },
   "devDependencies": {
     "@types/node": "24.x",
+    "drizzle-kit": "^0.31.10",
     "microsandbox": "^0.6.8",
     "typescript": "7.0.2",
     "vitest": "^4.1.10"
