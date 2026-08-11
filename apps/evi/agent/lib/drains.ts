@@ -5,15 +5,10 @@ import { createDrainPipeline } from 'evlog/pipeline'
 type Destination = (batch: DrainContext[]) => void | Promise<void>
 
 /**
- * Fan one wide event out to several destinations.
+ * Fan one wide event out to several destinations, each with its own pipeline
+ * so a rejected send is retried against that destination alone.
  *
- * Each destination gets its own pipeline, so a rejected send is retried
- * against that destination alone: sharing one pipeline would either hide the
- * rejection from the retry policy or redeliver the batch to the destinations
- * that already accepted it.
- *
- * Returns `undefined` when there is no destination, which is the shape
- * `defineEvlogHook` expects for "no drain".
+ * Returns `undefined` when there is no destination.
  */
 export function createFanOutDrain(
   destinations: readonly Destination[],

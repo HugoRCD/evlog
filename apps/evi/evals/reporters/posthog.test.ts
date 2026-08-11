@@ -137,6 +137,19 @@ describe('PostHogReporter', () => {
     expect(runConfig).toMatchObject({ eventName: 'evi_eval_run' })
   })
 
+  it('reads the api key at report time, not at construction', async () => {
+    delete process.env.POSTHOG_API_KEY
+    const reporter = PostHogReporter(identity)
+    await reporter.onEvalComplete(evalResult())
+
+    // eve loads the environment files after importing evals.config.ts.
+    process.env.POSTHOG_API_KEY = 'phc_late'
+    await reporter.onRunComplete(summary)
+
+    expect(send).toHaveBeenCalledTimes(2)
+    expect(send.mock.calls[0]![1]).toMatchObject({ apiKey: 'phc_late' })
+  })
+
   it('stays silent without an api key', async () => {
     delete process.env.POSTHOG_API_KEY
 
