@@ -3,7 +3,9 @@ import { TOOL_NAME } from '../constants'
 import type { BaselineComparison } from './baseline'
 import { hasRegressed } from './baseline'
 import { RULES } from './rules/index'
-import type { CheckId, Framework, Grade, ScanResult } from './types'
+import { classifyRouteObservability } from './score'
+import { sensitivityLabel } from './sensitivity'
+import type { CheckId, Framework, Grade, RouteEntry, RouteKind, ScanResult } from './types'
 
 /**
  * What `evlog map` reports about a scan.
@@ -13,14 +15,22 @@ import type { CheckId, Framework, Grade, ScanResult } from './types'
  * can travel as values; everything read out of the user's source stays a count.
  *
  * The distribution these fields produce is what calibrates the tool itself: the
- * 90/70/50 grade bands are a guess until real scores land against them, and a
- * rule suppressed on most of the entry points it fires on is a bad rule rather
- * than bad code.
+ * 90/70/50 grade bands are a guess until real scores land against them, a rule
+ * suppressed on most of the entry points it fires on is a bad rule rather than
+ * bad code, and the kind split says whether the next rule should be about
+ * scheduled jobs or server actions.
  */
 const PREFIX = 'map'
 
 const FRAMEWORKS: readonly Framework[] = ['nuxt', 'nitro', 'next', 'tanstack-start']
 const GRADES: readonly Grade[] = ['excellent', 'good', 'needs-work', 'at-risk']
+
+/** Entry-point kinds the map can scan, a closed set, in scan order. */
+const KINDS: readonly RouteKind[] = ['api', 'page', 'middleware', 'server-action', 'cron', 'websocket']
+
+/** Sensitivity labels the classifier can assign, in precedence order. */
+const SENSITIVITIES = ['money', 'auth', 'pii'] as const
+type SensitivityLabel = typeof SENSITIVITIES[number]
 
 /** Which gate the run asked for — `--min-score`, `--baseline`, both, neither. */
 const GATES = ['none', 'min-score', 'baseline', 'both'] as const
@@ -48,6 +58,16 @@ export function ruleField(group: 'Fail' | 'Suppressed', id: CheckId): string {
   return `${PREFIX}${group}${pascal(id)}`
 }
 
+/** Field name for a per-kind tally: `server-action` → `mapKindServerAction`. */
+export function kindField(group: 'Kind' | 'Dark', kind: RouteKind): string {
+  return `${PREFIX}${group}${pascal(kind)}`
+}
+
+/** Field name for a per-sensitivity tally: `money` → `mapSensitiveMoney`. */
+export function sensitiveField(group: 'Sensitive' | 'Dark', label: SensitivityLabel): string {
+  return `${PREFIX}${group}${pascal(label)}`
+}
+
 /** What the run was asked to gate on, from the two flags that can gate it. */
 export function resolveGate(input: { minScore: boolean, baseline: boolean }): MapGate {
   if (input.minScore && input.baseline) return 'both'
@@ -71,6 +91,61 @@ function ruleTallies(scan: ScanResult): Record<string, number> {
     }
   }
 
+  return out
+}
+
+/**
+ * Per-kind totals and dark tallies across every scanned entry point.
+ *
+ * A kind absent from the project is omitted rather than sent as zero, the
+ * same convention as flags left at their default. A kind that is present but
+ * fully covered still reports its dark count as 0, so the pair reads as
+ * "12 pages, 3 dark" and never as "12 pages, count missing".
+ */
+function kindTallies(routes: RouteEntry[]): Record<string, number> {
+  const total: Partial<Record<RouteKind, number>> = {}
+  const dark: Partial<Record<RouteKind, number>> = {}
+  for (const route of routes) {
+    total[route.kind] = (total[route.kind] ?? 0) + 1
+    if (classifyRouteObservability(route) === 'dark') dark[route.kind] = (dark[route.kind] ?? 0) + 1
+  }
+
+  const out: Record<string, number> = {}
+  for (const kind of KINDS) {
+    const count = total[kind]
+    if (count === undefined) continue
+    out[kindField('Kind', kind)] = count
+    out[kindField('Dark', kind)] = dark[kind] ?? 0
+  }
+  return out
+}
+
+/**
+ * Per-sensitivity totals and dark tallies (money / auth / pii).
+ *
+ * Sensitivity is a heuristic classification, not ground truth: these counts
+ * say what the classifier found, so a population-level "dark money handlers"
+ * number has to be read as an estimate. Labels are mutually exclusive per
+ * entry point (`sensitivityLabel` precedence), so the total and dark buckets
+ * stay disjoint.
+ */
+function sensitiveTallies(routes: RouteEntry[]): Record<string, number> {
+  const total: Partial<Record<SensitivityLabel, number>> = {}
+  const dark: Partial<Record<SensitivityLabel, number>> = {}
+  for (const route of routes) {
+    const label = sensitivityLabel(route.sensitivity)
+    if (!label) continue
+    total[label] = (total[label] ?? 0) + 1
+    if (classifyRouteObservability(route) === 'dark') dark[label] = (dark[label] ?? 0) + 1
+  }
+
+  const out: Record<string, number> = {}
+  for (const label of SENSITIVITIES) {
+    const count = total[label]
+    if (count === undefined) continue
+    out[sensitiveField('Sensitive', label)] = count
+    out[sensitiveField('Dark', label)] = dark[label] ?? 0
+  }
   return out
 }
 
@@ -106,6 +181,8 @@ export function mapTelemetryFields(input: {
     mapSuggestions: routes.reduce((total, route) => total + Object.keys(route.suggestions).length, 0),
     mapProjectSuggestions: scan.suggestions.length,
     mapGate: input.gate,
+    ...kindTallies(routes),
+    ...sensitiveTallies(routes),
     ...ruleTallies(scan),
   }
 
@@ -148,6 +225,11 @@ export async function recordMapRun(input: Parameters<typeof mapTelemetryFields>[
  * Read off a synthetic payload rather than listed again: a field added to one
  * and not the other would leave the disclosure quietly incomplete, and what
  * this CLI transmits is exactly the thing that must not drift.
+ *
+ * The kind and sensitivity tallies are the one deliberate exception: absent
+ * kinds are omitted from the payload, so the empty synthetic scan cannot name
+ * them, and the disclosure has to list every field the module *can* emit
+ * rather than every field an empty project would.
  */
 export function mapTelemetryFieldNames(): string[] {
   const empty: ScanResult = {
@@ -171,7 +253,7 @@ export function mapTelemetryFieldNames(): string[] {
     removed: [],
   }
 
-  return Object.keys(mapTelemetryFields({
+  const payload = Object.keys(mapTelemetryFields({
     scan: empty,
     frameworkForced: false,
     gate: 'none',
@@ -181,4 +263,11 @@ export function mapTelemetryFieldNames(): string[] {
     wrote: false,
     runState: { ordinal: 1, delta: 0 },
   }))
+
+  const tallies = [
+    ...KINDS.flatMap(kind => [kindField('Kind', kind), kindField('Dark', kind)]),
+    ...SENSITIVITIES.flatMap(label => [sensitiveField('Sensitive', label), sensitiveField('Dark', label)]),
+  ]
+
+  return [...payload, ...tallies]
 }
