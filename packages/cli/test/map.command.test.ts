@@ -1,9 +1,10 @@
 import { existsSync } from 'node:fs'
-import { cp, mkdtemp, readFile, rm } from 'node:fs/promises'
+import { cp, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { runCommand } from 'citty'
 import { afterEach, describe, expect, it, vi } from 'vitest'
+import { version } from '../package.json'
 import map, { formatMapReport, runMap } from '../src/commands/map'
 import type { MapResult } from '../src/commands/map'
 import { createContext } from '../src/core/context'
@@ -11,7 +12,7 @@ import type { CliContext } from '../src/core/context'
 import { SCHEMA_VERSION } from '../src/core/output'
 import { resolveCliEnvironment } from '../src/lib/environment'
 import { MIN_WIDTH, formatMapInspect } from '../src/lib/map/report'
-import { REQUIREMENTS } from '../src/lib/map/rules/index'
+import { REQUIREMENTS, RULE_SET_VERSION } from '../src/lib/map/rules/index'
 import type { RouteEntry } from '../src/lib/map/types'
 
 const FIXTURES = join(import.meta.dirname, 'map/fixtures')
@@ -69,6 +70,15 @@ describe('runMap', () => {
     const cwd = join(FIXTURES, 'tanstack-basic')
     const result = await runMap(fakeContext(cwd), undefined, { framework: 'tanstack-start', noWrite: true })
     expect(result.framework).toBe('tanstack-start')
+  })
+
+  it('writes the CLI and rule set versions that wrote the map', async () => {
+    const cwd = await copyFixture('nuxt-basic')
+    const result = await runMap(fakeContext(cwd))
+
+    const written = JSON.parse(await readFile(result.mapPath!, 'utf-8')) as { cliVersion: string, ruleSetVersion: number }
+    expect(written.ruleSetVersion).toBe(RULE_SET_VERSION)
+    expect(written.cliVersion).toBe(version)
   })
 
   it('throws a catalog error for an unsupported project', async () => {
@@ -351,6 +361,27 @@ describe('map command', () => {
     await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--min-score', 'abc'] })
 
     expect(existsSync(join(cwd, 'evlog.map.json'))).toBe(false)
+  })
+
+  it('refuses a --baseline written by a different rule set (exit 2) instead of diffing', async () => {
+    const cwd = await copyFixture('nuxt-basic')
+    vi.spyOn(process.stdout, 'write').mockImplementation(() => true)
+    vi.spyOn(process.stderr, 'write').mockImplementation(() => true)
+    await writeFile(join(cwd, 'evlog.map.json'), JSON.stringify({
+      version: 1,
+      generatedAt: '2026-01-01T00:00:00.000Z',
+      cliVersion: '0.3.0',
+      ruleSetVersion: RULE_SET_VERSION - 1,
+      framework: 'nuxt',
+      projectName: 'test',
+      score: 100,
+      routes: [],
+    }), 'utf8')
+
+    await runCommand(map, { rawArgs: ['--cwd', cwd, '--json', '--no-header', '--no-write', '--baseline'] })
+
+    /* A stale rule set is a usage error, not a check failure. */
+    expect(process.exitCode).toBe(2)
   })
 
   it('leaves the exit code untouched without --min-score', async () => {

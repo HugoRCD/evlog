@@ -177,6 +177,15 @@ export const cliErrors = defineErrorCatalog('cli', {
     link: 'https://evlog.dev/cli/ci',
     tags: ['map', 'baseline'],
   },
+  MAP_BASELINE_VERSION_MISMATCH: {
+    status: 400,
+    message: ({ baselineCli, runningCli, baselineRuleSet, runningRuleSet }: { baselineCli: string, runningCli: string, baselineRuleSet: number, runningRuleSet: number }) =>
+      `baseline was written by @evlog/cli ${baselineCli}, running @evlog/cli ${runningCli} (rule set ${baselineRuleSet} \u2192 ${runningRuleSet})`,
+    why: 'The rule set changed between the two versions, so a per-check diff could blame code the PR did not touch',
+    fix: 'Regenerate the baseline: evlog map && git add evlog.map.json',
+    link: 'https://evlog.dev/cli/ci',
+    tags: ['map', 'baseline'],
+  },
   MAP_INVALID_MIN_SCORE: {
     status: 400,
     message: ({ value }: { value: string }) =>

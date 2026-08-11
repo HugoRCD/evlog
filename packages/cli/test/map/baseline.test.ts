@@ -3,7 +3,8 @@ import { mkdtemp, rm, writeFile } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, describe, expect, it } from 'vitest'
-import { compareToBaseline, hasRegressed, loadBaseline } from '../../src/lib/map/baseline'
+import { checkBaselineVersion, compareToBaseline, hasRegressed, loadBaseline } from '../../src/lib/map/baseline'
+import { RULE_SET_VERSION } from '../../src/lib/map/rules/index'
 import type { BaselineSource } from '../../src/lib/map/baseline'
 import type { CheckId, CheckResult, MapFile, RouteEntry } from '../../src/lib/map/types'
 
@@ -203,3 +204,25 @@ describe('loadBaseline', () => {
     expect(() => loadBaseline(dir, 'missing.json')).toThrow(/missing\.json/)
   })
 })
+
+describe('checkBaselineVersion', () => {
+  it('accepts a baseline whose rule set matches the running CLI', () => {
+    expect(checkBaselineVersion({ ruleSetVersion: RULE_SET_VERSION, cliVersion: '0.5.1' })).toBe('ok')
+  })
+
+  it('does not gate on a CLI bump that left the rule set alone', () => {
+    /* A release that ships a new feature but no rule change must not force
+       every project to regenerate. */
+    expect(checkBaselineVersion({ ruleSetVersion: RULE_SET_VERSION, cliVersion: '0.1.0' })).toBe('ok')
+  })
+
+  it('treats a map that predates version reporting as unknown, not broken', () => {
+    expect(checkBaselineVersion({})).toBe('unknown')
+  })
+
+  it('refuses a baseline written by a different rule set', () => {
+    expect(() => checkBaselineVersion({ ruleSetVersion: RULE_SET_VERSION - 1, cliVersion: '0.3.0' }))
+      .toThrow(/rule set/)
+  })
+})
+

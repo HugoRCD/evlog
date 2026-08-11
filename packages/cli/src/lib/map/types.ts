@@ -85,6 +85,21 @@ export interface RouteEntry extends RawRouteEntry {
 export interface MapFile {
   version: 1
   generatedAt: string
+  /**
+   * The CLI version that wrote this map, for the `--baseline` compatibility
+   * check. Absent on maps written before version reporting existed, which the
+   * baseline check treats as "unknown" rather than failing.
+   */
+  cliVersion?: string
+  /**
+   * Rule-set version, bumped only when a rule's semantics change.
+   *
+   * A package release that adds an unrelated feature must not force every
+   * project to regenerate its baseline, so this is not the package version: it
+   * moves only when a verdict this map records could change for code the PR
+   * did not touch. Absent on pre-versioning maps, treated as "unknown".
+   */
+  ruleSetVersion?: number
   framework: Framework
   projectName: string
   score: number

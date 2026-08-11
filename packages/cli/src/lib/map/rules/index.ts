@@ -64,6 +64,18 @@ void idsMatch
  */
 export const RULES: readonly MapRule[] = REGISTRY
 
+/**
+ * Version of the rule set as written into `evlog.map.json`.
+ *
+ * Bump this only when a rule's semantics change in a way that could flip a
+ * verdict for code a PR did not touch: a tightened check, a new requirement, a
+ * reweighting. A release that adds a map feature without moving any verdict
+ * must leave it alone, or every project would be forced to regenerate its
+ * baseline for nothing. Written beside the CLI version so `--baseline` can
+ * tell a stale committed map apart from a merely older one.
+ */
+export const RULE_SET_VERSION = 1
+
 const RULES_BY_ID = new Map<CheckId, MapRule>(RULES.map(rule => [rule.id, rule]))
 
 /** Look up a rule's metadata — weight, title, docs link, suggested fix. */
