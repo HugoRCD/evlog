@@ -101,9 +101,13 @@ jobs:
         run: pnpm --filter evlog run build
 
       - name: Run evals
+        # `needs-connect` evals require a live Vercel Connect token to reach
+        # GitHub. CI has none, so their tool calls fail and the eval reports a
+        # regression that is not one. Run them locally, or from a deployment.
         run: >
           pnpm --filter evi exec eve eval
           ${{ github.event_name == 'pull_request' && '--tag fast' || '' }}
+          --exclude-tag needs-connect
           --junit evi-evals.xml
         env:
           EVE_RUN_MODE: eval

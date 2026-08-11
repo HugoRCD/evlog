@@ -17,7 +17,7 @@ export default defineEval({
   // assign the maintainer on escalation. Those are the only writes it may
   // reach; the reply is posted by the channel.
   description: 'A first-responder turn triages a bug report and writes nothing beyond labels, a doc-gap issue, or an assignment to the maintainer.',
-  tags: ['slow'],
+  tags: ['slow', 'needs-connect'],
   async test(t) {
     // The production instructions are injected per-turn only for autonomous
     // channel auth, which an eval cannot forge; clientContext delivers the
