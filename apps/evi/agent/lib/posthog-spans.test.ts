@@ -1,93 +1,128 @@
-import type { Attributes, Context } from '@opentelemetry/api'
-import type { ReadableSpan, Span } from '@opentelemetry/sdk-trace-base'
-import { describe, expect, it } from 'vitest'
+import type { Context, ContextManager, Tracer } from '@opentelemetry/api'
+import { ROOT_CONTEXT, context, trace } from '@opentelemetry/api'
+import { BasicTracerProvider, InMemorySpanExporter, SimpleSpanProcessor } from '@opentelemetry/sdk-trace-base'
+import { beforeAll, beforeEach, describe, expect, it } from 'vitest'
 import { createPostHogAttributeProcessor } from './posthog-spans'
 
-function fakeSpan(spanId: string, attributes: Attributes = {}) {
-  const span = {
-    attributes: { ...attributes },
-    spanContext: () => ({ spanId, traceId: 'trace', traceFlags: 1 }),
-    setAttributes(next: Attributes) {
-      Object.assign(span.attributes, next)
-      return span
-    },
+/**
+ * Nesting only resolves when a context manager is installed; without one every
+ * span looks like a root and the processor has nothing to inherit from. A
+ * synchronous stack is enough here and keeps the async-hooks package out of
+ * the dependency list.
+ */
+class SyncContextManager implements ContextManager {
+  private stack: Context[] = [ROOT_CONTEXT]
+
+  active(): Context {
+    return this.stack[this.stack.length - 1] ?? ROOT_CONTEXT
   }
-  return span as unknown as Span & ReadableSpan & { attributes: Attributes }
+
+  with<TArgs extends unknown[], TFn extends(...args: TArgs) => ReturnType<TFn>>(ctx: Context, fn: TFn, thisArg?: ThisParameterType<TFn>, ...args: TArgs): ReturnType<TFn> {
+    this.stack.push(ctx)
+    try {
+      return fn.call(thisArg as ThisParameterType<TFn>, ...args)
+    } finally {
+      this.stack.pop()
+    }
+  }
+
+  bind<T>(_ctx: Context, target: T): T {
+    return target
+  }
+
+  enable(): this {
+    return this
+  }
+
+  disable(): this {
+    this.stack = [ROOT_CONTEXT]
+    return this
+  }
 }
 
-/** A context whose active span is `spanId`, as the SDK passes to `onStart`. */
-function contextWithParent(spanId: string): Context {
-  return {
-    getValue: () => ({ spanContext: () => ({ spanId, traceId: 'trace', traceFlags: 1 }) }),
-  } as unknown as Context
-}
+/**
+ * The real SDK, not a hand-rolled `Context`: a fake whose `getValue` answers
+ * any key hides whether propagation resolves the parent at all.
+ */
+let exporter: InMemorySpanExporter
+let tracer: Tracer
 
+beforeAll(() => {
+  context.setGlobalContextManager(new SyncContextManager())
+})
+
+beforeEach(() => {
+  exporter = new InMemorySpanExporter()
+  tracer = new BasicTracerProvider({
+    spanProcessors: [createPostHogAttributeProcessor(), new SimpleSpanProcessor(exporter)],
+  }).getTracer('test')
+})
+
+function exported(name: string) {
+  return exporter.getFinishedSpans().find(span => span.name === name)
+}
 
 describe('createPostHogAttributeProcessor', () => {
-  it('carries posthog attributes from a step span to its children', () => {
-    const processor = createPostHogAttributeProcessor()
-    const step = fakeSpan('step-1', { posthog_distinct_id: 'github:1', posthog_environment: 'eval' })
+  it('carries posthog attributes to a child of the step span', () => {
+    tracer.startActiveSpan('step 1', (step) => {
+      // eve sets these after the span opens, which is the case that matters.
+      step.setAttributes({ posthog_distinct_id: 'github:1', posthog_environment: 'eval' })
+      tracer.startActiveSpan('chat', child => child.end())
+      step.end()
+    })
 
-    processor.onStart(step, contextWithParent('root'))
-    const generation = fakeSpan('gen-1', { 'gen_ai.request.model': 'x' })
-    processor.onStart(generation, contextWithParent('step-1'))
-
-    expect(generation.attributes.posthog_distinct_id).toBe('github:1')
-    expect(generation.attributes.posthog_environment).toBe('eval')
-    expect(generation.attributes['gen_ai.request.model']).toBe('x')
+    expect(exported('chat')?.attributes.posthog_distinct_id).toBe('github:1')
+    expect(exported('chat')?.attributes.posthog_environment).toBe('eval')
   })
 
-  it('reaches grandchildren, since a generation nests below the step', () => {
-    const processor = createPostHogAttributeProcessor()
-    processor.onStart(fakeSpan('step-1', { posthog_distinct_id: 'github:1' }), contextWithParent('root'))
-    processor.onStart(fakeSpan('gen-1'), contextWithParent('step-1'))
+  it('reaches a tool span two levels down', () => {
+    tracer.startActiveSpan('step 1', (step) => {
+      step.setAttributes({ posthog_distinct_id: 'github:1' })
+      tracer.startActiveSpan('invoke_agent', (generation) => {
+        tracer.startActiveSpan('execute_tool grep', tool => tool.end())
+        generation.end()
+      })
+      step.end()
+    })
 
-    const toolCall = fakeSpan('tool-1')
-    processor.onStart(toolCall, contextWithParent('gen-1'))
-
-    expect(toolCall.attributes.posthog_distinct_id).toBe('github:1')
+    expect(exported('execute_tool grep')?.attributes.posthog_distinct_id).toBe('github:1')
   })
 
   it('lets a child override an inherited value', () => {
-    const processor = createPostHogAttributeProcessor()
-    processor.onStart(fakeSpan('step-1', { posthog_distinct_id: 'github:1' }), contextWithParent('root'))
+    tracer.startActiveSpan('step 1', (step) => {
+      step.setAttributes({ posthog_distinct_id: 'github:1' })
+      tracer.startActiveSpan('chat', { attributes: { posthog_distinct_id: 'github:2' } }, child => child.end())
+      step.end()
+    })
 
-    const child = fakeSpan('gen-1', { posthog_distinct_id: 'github:2' })
-    processor.onStart(child, contextWithParent('step-1'))
-
-    expect(child.attributes.posthog_distinct_id).toBe('github:2')
+    expect(exported('chat')?.attributes.posthog_distinct_id).toBe('github:2')
   })
 
-  it('leaves spans outside a turn untouched', () => {
-    const processor = createPostHogAttributeProcessor()
+  it('leaves a span outside any turn untouched', () => {
+    tracer.startActiveSpan('orphan', { attributes: { 'gen_ai.request.model': 'x' } }, span => span.end())
 
-    const orphan = fakeSpan('other-1', { 'gen_ai.request.model': 'x' })
-    processor.onStart(orphan, contextWithParent('unknown'))
-
-    expect(orphan.attributes).toEqual({ 'gen_ai.request.model': 'x' })
+    expect(exported('orphan')?.attributes).toEqual({ 'gen_ai.request.model': 'x' })
   })
 
   it('ignores non-posthog attributes, which PostHog would drop anyway', () => {
-    const processor = createPostHogAttributeProcessor()
-    processor.onStart(fakeSpan('step-1', { 'evlog.request_id': 'sess:turn_0' }), contextWithParent('root'))
+    tracer.startActiveSpan('step 1', (step) => {
+      step.setAttributes({ 'evlog.request_id': 'sess:turn_0' })
+      tracer.startActiveSpan('chat', child => child.end())
+      step.end()
+    })
 
-    const child = fakeSpan('gen-1')
-    processor.onStart(child, contextWithParent('step-1'))
-
-    expect(child.attributes).toEqual({})
+    expect(exported('chat')?.attributes).toEqual({})
   })
 
-  it('forgets a span once it ends, so the map does not grow', async () => {
-    const processor = createPostHogAttributeProcessor()
-    const step = fakeSpan('step-1', { posthog_distinct_id: 'github:1' })
+  it('forgets a span once it ends, so the map does not grow', () => {
+    const step = tracer.startSpan('step 1')
+    step.setAttributes({ posthog_distinct_id: 'github:1' })
+    step.end()
 
-    processor.onStart(step, contextWithParent('root'))
-    processor.onEnd(step)
+    context.with(trace.setSpan(context.active(), step), () => {
+      tracer.startSpan('late').end()
+    })
 
-    const late = fakeSpan('gen-1')
-    processor.onStart(late, contextWithParent('step-1'))
-
-    expect(late.attributes).toEqual({})
-    await expect(processor.shutdown()).resolves.toBeUndefined()
+    expect(exported('late')?.attributes).toEqual({})
   })
 })
