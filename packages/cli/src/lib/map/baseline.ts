@@ -2,7 +2,9 @@ import { execFileSync } from 'node:child_process'
 import { readFileSync } from 'node:fs'
 import { isAbsolute, resolve } from 'node:path'
 import { cliErrors } from '../errors'
+import { version as CLI_VERSION } from '../../../package.json'
 import { classifyRouteObservability, scoreGlobal } from './score'
+import { RULE_SET_VERSION } from './rules/index'
 import type { CheckId, MapFile, RouteEntry } from './types'
 import { MAP_FILE_NAME } from './write'
 
@@ -206,4 +208,26 @@ export function compareToBaseline(baseline: MapFile, current: MapFile, source: B
 /** Whether the comparison should fail the command (exit 1). */
 export function hasRegressed(comparison: BaselineComparison): boolean {
   return comparison.regressions.length > 0 || comparison.delta < 0
+}
+
+/**
+ * Whether a committed baseline is comparable to the running CLI.
+ *
+ * Returns `'unknown'` (the caller warns rather than fails) when the map
+ * predates version reporting, and throws a usage error when the rule set moved
+ * underneath the committed file. Same reasoning as a malformed `--min-score`:
+ * a gate that reports a regression it cannot justify is worse than one that
+ * admits it cannot run.
+ */
+export type BaselineVersionStatus = 'ok' | 'unknown'
+
+export function checkBaselineVersion(baseline: Pick<MapFile, 'cliVersion' | 'ruleSetVersion'>): BaselineVersionStatus {
+  if (baseline.ruleSetVersion === undefined) return 'unknown'
+  if (baseline.ruleSetVersion === RULE_SET_VERSION) return 'ok'
+  throw cliErrors.MAP_BASELINE_VERSION_MISMATCH({
+    baselineCli: baseline.cliVersion ?? 'unknown',
+    runningCli: CLI_VERSION,
+    baselineRuleSet: baseline.ruleSetVersion,
+    runningRuleSet: RULE_SET_VERSION,
+  })
 }

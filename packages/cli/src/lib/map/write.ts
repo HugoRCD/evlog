@@ -35,10 +35,11 @@ export function serializeMapFile(map: MapFile): string {
   return JSON.stringify(sortedRoutes(map), null, 2)
 }
 
-/** {@link MapFile} with `generatedAt` redacted — stable across test runs for snapshotting. */
-export function mapForSnapshot(map: MapFile): Omit<MapFile, 'generatedAt'> & { generatedAt: '[REDACTED]' } {
+/** {@link MapFile} with `generatedAt` and `cliVersion` redacted — stable across test runs for snapshotting. Both churn on every release, while `ruleSetVersion` stays, so a snapshot only moves when the rule set actually changes. */
+export function mapForSnapshot(map: MapFile): Omit<MapFile, 'generatedAt' | 'cliVersion'> & { generatedAt: '[REDACTED]', cliVersion: '[REDACTED]' } {
   return {
     ...sortedRoutes(map),
     generatedAt: '[REDACTED]',
+    cliVersion: '[REDACTED]',
   }
 }

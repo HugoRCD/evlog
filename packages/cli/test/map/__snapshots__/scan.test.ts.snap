@@ -2,6 +2,7 @@
 
 exports[`full scan snapshots > next-app-router map snapshot 1`] = `
 {
+  "cliVersion": "[REDACTED]",
   "framework": "next",
   "generatedAt": "[REDACTED]",
   "projectName": "next-app-router-fixture",
@@ -360,6 +361,7 @@ exports[`full scan snapshots > next-app-router map snapshot 1`] = `
       "suggestions": {},
     },
   ],
+  "ruleSetVersion": 1,
   "score": 52,
   "version": 1,
 }
@@ -367,6 +369,7 @@ exports[`full scan snapshots > next-app-router map snapshot 1`] = `
 
 exports[`full scan snapshots > nuxt-basic map snapshot 1`] = `
 {
+  "cliVersion": "[REDACTED]",
   "framework": "nuxt",
   "generatedAt": "[REDACTED]",
   "projectName": "nuxt-basic-fixture",
@@ -901,6 +904,7 @@ exports[`full scan snapshots > nuxt-basic map snapshot 1`] = `
       "suggestions": {},
     },
   ],
+  "ruleSetVersion": 1,
   "score": 56,
   "version": 1,
 }
@@ -908,6 +912,7 @@ exports[`full scan snapshots > nuxt-basic map snapshot 1`] = `
 
 exports[`full scan snapshots > tanstack-basic map snapshot 1`] = `
 {
+  "cliVersion": "[REDACTED]",
   "framework": "tanstack-start",
   "generatedAt": "[REDACTED]",
   "projectName": "tanstack-basic-fixture",
@@ -1070,6 +1075,7 @@ exports[`full scan snapshots > tanstack-basic map snapshot 1`] = `
       "suggestions": {},
     },
   ],
+  "ruleSetVersion": 1,
   "score": 69,
   "version": 1,
 }

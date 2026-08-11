@@ -1,11 +1,12 @@
 import { join } from 'node:path'
+import { version as CLI_VERSION } from '../../../package.json'
 import { getAdapter } from './adapters/index'
 import { countSuppressed } from './directives'
 import { buildFileFacts } from './facts'
 import { createParseCache, parseFile } from './parse'
 import { collectProjectFacts, readPackageJson } from './project-facts'
 import type { ProjectFacts } from './project-facts'
-import { getRule, runRules } from './rules/index'
+import { RULE_SET_VERSION, getRule, runRules } from './rules/index'
 import type { FrameworkCapabilities } from './rules/index'
 import { classifySensitivity } from './sensitivity'
 import { classifyRouteObservability, gradeFromScore, scoreGlobal, scoreRoute } from './score'
@@ -106,6 +107,8 @@ export async function scan(input: ScanContext): Promise<ScanResult> {
   const map: MapFile = {
     version: 1,
     generatedAt: new Date().toISOString(),
+    cliVersion: CLI_VERSION,
+    ruleSetVersion: RULE_SET_VERSION,
     framework: ctx.framework,
     projectName: ctx.projectName,
     score: globalScore,

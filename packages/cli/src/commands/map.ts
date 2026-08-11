@@ -1,13 +1,13 @@
 import { EvlogError } from 'evlog'
 import type { CliContext } from '../core/context'
-import { EXIT_FAIL } from '../core/output'
+import { EXIT_FAIL, EXIT_USAGE } from '../core/output'
 import { defineEvlogCommand } from '../lib/command'
 import type { CliDebug } from '../lib/debug'
 import { createNoopCliDebug } from '../lib/debug'
 import { cliErrors } from '../lib/errors'
 import { resolveEvlog, resolveProject } from '../lib/project'
 import type { ProjectInfo } from '../lib/project'
-import { compareToBaseline, hasRegressed, loadBaseline } from '../lib/map/baseline'
+import { checkBaselineVersion, compareToBaseline, hasRegressed, loadBaseline } from '../lib/map/baseline'
 import type { BaselineComparison } from '../lib/map/baseline'
 import { detectFramework } from '../lib/map/detect'
 import {
@@ -42,6 +42,8 @@ export interface MapResult {
   mapPath: string | null
   /** Diff against the committed map, when `--baseline` was passed. */
   baseline: BaselineComparison | null
+  /** Baseline problems that do not stop the run — a map that predates version reporting. */
+  baselineWarnings: string[]
 }
 
 /**
@@ -93,6 +95,16 @@ export async function runMap(
     )
     : null
 
+  /* A map written before version reporting cannot prove its rule set matches
+     the running one, so it gets a warning instead of a gate: hard-failing every
+     project on upgrade would punish the ones that never saw the feature. */
+  const baselineWarnings: string[] = []
+  if (baselineMap && checkBaselineVersion(baselineMap.map) === 'unknown') {
+    baselineWarnings.push(
+      `the baseline ${baselineMap.source.label} predates map version reporting, so its rule set cannot be verified; regenerate it with evlog map`,
+    )
+  }
+
   const scanResult = await log.step(
     'scan',
     () => scan(scanCtx),
@@ -122,6 +134,7 @@ export async function runMap(
     scan: scanResult,
     mapPath,
     baseline,
+    baselineWarnings,
   }
 }
 
@@ -143,7 +156,7 @@ export function formatMapReport(
   /* Framework detection and disable-comment problems share one channel: both
      mean "the numbers below were produced under an assumption you should see",
      and both have to appear above every view rather than only the default one. */
-  const warnings = [...result.frameworkWarnings, ...result.scan.warnings]
+  const warnings = [...result.frameworkWarnings, ...result.baselineWarnings, ...result.scan.warnings]
   if (warnings.length > 0) {
     sections.push(formatMapWarnings(ctx, warnings))
   }
@@ -260,7 +273,9 @@ export default defineEvlogCommand('map', {
           json: { error: { code: error.code, message: error.message, why: error.why, fix: error.fix } },
           human: error.fix ? `${error.message}\n→ ${error.fix}` : error.message,
         })
-        ui.exit(EXIT_FAIL)
+        /* A baseline whose rule set does not match is a usage error, not a
+           check failure: the app did not get worse, the comparison is invalid. */
+        ui.exit(error.code === cliErrors.MAP_BASELINE_VERSION_MISMATCH.code ? EXIT_USAGE : EXIT_FAIL)
         return
       }
       throw error
