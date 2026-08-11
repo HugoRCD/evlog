@@ -22,12 +22,13 @@ with a colocated test).
 the CI triggers are narrow — see `.github/workflows/evi-evals.yml` for the full
 list and the guards.
 
-Evals tagged `needs-connect` are skipped in CI. They assert on GitHub calls
-that must *succeed*, and GitHub is reached through Vercel Connect, which has no
-token on a GitHub Actions runner — every call fails and the eval reports a
-regression that is not one. Run those locally, where `vc link` supplies the
-token. Two evals are in that state today; anything asserting `notCalledTool` on
-a GitHub tool is unaffected and still runs.
+Evals tagged `needs-connect` assert on GitHub calls that must *succeed*, and
+GitHub is reached through Vercel Connect, which authenticates with a Vercel
+OIDC token. CI pulls one with the Vercel CLI when `VERCEL_TOKEN`,
+`VERCEL_ORG_ID` and `VERCEL_PROJECT_ID` are set, and skips those evals
+otherwise — an unauthenticated run reports a regression that is not one. They
+always run locally, where `vc link` supplies the token. Anything asserting
+`notCalledTool` on a GitHub tool needs no credentials and always runs.
 
 A PR touching `agent/` (excluding tests) or an `.eval.ts` file runs the `fast`
 subset automatically. That is deliberate: Evi opens PRs on her own behaviour,

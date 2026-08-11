@@ -84,6 +84,11 @@ jobs:
       )
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    env:
+      # Secrets cannot be tested directly in `if:`, so the presence check is
+      # hoisted here. Without them the connect-dependent evals are skipped
+      # rather than failing on unauthenticated GitHub calls.
+      HAS_VERCEL: ${{ secrets.VERCEL_TOKEN != '' && secrets.VERCEL_PROJECT_ID != '' }}
     steps:
       - uses: actions/checkout@d23441a48e516b6c34aea4fa41551a30e30af803 # v6.1.0
         with:
@@ -100,14 +105,37 @@ jobs:
       - name: Build evlog
         run: pnpm --filter evlog run build
 
+      # Evi reaches GitHub through Vercel Connect, which authenticates with a
+      # Vercel OIDC token. That token is issued to a deployment or to a linked
+      # project — a runner is neither, and GitHub's own OIDC is not accepted in
+      # its place — so the only way to hold one here is to pull it with the CLI.
+      - name: Fetch the Vercel OIDC token
+        if: env.HAS_VERCEL == 'true'
+        working-directory: apps/evi
+        run: |
+          pnpm dlx vercel@latest pull --yes --environment=preview --token="$VERCEL_TOKEN"
+          # Never fail the job over this: no token degrades to skipping the
+          # connect-dependent evals, which is the same state as no secrets.
+          token=$(grep -h '^VERCEL_OIDC_TOKEN=' .vercel/.env*.local 2>/dev/null | head -1 | cut -d= -f2- | tr -d '"') || true
+          if [ -n "$token" ]; then
+            echo "::add-mask::$token"
+            echo "VERCEL_OIDC_TOKEN=$token" >> "$GITHUB_ENV"
+          else
+            echo "::warning::No VERCEL_OIDC_TOKEN in the pulled environment — connect-dependent evals will be skipped."
+          fi
+        env:
+          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+
       - name: Run evals
         # `needs-connect` evals require a live Vercel Connect token to reach
-        # GitHub. CI has none, so their tool calls fail and the eval reports a
+        # GitHub. Without one their tool calls fail and the eval reports a
         # regression that is not one. Run them locally, or from a deployment.
         run: >
           pnpm --filter evi exec eve eval
           ${{ github.event_name == 'pull_request' && '--tag fast' || '' }}
-          --exclude-tag needs-connect
+          ${{ env.VERCEL_OIDC_TOKEN == '' && '--exclude-tag needs-connect' || '' }}
           --junit evi-evals.xml
         env:
           EVE_RUN_MODE: eval
