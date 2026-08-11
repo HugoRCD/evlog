@@ -77,6 +77,12 @@ deployments and promos move.
 Reconstructing an observed turn from it matched eve's reported `costUsd` to four
 decimals, which is how the overspend was found.
 
+**`group_by: tag` on the report returns one row per tag value.** Scoped to
+`evi:env:*`, that is the env total row plus one `evi:surface:*` row per surface,
+each with cost, token and `request_count` columns, so the surface breakdown and
+the per-model mix (`group_by: model`) are two calls away. The cost-watchdog
+skill reads both; the surface set must be taken from the rows, never assumed.
+
 ## github-tools
 
 **The `maintainer` preset ships gist tools that always 403 over Connect** — the
