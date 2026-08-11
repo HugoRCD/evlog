@@ -1,5 +1,20 @@
 # @evlog/cli
 
+## 0.5.2
+
+### Patch Changes
+
+- [#561](https://github.com/HugoRCD/evlog/pull/561) [`bae4413`](https://github.com/HugoRCD/evlog/commit/bae44137f363d6e57852af294b1735f9189afb1d) Thanks [@evlogai](https://github.com/apps/evlogai)! - fix: `evlog map --baseline git:<ref>` now tells a ref that does not resolve apart from a ref that is fine but has no committed `evlog.map.json`. The ratchet reads the map through git, so a map you gitignored is unreachable: instead of a generic "not found", the CLI says `no evlog.map.json in <ref>, and the ratchet needs a committed map` and names the fix (`evlog map && git add -f evlog.map.json`), while a nonexistent ref gets its own error (`no git ref <ref>`).
+
+- [#559](https://github.com/HugoRCD/evlog/pull/559) [`e72019a`](https://github.com/HugoRCD/evlog/commit/e72019a46f3fcb9740c52cb41c41bb04e1de1a37) Thanks [@evlogai](https://github.com/apps/evlogai)! - fix: `evlog map --baseline` records the CLI and rule-set versions in `evlog.map.json` and refuses to diff (exit 2) when the committed rule set does not match the running CLI, instead of reporting regressions caused by a rule change
+
+- [#549](https://github.com/HugoRCD/evlog/pull/549) [`9eb98cf`](https://github.com/HugoRCD/evlog/commit/9eb98cfb803d60658b5f833305ce486d2399c521) Thanks [@evlogai](https://github.com/apps/evlogai)! - fix: `evlog doctor` treats a wired fs drain as a local sink before the first event, and no longer warns when no local sink is configured
+
+- [#564](https://github.com/HugoRCD/evlog/pull/564) [`b45eed5`](https://github.com/HugoRCD/evlog/commit/b45eed545f531fb99e5cd70b87e2f81d0c14d58a) Thanks [@evlogai](https://github.com/apps/evlogai)! - `evlog map` telemetry now records per-kind entry point totals and dark counts (`mapKindPage`, `mapDarkPage`, ...), and the same split by sensitivity (`mapSensitiveMoney`, `mapDarkMoney`, ...). A kind absent from the project is omitted rather than sent as zero. The disclosure table from `evlog telemetry status` and the CLI telemetry docs were updated to match.
+
+- Updated dependencies [[`15b292d`](https://github.com/HugoRCD/evlog/commit/15b292d2e824f90738b69ccdfb3ba41da3710f16), [`ebed9cf`](https://github.com/HugoRCD/evlog/commit/ebed9cf8936672552ebb2ed125f3722b53c183ba)]:
+  - evlog@2.26.0
+
 ## 0.5.1
 
 ### Patch Changes
