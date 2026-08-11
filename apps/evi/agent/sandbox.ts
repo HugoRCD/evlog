@@ -16,7 +16,16 @@ const BEFORE_AFTER_CLI = '@vercel/before-and-after@0.0.4'
  * fetch to move to the current main.
  */
 export default defineSandbox({
-  backend: defaultBackend({ vercel: { resources: { vcpus: 4 } } }),
+  backend: defaultBackend({
+    vercel: {
+      resources: { vcpus: 4 },
+      // Each idled-out session leaves a ~1.5 GB snapshot, billed per GB-month
+      // for 30 days by default. A thread reopened after two days is rare.
+      // This also expires the template snapshot, so a rebuild runs at most
+      // every 48h.
+      snapshotExpiration: 48 * 60 * 60 * 1000,
+    },
+  }),
   revalidationKey: () => `evlog-workspace-v5:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
   async bootstrap({ use }) {
     const sandbox = await use()
