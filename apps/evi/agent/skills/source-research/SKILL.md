@@ -33,18 +33,19 @@ If nothing in the index looks right, try one reformulation against the index bef
 
 Go to the repository when the docs do not settle the question, or when the question is inherently about implementation: why something behaves the way it does, what a function actually emits, whether an edge case is handled.
 
-Your system context has a **Workspace** section saying whether the repository is checked out at `/workspace` on this turn. Follow it rather than probing: a `read_file` against a checkout that is not there costs a step and tells you nothing you were not already told.
+Your system context has a **Workspace** section saying whether a sandbox is available on this turn. Follow it rather than probing: a `read_file` against a checkout that is not there costs a step and tells you nothing you were not already told.
 
 **With a checkout**, read it directly. `grep` and `glob` beat GitHub code search on every axis: real regular expressions, no indexing lag, and the tree is the one under discussion rather than the default branch.
 
-Paths must be absolute: `glob`, `grep` and `read_file` reject a repo-relative
-path outright, so always write the `/workspace/` prefix:
+The checkout lives at `/workspace/repo`, not at `/workspace`: the sandbox clones the repository into a `repo/` subdirectory. Paths must be absolute, so every path starts with that prefix:
 
 ```
-glob "/workspace/packages/evlog/src/adapters/*.ts"
-grep "createFsDrain" --glob "/workspace/packages/evlog/src/**"
-read_file /workspace/packages/evlog/src/eve/index.ts
+glob "/workspace/repo/packages/evlog/src/adapters/*.ts"
+grep "createFsDrain" --glob "/workspace/repo/packages/evlog/src/**"
+read_file /workspace/repo/packages/evlog/src/eve/index.ts
 ```
+
+A path under `/workspace` alone resolves to nothing and the tool fails with `No such file or directory`.
 
 **Without one**, go through the API:
 
@@ -55,7 +56,7 @@ Use `github__getBlame` for "when did this change" or "why is this like this" eit
 
 Useful paths when you already know roughly where to look:
 
-- `packages/evlog/src/`: the main package. One directory per framework integration, plus `adapters/`, `enrichers/`, `shared/` (published as `evlog/toolkit`), `runtime/`, `nuxt/`, `nitro/`, `vite/`, `ai/`, `eve/`.
+- `packages/evlog/src/`: the main package. One directory per framework integration, plus `adapters/`, `enrichers/`, `shared/` (published as `evlog/toolkit`), `runtime/`, `nuxt/`, `nitro/`, `vite/`, `ai/`, `eve/`. Several entrypoints are a single file at that level rather than a directory, `pipeline.ts` and `redact.ts` among them, so glob the level before assuming a subtree.
 - `packages/cli/src/commands/`: the CLI.
 - `packages/evlog/test/`: mirrors `src/`; the tests are often the clearest statement of intended behavior.
 - `examples/`: one runnable example per framework.
