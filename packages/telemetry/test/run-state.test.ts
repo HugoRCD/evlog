@@ -14,6 +14,9 @@ describe('run state', () => {
   beforeEach(async () => {
     base = await mkdtemp(join(tmpdir(), 'evlog-run-state-'))
     process.env.XDG_CONFIG_HOME = base
+    /* Pin a machine id so the counter behaves as on a stable machine even when
+       the test runner itself is in CI, where it would otherwise be ephemeral. */
+    process.env.EVLOG_TELEMETRY_MACHINE_ID = 'test-machine'
     delete process.env.DO_NOT_TRACK
     delete process.env.EVLOG_TELEMETRY
   })
@@ -21,6 +24,7 @@ describe('run state', () => {
   afterEach(async () => {
     await rm(base, { recursive: true, force: true })
     delete process.env.XDG_CONFIG_HOME
+    delete process.env.EVLOG_TELEMETRY_MACHINE_ID
   })
 
   it('starts at ordinal 1 with no delta', async () => {
