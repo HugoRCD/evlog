@@ -46,11 +46,24 @@ export const GITHUB_WRITE_TOOLS = [
 ] as const
 
 /** Repository read tools any source-level question could reasonably reach for. */
-export const GITHUB_SOURCE_TOOLS = [
+const GITHUB_SOURCE_TOOLS = [
   'github__searchCode',
   'github__getFileContent',
   'github__getRepositoryTree',
   'github__getBlame',
+] as const
+
+/**
+ * Reading source, whichever way. With a sandbox the checkout is the better
+ * answer and `source-research` says so, so an eval that accepts only the API
+ * gates on the environment rather than on the routing decision. `bash` is left
+ * out: it reads source among a hundred other things.
+ */
+export const SOURCE_READ_TOOLS = [
+  ...GITHUB_SOURCE_TOOLS,
+  'grep',
+  'glob',
+  'read_file',
 ] as const
 
 /** The tools that answer "is this already known". */
