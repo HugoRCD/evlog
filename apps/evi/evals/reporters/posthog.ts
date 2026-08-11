@@ -18,11 +18,8 @@ const SERVICE = 'evi-evals'
 
 export function resolveRunIdentity(env: NodeJS.ProcessEnv = process.env): EvalRunIdentity {
   return {
-    // `||`, not `??`: an unset workflow_dispatch input arrives as an empty
-    // string, which would otherwise be recorded as the run id.
+    // `||`, not `??`: an unset workflow_dispatch input arrives as an empty string.
     runId: env.GITHUB_RUN_ID || 'local',
-    // The resolved model, never the override's name: recording `default` would
-    // silently mean a different model once the constant in agent.ts changes.
     model: MODEL,
     ...(env.GITHUB_SHA ? { commit: env.GITHUB_SHA.slice(0, 7) } : {}),
     ...(env.GITHUB_REF_NAME ? { branch: env.GITHUB_REF_NAME } : {}),
@@ -33,12 +30,7 @@ function durationMs(startedAt: string, completedAt: string): number {
   return Math.max(0, Date.parse(completedAt) - Date.parse(startedAt))
 }
 
-/**
- * One wide event per eval. `eveSessionId` is the join key: the agent's LLM
- * generations reach PostHog carrying the same session id, so cost and latency
- * for an eval are a lookup away rather than a number this reporter has to
- * compute itself.
- */
+/** One wide event per eval. `eveSessionId` joins it to that run's LLM generations. */
 export function toEvalEvent(result: EveEvalResult, identity: EvalRunIdentity): WideEvent {
   const failed = result.assertions.filter(assertion => !assertion.passed)
   return {
@@ -78,13 +70,8 @@ export function toRunEvent(summary: EveEvalRunSummary, identity: EvalRunIdentity
 }
 
 /**
- * Report eval outcomes to PostHog as custom events, one per eval plus one per
- * run. They are events rather than logs because the question asked of them is
- * a trend — is this eval getting slower, is the pass rate drifting — which is
- * what insights and alerts are built on.
- *
- * Without `POSTHOG_API_KEY` the reporter stays silent, so a local run needs no
- * setup and CI without the secret still runs the evals.
+ * Report eval outcomes to PostHog: one event per eval, one per run. Stays
+ * silent without `POSTHOG_API_KEY`.
  */
 export function PostHogReporter(identity?: EvalRunIdentity): EvalReporter {
   const results: EveEvalResult[] = []
@@ -95,8 +82,7 @@ export function PostHogReporter(identity?: EvalRunIdentity): EvalReporter {
       results.push(result)
     },
     async onRunComplete(summary) {
-      // Read at report time, not at construction: eve loads the environment
-      // files after it imports `evals.config.ts`.
+      // Read here, not at construction: eve loads the env files after importing this.
       const apiKey = process.env.POSTHOG_API_KEY
       if (!apiKey) return
       const runIdentity = identity ?? resolveRunIdentity()
@@ -104,8 +90,7 @@ export function PostHogReporter(identity?: EvalRunIdentity): EvalReporter {
         apiKey,
         ...(process.env.POSTHOG_HOST ? { host: process.env.POSTHOG_HOST } : {}),
       }
-      // Reporting must never decide the run's outcome: a failed upload is
-      // worth a line on stderr and nothing more.
+      // Reporting never decides the run's outcome.
       try {
         await sendBatchToPostHogEvents(
           results.map(result => toEvalEvent(result, runIdentity)),

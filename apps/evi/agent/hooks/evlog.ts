@@ -4,22 +4,17 @@ import { createPostHogDrain } from 'evlog/posthog'
 import { createFanOutDrain } from '../lib/drains'
 import { environment } from '../lib/environment'
 
-/**
- * The fs drain requires a writable filesystem, which Vercel only offers under
- * /tmp. PostHog Logs is the hosted destination, and is skipped without a key.
- *
- * Turns are attributed to the principal that opened the session — the same id
- * the instrumentation stamps on the model-call spans — so a wide event and the
- * generations it produced land on one PostHog person.
- */
+/** The fs drain needs a writable filesystem, which Vercel only offers under /tmp. */
 const drain = createFanOutDrain(
   [
     ...(process.env.VERCEL ? [] : [createFsDrain()]),
     ...(process.env.POSTHOG_API_KEY
+      // Events, not Logs: at a few dozen turns a day the per-GB saving is
+      // irrelevant and only events can be charted and alerted on.
       ? [createPostHogDrain({
+          mode: 'events',
+          eventName: 'evi_turn',
           distinctIdField: 'eve.caller.principalId',
-          // Flattened attributes are what PostHog facets on: `ai.costUsd` and
-          // `eve.sessionId` are filterable, a serialized `ai` object is not.
           recordShape: 'compact',
         })]
       : []),

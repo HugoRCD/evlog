@@ -448,6 +448,23 @@ describe('posthog adapter', () => {
       expect(result.properties).not.toHaveProperty('$process_person_profile')
     })
 
+    it('keeps nested properties nested by default', () => {
+      const event = createTestEvent({ ai: { costUsd: 0.01 } })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test' })
+
+      expect(result.properties.ai).toEqual({ costUsd: 0.01 })
+    })
+
+    it('flattens nested properties in compact shape', () => {
+      const event = createTestEvent({ ai: { costUsd: 0.01, tools: ['search'] }, eve: { caller: { principalId: 'github:1' } } })
+      const result = toPostHogEvent(event, { apiKey: 'phc_test', recordShape: 'compact' })
+
+      expect(result.properties['ai.costUsd']).toBe(0.01)
+      expect(result.properties['ai.tools']).toEqual(['search'])
+      expect(result.properties['eve.caller.principalId']).toBe('github:1')
+      expect(result.properties).not.toHaveProperty('ai')
+    })
+
     it('reads the identity from a dot path', () => {
       const event = createTestEvent({ user: { id: 'usr_456' } })
       const result = toPostHogEvent(event, { apiKey: 'phc_test', distinctIdField: 'user.id' })

@@ -1,16 +1,13 @@
 import { trace, type Attributes, type Context } from '@opentelemetry/api'
 import type { ReadableSpan, Span, SpanProcessor } from '@opentelemetry/sdk-trace-base'
 
-/** PostHog keeps only `posthog_`-prefixed span attributes; everything else is dropped. */
+/** PostHog keeps only `posthog_`-prefixed span attributes. */
 const POSTHOG_PREFIX = 'posthog_'
 
 /**
- * Carry a turn's `posthog_*` attributes down its span tree.
- *
- * eve applies the runtime context returned by `step.started` to the step span
- * alone. Generation spans hang beneath it and inherit nothing, so without this
- * the events that carry cost reach PostHog with no environment and no
- * identity — and PostHog then invents an anonymous person per generation.
+ * Carry a turn's `posthog_*` attributes down its span tree. eve applies the
+ * `step.started` runtime context to the step span alone, so generation spans
+ * would otherwise reach PostHog with no environment and no identity.
  */
 export function createPostHogAttributeProcessor(): SpanProcessor {
   const inherited = new Map<string, Attributes>()

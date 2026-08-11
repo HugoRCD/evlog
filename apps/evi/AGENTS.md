@@ -16,6 +16,13 @@ Before adding a capability (tool, connection, skill, schedule, subagent), read
 the two-layer rule (files under `agent/` are wiring; logic goes in `agent/lib/`
 with a colocated test).
 
+## What reaches PostHog
+
+Metadata only — tokens, cost, latency, model, tool names. Prompts, responses,
+and tool payloads stay in the agent: turns carry third-party GitHub and Linear
+content. Turning that off rules out LLM-judge evaluations in PostHog, which is
+a deliberate trade.
+
 ## Evals cost real money
 
 `pnpm eval` runs the agent against a live model. Twenty evals is a real bill, so

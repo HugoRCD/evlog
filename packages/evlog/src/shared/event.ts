@@ -5,6 +5,37 @@
 import type { WideEvent } from '../types'
 
 /**
+ * Whether a value is a plain object, and so safe to walk field by field.
+ * A `Date`, a `Map`, or a class instance is treated as a leaf.
+ */
+export function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
+  const proto = Object.getPrototypeOf(value)
+  return proto === Object.prototype || proto === null
+}
+
+/**
+ * Flatten nested plain objects into dotted keys — `user.id`, `ai.costUsd`.
+ * Arrays and non-plain values are kept as they are; an empty object stays a
+ * leaf rather than disappearing.
+ */
+export function flattenRecord(
+  source: Record<string, unknown>,
+  prefix = '',
+  out: Record<string, unknown> = {},
+): Record<string, unknown> {
+  for (const [key, value] of Object.entries(source)) {
+    const path = prefix ? `${prefix}.${key}` : key
+    if (isPlainObject(value) && Object.keys(value).length > 0) {
+      flattenRecord(value, path, out)
+      continue
+    }
+    out[path] = value
+  }
+  return out
+}
+
+/**
  * One-line summary of a wide event — `POST /api/checkout (500)`.
  *
  * Limited to the request shape and its outcome: `method`, `path`, `status`.

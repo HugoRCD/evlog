@@ -3,6 +3,7 @@ import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineDrain, defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
+import { flattenRecord } from '../shared/event'
 import { sendBatchToOTLP } from './otlp'
 import type { OTLPConfig, OTLPRecordShape } from './otlp'
 
@@ -57,7 +58,12 @@ export interface PostHogConfig {
    */
   sessionIdField?: string
   /**
-   * Log record shape in `'logs'` mode. Default: `'json'`.
+   * Record shape. Default: `'json'`.
+   *
+   * In `'events'` mode, `'compact'` flattens nested properties into dotted
+   * keys (`ai.costUsd`), which is what the PostHog UI filters and breaks down
+   * by — a nested object is one opaque property there.
+   *
    * @see {@link OTLPRecordShape}
    */
   recordShape?: OTLPRecordShape
@@ -158,6 +164,7 @@ function withPostHogIdentity(event: WideEvent, config: PostHogConfig): WideEvent
 export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHogEvent {
   const { timestamp, level, service, ...rest } = event
   const distinctId = resolveDistinctId(event, config)
+  const fields = config.recordShape === 'compact' ? flattenRecord(rest) : rest
   return {
     event: config.eventName ?? 'evlog_wide_event',
     distinct_id: distinctId ?? service,
@@ -165,7 +172,7 @@ export function toPostHogEvent(event: WideEvent, config: PostHogConfig): PostHog
     properties: {
       level,
       service,
-      ...rest,
+      ...fields,
       ...(distinctId === undefined ? { $process_person_profile: false } : {}),
     },
   }
