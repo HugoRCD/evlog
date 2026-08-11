@@ -203,6 +203,42 @@ describe('loadBaseline', () => {
 
     expect(() => loadBaseline(dir, 'missing.json')).toThrow(/missing\.json/)
   })
+
+  it('reads a committed map from an explicit git ref', async () => {
+    const dir = await tempProject()
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' })
+    await writeFile(join(dir, 'evlog.map.json'), JSON.stringify(mapOf([], 55)), 'utf8')
+    git('init', '-q')
+    git('add', '-A')
+    git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base')
+
+    const { map, source } = loadBaseline(dir, 'git:HEAD')
+
+    expect(map.score).toBe(55)
+    expect(source).toEqual({ kind: 'git', label: 'git:HEAD' })
+  })
+
+  it('names a git ref that does not exist', async () => {
+    const dir = await tempProject()
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' })
+    git('init', '-q')
+
+    expect(() => loadBaseline(dir, 'git:nope')).toThrow(/No git ref nope/)
+  })
+
+  it('says a ref with no committed map needs one instead of a generic not found', async () => {
+    /* the ratchet reads the map through git, so a file the docs told you to
+       gitignore is unreachable; the error has to name that cause rather than
+       collapsing into a plain "not found" */
+    const dir = await tempProject()
+    const git = (...args: string[]) => execFileSync('git', ['-C', dir, ...args], { stdio: 'ignore' })
+    await writeFile(join(dir, 'package.json'), '{}', 'utf8')
+    git('init', '-q')
+    git('add', '-A')
+    git('-c', 'user.email=t@t', '-c', 'user.name=t', 'commit', '-qm', 'base')
+
+    expect(() => loadBaseline(dir, 'git:HEAD')).toThrow(/needs a committed map/)
+  })
 })
 
 describe('checkBaselineVersion', () => {
