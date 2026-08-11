@@ -210,6 +210,11 @@ const TURN_ONLY_KEYS = new Set([
   'spanId',
 ])
 
+/**
+ * Globally unique id for one turn. eve numbers turns within a session, so
+ * `turn_0` is the first turn of *every* session and cannot correlate anything
+ * on its own.
+ */
 function turnKey(sessionId: string, turnId: string): string {
   return `${sessionId}:${turnId}`
 }
@@ -782,7 +787,7 @@ function getOrCreateTurnState(
   const middlewareOptions: MiddlewareLoggerOptions = {
     method: 'EVE',
     path,
-    requestId: turnId,
+    requestId: key,
     ...pickBaseEvlogOptions(options),
   }
 
@@ -1476,7 +1481,7 @@ export function evlogRuntimeContext(
   if (!state) return undefined
 
   return {
-    'evlog.request_id': state.turnId,
+    'evlog.request_id': turnKey(state.sessionId, state.turnId),
     'evlog.session_id': state.sessionId,
   }
 }

@@ -336,6 +336,17 @@ describe('evlog/eve', () => {
     expect(event?.channel).toMatchObject({ kind: 'http' })
   })
 
+  it('qualifies requestId with the session, since turn ids restart at 0', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    await runTurn(hook)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.requestId).toBe(`${SESSION_ID}:${TURN_ID}`)
+  })
+
   it('accumulates token usage across multiple steps', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })
@@ -1741,7 +1752,7 @@ describe('defineEvlogInstrumentation', () => {
 
     expect(instrumentation.events!['step.started']!(stepStartedInput())).toEqual({
       runtimeContext: {
-        'evlog.request_id': TURN_ID,
+        'evlog.request_id': `${SESSION_ID}:${TURN_ID}`,
         'evlog.session_id': SESSION_ID,
       },
     })
@@ -1816,7 +1827,7 @@ describe('evlogRuntimeContext', () => {
       ...evlogRuntimeContext(stepStartedInput()),
       posthog_distinct_id: 'user_1',
     }).toEqual({
-      'evlog.request_id': TURN_ID,
+      'evlog.request_id': `${SESSION_ID}:${TURN_ID}`,
       'evlog.session_id': SESSION_ID,
       posthog_distinct_id: 'user_1',
     })
