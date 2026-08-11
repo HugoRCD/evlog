@@ -10,7 +10,7 @@ export default defineEval({
   // clarifying question, which is the documented behavior, so the run-complete
   // assertion would fail a correct answer.
   description: 'A bug report triggers an issue search before an explanation.',
-  tags: ['fast'],
+  tags: ['fast', 'needs-connect'],
   async test(t) {
     await t.send('evlog redaction is broken for me — my authorization header still shows up in the drained event.')
     t.noFailedActions()

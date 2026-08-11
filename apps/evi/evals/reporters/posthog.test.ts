@@ -1,6 +1,7 @@
 import type { EveEvalResult, EveEvalRunSummary } from 'eve/evals'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { sendBatchToPostHogEvents } from 'evlog/posthog'
+import { MODEL } from '../../agent/lib/model'
 import { PostHogReporter, resolveRunIdentity, toEvalEvent, toRunEvent } from './posthog'
 
 vi.mock('evlog/posthog', () => ({ sendBatchToPostHogEvents: vi.fn() }))
@@ -173,12 +174,11 @@ describe('resolveRunIdentity', () => {
       GITHUB_RUN_ID: '99',
       GITHUB_SHA: 'abcdef1234567890',
       GITHUB_REF_NAME: 'feat/x',
-      EVI_MODEL: 'anthropic/claude-opus-5',
     } as NodeJS.ProcessEnv)
 
     expect(resolved).toEqual({
       runId: '99',
-      model: 'anthropic/claude-opus-5',
+      model: MODEL,
       commit: 'abcdef1',
       branch: 'feat/x',
     })
@@ -188,7 +188,8 @@ describe('resolveRunIdentity', () => {
     const resolved = resolveRunIdentity({} as NodeJS.ProcessEnv)
 
     expect(resolved.runId).toBe('local')
-    expect(resolved.model).toBe('default')
+    // The resolved model, so a run is comparable even with no override set.
+    expect(resolved.model).toBe(MODEL)
     expect(resolved).not.toHaveProperty('commit')
   })
 })
