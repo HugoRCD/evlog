@@ -1,19 +1,20 @@
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { channelName } from '../lib/channel'
-import { NO_DB_ERROR, saveFeedback } from '../lib/feedback'
-import { isAutonomous } from '../lib/trust'
+import { feedbackStats, NO_DB_ERROR, saveFeedback } from '../lib/feedback'
+import { canAccessAdminTools, isAutonomous } from '../lib/trust'
 
 // Feedback capture is a small, user-requested write: it stays off the approval
-// cards. Autonomous first-responder turns never see the tool (they process
-// untrusted text and have no one to confirm with). Keep executes inline in the
-// resolver (docs/notes.md).
+// cards. Autonomous first-responder turns never see it (they process untrusted
+// text and have no one to confirm with). The stats tool is admin-only. Keep
+// executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) => {
       if (isAutonomous(ctx.session.auth.current)) return null
       const channel = channelName(ctx.channel.kind)
       const sessionRef = ctx.session.id
+      const admin = canAccessAdminTools(ctx.session.auth.current)
       return {
         feedback__record: defineTool({
           description:
@@ -43,6 +44,25 @@ export default defineDynamic({
             return result
           },
         }),
+        ...(admin
+          ? {
+            feedback__stats: defineTool({
+              description:
+                  'Read feedback statistics from the store since a number of days ago: totals, positive/negative split, reaction vs written counts, per-channel counts, and the most recent written negative feedback with its reasons. Use it to review how Evi is doing, or as input to the weekly self-review or evals.',
+              inputSchema: z.object({
+                sinceDays: z.number().int().min(1).max(365).default(7).describe('How far back to aggregate, in days. Defaults to 7.'),
+              }),
+              async execute(input, toolCtx) {
+                if (!canAccessAdminTools(toolCtx.session.auth.current)) {
+                  return { success: false as const, error: 'Feedback statistics are only available to admin sessions.' }
+                }
+                const since = new Date(Date.now() - input.sinceDays * 24 * 60 * 60 * 1000)
+                const stats = await feedbackStats(since)
+                return { success: true as const, sinceDays: input.sinceDays, ...stats }
+              },
+            }),
+          }
+          : {}),
       }
     },
   },

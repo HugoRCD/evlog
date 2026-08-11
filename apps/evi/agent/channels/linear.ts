@@ -1,6 +1,6 @@
 import { connectLinearCredentials } from '@vercel/connect/eve'
 import { linearChannel } from 'eve/channels/linear'
-import { saveFeedback, verdictFromReactionEmoji } from '../lib/feedback'
+import { captureReaction } from '../lib/feedback'
 
 export default linearChannel({
   credentials: connectLinearCredentials('linear/evi'),
@@ -16,16 +16,13 @@ export default linearChannel({
       : typeof data?.emoji === 'string'
         ? data.emoji
         : ''
-    const verdict = emoji === '' ? null : verdictFromReactionEmoji(emoji)
-    if (!verdict) return
-
     const commentId = typeof data?.commentId === 'string' ? data.commentId : undefined
     const userId = typeof data?.userId === 'string' ? data.userId : undefined
-    await saveFeedback({
+    await captureReaction({
       channel: 'linear',
-      verdict,
+      emoji,
       author: userId ?? 'linear:unknown',
-      source: 'reaction',
+      added: true,
       messageRef: commentId,
     })
   },
