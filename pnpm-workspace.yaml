@@ -18,6 +18,7 @@ allowBuilds:
   isolated-vm: true
   sharp: true
   maplibre-gl: false
+  core-js: false
 
 overrides:
   # A second @types/react copy makes React.Key incompatible with itself in
