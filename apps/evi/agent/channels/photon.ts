@@ -1,6 +1,21 @@
 import { connectPhotonCredentials } from '@vercel/connect/eve'
 import { photonIMessageChannel } from 'eve/channels/photon'
+import { captureReaction } from '../lib/feedback'
 import { MAINTAINER_PHONE } from '../lib/trust'
+
+/**
+ * The inbound reaction (tapback) the repo's eve patch bridges out of the
+ * Chat SDK. Kept local so the patch does not have to widen the package's
+ * public index.
+ */
+interface PhotonReactionEvent {
+  emoji: string
+  rawEmoji?: string
+  added: boolean
+  messageId: string
+  threadId: string
+  userName: string
+}
 
 const MAX_VALUE_LENGTH = 160
 
@@ -24,6 +39,17 @@ export default photonIMessageChannel({
         principalType: 'user',
       },
     }
+  },
+  // A thumbs up/down tapback on an iMessage becomes a verdict on that message.
+  onReaction: async (reaction: PhotonReactionEvent) => {
+    await captureReaction({
+      channel: 'imessage',
+      emoji: reaction.emoji,
+      author: reaction.userName || 'imessage:unknown',
+      added: reaction.added,
+      messageRef: reaction.messageId,
+      threadRef: reaction.threadId,
+    })
   },
   events: {
     async 'input.requested'(event, channel) {
