@@ -3,7 +3,7 @@ import type { ConfigField } from '../shared/config'
 import { formatPublicEnvKeys, resolveAdapterConfig } from '../shared/config'
 import type { HttpDrainRequest } from '../shared/drain'
 import { defineHttpDrain, sendEncodedDrainRequest } from '../shared/drain'
-import { formatEventSummary, toOtlpAttributeValue } from '../shared/event'
+import { formatEventSummary, isPlainObject, toOtlpAttributeValue } from '../shared/event'
 import { OTEL_SEVERITY_NUMBER, OTEL_SEVERITY_TEXT } from '../shared/severity'
 
 /**
@@ -90,13 +90,6 @@ const OTLP_FIELDS: ConfigField<OTLPConfig>[] = [
 // Re-exposed under a local name to keep call-sites tight while delegating to
 // the shared OTLP attribute encoder in `evlog/toolkit`.
 const toAttributeValue = toOtlpAttributeValue
-
-/** Recursive flattening is limited to these; everything else is serialized whole. */
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== 'object' || value === null || Array.isArray(value)) return false
-  const proto = Object.getPrototypeOf(value)
-  return proto === Object.prototype || proto === null
-}
 
 /**
  * Flatten nested plain objects into dotted attribute keys — `ai.costUsd`,

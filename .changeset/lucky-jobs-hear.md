@@ -18,4 +18,6 @@ The `otlp`, `posthog`, and `hyperdx` adapters accept a new `recordShape` option.
 createOTLPDrain({ recordShape: 'compact' })
 ```
 
-The default stays `'json'` — the whole event in the body, one attribute per top-level field — so existing records and the queries built on them are unchanged. `'compact'` becomes the default in the next major.
+In `mode: 'events'`, `'compact'` flattens the same way, so nested fields become properties the PostHog UI can filter and break down by rather than one opaque object.
+
+The default stays `'json'` — the whole event in the body, one attribute per top-level field, nested properties untouched — so existing records and the queries built on them are unchanged. `'compact'` becomes the default in the next major.
