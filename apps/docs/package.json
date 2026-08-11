@@ -12,7 +12,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@databuddy/nuxt": "^2.4.20",
     "@nuxt/fonts": "0.14.0",
     "@nuxt/icon": "^2.3.1",
     "@nuxt/ui": "^4.10.0",
@@ -26,11 +25,13 @@
     "nostics": "^1.2.0",
     "nuxt": "^4.4.4",
     "nuxt-studio": "^1.7.0",
+    "posthog-js": "^1.414.0",
     "satori": "^0.28.0",
     "shaders": "^2.5.135"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
+    "nuxt-site-config": "4.1.1",
     "vitest": "^4.1.10"
   }
 }

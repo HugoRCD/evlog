@@ -10,6 +10,10 @@ export default defineNuxtConfig({
   },
 
   routeRules: {
+    // First-party path for PostHog ingestion: a docs site for developers loses
+    // most of its traffic to blockers otherwise.
+    '/_ph/static/**': { proxy: 'https://eu-assets.i.posthog.com/static/**' },
+    '/_ph/**': { proxy: 'https://eu.i.posthog.com/**' },
     '/': { prerender: true, headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
     '/_nuxt/**': { headers: { 'cache-control': 'public, max-age=31536000, immutable' } },
     '/**': { headers: { 'cache-control': 'public, max-age=0, must-revalidate' } },
@@ -31,18 +35,7 @@ export default defineNuxtConfig({
     'nuxt-studio',
     '@vercel/analytics',
     '@vercel/speed-insights',
-    '@databuddy/nuxt',
   ],
-
-  databuddy: {
-    clientId: '389b5a41-31cb-4ea4-a5e8-8ec3ac4ffccc',
-    trackWebVitals: true,
-    trackErrors: true,
-    trackHashChanges: true,
-    trackOutgoingLinks: true,
-    trackInteractions: true,
-    trackAttributes: true,
-  },
 
   colorMode: {
     preference: 'dark',
@@ -145,6 +138,7 @@ export default defineNuxtConfig({
   runtimeConfig: {
     public: {
       justUseEvlogUrl: process.env.NUXT_PUBLIC_JUST_USE_EVLOG_URL || '',
+      posthogKey: process.env.NUXT_PUBLIC_POSTHOG_KEY || '',
     },
   },
 
