@@ -144,4 +144,21 @@ describe('map telemetry', () => {
     expect(MAP_TELEMETRY_FIELDS.mapFramework).toContain('tanstack-start')
     expect(MAP_TELEMETRY_FIELDS.mapGrade).toContain('at-risk')
   })
+
+  it('reports the machine run ordinal and score delta when the state exists', () => {
+    const out = fields({ runState: { ordinal: 4, delta: 6 } })
+    expect(out.mapRunOrdinal).toBe(4)
+    expect(out.mapScoreDelta).toBe(6)
+  })
+
+  it('omits the score delta when the run state has no previous score', () => {
+    expect(fields({ runState: { ordinal: 1 } })).not.toHaveProperty('mapScoreDelta')
+    expect(fields({ runState: { ordinal: 1 } }).mapRunOrdinal).toBe(1)
+  })
+
+  it('omits both run-state fields when no state was advanced', () => {
+    const out = fields()
+    expect(out).not.toHaveProperty('mapRunOrdinal')
+    expect(out).not.toHaveProperty('mapScoreDelta')
+  })
 })

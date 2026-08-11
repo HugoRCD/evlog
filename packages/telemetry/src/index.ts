@@ -10,6 +10,7 @@ export { defineTelemetryCommands } from './commands'
 export { createGitHubActionsTelemetry, type GitHubActionsTelemetryOptions } from './github-actions'
 export { generateDisclosure, exampleRunEvent, type DisclosureDocument } from './disclosure'
 export { parseIngestBody, IngestValidationError, type IngestValidatorOptions } from './ingest'
+export { advanceRunState, purgeRunState, type RunState } from './run-state'
 export { FLAG_VALUE_SET } from './sanitize'
 
 export type {

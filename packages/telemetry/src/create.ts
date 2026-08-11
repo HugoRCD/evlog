@@ -1,6 +1,6 @@
 import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
-import { readPreferenceSync, resolveConsent, writePreference, purgeOutbox } from './consent'
+import { readPreferenceSync, resolveConsent, writePreference, purgeTelemetryState } from './consent'
 import {
   composeDrains,
   createDebugDrain,
@@ -239,13 +239,13 @@ export const telemetry = {
   },
 }
 
-/** Disable telemetry and purge the local outbox. */
+/** Disable telemetry and purge the local outbox and run state. */
 export async function disableTelemetry(toolName: string): Promise<void> {
   if (activeHandle?.options.name === toolName) {
     activeHandle.setEnabled(false)
   }
   await writePreference(toolName, 'disabled')
-  await purgeOutbox(toolName)
+  await purgeTelemetryState(toolName)
 }
 
 /** Enable telemetry (persisted preference). */

@@ -92,6 +92,8 @@ export const DEFAULT_ALLOWED_CUSTOM_KEYS: Record<string, string[]> = {
     'mapProjectSuggestions',
     'mapGate',
     'mapGateFailed',
+    'mapRunOrdinal',
+    'mapScoreDelta',
     'mapMinScore',
     'mapBaselineDelta',
     'mapBaselineRegressions',

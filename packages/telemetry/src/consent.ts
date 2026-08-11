@@ -3,6 +3,7 @@ import { mkdir, writeFile } from 'node:fs/promises'
 import { join } from 'node:path'
 import { getTelemetryDir } from './paths'
 import { TelemetryOutbox } from './outbox'
+import { purgeRunState } from './run-state'
 
 /**
  * Persisted telemetry consent state for a tool.
@@ -48,7 +49,8 @@ export async function writePreference(toolName: string, preference: TelemetryPre
   await writeFile(join(dir, 'preference.json'), JSON.stringify({ preference }), 'utf-8')
 }
 
-/** Remove the outbox on opt-out (retroactive on undelivered data). */
-export async function purgeOutbox(toolName: string): Promise<void> {
+/** Remove local telemetry state on opt-out (retroactive on undelivered data). */
+export async function purgeTelemetryState(toolName: string): Promise<void> {
   await new TelemetryOutbox({ toolName }).purge()
+  await purgeRunState(toolName)
 }

@@ -44,9 +44,10 @@ export function buildEnvInfo(options: { environment?: string } = {}): EnvInfo {
 }
 
 /**
- * Ephemeral CI environments skip machine id (no stable cross-run identity).
+ * Ephemeral CI environments skip machine id (no stable cross-run identity),
+ * and with it any cross-run state such as a run counter.
  */
-function isEphemeralCI(): boolean {
+export function isEphemeralCI(): boolean {
   return isCI && !process.env.EVLOG_TELEMETRY_MACHINE_ID
 }
 

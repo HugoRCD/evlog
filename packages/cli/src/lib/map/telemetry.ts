@@ -1,4 +1,5 @@
-import { telemetry } from '@evlog/telemetry'
+import { advanceRunState, telemetry } from '@evlog/telemetry'
+import { TOOL_NAME } from '../constants'
 import type { BaselineComparison } from './baseline'
 import { hasRegressed } from './baseline'
 import { RULES } from './rules/index'
@@ -82,6 +83,7 @@ export function mapTelemetryFields(input: {
   baseline: BaselineComparison | null
   view: MapView
   wrote: boolean
+  runState?: { ordinal: number, delta?: number }
 }): Record<string, boolean | number | string> {
   const { scan } = input
   const { routes } = scan.map
@@ -115,6 +117,13 @@ export function mapTelemetryFields(input: {
     fields.mapBaselineAdded = input.baseline.added.length
   }
 
+  /* Whether the score moved since the previous map run on this machine. The
+     delta is absent on the first run, which has no previous score. */
+  if (input.runState) {
+    fields.mapRunOrdinal = input.runState.ordinal
+    if (input.runState.delta !== undefined) fields.mapScoreDelta = input.runState.delta
+  }
+
   /* Whether CI actually went red. The count of people who wired a gate at all
      is the adoption number; this is the one that says it does something. */
   fields.mapGateFailed
@@ -125,11 +134,12 @@ export function mapTelemetryFields(input: {
 }
 
 /** Record one `evlog map` scan on the active telemetry run. */
-export function recordMapRun(input: Parameters<typeof mapTelemetryFields>[0]): void {
+export async function recordMapRun(input: Parameters<typeof mapTelemetryFields>[0]): Promise<void> {
+  const runState = await advanceRunState(TOOL_NAME, 'map', input.scan.map.score)
   /* Typed for numbers and booleans because strings need an allowlisted key —
      ours are, on the wrapper. The cast cannot get an unlisted value past
      `sanitizeCustom`. */
-  telemetry.set(mapTelemetryFields(input) as Record<string, boolean | number>)
+  telemetry.set(mapTelemetryFields(runState ? { ...input, runState } : input) as Record<string, boolean | number>)
 }
 
 /**
@@ -169,5 +179,6 @@ export function mapTelemetryFieldNames(): string[] {
     baseline: emptyBaseline,
     view: 'summary',
     wrote: false,
+    runState: { ordinal: 1, delta: 0 },
   }))
 }

@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { defineCommand, runCommand } from 'citty'
 import { afterEach, beforeEach, describe, expect, it } from 'vitest'
-import { resolveConsent, purgeOutbox } from '../src/consent'
+import { resolveConsent, purgeTelemetryState } from '../src/consent'
 import { FLAG_VALUE_SET, sanitizeFlags, sanitizeCustom, sanitizeSystemCustom } from '../src/sanitize'
 import { computeRunIdempotencyKey } from '../src/idempotency'
 import { generateDisclosure, exampleRunEvent } from '../src/disclosure'
@@ -159,7 +159,7 @@ describe('telemetry outbox', () => {
   it('purges on opt-out', async () => {
     const outbox = new TelemetryOutbox({ toolName: TOOL })
     await outbox.append(exampleRunEvent())
-    await purgeOutbox(TOOL)
+    await purgeTelemetryState(TOOL)
     expect(await outbox.readAll()).toHaveLength(0)
   })
 

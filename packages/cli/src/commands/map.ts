@@ -281,7 +281,7 @@ export default defineEvlogCommand('map', {
       throw error
     }
 
-    recordMapRun({
+    await recordMapRun({
       scan: result.scan,
       frameworkForced: framework !== undefined,
       gate: resolveGate({ minScore: threshold !== undefined, baseline: result.baseline !== null }),
