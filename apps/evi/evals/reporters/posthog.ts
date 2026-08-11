@@ -2,6 +2,7 @@ import type { EveEvalResult, EveEvalRunSummary } from 'eve/evals'
 import type { EvalReporter } from 'eve/evals/reporters'
 import type { WideEvent } from 'evlog'
 import { sendBatchToPostHogEvents } from 'evlog/posthog'
+import { MODEL } from '../../agent/lib/model'
 
 /** Recorded on every event so runs stay comparable. */
 export interface EvalRunIdentity {
@@ -18,9 +19,11 @@ const SERVICE = 'evi-evals'
 export function resolveRunIdentity(env: NodeJS.ProcessEnv = process.env): EvalRunIdentity {
   return {
     // `||`, not `??`: an unset workflow_dispatch input arrives as an empty
-    // string, which would otherwise be recorded as the model under test.
+    // string, which would otherwise be recorded as the run id.
     runId: env.GITHUB_RUN_ID || 'local',
-    model: env.EVI_MODEL || 'default',
+    // The resolved model, never the override's name: recording `default` would
+    // silently mean a different model once the constant in agent.ts changes.
+    model: MODEL,
     ...(env.GITHUB_SHA ? { commit: env.GITHUB_SHA.slice(0, 7) } : {}),
     ...(env.GITHUB_REF_NAME ? { branch: env.GITHUB_REF_NAME } : {}),
   }

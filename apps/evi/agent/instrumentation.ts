@@ -4,6 +4,7 @@ import { registerOTel } from '@vercel/otel'
 import { defineInstrumentation } from 'eve/instrumentation'
 import { evlogRuntimeContext } from 'evlog/eve'
 import { environment } from './lib/environment'
+import { createPostHogAttributeProcessor } from './lib/posthog-spans'
 
 /**
  * OpenTelemetry spans for every turn, carrying evlog's correlation ids and the
@@ -24,6 +25,7 @@ export default defineInstrumentation({
     registerOTel({
       serviceName: agentName,
       spanProcessors: [
+        createPostHogAttributeProcessor(),
         new SimpleSpanProcessor(new PostHogTraceExporter({
           projectToken,
           ...(process.env.POSTHOG_HOST ? { host: process.env.POSTHOG_HOST } : {}),
@@ -37,9 +39,14 @@ export default defineInstrumentation({
       // The run is attributed to whoever opened the session, not to the caller
       // of the current turn.
       const distinctId = input.session.auth.initiator?.principalId ?? caller?.principalId
+      const evlog = evlogRuntimeContext(input)
       return {
         runtimeContext: {
-          ...evlogRuntimeContext(input),
+          ...evlog,
+          // PostHog keeps only `posthog_`-prefixed attributes and strips the
+          // prefix, so the evlog ids are repeated under names that survive.
+          ...(evlog ? { posthog_evlog_request_id: evlog['evlog.request_id'] } : {}),
+          ...(evlog ? { posthog_evlog_session_id: evlog['evlog.session_id'] } : {}),
           posthog_environment: environment(),
           // Omitted rather than blank: an empty attribute reads as an empty id.
           ...(distinctId ? { posthog_distinct_id: distinctId } : {}),

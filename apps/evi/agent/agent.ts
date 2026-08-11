@@ -1,8 +1,6 @@
 import { defineAgent, defineDynamic } from 'eve'
 import { gatewayRouting, sessionTags } from './lib/gateway'
-
-/** `EVI_MODEL` overrides the model, for running the eval suite on a candidate. */
-const MODEL = process.env.EVI_MODEL || 'deepseek/deepseek-v4-flash'
+import { MODEL } from './lib/model'
 
 export default defineAgent({
   model: defineDynamic({
