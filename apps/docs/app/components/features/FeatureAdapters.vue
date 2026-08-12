@@ -371,7 +371,6 @@ function setupCanvas() {
           <div ref="containerRef" class="relative flex flex-col items-center w-full border-t border-muted/50 pt-6 sm:pt-10 pb-5 px-3">
             <canvas ref="canvasRef" class="absolute top-0 left-0 pointer-events-none hidden sm:block" />
 
-            <!-- evlog hub -->
             <div data-node="evlog" class="relative z-10 flex flex-col items-center border border-primary/30 bg-default px-6 py-3">
               <div class="flex items-center gap-1.5">
                 <span class="relative flex size-1.5">

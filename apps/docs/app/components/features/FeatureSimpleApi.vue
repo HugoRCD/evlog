@@ -93,7 +93,6 @@ function setOutput(type: 'success' | 'error') {
     </Motion>
 
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
-      <!-- Left: Combined handler code -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
@@ -131,7 +130,6 @@ function setOutput(type: 'success' | 'error') {
         </div>
       </Motion>
 
-      <!-- Right: Output with 200/402 toggle -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
@@ -168,9 +166,7 @@ function setOutput(type: 'success' | 'error') {
             </div>
           </div>
 
-          <!-- Stacked outputs — grid trick for stable height -->
           <div class="grid [&>*]:col-start-1 [&>*]:row-start-1">
-            <!-- Success output -->
             <div
               class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto transition-opacity duration-300"
               :class="activeOutput === 'success' ? 'opacity-100' : 'opacity-0 pointer-events-none'"
@@ -206,7 +202,6 @@ function setOutput(type: 'success' | 'error') {
               </div>
             </div>
 
-            <!-- Error output -->
             <div
               class="p-5 font-mono text-xs sm:text-sm leading-relaxed overflow-x-auto transition-opacity duration-300"
               :class="activeOutput === 'error' ? 'opacity-100' : 'opacity-0 pointer-events-none'"

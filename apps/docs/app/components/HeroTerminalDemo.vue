@@ -148,9 +148,7 @@ const levelColors: Record<string, string> = {
 
 <template>
   <div ref="rootRef" class="w-full max-w-7xl mx-auto px-4">
-    <!-- Sources + Terminal grid -->
     <div class="grid grid-cols-1 lg:grid-cols-[160px_1fr_160px] gap-0 items-center">
-      <!-- Left sources with connector lines -->
       <div class="hidden lg:flex flex-col items-end gap-10">
         <div v-for="(src, idx) in sourcesLeft" :key="src.label" class="flex items-center gap-0">
           <div class="flex items-center gap-2 px-3 py-2.5 bg-default border border-muted font-mono text-[10px] shrink-0">
@@ -166,7 +164,6 @@ const levelColors: Record<string, string> = {
         </div>
       </div>
 
-      <!-- Terminal -->
       <div class="mask-b-from-90%">
         <div class="terminal-container overflow-hidden bg-default shadow-2xl shadow-black/60">
           <div class="flex items-center border-b border-muted/30 px-5 py-3">
@@ -200,7 +197,6 @@ const levelColors: Record<string, string> = {
             <div class="absolute inset-x-0 bottom-0 h-6 bg-linear-to-t from-default to-transparent z-10 pointer-events-none" />
             <div class="absolute inset-0 terminal-dots pointer-events-none" />
 
-            <!-- Chaos Logs -->
             <div
               class="absolute inset-0 px-5 py-4 md:px-6 md:py-5 font-mono text-[11px] md:text-xs overflow-hidden transition-all duration-600"
               :class="phase === 'resolved' ? 'opacity-0 scale-[0.97] blur-xs' : 'opacity-100'"
@@ -273,7 +269,6 @@ const levelColors: Record<string, string> = {
               </Transition>
             </div>
 
-            <!-- Wide Event -->
             <Transition
               enter-active-class="transition-all duration-600 ease-out"
               enter-from-class="opacity-0 translate-y-3"
@@ -333,7 +328,6 @@ const levelColors: Record<string, string> = {
         </div>
       </div>
 
-      <!-- Right sources with connector lines -->
       <div class="hidden lg:flex flex-col items-start gap-10">
         <div v-for="(src, idx) in sourcesRight" :key="src.label" class="flex items-center gap-0">
           <div class="w-5 h-px bg-muted relative overflow-hidden">
@@ -350,7 +344,6 @@ const levelColors: Record<string, string> = {
       </div>
     </div>
 
-    <!-- Questions below terminal -->
     <div class="hidden lg:flex justify-center gap-3 mt-6 max-w-4xl mx-auto flex-wrap">
       <div
         v-for="(q, idx) in questions"

@@ -159,7 +159,6 @@ function display(field: Field, idx: number) {
       </div>
 
       <div class="relative px-4 sm:px-6 py-4 font-mono text-[11px] sm:text-xs">
-        <!-- Scanner bar -->
         <div
           v-show="scanning"
           aria-hidden="true"
