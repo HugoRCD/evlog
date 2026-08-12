@@ -123,6 +123,22 @@ const shortcutsOpen = ref(false)
 
 /** Composition overlay — thirds, safe area, rulers. Never filmed. */
 const guides = ref(false)
+/** The axis gizmo, off by default: it is a readout, not part of the picture. */
+const gizmo = ref(false)
+
+/**
+ * Put the camera square onto an axis.
+ *
+ * Roll goes to zero alongside, because "look down X" means a level shot down X
+ * — leaving a tilt on would land you square to the plate and still crooked,
+ * which is not what anyone clicking an axis is asking for.
+ */
+function snapCamera(pitch: number, yaw: number) {
+  settings.value.pitch = pitch
+  settings.value.yaw = yaw
+  settings.value.roll = 0
+  cue('toggle')
+}
 /** Pointer over the frame, 0..1, for the crosshair readout. */
 const framePointer = ref<{ x: number, y: number } | null>(null)
 
@@ -2342,10 +2358,28 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
             contains, so they live on the frame instead of down a section of the
             panel — and being visible is how anyone finds out they exist.
           -->
+          <!--
+            Opposite the instruments and clear of the middle. It is a compass,
+            and a compass belongs in a corner rather than over the thing you are
+            trying to look at.
+          -->
+          <div
+            v-if="gizmo"
+            class="absolute right-2 top-2"
+          >
+            <LabGizmo
+              :pitch="settings.pitch"
+              :yaw="settings.yaw"
+              :roll="settings.roll"
+              @snap="snapCamera"
+            />
+          </div>
+
           <div class="absolute left-2 top-2 flex flex-col gap-1">
             <button
               v-for="tool in [
                 { key: 'guides', icon: 'i-lucide-grid-2x2', label: 'Guides, safe area and rulers (G)', on: guides },
+                { key: 'gizmo', icon: 'i-lucide-axis-3d', label: 'Which way the camera is pointing', on: gizmo },
                 { key: 'focus', icon: 'i-lucide-crosshair', label: 'Click a spot in the frame to focus on it', on: picking },
               ]"
               :key="tool.key"
@@ -2356,7 +2390,11 @@ onBeforeUnmount(() => window.removeEventListener('keydown', onKeydown))
                 ? 'border-blue-500/60 bg-blue-500/15 text-blue-300'
                 : 'border-white/10 bg-black/40 text-white/45 hover:border-white/25 hover:text-white/90'"
               :title="tool.label"
-              @click="tool.key === 'guides' ? (guides = !guides) : (picking ? cancelPicking() : (picking = true))"
+              @click="tool.key === 'guides'
+                ? (guides = !guides)
+                : tool.key === 'gizmo'
+                  ? (gizmo = !gizmo)
+                  : (picking ? cancelPicking() : (picking = true))"
             >
               <UIcon :name="tool.icon" class="size-3.5" />
             </button>

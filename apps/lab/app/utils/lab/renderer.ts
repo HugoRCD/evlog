@@ -724,8 +724,13 @@ function normalize(v: Vec3): Vec3 {
 /**
  * Rotation basis, column-major to match the shader's `mat3` construction so the
  * CPU and GPU agree on which way the plate is facing.
+ *
+ * Exported because the axis gizmo has to draw the same basis the renderer uses.
+ * A second copy of this in a component would be a second thing to keep in step
+ * with the shader, and the gizmo's whole job is to be trusted about which way
+ * the plate is pointing.
  */
-function rotationMatrix(pitch: number, yaw: number, roll: number): number[] {
+export function rotationMatrix(pitch: number, yaw: number, roll: number): number[] {
   const cx = Math.cos(pitch), sx = Math.sin(pitch)
   const cy = Math.cos(yaw), sy = Math.sin(yaw)
   const cz = Math.cos(roll), sz = Math.sin(roll)
