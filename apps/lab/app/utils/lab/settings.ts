@@ -96,6 +96,22 @@ export interface LabSettings {
    * the edge of the frame is squeezed into a lens — the cat's eye.
    */
   bokehCatEye: number
+  /**
+   * Field curvature, as a whirlpool.
+   *
+   * An uncorrected field draws an off-axis highlight as an arc rather than a
+   * circle, and the arcs sweep around the frame. It is the one lens defect
+   * nobody tries to remove.
+   */
+  bokehSwirl: number
+  /** Squeezes the bokeh into a standing oval, the way an anamorphic front does. */
+  bokehSqueeze: number
+  /**
+   * How far the plane of sharpness leans away from the sensor, and about which
+   * axis. Zero is the parallel plane every ordinary lens is stuck with.
+   */
+  focusTilt: number
+  focusTiltAngle: number
 
   // Bloom
   bloomIntensity: number
@@ -202,6 +218,10 @@ export const DEFAULT_SETTINGS: LabSettings = {
   blurRadius: 12,
   bokehBlades: 0,
   bokehCatEye: 0,
+  bokehSwirl: 0,
+  bokehSqueeze: 0,
+  focusTilt: 0,
+  focusTiltAngle: 0,
 
   bloomIntensity: 0.35,
   bloomThreshold: 0.75,
@@ -259,6 +279,10 @@ export const HINTS: Partial<Record<string, string>> = {
   blurRadius: 'Widest the bokeh can grow, measured on a 1080p frame.',
   bokehBlades: 'Sides of the aperture. Zero is a perfect disc; six is what an iris gives.',
   bokehCatEye: 'Squeezes the bokeh into a lens shape towards the corners, the way a barrel does.',
+  bokehSwirl: 'Bends the bokeh into arcs that sweep around the frame — an uncorrected field.',
+  bokehSqueeze: 'Stands the bokeh up into ovals, the way an anamorphic front element does.',
+  focusTilt: 'Leans the sharp plane away from the sensor, so it cuts across the frame instead of facing it.',
+  focusTiltAngle: 'Which way that lean runs.',
   streaks: 'Stretches the highlights sideways, the way an anamorphic lens flares.',
   ghosts: 'Reflections thrown back across the centre from whatever is bright.',
   emission: 'How bright the picture is before it glows. Raise it to give bloom something to catch; it is what feeds the glow, not the glow itself.',
@@ -297,6 +321,10 @@ export const RANGES = {
   // on a triangle and everything between is skipped rather than clamped.
   bokehBlades: { min: 0, max: 9, step: 1 },
   bokehCatEye: { min: 0, max: 1, step: 0.005 },
+  bokehSwirl: { min: 0, max: 1, step: 0.005 },
+  bokehSqueeze: { min: 0, max: 1.5, step: 0.005 },
+  focusTilt: { min: -1, max: 1, step: 0.005 },
+  focusTiltAngle: { min: 0, max: 180, step: 1, unit: '°' },
 
   bloomIntensity: { min: 0, max: 3, step: 0.005 },
   bloomThreshold: { min: 0, max: 2, step: 0.005 },

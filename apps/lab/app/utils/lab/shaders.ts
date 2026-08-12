@@ -52,6 +52,7 @@ uniform float uTanHalfFov;
 uniform float uFocusNear;     // view depth of the plate's nearest corner
 uniform float uFocusFar;      // ...and its farthest
 uniform float uFocus;         // focal plane, 0..1 across that span
+uniform vec2 uFocusTilt;      // how far that plane leans, per unit of ndc
 uniform float uFocusRange;    // half-width of the sharp band, in the same units
 uniform float uReferenceDistance;
 uniform float uAperture;
@@ -123,9 +124,27 @@ void main() {
         float span = uFocusFar - uFocusNear;
         if (span > 1e-4) {
           float position = (-hit.z - uFocusNear) / span;
+
+          /*
+           * Scheimpflug: the sharp plane leans, and the band leans with it.
+           *
+           * A sensor and a lens that are parallel can only ever hold a slab
+           * parallel to both in focus. Tilt the element and the plane of
+           * sharpness swings — which is why a tilted lens can hold a receding
+           * surface sharp end to end, or cut a thin diagonal band across a
+           * flat one and leave the rest soft. The second is the whole of the
+           * look; the focus control alone can only slide a band that stays
+           * square to the camera.
+           *
+           * Applied to the focal position rather than to the geometry, because
+           * the plane is defined here in the same normalised span the focus
+           * lives in — a linear lean across the frame is exactly a tilt of it.
+           */
+          float tilted = uFocus + dot(ndc, uFocusTilt);
+
           // Signed, so the DOF pass can tell near bokeh from far bokeh, and
           // saturating at ±1 so the band edge is where blur stops growing.
-          coc = clamp((position - uFocus) / max(uFocusRange, 1e-3), -1.0, 1.0) * uAperture;
+          coc = clamp((position - tilted) / max(uFocusRange, 1e-3), -1.0, 1.0) * uAperture;
         }
       }
     }
@@ -164,6 +183,8 @@ uniform float uMaxRadius;   // in pixels
 uniform int uSamples;
 uniform float uBlades;      // 0 for a disc, 3..9 for an iris
 uniform float uCatEye;
+uniform float uSwirl;
+uniform float uSqueeze;
 
 ${COMMON}
 
@@ -210,6 +231,40 @@ vec2 catEye(vec2 offset, vec2 centred, float cornerRadius) {
   return direction * along * (1.0 - uCatEye * distance * 0.6) + across;
 }
 
+/**
+ * Petzval swirl.
+ *
+ * An uncorrected field curves, so away from the axis a bokeh disc is drawn as an
+ * arc rather than a circle — stretched along the tangent, pinched along the
+ * radius, and more of both the further out it sits. Read around a frame those
+ * arcs form the whirlpool a Petzval lens is bought for.
+ *
+ * Anisotropy rather than rotation. Turning a symmetric disc changes nothing;
+ * the swirl is the disc ceasing to be symmetric.
+ */
+vec2 swirled(vec2 offset, vec2 centred, float cornerRadius) {
+  if (uSwirl <= 0.0) return offset;
+  float distance = clamp(length(centred) / cornerRadius, 0.0, 1.0);
+  if (distance < 1e-4) return offset;
+
+  vec2 radial = normalize(centred);
+  vec2 tangent = vec2(-radial.y, radial.x);
+  return radial * dot(offset, radial) * (1.0 - uSwirl * distance * 0.55)
+    + tangent * dot(offset, tangent) * (1.0 + uSwirl * distance * 0.95);
+}
+
+/**
+ * The anamorphic oval.
+ *
+ * A squeezed front element gathers a wider field onto the same frame, so its
+ * out-of-focus highlights come back as ovals standing on end — the companion to
+ * the horizontal flare, and the half of the look that survives when nothing in
+ * the shot is bright enough to streak.
+ */
+vec2 squeezed(vec2 offset) {
+  return uSqueeze > 0.0 ? vec2(offset.x / (1.0 + uSqueeze), offset.y) : offset;
+}
+
 void main() {
   vec4 centre = texture(uSource, vUv);
   float centreCoc = unpackCoc(texture(uCocMap, vUv).r);
@@ -236,7 +291,13 @@ void main() {
     // sqrt keeps the spiral area-uniform instead of clustering at the centre.
     float radius = sqrt(fi / count);
     float angle = fi * GOLDEN_ANGLE;
-    vec2 offset = catEye(bladed(vec2(cos(angle), sin(angle)) * radius, angle), centred, cornerRadius);
+    // Shape, then aperture geometry, then field: the blade decides the outline,
+    // the barrel clips it, and the curvature bends what is left.
+    vec2 offset = swirled(
+      catEye(squeezed(bladed(vec2(cos(angle), sin(angle)) * radius, angle)), centred, cornerRadius),
+      centred,
+      cornerRadius
+    );
 
     vec2 uv = vUv + offset * centreRadius * uTexel;
     vec4 tap = texture(uSource, uv);

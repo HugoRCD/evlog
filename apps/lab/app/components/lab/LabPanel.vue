@@ -589,7 +589,22 @@ const CONTAINERS = [
         <template v-if="settings.aperture > 0">
           <LabNumber v-model="settings.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
           <LabNumber v-model="settings.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
+          <LabNumber v-model="settings.bokehSwirl" label="Swirl" v-bind="range('bokehSwirl')" />
+          <LabNumber v-model="settings.bokehSqueeze" label="Anamorphic bokeh" v-bind="range('bokehSqueeze')" />
         </template>
+
+        <!--
+          The tilt sits with the focal plane rather than with the bokeh, because
+          it moves where the sharpness is rather than what the blur looks like.
+          Its direction only appears once there is a lean to point.
+        -->
+        <LabNumber v-model="settings.focusTilt" label="Plane tilt" v-bind="range('focusTilt')" />
+        <LabNumber
+          v-if="Math.abs(settings.focusTilt) > 0.002"
+          v-model="settings.focusTiltAngle"
+          label="Tilt axis"
+          v-bind="range('focusTiltAngle')"
+        />
 
         <p v-if="!hasDepth" class="mt-2 font-mono text-[10px] leading-relaxed text-warning">
           The plate faces the camera square-on, so every point of it is the same

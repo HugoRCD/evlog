@@ -542,6 +542,14 @@ export class LabRenderer {
     this.stage.set('uFocusNear', near)
     this.stage.set('uFocusFar', far)
     this.stage.set('uFocus', settings.focus)
+    // Resolved to a gradient across the frame here rather than in the shader:
+    // the tilt is authored as an amount and a direction, which is how anyone
+    // thinks about it, and the plane only needs the two components.
+    const tilt = settings.focusTiltAngle * DEGREES
+    this.stage.set('uFocusTilt', [
+      Math.cos(tilt) * settings.focusTilt * 0.5,
+      Math.sin(tilt) * settings.focusTilt * 0.5,
+    ])
     this.stage.set('uFocusRange', settings.focusRange)
     // Falloff is measured from the camera distance, not the focal plane, so
     // racking focus does not also change how dark the far edge sits.
@@ -571,6 +579,8 @@ export class LabRenderer {
     this.dof.set('uSamples', dofSamplesFor(settings.blurRadius))
     this.dof.set('uBlades', settings.bokehBlades)
     this.dof.set('uCatEye', settings.bokehCatEye)
+    this.dof.set('uSwirl', settings.bokehSwirl)
+    this.dof.set('uSqueeze', settings.bokehSqueeze)
     renderer.draw()
     return this.dofTarget
   }
