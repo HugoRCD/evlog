@@ -10,6 +10,13 @@ beforeEach(() => {
   vi.unstubAllEnvs()
 })
 
+describe('gatewayRouting', () => {
+  it('routes with zero data retention enabled', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting.zeroDataRetention).toBe(true)
+  })
+})
+
 describe('sessionTags', () => {
   it('tags one dimension per tag: environment and surface', async () => {
     const { sessionTags } = await loadGateway({ VERCEL_ENV: 'production' })

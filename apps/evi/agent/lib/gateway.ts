@@ -5,6 +5,7 @@ import { environment } from './environment'
 export const gatewayRouting = {
   caching: 'auto',
   sort: 'cost',
+  zeroDataRetention: true,
 } as const
 
 /**
@@ -14,4 +15,3 @@ export const gatewayRouting = {
 export function sessionTags(kind?: string): string[] {
   return [`evi:env:${environment()}`, `evi:surface:${channelName(kind)}`]
 }
-
