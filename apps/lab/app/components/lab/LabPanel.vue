@@ -630,6 +630,18 @@ const CONTAINERS = [
         <LabNumber v-model="settings.bleed" label="Halation" v-bind="range('bleed')" />
         <LabNumber v-model="settings.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
         <LabNumber v-model="settings.ghosts" label="Ghosts" v-bind="range('ghosts')" />
+        <LabNumber v-model="settings.diffusion" label="Diffusion" v-bind="range('diffusion')" />
+        <LabNumber v-model="settings.starIntensity" label="Star" v-bind="range('starIntensity')" />
+
+        <!--
+          The star's shape, only once there is one. Three numbers that decide
+          nothing are three ways to doubt the panel describes the frame.
+        -->
+        <template v-if="settings.starIntensity > 0">
+          <LabNumber v-model="settings.starPoints" label="Points" v-bind="range('starPoints')" />
+          <LabNumber v-model="settings.starLength" label="Reach" v-bind="range('starLength')" />
+          <LabNumber v-model="settings.starAngle" label="Star angle" v-bind="range('starAngle')" />
+        </template>
 
         <p v-if="settings.bloomIntensity <= 0" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Everything below the glow is spilled light, so it needs some glow to

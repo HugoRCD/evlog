@@ -121,6 +121,21 @@ export interface LabSettings {
   streaks: number
   /** Internal reflections thrown back across the centre from what is bright. */
   ghosts: number
+  /**
+   * A net or mist filter: the picture mixed towards a blurred copy of itself.
+   *
+   * The one effect here that takes contrast away rather than adding light. It is
+   * what veils the blacks around a highlight instead of merely brightening it,
+   * and it is the closest thing in the lens to what "dreamy" usually means.
+   */
+  diffusion: number
+  /** Diffraction spikes off the highlights, from a filter with grooves etched in it. */
+  starIntensity: number
+  /** Arms on that star. Four is two crossed sets of grooves, six is three. */
+  starPoints: number
+  starAngle: number
+  /** How far the spikes reach. */
+  starLength: number
 
   // Lens
   /**
@@ -236,6 +251,11 @@ export const DEFAULT_SETTINGS: LabSettings = {
   bloomRadius: 1,
   streaks: 0,
   ghosts: 0,
+  diffusion: 0,
+  starIntensity: 0,
+  starPoints: 4,
+  starAngle: 0,
+  starLength: 0.5,
 
   distortion: 0,
   aberration: 0,
@@ -295,6 +315,8 @@ export const HINTS: Partial<Record<string, string>> = {
   focusTiltAngle: 'Which way that lean runs.',
   streaks: 'Stretches the highlights sideways, the way an anamorphic lens flares.',
   ghosts: 'Reflections thrown back across the centre from whatever is bright.',
+  diffusion: 'Scatters the light already there instead of adding more. Veils the blacks, lowers contrast.',
+  starIntensity: 'Diffraction spikes off the highlights, the way an etched filter throws them.',
   emission: 'How bright the picture is before it glows. Raise it to give bloom something to catch; it is what feeds the glow, not the glow itself.',
   attenuation: 'Darkens the scene as it recedes, which reads as depth.',
   bloomThreshold: 'Brightness a pixel must reach before it glows.',
@@ -343,6 +365,11 @@ export const RANGES = {
   bloomRadius: { min: 0.2, max: 4, step: 0.01 },
   streaks: { min: 0, max: 1.5, step: 0.005 },
   ghosts: { min: 0, max: 1.5, step: 0.005 },
+  diffusion: { min: 0, max: 1, step: 0.005 },
+  starIntensity: { min: 0, max: 2, step: 0.005 },
+  starPoints: { min: 2, max: 8, step: 1 },
+  starAngle: { min: 0, max: 180, step: 1, unit: '°' },
+  starLength: { min: 0.1, max: 1.5, step: 0.005 },
 
   emission: { min: 0.2, max: 4, step: 0.005 },
   exposure: { min: 0.05, max: 4, step: 0.005 },

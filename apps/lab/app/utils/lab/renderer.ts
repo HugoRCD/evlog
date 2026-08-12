@@ -23,6 +23,7 @@ import {
   DOF_FRAG,
   OVERLAY_FRAG,
   STAGE_FRAG,
+  STAR_FRAG,
   STREAK_FRAG,
   STYLIZE_FRAG,
 } from './shaders'
@@ -93,6 +94,7 @@ export class LabRenderer {
   private up: Program
   private composite: Program
   private streak: Program
+  private star: Program
   private stylize: Program
   private overlay: Program
   private blit: Program
@@ -104,6 +106,8 @@ export class LabRenderer {
   private bloomChain: Target[] = []
   /** Ping-pong pair for the streak, at the first bloom mip's size. */
   private streakTargets: [Target, Target] | null = null
+  /** The star's own target, at the first bloom mip's size. */
+  private starTarget: Target | null = null
   private width = 0
   private height = 0
 
@@ -120,6 +124,7 @@ export class LabRenderer {
     this.up = this.renderer.fragment(BLOOM_UP_FRAG, 'bloom-up')
     this.composite = this.renderer.fragment(COMPOSITE_FRAG, 'composite')
     this.streak = this.renderer.fragment(STREAK_FRAG, 'streak')
+    this.star = this.renderer.fragment(STAR_FRAG, 'star')
     this.stylize = this.renderer.fragment(STYLIZE_FRAG, 'stylize')
     this.overlay = this.renderer.fragment(OVERLAY_FRAG, 'overlay')
     this.blit = this.renderer.fragment(BLIT_FRAG, 'blit')
@@ -214,6 +219,9 @@ export class LabRenderer {
 
     for (const target of this.streakTargets ?? []) target.dispose()
     const [first] = this.bloomChain
+    this.starTarget?.dispose()
+    this.starTarget = first ? this.renderer.createTarget(first.width, first.height) : null
+
     this.streakTargets = first
       ? [
         this.renderer.createTarget(first.width, first.height),
@@ -233,7 +241,8 @@ export class LabRenderer {
 
     const bloom = this.renderBloom(settings, scene)
     const streak = this.renderStreak(settings, bloom)
-    this.renderComposite(settings, time, { scene, bloom, streak })
+    const star = this.renderStar(settings, bloom)
+    this.renderComposite(settings, time, { scene, bloom, streak, star })
 
     this.renderOverlays(overlays)
   }
@@ -599,7 +608,10 @@ export class LabRenderer {
     this.prefilter.set('uSource', scene.texture)
     this.prefilter.set('uThreshold', settings.bloomThreshold)
     this.prefilter.set('uKnee', bloomKneeFor(settings.bloomThreshold))
-    this.prefilter.set('uBleed', settings.bleed)
+    // Diffusion mixes towards this chain, so the chain has to hold the whole
+    // picture rather than only what passed the threshold — the same floor
+    // halation raises, taken to whichever of the two asks for more.
+    this.prefilter.set('uBleed', Math.max(settings.bleed, settings.diffusion))
     renderer.draw()
 
     for (let i = 1; i < this.bloomChain.length; i++) {
@@ -667,15 +679,35 @@ export class LabRenderer {
     return source
   }
 
-  private renderComposite(settings: LabSettings, time: number, pass: { scene: Target, bloom: Target, streak: Target | null }) {
+  /** The diffraction spikes, walked out from the thresholded bloom. */
+  private renderStar(settings: LabSettings, bloom: Target): Target | null {
+    if (settings.starIntensity <= 0 || !this.starTarget) return null
+
     const { renderer } = this
-    const { scene, bloom, streak } = pass
+    renderer.bind(this.starTarget)
+    this.star.use()
+    this.star.set('uSource', bloom.texture)
+    this.star.set('uTexel', [1 / this.starTarget.width, 1 / this.starTarget.height])
+    this.star.set('uPoints', settings.starPoints)
+    this.star.set('uAngle', settings.starAngle * DEGREES)
+    // Authored against a 1080-high frame, like every other reach in this file.
+    this.star.set('uLength', settings.starLength * (this.height / 1080))
+    renderer.draw()
+    return this.starTarget
+  }
+
+  private renderComposite(settings: LabSettings, time: number, pass: { scene: Target, bloom: Target, streak: Target | null, star: Target | null }) {
+    const { renderer } = this
+    const { scene, bloom, streak, star } = pass
     renderer.bind(null)
     this.composite.use()
     this.composite.set('uScene', scene.texture)
     this.composite.set('uBloom', bloom.texture)
     this.composite.set('uStreak', (streak ?? bloom).texture)
     this.composite.set('uStreaks', streak ? settings.streaks : 0)
+    this.composite.set('uStar', (star ?? bloom).texture)
+    this.composite.set('uStarIntensity', star ? settings.starIntensity : 0)
+    this.composite.set('uDiffusion', settings.diffusion)
     this.composite.set('uGhosts', settings.ghosts)
     this.composite.set('uTanHalfFov', Math.tan((settings.fov * DEGREES) / 2))
     this.composite.set('uResolution', [this.width, this.height])
@@ -711,9 +743,9 @@ export class LabRenderer {
   }
 
   dispose() {
-    const programs = [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.streak, this.stylize, this.overlay, this.blit]
+    const programs = [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.streak, this.star, this.stylize, this.overlay, this.blit]
     for (const program of programs) program.dispose()
-    const targets = [this.sceneTarget, this.dofTarget, this.screenTarget, ...this.bloomChain, ...this.streakTargets ?? []]
+    const targets = [this.sceneTarget, this.dofTarget, this.screenTarget, ...this.bloomChain, ...this.streakTargets ?? [], ...(this.starTarget ? [this.starTarget] : [])]
     for (const target of targets) target.dispose()
     for (const texture of this.layerTextures.values()) this.renderer.gl.deleteTexture(texture)
     if (this.glyphs) this.renderer.gl.deleteTexture(this.glyphs.texture)

@@ -427,6 +427,54 @@ void main() {
   fragColor = vec4(sum / weightSum, 1.0);
 }`
 
+/**
+ * A star filter: the same smear as the streak, sent out along several axes.
+ *
+ * The glass has grooves etched into it, and every groove diffracts a highlight
+ * into a line perpendicular to itself. Two crossed sets give the four-pointed
+ * star everyone recognises; three give six. It is the one flare that survives
+ * being pointed at a small light rather than a bright field, which is what makes
+ * it read on a shot with nothing else going on.
+ *
+ * One pass over all the arms rather than a chain per arm: the reach here is a
+ * few hundred pixels rather than the streak's thousand, so a straight weighted
+ * walk is cheaper than compounding.
+ */
+export const STAR_FRAG = `#version 300 es
+precision highp float;
+in vec2 vUv;
+out vec4 fragColor;
+
+uniform sampler2D uSource;
+uniform vec2 uTexel;
+uniform float uPoints;
+uniform float uAngle;
+uniform float uLength;
+
+const float TAU = 6.28318530718;
+
+void main() {
+  vec3 sum = vec3(0.0);
+  float weightSum = 0.0;
+  int arms = int(uPoints);
+
+  for (int a = 0; a < 8; a++) {
+    if (a >= arms) break;
+    float angle = uAngle + float(a) * TAU / float(arms);
+    vec2 direction = vec2(cos(angle), sin(angle));
+
+    for (int i = 1; i <= 12; i++) {
+      float t = float(i) / 12.0;
+      // Falls away along the arm, so it tapers to a point instead of ending.
+      float weight = exp(-t * 2.6);
+      sum += texture(uSource, vUv + direction * t * uLength * uTexel * 260.0).rgb * weight;
+      weightSum += weight;
+    }
+  }
+
+  fragColor = vec4(sum / max(weightSum, 1e-4), 1.0);
+}`
+
 /** 9-tap tent upsample, accumulated additively back up the mip chain. */
 export const BLOOM_UP_FRAG = `#version 300 es
 precision highp float;
@@ -464,7 +512,10 @@ uniform sampler2D uStreak;
 uniform vec2 uResolution;
 uniform float uBloomIntensity;
 uniform float uStreaks;
+uniform sampler2D uStar;
+uniform float uStarIntensity;
 uniform float uGhosts;
+uniform float uDiffusion;
 uniform float uTanHalfFov;
 uniform float uDistortion;
 uniform float uAberration;
@@ -678,7 +729,25 @@ void main() {
     // element is what produces the flare, and it is what makes it blue.
     colour += texture(uStreak, lensed).rgb * uStreaks * vec3(0.55, 0.75, 1.0);
   }
+  if (uStarIntensity > 0.0) colour += texture(uStar, lensed).rgb * uStarIntensity;
   if (uGhosts > 0.0) colour += lensGhosts(lensed) * uGhosts;
+
+  /*
+   * A diffusion filter, and the reason it is a blend rather than an addition.
+   *
+   * Everything above adds light: the glow, the streak, the ghosts all leave the
+   * picture where it was and put more on top. A net or a mist filter does the
+   * opposite — it scatters the light already there, so a highlight loses as much
+   * as its surroundings gain. What that costs is contrast, and what it buys is
+   * the veil around every bright edge that reads as dreamy rather than as bright.
+   *
+   * Mixed towards the same blurred copy the glow is made of, which is why this
+   * needs some glow to work with — and why it lifts the blacks nearest a
+   * highlight and leaves the far corners alone, exactly as a real filter does.
+   */
+  if (uDiffusion > 0.0) {
+    colour = mix(colour, texture(uBloom, lensed).rgb, uDiffusion * 0.65);
+  }
 
   colour *= uExposure;
   if (uTonemap) colour = aces(colour);
