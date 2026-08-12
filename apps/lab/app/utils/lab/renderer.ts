@@ -285,6 +285,7 @@ export class LabRenderer {
     this.stylize.set('uLevels', settings.stylizeLevels)
     this.stylize.set('uColour', settings.stylizeColour)
     this.stylize.set('uAngle', settings.stylizeAngle * DEGREES)
+    this.stylize.set('uMask', settings.stylizeMask)
     this.stylize.set('uMode', branch)
     renderer.draw()
     return this.screenTarget

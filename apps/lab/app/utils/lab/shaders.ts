@@ -686,6 +686,7 @@ uniform float uGlyphGain;
 uniform float uLevels;
 uniform float uColour;
 uniform float uAngle;      // radians
+uniform float uMask;       // -1 shadows only, 0 everywhere, 1 highlights only
 uniform int uMode;         // 1 dither, 2 ascii, 3 halftone, 4 posterize, 5 crt
 
 ${COMMON}
@@ -734,6 +735,25 @@ vec3 ink(vec3 c) {
   return mix(vec3(dot(c, LUMA)), c, uColour);
 }
 
+/**
+ * How much of this cell the screen is allowed to draw.
+ *
+ * A screen over the whole frame is a filter; a screen that keeps to one band of
+ * the tone is a material sitting inside a photograph — the glyphs live in the
+ * glow and the rest of the picture is left alone. The band is soft on purpose:
+ * a hard cut would trace the threshold as an outline, which reads as a mask
+ * rather than as something the light is doing.
+ */
+float coverage(float luma) {
+  if (uMask == 0.0) return 1.0;
+  float amount = abs(uMask);
+  // The threshold never quite reaches white, or the last of the travel would
+  // turn the screen off entirely and the control would end in nothing.
+  float threshold = amount * 0.92;
+  float above = smoothstep(threshold - 0.2, threshold + 0.2, luma);
+  return uMask > 0.0 ? above : 1.0 - above;
+}
+
 /** Whatever this cell had above white, kept so the panel can still light the room. */
 float headroom(vec3 linear) {
   return max(1.0, max(linear.r, max(linear.g, linear.b)));
@@ -744,12 +764,17 @@ void main() {
   float steps = max(uLevels - 1.0, 1.0);
   vec3 result;
   float boost = 1.0;
+  // The tone the mask is judged on. Read per cell rather than per fragment, so
+  // a cell is either drawn or not — sampled per fragment the band would cut
+  // through the glyphs and leave half a character behind.
+  float maskLuma = 0.0;
 
   if (uMode == 1) {
     vec2 cell = floor(pixel / uCell);
     vec3 linear = cellLinear(cell);
     boost = headroom(linear);
     vec3 c = ink(toSrgb(linear));
+    maskLuma = dot(toSrgb(linear), LUMA);
     result = floor(c * steps + bayer8(cell)) / steps;
   }
   else if (uMode == 2) {
@@ -759,6 +784,7 @@ void main() {
     boost = headroom(linear);
     vec3 c = toSrgb(linear);
     float luma = clamp(dot(c, LUMA), 0.0, 1.0);
+    maskLuma = luma;
 
     // Dithered before it is quantized to a glyph. Without it a slow gradient
     // lands on the same character across a wide band, and the picture reads as
@@ -809,6 +835,7 @@ void main() {
     boost = headroom(linear);
     vec3 c = toSrgb(linear);
     float luma = clamp(dot(c, LUMA), 0.0, 1.0);
+    maskLuma = luma;
 
     // Area proportional to brightness, hence the square root. A radius that
     // tracked brightness directly would put a mid grey at a quarter of its
@@ -821,12 +848,14 @@ void main() {
     vec3 linear = cellLinear(floor(pixel / uCell));
     boost = headroom(linear);
     vec3 c = ink(toSrgb(linear));
+    maskLuma = dot(toSrgb(linear), LUMA);
     result = floor(c * steps + 0.5) / steps;
   }
   else {
     vec3 linear = max(texture(uSource, vUv).rgb, 0.0);
     boost = headroom(linear);
     vec3 c = ink(toSrgb(linear));
+    maskLuma = dot(toSrgb(linear), LUMA);
     float scan = 0.5 + 0.5 * cos(TAU * pixel.y / uCell.y);
     // An aperture grille: each cell split into three vertical stripes, which is
     // where a tube's colour comes from in the first place.
@@ -846,7 +875,12 @@ void main() {
   // downstream — the glow, the streak, the lens, the grade — is expecting light,
   // and a screen that clipped itself at 1.0 here would be a panel that cannot
   // illuminate anything, including its own neighbouring cells.
-  fragColor = vec4(toLinear(clamp(result, 0.0, 1.0)) * boost, 1.0);
+  vec3 screened = toLinear(clamp(result, 0.0, 1.0)) * boost;
+
+  // Blended against this fragment's own scene rather than the cell's, so the
+  // part the screen was kept out of holds every bit of detail it arrived with.
+  vec3 plain = max(texture(uSource, vUv).rgb, 0.0);
+  fragColor = vec4(mix(plain, screened, coverage(maskLuma)), 1.0);
 }`
 
 /**

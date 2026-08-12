@@ -160,6 +160,18 @@ export interface LabSettings {
   stylizeColour: number
   /** Screen angle, for the modes that have one. */
   stylizeAngle: number
+  /**
+   * Which part of the picture the screen is allowed to touch.
+   *
+   * Zero is the whole frame. Pushed positive it retreats to the highlights and
+   * leaves everything below them as photographed; pulled negative it does the
+   * opposite and keeps to the shadows.
+   *
+   * One signed control rather than a threshold and a direction, because the
+   * two are never useful apart — and the middle of its travel is the answer
+   * anyone reaching for it already had.
+   */
+  stylizeMask: number
   /** Which ramp of glyphs the ascii screen draws with. */
   asciiSet: AsciiSet
 
@@ -226,6 +238,7 @@ export const DEFAULT_SETTINGS: LabSettings = {
   stylizeLevels: 4,
   stylizeColour: 0,
   stylizeAngle: 15,
+  stylizeMask: 0,
   asciiSet: 'ascii',
 }
 
@@ -261,6 +274,7 @@ export const HINTS: Partial<Record<string, string>> = {
   stylizeScale: 'Cell size of the screen, measured on a 1080p frame.',
   stylizeLevels: 'Steps the brightness is quantized to before the screen draws it.',
   stylizeColour: 'Zero draws in brightness alone; one keeps the colour underneath.',
+  stylizeMask: 'Confines the screen to the bright parts, or below zero to the dark ones. Zero is everywhere.',
   tail: 'Black held after the last clip ends, so a shot can land instead of cutting.',
   speed: 'Playback rate. Below 1 the animation is stepped in smaller increments — real slow motion.',
   lookAmount: 'How far towards the look to go. Past 1 it is pushed beyond what it was authored at.',
@@ -315,6 +329,7 @@ export const RANGES = {
   stylizeLevels: { min: 2, max: 16, step: 1 },
   stylizeColour: { min: 0, max: 1, step: 0.005 },
   stylizeAngle: { min: 0, max: 90, step: 1, unit: '°' },
+  stylizeMask: { min: -1, max: 1, step: 0.005 },
 
   stageWidth: { min: 320, max: 2400, step: 10, unit: 'px' },
   stageHeight: { min: 240, max: 1600, step: 10, unit: 'px' },

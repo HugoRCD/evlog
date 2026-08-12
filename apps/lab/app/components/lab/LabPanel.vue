@@ -710,6 +710,15 @@ const CONTAINERS = [
             v-bind="range('stylizeAngle')"
           />
           <LabNumber v-model="settings.stylizeColour" label="Keep colour" v-bind="range('stylizeColour')" />
+          <LabNumber v-model="settings.stylizeMask" label="Confine to" v-bind="range('stylizeMask')" />
+
+          <p class="mt-1 font-mono text-[10px] leading-relaxed text-dimmed/70">
+            {{ settings.stylizeMask > 0.02
+              ? 'Only the highlights are screened; the rest stays as photographed.'
+              : settings.stylizeMask < -0.02
+                ? 'Only the shadows are screened.'
+                : 'The whole frame is screened.' }}
+          </p>
 
           <LabChoice
             v-if="settings.stylize === 'ascii'"
