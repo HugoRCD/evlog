@@ -125,7 +125,6 @@ function startAnimation() {
     </Motion>
 
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
-      <!-- Left: Structured error output -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
@@ -190,7 +189,6 @@ function startAnimation() {
         </div>
       </Motion>
 
-      <!-- Right: AI Agent Analysis -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
@@ -233,7 +231,6 @@ function startAnimation() {
               {{ isComplete ? 'Analysis complete — 4 insights extracted' : 'Reading structured error context...' }}
             </div>
 
-            <!-- All lines rendered upfront — no layout shift -->
             <div class="space-y-3">
               <div
                 v-for="(step, i) in steps"
@@ -251,7 +248,6 @@ function startAnimation() {
               </div>
             </div>
 
-            <!-- Action line — always in DOM, opacity-controlled -->
             <div
               class="mt-4 border-t border-muted pt-3 transition-opacity duration-500"
               :class="isComplete ? 'opacity-100' : 'opacity-0'"

@@ -132,10 +132,8 @@ const pills = [
             <!-- eslint-enable -->
           </div>
 
-          <!-- Flow diagram -->
           <div class="border-t border-muted/50 px-4 sm:px-6 py-8 sm:py-10">
             <div class="flex items-start justify-between">
-              <!-- Browser node -->
               <div class="flex flex-col items-center gap-2 shrink-0">
                 <div class="border border-muted bg-default p-3">
                   <UIcon name="i-lucide-globe" class="size-5 text-primary" />
@@ -144,7 +142,6 @@ const pills = [
                 <span class="font-mono text-[7px] tracking-widest text-dimmed">EVENTS</span>
               </div>
 
-              <!-- Connection 1 -->
               <div class="connection flex-1 self-[22px] mt-5 mx-2 sm:mx-3">
                 <div class="h-px bg-muted relative overflow-hidden">
                   <div class="pulse-trail" />
@@ -154,7 +151,6 @@ const pills = [
                 </p>
               </div>
 
-              <!-- Pipeline node -->
               <div class="flex flex-col items-center gap-2 shrink-0">
                 <div class="relative border border-primary/30 bg-default p-3">
                   <div class="flex items-center gap-1.5">
@@ -169,7 +165,6 @@ const pills = [
                 <span class="font-mono text-[7px] tracking-widest text-dimmed">RETRY &middot; BACKOFF</span>
               </div>
 
-              <!-- Connection 2 -->
               <div class="connection flex-1 self-[22px] mt-5 mx-2 sm:mx-3">
                 <div class="h-px bg-muted relative overflow-hidden">
                   <div class="pulse-trail pulse-trail-delayed" />
@@ -179,7 +174,6 @@ const pills = [
                 </p>
               </div>
 
-              <!-- Server node -->
               <div class="flex flex-col items-center gap-2 shrink-0">
                 <div class="border border-muted bg-default p-3">
                   <UIcon name="i-lucide-server" class="size-5 text-dimmed" />

@@ -198,7 +198,6 @@ onBeforeUnmount(() => {
           </div>
 
           <div class="p-5 sm:p-6 flex-1 space-y-5">
-            <!-- Same width and gap as the coverage labels, so both start on one vertical. -->
             <div class="flex items-end gap-3">
               <div class="w-32 shrink-0">
                 <p class="font-mono text-[10px] uppercase tracking-wide text-dimmed">
@@ -212,7 +211,6 @@ onBeforeUnmount(() => {
                 </p>
               </div>
               <div class="flex-1 flex h-14 items-end gap-px" aria-hidden="true">
-                <!-- Scaled, not resized: `height` on 29 flex siblings re-runs layout every frame. -->
                 <div
                   v-for="(value, i) in skyline"
                   :key="i"

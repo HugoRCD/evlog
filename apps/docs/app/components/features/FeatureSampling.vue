@@ -136,7 +136,6 @@ function getLevelColor(level: string): string {
     </Motion>
 
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
-      <!-- Left: Config code -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"
@@ -174,7 +173,6 @@ function getLevelColor(level: string): string {
         </div>
       </Motion>
 
-      <!-- Right: Animated log stream -->
       <Motion
         :initial="false"
         :while-in-view="{ opacity: 1, y: 0 }"

@@ -217,7 +217,6 @@ const isDone = computed(() => phase.value >= stages.length - 1)
       </div>
 
       <div class="grid gap-0 lg:grid-cols-[minmax(0,1fr)_minmax(0,1.1fr)]">
-        <!-- Pipeline -->
         <div class="relative px-4 sm:px-6 py-6 sm:py-7">
           <ol class="relative flex flex-col gap-3.5">
             <li
@@ -277,7 +276,6 @@ const isDone = computed(() => phase.value >= stages.length - 1)
           </ol>
         </div>
 
-        <!-- Side panel: context accumulation + emitted event -->
         <div class="border-t border-default/30 lg:border-t-0 lg:border-l">
           <div class="flex items-center gap-2 border-b border-default/30 px-4 py-2.5">
             <UIcon name="i-lucide-layers" class="size-3 text-primary" />
