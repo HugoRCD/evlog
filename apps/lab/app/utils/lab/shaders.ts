@@ -768,6 +768,17 @@ void main() {
   // a cell is either drawn or not — sampled per fragment the band would cut
   // through the glyphs and leave half a character behind.
   float maskLuma = 0.0;
+  /*
+   * How much of its cell this fragment's mark actually covers.
+   *
+   * One for the screens that fill a cell outright, the glyph or dot coverage
+   * for the two that draw a shape inside one. It only matters when the screen
+   * is confined: replacing a whole frame, the gaps between glyphs are the black
+   * an ascii rendering is made of. Laid into one band of a photograph, that same
+   * black turns every cell into a dark box around its character — the picture
+   * has to show through the gaps, not be punched out by them.
+   */
+  float inkCover = 1.0;
 
   if (uMode == 1) {
     vec2 cell = floor(pixel / uCell);
@@ -805,6 +816,7 @@ void main() {
      * still antialiased at exactly the width of one sample.
      */
     float cover = smoothstep(0.35, 0.62, texture(uGlyphs, vec2(u, inCell.y)).a);
+    inkCover = cover;
     // Divided by the ramp's gain because it is multiplied back by it below.
     // Ambient on a dark cell is a property of the panel, not of how dense the
     // glyphs happen to be — left un-divided, a sparse ramp with a 3x gain drew
@@ -842,7 +854,9 @@ void main() {
     // coverage and darken every midtone in the frame.
     float radius = sqrt(luma) * 0.71;
     float edge = 0.7071 / min(uCell.x, uCell.y);
-    result = ink(c) * (1.0 - smoothstep(radius - edge, radius + edge, length(inCell)));
+    float dotCover = 1.0 - smoothstep(radius - edge, radius + edge, length(inCell));
+    inkCover = dotCover;
+    result = ink(c) * dotCover;
   }
   else if (uMode == 4) {
     vec3 linear = cellLinear(floor(pixel / uCell));
@@ -880,7 +894,14 @@ void main() {
   // Blended against this fragment's own scene rather than the cell's, so the
   // part the screen was kept out of holds every bit of detail it arrived with.
   vec3 plain = max(texture(uSource, vUv).rgb, 0.0);
-  fragColor = vec4(mix(plain, screened, coverage(maskLuma)), 1.0);
+
+  // Confined, the screen is a material laid onto a photograph and only its marks
+  // belong there. Unconfined it replaces the frame outright, gaps included,
+  // which is what makes an ascii rendering a rendering rather than an overlay.
+  float blend = coverage(maskLuma);
+  if (uMask != 0.0) blend *= inkCover;
+
+  fragColor = vec4(mix(plain, screened, blend), 1.0);
 }`
 
 /**
