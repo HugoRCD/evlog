@@ -5,6 +5,10 @@ import { environment } from './environment'
 export const gatewayRouting = {
   caching: 'auto',
   sort: 'cost',
+  // Zero data retention skips BYOK keys and fails closed when no ZDR provider
+  // serves the model, so it must stay on only while every model it routes has
+  // a ZDR-compliant provider.
+  zeroDataRetention: true,
 } as const
 
 /**
@@ -14,4 +18,3 @@ export const gatewayRouting = {
 export function sessionTags(kind?: string): string[] {
   return [`evi:env:${environment()}`, `evi:surface:${channelName(kind)}`]
 }
-
