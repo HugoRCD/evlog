@@ -589,7 +589,22 @@ const CONTAINERS = [
         <template v-if="settings.aperture > 0">
           <LabNumber v-model="settings.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
           <LabNumber v-model="settings.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
+          <LabNumber v-model="settings.bokehSwirl" label="Swirl" v-bind="range('bokehSwirl')" />
+          <LabNumber v-model="settings.bokehSqueeze" label="Anamorphic bokeh" v-bind="range('bokehSqueeze')" />
         </template>
+
+        <!--
+          The tilt sits with the focal plane rather than with the bokeh, because
+          it moves where the sharpness is rather than what the blur looks like.
+          Its direction only appears once there is a lean to point.
+        -->
+        <LabNumber v-model="settings.focusTilt" label="Plane tilt" v-bind="range('focusTilt')" />
+        <LabNumber
+          v-if="Math.abs(settings.focusTilt) > 0.002"
+          v-model="settings.focusTiltAngle"
+          label="Tilt axis"
+          v-bind="range('focusTiltAngle')"
+        />
 
         <p v-if="!hasDepth" class="mt-2 font-mono text-[10px] leading-relaxed text-warning">
           The plate faces the camera square-on, so every point of it is the same
@@ -615,6 +630,18 @@ const CONTAINERS = [
         <LabNumber v-model="settings.bleed" label="Halation" v-bind="range('bleed')" />
         <LabNumber v-model="settings.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
         <LabNumber v-model="settings.ghosts" label="Ghosts" v-bind="range('ghosts')" />
+        <LabNumber v-model="settings.diffusion" label="Diffusion" v-bind="range('diffusion')" />
+        <LabNumber v-model="settings.starIntensity" label="Star" v-bind="range('starIntensity')" />
+
+        <!--
+          The star's shape, only once there is one. Three numbers that decide
+          nothing are three ways to doubt the panel describes the frame.
+        -->
+        <template v-if="settings.starIntensity > 0">
+          <LabNumber v-model="settings.starPoints" label="Points" v-bind="range('starPoints')" />
+          <LabNumber v-model="settings.starLength" label="Reach" v-bind="range('starLength')" />
+          <LabNumber v-model="settings.starAngle" label="Star angle" v-bind="range('starAngle')" />
+        </template>
 
         <p v-if="settings.bloomIntensity <= 0" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Everything below the glow is spilled light, so it needs some glow to
@@ -634,6 +661,8 @@ const CONTAINERS = [
         <LabNumber v-model="settings.aberration" label="Colour spread" v-bind="range('aberration')" />
         <LabNumber v-model="settings.dispersion" label="Dispersion" v-bind="range('dispersion')" />
         <LabNumber v-model="settings.lensNoise" label="Scatter" v-bind="range('lensNoise')" />
+        <LabNumber v-model="settings.radialBlur" label="Zoom blur" v-bind="range('radialBlur')" />
+        <LabNumber v-model="settings.spinBlur" label="Spin blur" v-bind="range('spinBlur')" />
 
         <p v-if="!hasSpread" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Dispersion and scatter both act on the colour spread, so they do
@@ -710,6 +739,15 @@ const CONTAINERS = [
             v-bind="range('stylizeAngle')"
           />
           <LabNumber v-model="settings.stylizeColour" label="Keep colour" v-bind="range('stylizeColour')" />
+          <LabNumber v-model="settings.stylizeMask" label="Confine to" v-bind="range('stylizeMask')" />
+
+          <p class="mt-1 font-mono text-[10px] leading-relaxed text-dimmed/70">
+            {{ settings.stylizeMask > 0.02
+              ? 'Only the highlights are screened; the rest stays as photographed.'
+              : settings.stylizeMask < -0.02
+                ? 'Only the shadows are screened.'
+                : 'The whole frame is screened.' }}
+          </p>
 
           <LabChoice
             v-if="settings.stylize === 'ascii'"

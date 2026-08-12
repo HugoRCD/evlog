@@ -96,6 +96,22 @@ export interface LabSettings {
    * the edge of the frame is squeezed into a lens — the cat's eye.
    */
   bokehCatEye: number
+  /**
+   * Field curvature, as a whirlpool.
+   *
+   * An uncorrected field draws an off-axis highlight as an arc rather than a
+   * circle, and the arcs sweep around the frame. It is the one lens defect
+   * nobody tries to remove.
+   */
+  bokehSwirl: number
+  /** Squeezes the bokeh into a standing oval, the way an anamorphic front does. */
+  bokehSqueeze: number
+  /**
+   * How far the plane of sharpness leans away from the sensor, and about which
+   * axis. Zero is the parallel plane every ordinary lens is stuck with.
+   */
+  focusTilt: number
+  focusTiltAngle: number
 
   // Bloom
   bloomIntensity: number
@@ -105,6 +121,21 @@ export interface LabSettings {
   streaks: number
   /** Internal reflections thrown back across the centre from what is bright. */
   ghosts: number
+  /**
+   * A net or mist filter: the picture mixed towards a blurred copy of itself.
+   *
+   * The one effect here that takes contrast away rather than adding light. It is
+   * what veils the blacks around a highlight instead of merely brightening it,
+   * and it is the closest thing in the lens to what "dreamy" usually means.
+   */
+  diffusion: number
+  /** Diffraction spikes off the highlights, from a filter with grooves etched in it. */
+  starIntensity: number
+  /** Arms on that star. Four is two crossed sets of grooves, six is three. */
+  starPoints: number
+  starAngle: number
+  /** How far the spikes reach. */
+  starLength: number
 
   // Lens
   /**
@@ -126,6 +157,14 @@ export interface LabSettings {
   dispersion: number
   /** Jitters each sample along the split, so the fringe breaks up rather than banding. */
   lensNoise: number
+  /**
+   * A zoom made during the exposure: the frame smeared along rays from its
+   * middle. Unlike anything in Focus, it acts on the whole picture rather than
+   * on what happens to be out of focus.
+   */
+  radialBlur: number
+  /** The same, turned rather than racked — a twist about the middle. */
+  spinBlur: number
 
   // Grade
   emission: number
@@ -160,6 +199,18 @@ export interface LabSettings {
   stylizeColour: number
   /** Screen angle, for the modes that have one. */
   stylizeAngle: number
+  /**
+   * Which part of the picture the screen is allowed to touch.
+   *
+   * Zero is the whole frame. Pushed positive it retreats to the highlights and
+   * leaves everything below them as photographed; pulled negative it does the
+   * opposite and keeps to the shadows.
+   *
+   * One signed control rather than a threshold and a direction, because the
+   * two are never useful apart — and the middle of its travel is the answer
+   * anyone reaching for it already had.
+   */
+  stylizeMask: number
   /** Which ramp of glyphs the ascii screen draws with. */
   asciiSet: AsciiSet
 
@@ -190,17 +241,28 @@ export const DEFAULT_SETTINGS: LabSettings = {
   blurRadius: 12,
   bokehBlades: 0,
   bokehCatEye: 0,
+  bokehSwirl: 0,
+  bokehSqueeze: 0,
+  focusTilt: 0,
+  focusTiltAngle: 0,
 
   bloomIntensity: 0.35,
   bloomThreshold: 0.75,
   bloomRadius: 1,
   streaks: 0,
   ghosts: 0,
+  diffusion: 0,
+  starIntensity: 0,
+  starPoints: 4,
+  starAngle: 0,
+  starLength: 0.5,
 
   distortion: 0,
   aberration: 0,
   dispersion: 0,
   lensNoise: 0,
+  radialBlur: 0,
+  spinBlur: 0,
 
   emission: 1,
   exposure: 1,
@@ -226,6 +288,7 @@ export const DEFAULT_SETTINGS: LabSettings = {
   stylizeLevels: 4,
   stylizeColour: 0,
   stylizeAngle: 15,
+  stylizeMask: 0,
   asciiSet: 'ascii',
 }
 
@@ -246,8 +309,14 @@ export const HINTS: Partial<Record<string, string>> = {
   blurRadius: 'Widest the bokeh can grow, measured on a 1080p frame.',
   bokehBlades: 'Sides of the aperture. Zero is a perfect disc; six is what an iris gives.',
   bokehCatEye: 'Squeezes the bokeh into a lens shape towards the corners, the way a barrel does.',
+  bokehSwirl: 'Bends the bokeh into arcs that sweep around the frame — an uncorrected field.',
+  bokehSqueeze: 'Stands the bokeh up into ovals, the way an anamorphic front element does.',
+  focusTilt: 'Leans the sharp plane away from the sensor, so it cuts across the frame instead of facing it.',
+  focusTiltAngle: 'Which way that lean runs.',
   streaks: 'Stretches the highlights sideways, the way an anamorphic lens flares.',
   ghosts: 'Reflections thrown back across the centre from whatever is bright.',
+  diffusion: 'Scatters the light already there instead of adding more. Veils the blacks, lowers contrast.',
+  starIntensity: 'Diffraction spikes off the highlights, the way an etched filter throws them.',
   emission: 'How bright the picture is before it glows. Raise it to give bloom something to catch; it is what feeds the glow, not the glow itself.',
   attenuation: 'Darkens the scene as it recedes, which reads as depth.',
   bloomThreshold: 'Brightness a pixel must reach before it glows.',
@@ -256,11 +325,14 @@ export const HINTS: Partial<Record<string, string>> = {
   aberration: 'Splits the colour channels towards the edges, the way a real lens does.',
   dispersion: 'Smears that split into a spectrum instead of three clean channels.',
   lensNoise: 'Breaks the split up, so it reads as scattered light rather than as a band.',
+  radialBlur: 'Smears the frame along rays from the middle — a zoom made while the shutter was open.',
+  spinBlur: 'Smears it along arcs instead — the same gesture, turned rather than racked.',
   duotone: 'Maps the picture onto two colours by brightness. The grade still applies on top.',
   bleed: 'Diffuses the whole picture, not only what is bright enough to glow. Halation.',
   stylizeScale: 'Cell size of the screen, measured on a 1080p frame.',
   stylizeLevels: 'Steps the brightness is quantized to before the screen draws it.',
   stylizeColour: 'Zero draws in brightness alone; one keeps the colour underneath.',
+  stylizeMask: 'Confines the screen to the bright parts, or below zero to the dark ones. Zero is everywhere.',
   tail: 'Black held after the last clip ends, so a shot can land instead of cutting.',
   speed: 'Playback rate. Below 1 the animation is stepped in smaller increments — real slow motion.',
   lookAmount: 'How far towards the look to go. Past 1 it is pushed beyond what it was authored at.',
@@ -283,12 +355,21 @@ export const RANGES = {
   // on a triangle and everything between is skipped rather than clamped.
   bokehBlades: { min: 0, max: 9, step: 1 },
   bokehCatEye: { min: 0, max: 1, step: 0.005 },
+  bokehSwirl: { min: 0, max: 1, step: 0.005 },
+  bokehSqueeze: { min: 0, max: 1.5, step: 0.005 },
+  focusTilt: { min: -1, max: 1, step: 0.005 },
+  focusTiltAngle: { min: 0, max: 180, step: 1, unit: '°' },
 
   bloomIntensity: { min: 0, max: 3, step: 0.005 },
   bloomThreshold: { min: 0, max: 2, step: 0.005 },
   bloomRadius: { min: 0.2, max: 4, step: 0.01 },
   streaks: { min: 0, max: 1.5, step: 0.005 },
   ghosts: { min: 0, max: 1.5, step: 0.005 },
+  diffusion: { min: 0, max: 1, step: 0.005 },
+  starIntensity: { min: 0, max: 2, step: 0.005 },
+  starPoints: { min: 2, max: 8, step: 1 },
+  starAngle: { min: 0, max: 180, step: 1, unit: '°' },
+  starLength: { min: 0.1, max: 1.5, step: 0.005 },
 
   emission: { min: 0.2, max: 4, step: 0.005 },
   exposure: { min: 0.05, max: 4, step: 0.005 },
@@ -300,6 +381,8 @@ export const RANGES = {
   aberration: { min: 0, max: 3, step: 0.005 },
   dispersion: { min: 0, max: 1, step: 0.005 },
   lensNoise: { min: 0, max: 1, step: 0.005 },
+  radialBlur: { min: 0, max: 1, step: 0.005 },
+  spinBlur: { min: 0, max: 1, step: 0.005 },
 
   vignette: { min: 0, max: 1, step: 0.005 },
   grain: { min: 0, max: 0.12, step: 0.001 },
@@ -315,6 +398,7 @@ export const RANGES = {
   stylizeLevels: { min: 2, max: 16, step: 1 },
   stylizeColour: { min: 0, max: 1, step: 0.005 },
   stylizeAngle: { min: 0, max: 90, step: 1, unit: '°' },
+  stylizeMask: { min: -1, max: 1, step: 0.005 },
 
   stageWidth: { min: 320, max: 2400, step: 10, unit: 'px' },
   stageHeight: { min: 240, max: 1600, step: 10, unit: 'px' },

@@ -23,6 +23,7 @@ import {
   DOF_FRAG,
   OVERLAY_FRAG,
   STAGE_FRAG,
+  STAR_FRAG,
   STREAK_FRAG,
   STYLIZE_FRAG,
 } from './shaders'
@@ -93,6 +94,7 @@ export class LabRenderer {
   private up: Program
   private composite: Program
   private streak: Program
+  private star: Program
   private stylize: Program
   private overlay: Program
   private blit: Program
@@ -104,6 +106,8 @@ export class LabRenderer {
   private bloomChain: Target[] = []
   /** Ping-pong pair for the streak, at the first bloom mip's size. */
   private streakTargets: [Target, Target] | null = null
+  /** The star's own target, at the first bloom mip's size. */
+  private starTarget: Target | null = null
   private width = 0
   private height = 0
 
@@ -120,6 +124,7 @@ export class LabRenderer {
     this.up = this.renderer.fragment(BLOOM_UP_FRAG, 'bloom-up')
     this.composite = this.renderer.fragment(COMPOSITE_FRAG, 'composite')
     this.streak = this.renderer.fragment(STREAK_FRAG, 'streak')
+    this.star = this.renderer.fragment(STAR_FRAG, 'star')
     this.stylize = this.renderer.fragment(STYLIZE_FRAG, 'stylize')
     this.overlay = this.renderer.fragment(OVERLAY_FRAG, 'overlay')
     this.blit = this.renderer.fragment(BLIT_FRAG, 'blit')
@@ -214,6 +219,9 @@ export class LabRenderer {
 
     for (const target of this.streakTargets ?? []) target.dispose()
     const [first] = this.bloomChain
+    this.starTarget?.dispose()
+    this.starTarget = first ? this.renderer.createTarget(first.width, first.height) : null
+
     this.streakTargets = first
       ? [
         this.renderer.createTarget(first.width, first.height),
@@ -233,7 +241,8 @@ export class LabRenderer {
 
     const bloom = this.renderBloom(settings, scene)
     const streak = this.renderStreak(settings, bloom)
-    this.renderComposite(settings, time, { scene, bloom, streak })
+    const star = this.renderStar(settings, bloom)
+    this.renderComposite(settings, time, { scene, bloom, streak, star })
 
     this.renderOverlays(overlays)
   }
@@ -285,6 +294,7 @@ export class LabRenderer {
     this.stylize.set('uLevels', settings.stylizeLevels)
     this.stylize.set('uColour', settings.stylizeColour)
     this.stylize.set('uAngle', settings.stylizeAngle * DEGREES)
+    this.stylize.set('uMask', settings.stylizeMask)
     this.stylize.set('uMode', branch)
     renderer.draw()
     return this.screenTarget
@@ -541,6 +551,14 @@ export class LabRenderer {
     this.stage.set('uFocusNear', near)
     this.stage.set('uFocusFar', far)
     this.stage.set('uFocus', settings.focus)
+    // Resolved to a gradient across the frame here rather than in the shader:
+    // the tilt is authored as an amount and a direction, which is how anyone
+    // thinks about it, and the plane only needs the two components.
+    const tilt = settings.focusTiltAngle * DEGREES
+    this.stage.set('uFocusTilt', [
+      Math.cos(tilt) * settings.focusTilt * 0.5,
+      Math.sin(tilt) * settings.focusTilt * 0.5,
+    ])
     this.stage.set('uFocusRange', settings.focusRange)
     // Falloff is measured from the camera distance, not the focal plane, so
     // racking focus does not also change how dark the far edge sits.
@@ -570,6 +588,8 @@ export class LabRenderer {
     this.dof.set('uSamples', dofSamplesFor(settings.blurRadius))
     this.dof.set('uBlades', settings.bokehBlades)
     this.dof.set('uCatEye', settings.bokehCatEye)
+    this.dof.set('uSwirl', settings.bokehSwirl)
+    this.dof.set('uSqueeze', settings.bokehSqueeze)
     renderer.draw()
     return this.dofTarget
   }
@@ -588,7 +608,10 @@ export class LabRenderer {
     this.prefilter.set('uSource', scene.texture)
     this.prefilter.set('uThreshold', settings.bloomThreshold)
     this.prefilter.set('uKnee', bloomKneeFor(settings.bloomThreshold))
-    this.prefilter.set('uBleed', settings.bleed)
+    // Diffusion mixes towards this chain, so the chain has to hold the whole
+    // picture rather than only what passed the threshold — the same floor
+    // halation raises, taken to whichever of the two asks for more.
+    this.prefilter.set('uBleed', Math.max(settings.bleed, settings.diffusion))
     renderer.draw()
 
     for (let i = 1; i < this.bloomChain.length; i++) {
@@ -656,15 +679,35 @@ export class LabRenderer {
     return source
   }
 
-  private renderComposite(settings: LabSettings, time: number, pass: { scene: Target, bloom: Target, streak: Target | null }) {
+  /** The diffraction spikes, walked out from the thresholded bloom. */
+  private renderStar(settings: LabSettings, bloom: Target): Target | null {
+    if (settings.starIntensity <= 0 || !this.starTarget) return null
+
     const { renderer } = this
-    const { scene, bloom, streak } = pass
+    renderer.bind(this.starTarget)
+    this.star.use()
+    this.star.set('uSource', bloom.texture)
+    this.star.set('uTexel', [1 / this.starTarget.width, 1 / this.starTarget.height])
+    this.star.set('uPoints', settings.starPoints)
+    this.star.set('uAngle', settings.starAngle * DEGREES)
+    // Authored against a 1080-high frame, like every other reach in this file.
+    this.star.set('uLength', settings.starLength * (this.height / 1080))
+    renderer.draw()
+    return this.starTarget
+  }
+
+  private renderComposite(settings: LabSettings, time: number, pass: { scene: Target, bloom: Target, streak: Target | null, star: Target | null }) {
+    const { renderer } = this
+    const { scene, bloom, streak, star } = pass
     renderer.bind(null)
     this.composite.use()
     this.composite.set('uScene', scene.texture)
     this.composite.set('uBloom', bloom.texture)
     this.composite.set('uStreak', (streak ?? bloom).texture)
     this.composite.set('uStreaks', streak ? settings.streaks : 0)
+    this.composite.set('uStar', (star ?? bloom).texture)
+    this.composite.set('uStarIntensity', star ? settings.starIntensity : 0)
+    this.composite.set('uDiffusion', settings.diffusion)
     this.composite.set('uGhosts', settings.ghosts)
     this.composite.set('uTanHalfFov', Math.tan((settings.fov * DEGREES) / 2))
     this.composite.set('uResolution', [this.width, this.height])
@@ -673,6 +716,8 @@ export class LabRenderer {
     this.composite.set('uAberration', settings.aberration)
     this.composite.set('uDispersion', settings.dispersion)
     this.composite.set('uLensNoise', settings.lensNoise)
+    this.composite.set('uRadialBlur', settings.radialBlur)
+    this.composite.set('uSpinBlur', settings.spinBlur)
     this.composite.set('uDuotone', settings.duotone)
     this.composite.set('uDuotoneShadow', hexToLinearRgb(settings.duotoneShadow))
     this.composite.set('uDuotoneHighlight', hexToLinearRgb(settings.duotoneHighlight))
@@ -698,9 +743,9 @@ export class LabRenderer {
   }
 
   dispose() {
-    const programs = [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.streak, this.stylize, this.overlay, this.blit]
+    const programs = [this.stage, this.dof, this.prefilter, this.down, this.up, this.composite, this.streak, this.star, this.stylize, this.overlay, this.blit]
     for (const program of programs) program.dispose()
-    const targets = [this.sceneTarget, this.dofTarget, this.screenTarget, ...this.bloomChain, ...this.streakTargets ?? []]
+    const targets = [this.sceneTarget, this.dofTarget, this.screenTarget, ...this.bloomChain, ...this.streakTargets ?? [], ...(this.starTarget ? [this.starTarget] : [])]
     for (const target of targets) target.dispose()
     for (const texture of this.layerTextures.values()) this.renderer.gl.deleteTexture(texture)
     if (this.glyphs) this.renderer.gl.deleteTexture(this.glyphs.texture)
@@ -723,8 +768,13 @@ function normalize(v: Vec3): Vec3 {
 /**
  * Rotation basis, column-major to match the shader's `mat3` construction so the
  * CPU and GPU agree on which way the plate is facing.
+ *
+ * Exported because the axis gizmo has to draw the same basis the renderer uses.
+ * A second copy of this in a component would be a second thing to keep in step
+ * with the shader, and the gizmo's whole job is to be trusted about which way
+ * the plate is pointing.
  */
-function rotationMatrix(pitch: number, yaw: number, roll: number): number[] {
+export function rotationMatrix(pitch: number, yaw: number, roll: number): number[] {
   const cx = Math.cos(pitch), sx = Math.sin(pitch)
   const cy = Math.cos(yaw), sy = Math.sin(yaw)
   const cz = Math.cos(roll), sz = Math.sin(roll)
