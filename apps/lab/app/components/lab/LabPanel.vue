@@ -649,6 +649,8 @@ const CONTAINERS = [
         <LabNumber v-model="settings.aberration" label="Colour spread" v-bind="range('aberration')" />
         <LabNumber v-model="settings.dispersion" label="Dispersion" v-bind="range('dispersion')" />
         <LabNumber v-model="settings.lensNoise" label="Scatter" v-bind="range('lensNoise')" />
+        <LabNumber v-model="settings.radialBlur" label="Zoom blur" v-bind="range('radialBlur')" />
+        <LabNumber v-model="settings.spinBlur" label="Spin blur" v-bind="range('spinBlur')" />
 
         <p v-if="!hasSpread" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Dispersion and scatter both act on the colour spread, so they do

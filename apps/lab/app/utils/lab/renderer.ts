@@ -684,6 +684,8 @@ export class LabRenderer {
     this.composite.set('uAberration', settings.aberration)
     this.composite.set('uDispersion', settings.dispersion)
     this.composite.set('uLensNoise', settings.lensNoise)
+    this.composite.set('uRadialBlur', settings.radialBlur)
+    this.composite.set('uSpinBlur', settings.spinBlur)
     this.composite.set('uDuotone', settings.duotone)
     this.composite.set('uDuotoneShadow', hexToLinearRgb(settings.duotoneShadow))
     this.composite.set('uDuotoneHighlight', hexToLinearRgb(settings.duotoneHighlight))

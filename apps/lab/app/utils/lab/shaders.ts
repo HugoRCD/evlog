@@ -470,6 +470,8 @@ uniform float uDistortion;
 uniform float uAberration;
 uniform float uDispersion;
 uniform float uLensNoise;
+uniform float uRadialBlur;
+uniform float uSpinBlur;
 uniform float uExposure;
 uniform float uContrast;
 uniform float uSaturation;
@@ -525,6 +527,15 @@ vec2 lensUv(vec2 centred, float aspect, float scale) {
 }
 
 const int SPECTRAL_TAPS = 12;
+
+/**
+ * Steps along the camera's path during the exposure.
+ *
+ * Eight rather than more, because each one is itself a full lens sample — with
+ * dispersion on, a tap is twelve reads of the frame. Eight is where the smear
+ * stops showing its own steps on the ranges these controls allow.
+ */
+const int MOTION_TAPS = 8;
 
 /**
  * Three overlapping responses standing in for a sensor's.
@@ -623,7 +634,38 @@ void main() {
     ? (hash(grainUv + uTime * 331.0) - 0.5) * uLensNoise * 2.0
     : 0.0;
 
-  vec3 scene = sampleScene(centred, aspect, jitter);
+  /*
+   * A zoom or a twist made during the exposure.
+   *
+   * Both are the same gesture — the frame sampled repeatedly along the path the
+   * camera travelled while the shutter was open, and averaged. A zoom scales the
+   * coordinate towards the middle, a twist turns it about the middle, and doing
+   * both at once is what a lens does when it is racked and rotated together.
+   *
+   * Unlike the bokeh, this needs nothing in the shot to work on: it smears
+   * whatever is there, so it reads on a flat panel as clearly as on a highlight.
+   *
+   * The rotation happens in a square space and comes back out of it, or a twist
+   * would trace an ellipse on a wide frame instead of a circle.
+   */
+  vec3 scene;
+  if (uRadialBlur > 0.0 || uSpinBlur > 0.0) {
+    vec3 sum = vec3(0.0);
+    for (int i = 0; i < MOTION_TAPS; i++) {
+      float t = float(i) / float(MOTION_TAPS - 1);
+      float scale = 1.0 - uRadialBlur * 0.3 * t;
+      float turn = uSpinBlur * 0.4 * t;
+      float c = cos(turn), sn = sin(turn);
+
+      vec2 square = centred * vec2(aspect, 1.0);
+      square = mat2(c, -sn, sn, c) * square * scale;
+      sum += sampleScene(square / vec2(aspect, 1.0), aspect, jitter);
+    }
+    scene = sum / float(MOTION_TAPS);
+  }
+  else {
+    scene = sampleScene(centred, aspect, jitter);
+  }
   // The glow follows the geometry it came from. Sampled straight it would stay
   // put while the picture under it bent, and every highlight near an edge would
   // separate from the thing that was glowing.

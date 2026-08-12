@@ -142,6 +142,14 @@ export interface LabSettings {
   dispersion: number
   /** Jitters each sample along the split, so the fringe breaks up rather than banding. */
   lensNoise: number
+  /**
+   * A zoom made during the exposure: the frame smeared along rays from its
+   * middle. Unlike anything in Focus, it acts on the whole picture rather than
+   * on what happens to be out of focus.
+   */
+  radialBlur: number
+  /** The same, turned rather than racked — a twist about the middle. */
+  spinBlur: number
 
   // Grade
   emission: number
@@ -233,6 +241,8 @@ export const DEFAULT_SETTINGS: LabSettings = {
   aberration: 0,
   dispersion: 0,
   lensNoise: 0,
+  radialBlur: 0,
+  spinBlur: 0,
 
   emission: 1,
   exposure: 1,
@@ -293,6 +303,8 @@ export const HINTS: Partial<Record<string, string>> = {
   aberration: 'Splits the colour channels towards the edges, the way a real lens does.',
   dispersion: 'Smears that split into a spectrum instead of three clean channels.',
   lensNoise: 'Breaks the split up, so it reads as scattered light rather than as a band.',
+  radialBlur: 'Smears the frame along rays from the middle — a zoom made while the shutter was open.',
+  spinBlur: 'Smears it along arcs instead — the same gesture, turned rather than racked.',
   duotone: 'Maps the picture onto two colours by brightness. The grade still applies on top.',
   bleed: 'Diffuses the whole picture, not only what is bright enough to glow. Halation.',
   stylizeScale: 'Cell size of the screen, measured on a 1080p frame.',
@@ -342,6 +354,8 @@ export const RANGES = {
   aberration: { min: 0, max: 3, step: 0.005 },
   dispersion: { min: 0, max: 1, step: 0.005 },
   lensNoise: { min: 0, max: 1, step: 0.005 },
+  radialBlur: { min: 0, max: 1, step: 0.005 },
+  spinBlur: { min: 0, max: 1, step: 0.005 },
 
   vignette: { min: 0, max: 1, step: 0.005 },
   grain: { min: 0, max: 0.12, step: 0.001 },
