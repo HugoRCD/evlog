@@ -64,5 +64,3 @@ minimumReleaseAgeExclude:
   - rolldown
   - workflow
 
-patchedDependencies:
-  eve@0.31.3: patches/eve@0.31.3.patch
