@@ -2,6 +2,19 @@
 
 Read the root `AGENTS.md` first — this file only adds docs-specific rules.
 
+## Nuxt UI components in MDC
+
+Nuxt UI ships the components this site renders inside markdown. Use them as the module exposes them, and never rename or re-skin one from the outside.
+
+- **Call the component by its MDC tag, not by its Vue name.** `@nuxt/ui` registers a tag map (`mdc.components.map` in its module): `::accordion`, `::accordion-item`, `::callout`, `::card-group`, `::code-group`, `::collapsible`, `::field`, `::steps`, `::tabs`. Writing `::prose-accordion` reaches the same globally-registered component by accident and is wrong: the tag map is the public surface, the `Prose*` names are Nuxt UI internals.
+- **Only pass props the prose wrapper declares.** The wrappers are thin and expose a small set (`ProseAccordion` takes `type`, `class`, `ui`). Anything else lands on the underlying component through attribute fall-through, which happens to work until the wrapper grows a root element. Read the component in `node_modules/@nuxt/ui/dist/runtime/components/prose/` before inventing an attribute.
+- **Style a component through its own `ui` prop or `app.config.ts`**, never by wrapping it in a bordered box. An accordion already draws its dividers; a parent that adds a border and a background is fighting the theme and will drift from it.
+- **A component carries meaning, not texture.** An accordion holds answers the reader chooses between. Do not fold prose that already reads fine into a component, and never restate on a page something the same page says a few paragraphs above.
+
+## Structured data
+
+JSON-LD on a page is generated from the content that page renders, never hand-maintained beside it. `app/pages/index.vue` builds its `FAQPage` entities from the landing markdown with `collectFaqEntries`, so the machine-readable answers cannot drift from the visible ones. A second copy of the same prose in a `.vue` file is the defect, not the feature.
+
 ## Doc animation components (`app/components/content/`)
 
 MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) follow a strict set of rules:
