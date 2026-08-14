@@ -96,8 +96,12 @@ function element(text: string, section?: Record<string, unknown>) {
   return {
     textContent: text,
     marks,
-    setAttribute: (name: string, value: string) => { marks[name] = value },
-    removeAttribute: (name: string) => { delete marks[name] },
+    setAttribute: (name: string, value: string) => {
+      marks[name] = value 
+    },
+    removeAttribute: (name: string) => {
+      delete marks[name] 
+    },
     closest: () => section ?? null,
   }
 }

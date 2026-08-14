@@ -138,8 +138,7 @@ export function validateCaptureUrl(raw: string): string | null {
   let url: URL
   try {
     url = new URL(raw)
-  }
-  catch {
+  } catch {
     return `"${raw}" is not a valid absolute URL.`
   }
   if (url.protocol !== 'https:' && url.protocol !== 'http:') {
