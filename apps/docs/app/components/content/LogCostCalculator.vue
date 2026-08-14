@@ -8,7 +8,7 @@ import {
   PINO_LINE_BYTES,
   PRICES_READ_ON,
   type LogCostProvider,
-} from '~~/shared/utils/log-cost'
+} from '../../../shared/utils/log-cost'
 
 const REQUEST_STEPS = [1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9]
 
