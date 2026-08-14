@@ -60,6 +60,15 @@ A second, later trigger is an independent authority boundary: a capability
 whose credentials, failure modes, or release cadence should not move with Evi.
 None exists today.
 
+A third trigger is now in use, and it is the one the content pass hit: a task
+whose correctness depends on two parties not sharing a context. `content_review`
+and `content_rewrite` exist as separate subagents because a reviewer that can
+edit talks itself into changes it cannot justify, and a writer that has read the
+review's reasoning rewrites to that reasoning instead of to the page. The
+isolation is the mechanism, not the tidiness. Both re-export the root sandbox,
+since a declared subagent inherits nothing and the framework default has no
+checkout.
+
 ## Review checklist
 
 Before adding a capability, answer in the PR:
