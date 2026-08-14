@@ -84,6 +84,11 @@ jobs:
       - name: Test workspace
         run: pnpm exec turbo run test --affected --filter='!evlog'
 
+      # content-lint lives in scripts/, outside the workspace graph, so turbo
+      # never sees it. Its fixture test is what keeps the content pass honest.
+      - name: Test content-lint
+        run: pnpm run content:lint:test
+
       # The coverage step bypasses turbo, so it inherits no dist/ from the
       # affected graph — on a docs-only change nothing is affected and the
       # dist-dependent tests (auto-import types, api-surface) would run

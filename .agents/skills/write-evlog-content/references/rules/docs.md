@@ -1,0 +1,73 @@
+# Docs rules
+
+Apply to `apps/docs/content/`. Load alongside `universal.md`.
+
+---
+
+**D-01 · One page answers one intent** · `standard`
+
+Rule: a page has a single question it exists to answer, stated in its `description` frontmatter. Material that answers a different question belongs on the page that owns it, behind a link.
+Why: pages that grow by accretion get skimmed, and the reader stops finding the answer that was there.
+
+---
+
+**D-02 · The description is the answer, not the label** · `standard`
+
+Rule: `description:` in frontmatter states what the reader gets, in a full sentence. It is the search result and the LLM summary.
+Bad: `description: Documentation for the sampling feature.`
+Better: `description: Drop low-importance events at emit time and force-keep slow requests and errors, so your bill scales with signal instead of traffic.`
+Why: it is the highest-leverage sentence on the page and the one most often written last.
+
+---
+
+**D-03 · Prose before code, always** · `standard`
+
+Rule: a code block is preceded by the sentence that says what it does and when you would reach for it. A page never opens on a block.
+Why: readers scan code first and then look up for the reason. If the reason is below, they leave with the wrong mental model.
+
+---
+
+**D-04 · Show the failure, not only the success** · `standard`
+
+Rule: where a feature exists because something goes wrong, the page shows the wrong shape before the right one: the scattered logs before the wide event, the opaque error before the structured one.
+Why: this is how evlog's own strongest pages work, and it is what makes the API feel inevitable instead of arbitrary.
+
+---
+
+**D-05 · MDC structure is content, not decoration** · `critical`
+
+Rule: `::callout`, `::card-group`, `::code-group`, `::prompt`, `::steps` carry meaning. A callout holds the exception the reader will hit. A card group holds a set the reader chooses from. Do not convert prose into components for texture, and never leave a component with a body that would read the same as a paragraph.
+Why: every component costs vertical space, and a decorative one pushes the answer below the fold.
+
+---
+
+**D-06 · No HTML comments in Vue templates or MDC blocks** · `critical`
+
+Rule: repo-wide. `<!-- -->` never appears in a `<template>` block or inside MDC content.
+
+---
+
+**D-07 · Options are tables, not prose** · `standard`
+
+Rule: a set of configuration options with types and defaults is a table. Prose describing each option in sequence is a table someone refused to write.
+Why: nobody reads an options list linearly, and a table makes a missing default visible.
+
+---
+
+**D-08 · Link laterally, once** · `standard`
+
+Rule: when a page names a concept another page owns, link it on first mention and not again. Every page names at least one next step.
+Why: the docs are a graph the reader navigates by curiosity. A page with no outbound link is a dead end, and a page with the same link six times is noise.
+
+---
+
+**D-09 · Frontmatter stays intact through a rewrite** · `critical`
+
+Rule: keys, order, `navigation.icon`, and `links:` entries survive an edit unchanged unless a finding names them. Icons and link colors are design decisions.
+
+---
+
+**D-10 · The page matches the code it documents** · `critical`
+
+Rule: symbols, option names, defaults, and error codes are verified against `packages/evlog/src` at review time. A rename in the package is a docs bug the moment it ships.
+Why: this is the only class of docs defect that silently converts a correct reader into a wrong one.
