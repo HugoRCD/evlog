@@ -31,6 +31,7 @@ import { buildBaseline, evaluate } from './lib/score.mjs'
 import { SURFACES, corpusFiles, surfaceOf } from './lib/surfaces.mjs'
 import { modelChecks } from './lib/model-checks.mjs'
 import { extract } from './lib/extract.mjs'
+import { fetchPublic } from './lib/net.mjs'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CONTENT_ROOT = resolve(REPO_ROOT, 'apps/docs/content')
@@ -44,8 +45,8 @@ const argv = process.argv.slice(2)
 const options = {
   json: argv.includes('--json'),
   stdin: argv.includes('--stdin'),
-  top: numberFlag('--top'),
-  minScore: numberFlag('--min-score'),
+  top: numberFlag('--top', { min: 1, integer: true }),
+  minScore: numberFlag('--min-score', { min: 0, max: 100 }),
   surface: surfaceFlag('--surface'),
   url: stringFlag('--url'),
   as: surfaceFlag('--as') ?? 'docs',
@@ -150,14 +151,10 @@ if (options.minScore !== null && worst && worst.score < options.minScore) {
  * @param {string} url
  */
 async function fromUrl(url) {
-  const response = await fetch(url, {
-    headers: { 'user-agent': 'evlog-content-lint' },
-    redirect: 'follow',
-    signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-  }).catch((error) => {
-    fail(`${url} could not be fetched: ${error instanceof Error ? error.message : String(error)}`)
-  })
+  const fetched = await fetchPublic(url, { timeoutMs: FETCH_TIMEOUT_MS, userAgent: 'evlog-content-lint' })
+  if ('error' in fetched) fail(fetched.error)
 
+  const { response } = fetched
   if (!response.ok) fail(`${url} responded ${response.status}`)
   if (!/^text\/(html|markdown|plain)\b/i.test(response.headers.get('content-type') ?? '')) {
     fail(`${url} served ${response.headers.get('content-type') ?? 'no content type'}; expected html, markdown, or plain text`)
@@ -286,11 +283,22 @@ function renderTable(selected, total, baseline) {
  * @param {string} name
  * @returns {number | null}
  */
-function numberFlag(name) {
+function numberFlag(name, bounds) {
   const at = argv.indexOf(name)
   if (at === -1) return null
-  const value = Number(argv[at + 1])
-  return Number.isFinite(value) ? value : null
+
+  const raw = argv[at + 1]
+  const value = Number(raw)
+  // A typo used to read as "flag absent", which silently disabled --min-score
+  // and made --top 0 mean "every page".
+  if (raw === undefined || raw.trim() === '' || !Number.isFinite(value)) {
+    fail(`${name} takes a number. Got ${raw === undefined ? 'nothing' : `"${raw}"`}.`)
+  }
+  if (bounds.integer && !Number.isInteger(value)) fail(`${name} takes a whole number.`)
+  if (value < bounds.min || (bounds.max !== undefined && value > bounds.max)) {
+    fail(`${name} takes a number between ${bounds.min} and ${bounds.max ?? 'up'}. Got ${value}.`)
+  }
+  return value
 }
 
 /**

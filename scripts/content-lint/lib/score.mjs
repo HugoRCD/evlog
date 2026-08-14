@@ -12,7 +12,9 @@
 import { ALTERNATIVES } from './corpus.mjs'
 import { profileOf, surfaceOf } from './surfaces.mjs'
 
-const DOCUMENTING_A_DEPRECATION = /\b(deprecat\w*|removed|retired|renamed|legacy|instead of|prefer|migrat\w*|never|not\b)/i
+// Deprecation vocabulary, not a bare negation: `not` alone let "do not forget
+// to import from `evlog/shared`" through, and T-15 is the one critical tell.
+const DOCUMENTING_A_DEPRECATION = /\b(deprecat\w*|removed|retired|renamed|legacy|no longer|instead of|prefer|migrat\w*|never use|never import|do(es)? not (use|exist|ship)|not an entry point)\b/i
 
 /** Below this, a surface cannot speak for itself and answers to the whole-corpus median. */
 const MIN_SURFACE_SAMPLE = 5
@@ -51,7 +53,12 @@ function median(values) {
 }
 
 /**
- * @param {{ path: string, metrics: object, drift: object[] }} page
+ * @param {object} page
+ * @param {string} page.path
+ * @param {object} page.metrics
+ * @param {object[]} page.drift
+ * @param {string} [page.surface] Stated by ad-hoc input, which belongs to no path.
+ * @param {boolean} [page.external] True for a page outside this repository, which answers to no evlog-specific check.
  * @param {ReturnType<typeof buildBaseline>} baseline
  * @returns {{ surface: string, score: number, findings: object[] }}
  */

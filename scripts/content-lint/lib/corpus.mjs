@@ -225,7 +225,7 @@ export const ALTERNATIVES = [
 ]
 
 /** Words that turn naming an alternative into a claim about it. */
-const COMPARATIVE = /\b(unlike|whereas|slower|faster|heavier|lighter|worse|better|lacks?|cannot|can't|does ?n[o']t|has no|have no|without|instead of|beats?|outperforms?)\b/i
+const COMPARATIVE = /\b(unlike|whereas|slower|faster|heavier|lighter|worse|better|lacks?|cannot|can['’]t|does ?n[o'’]t|has no|have no|without|instead of|beats?|outperforms?)\b/i
 
 const CONTRACTION = /\b[A-Za-z]+['’](s|t|re|ve|ll|d|m)\b/g
 const EXPANDED = /\b(do not|does not|did not|is not|are not|was not|were not|cannot|can not|will not|would not|should not|could not|have not|has not|had not|it is|that is|there is|you are|we are|they are|you will|we will|let us)\b/gi

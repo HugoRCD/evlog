@@ -166,7 +166,9 @@ function epigrams(doc) {
     const last = parts.at(-1)
     const length = wordCount(last)
     if (length > 8 || length < 2) continue
-    if (/\d/.test(last) || last.includes('code')) continue
+    // `code` is the whole-word placeholder `cleanInline` leaves behind, so a
+    // substring test would also exempt `encoded` and `decode`.
+    if (/\d/.test(last) || /\bcode\b/.test(last)) continue
     // A closer pointing somewhere carries something: the destination.
     const labels = doc.links.filter(link => link.line === paragraph.line).map(link => link.text)
     if (labels.some(label => label && last.includes(label))) continue
@@ -278,12 +280,19 @@ function unbackedSections(doc) {
 
   return bounds
     .map((section) => {
-      const paragraphs = doc.paragraphs.filter(p => p.line > section.from && p.line < section.to)
-      const words = paragraphs.reduce((total, p) => total + wordCount(p.text), 0)
-      const hasCode = doc.code.some(block => block.line > section.from && block.line < section.to)
-      const hasLink = doc.links.some(link => link.line > section.from && link.line < section.to)
-      const hasNumber = paragraphs.some(p => /\d/.test(p.text))
-      const hasSymbol = doc.inlineCode.some(item => item.line > section.from && item.line < section.to)
+      // Bullets are prose too. Counting only paragraphs called a section of
+      // measured bullets unbacked, and left a section written entirely as
+      // bullets at zero words, where nothing is ever reported.
+      const within = span => span.line > section.from && span.line < section.to
+      const spans = [
+        ...doc.paragraphs.filter(within),
+        ...doc.lists.flatMap(list => list.items).filter(within),
+      ]
+      const words = spans.reduce((total, span) => total + wordCount(span.text), 0)
+      const hasCode = doc.code.some(within)
+      const hasLink = doc.links.some(within)
+      const hasNumber = spans.some(span => /\d/.test(span.text))
+      const hasSymbol = doc.inlineCode.some(within)
       const backed = hasCode || hasLink || hasNumber || hasSymbol
       return { heading: section.heading, line: section.from, words, backed }
     })

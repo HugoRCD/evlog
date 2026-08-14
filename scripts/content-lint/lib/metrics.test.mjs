@@ -96,4 +96,13 @@ describe('unbacked sections', () => {
 
     expect(metrics.unbackedSections).toHaveLength(0)
   })
+
+  it('counts a bullet as evidence, and as words', () => {
+    const filler = 'The system handles high throughput and keeps overhead low for demanding workloads. '
+    const measured = measureSource(`## Performance\n\n${filler.repeat(8)}\n\n- Flushes every 2 seconds\n`)
+    const bulletsOnly = measureSource(`## Performance\n\n${Array.from({ length: 12 }, () => '- The system handles high throughput and keeps the overhead low for demanding workloads').join('\n')}\n`)
+
+    expect(measured.unbackedSections).toHaveLength(0)
+    expect(bulletsOnly.unbackedSections.map(section => section.heading)).toEqual(['Performance'])
+  })
 })

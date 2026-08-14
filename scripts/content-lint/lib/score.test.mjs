@@ -61,6 +61,19 @@ describe('evaluate', () => {
     expect(result.findings).toEqual([])
   })
 
+  it('does not let a bare negation shield a retired entry point', () => {
+    const source = 'Do not forget to import the helper from `evlog/shared` in your entry.'
+    const result = evaluate(page('apps/docs/content/2.learn/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).toContain('T-15')
+  })
+
+  it('still spares the sentence that retires it', () => {
+    const source = 'Never use `evlog/shared`; the public entry point is `evlog/toolkit`.'
+
+    expect(evaluate(page('AGENTS.md', source), quiet).findings.map(finding => finding.id)).not.toContain('T-15')
+  })
+
   it('flags assistant framing on sight', () => {
     const result = evaluate(page('apps/docs/content/2.learn/1.a.md', "Great question. Here's a breakdown of the pipeline."), quiet)
 

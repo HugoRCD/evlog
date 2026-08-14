@@ -237,7 +237,11 @@ export function sentences(text) {
   })
 
   return guarded
-    .split(/(?<=[.!?])\s+(?=[A-Z`"'(\d])/)
+    // A lowercase start is a real sentence here: this corpus opens them with
+    // tool names and package paths (`pino writes through a transport`). The
+    // lookbehind still requires terminal punctuation, and abbreviations are
+    // masked above.
+    .split(/(?<=[.!?])\s+(?=[A-Za-z`"'(\d])/)
     .map(part => part.replace(/\u0000(\d+)\u0000/g, (_match, position) => ABBREVIATIONS[Number(position)]))
     .map(part => part.trim())
     .filter(Boolean)

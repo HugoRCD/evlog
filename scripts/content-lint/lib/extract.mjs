@@ -47,14 +47,16 @@ export function extract(html) {
 }
 
 /**
- * The inner HTML of the first element with this tag.
+ * The inner HTML of the first element with this tag, up to its first closing
+ * tag. Lazy on purpose: a greedy capture on a page with several `<article>`
+ * elements runs from the first to the last and keeps the markup between them.
  *
  * @param {string} html
  * @param {string} tag
  * @returns {string | null}
  */
 function region(html, tag) {
-  const match = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*)<\\/${tag}>`, 'i').exec(html)
+  const match = new RegExp(`<${tag}\\b[^>]*>([\\s\\S]*?)<\\/${tag}>`, 'i').exec(html)
   return match ? match[1] : null
 }
 
@@ -69,16 +71,19 @@ function toMarkdown(html) {
     (_match, code) => `\n\n\`\`\`\n${decode(strip(code))}\n\`\`\`\n\n`)
   out = out.replace(/<code\b[^>]*>([\s\S]*?)<\/code>/gi, (_match, code) => `\`${decode(strip(code))}\``)
 
+  // Anchors first: the heading and list callbacks below both strip tags, so an
+  // anchor converted after them is an anchor already deleted, and every link in
+  // a bullet or a heading would vanish from `doc.links`.
+  out = out.replace(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href, text) => {
+    const label = collapse(decode(strip(text)))
+    return label ? `[${label}](${href})` : ''
+  })
+
   out = out.replace(/<h([1-6])\b[^>]*>([\s\S]*?)<\/h\1>/gi,
     (_match, depth, text) => `\n\n${'#'.repeat(Number(depth))} ${collapse(decode(strip(text)))}\n\n`)
 
   out = out.replace(/<li\b[^>]*>([\s\S]*?)<\/li>/gi,
     (_match, text) => `\n- ${collapse(decode(strip(text)))}`)
-
-  out = out.replace(/<a\b[^>]*href=["']([^"']*)["'][^>]*>([\s\S]*?)<\/a>/gi, (_match, href, text) => {
-    const label = collapse(decode(strip(text)))
-    return label ? `[${label}](${href})` : ''
-  })
 
   out = out.replace(/<br\s*\/?>/gi, '\n')
   out = out.replace(/<\/(p|div|section|tr|blockquote|ul|ol)>/gi, '\n\n')

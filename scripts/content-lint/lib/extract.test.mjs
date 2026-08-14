@@ -49,6 +49,22 @@ describe('extract', () => {
     expect(doc.inlineCode.map(item => item.token)).toContain('evlog/toolkit')
   })
 
+  it('keeps a link that lives inside a bullet or a heading', () => {
+    const result = extract(page([
+      '<ul><li>See the <a href="/reference/performance">bench</a></li></ul>',
+      '<h2>Read <a href="/learn/overview">the overview</a></h2>',
+    ].join('')))
+    const doc = parseMarkdown(result.markdown)
+
+    expect(doc.links.map(link => link.href)).toEqual(['/reference/performance', '/learn/overview'])
+  })
+
+  it('stops at the first closing tag rather than the last', () => {
+    const html = '<html><body><article><p>First article.</p></article><p>Between.</p><article><p>Second.</p></article></body></html>'
+
+    expect(extract(html).markdown).not.toContain('Between.')
+  })
+
   it('decodes entities, so an em dash is still found', () => {
     const result = extract(page('<p>The drain retries &mdash; twice &mdash; then drops the batch.</p>'))
 
