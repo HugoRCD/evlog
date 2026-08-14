@@ -128,6 +128,14 @@ export interface AIToolExecution {
   durationMs: number
   success: boolean
   error?: string
+  /**
+   * Input tokens this tool result added to the next model call, measured as
+   * the delta in the consumed input between the step that called the tool and
+   * the step that consumed its result. Undefined when the turn ended before a
+   * step consumed the result, when a compaction reset the context, or when the
+   * tools in one step share the delta (each reports its share, rounded).
+   */
+  inputTokens?: number
 }
 
 /**
