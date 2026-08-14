@@ -24,7 +24,7 @@ const structuredData = computed(() => ({
       url: 'https://www.evlog.dev/',
       offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
       license: 'https://github.com/hugorcd/evlog/blob/main/LICENSE',
-      author: { '@type': 'Person', name: 'HugoRCD', url: 'https://hrcd.fr/' },
+      author: { '@type': 'Person', name: 'HugoRCD', url: 'https://hugorcd.com/' },
     },
     {
       '@type': 'FAQPage',
