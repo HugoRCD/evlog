@@ -4,6 +4,12 @@ import { GITHUB_CONNECTOR } from '../lib/github/credentials'
 import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
 import { isAutonomous, isScheduleAppAuth, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
+/**
+ * Every tool here is carried in the prompt on every turn, whatever the turn is
+ * about, so the list stays at what the agent's instructions and skills actually
+ * reach for. A capability that reads well on paper and is never called is paid
+ * for on every request; add one back when a run needs it, not in anticipation.
+ */
 const TOOLS = [
   // Repository and code
   'getRepository',
@@ -11,10 +17,7 @@ const TOOLS = [
   'getFileContent',
   'searchCode',
   'getBlame',
-  'listBranches',
   'listCommits',
-  'getCommit',
-  'compareCommits',
 
   // Issues
   'searchIssues',
@@ -26,7 +29,6 @@ const TOOLS = [
   'closeIssue',
   'addIssueComment',
   'updateIssueComment',
-  'deleteIssueComment',
 
   // Triage
   'listLabels',
@@ -36,8 +38,6 @@ const TOOLS = [
   'removeLabel',
   'addAssignees',
   'removeAssignees',
-  'addIssueReaction',
-  'addCommentReaction',
 
   // Pull requests
   'listPullRequests',
@@ -48,7 +48,6 @@ const TOOLS = [
   'updatePullRequest',
   'addPullRequestComment',
   'updatePullRequestComment',
-  'deletePullRequestComment',
   'createPullRequestReview',
   'requestReviewers',
 
@@ -59,8 +58,6 @@ const TOOLS = [
 
   // Releases, read only: AGENTS.md forbids agents from creating one
   'listReleases',
-  'getLatestRelease',
-  'getReleaseContext',
 
   // CI, read only — diagnose a red build, never restart or cancel one
   'listCheckRuns',
@@ -98,8 +95,7 @@ export default githubExtension({
   connector: GITHUB_CONNECTOR,
   context: { owner: 'HugoRCD', repo: 'evlog' },
   include: [...TOOLS],
-  // Omitted write tools keep the default always(): closeIssue, deleteIssueComment,
-  // deletePullRequestComment, createPullRequestReview, deleteLabel.
+  // Omitted write tools keep the default always(): closeIssue, createPullRequestReview.
   // Connect scopes are derived from `include` (createLabel → issues:write) in sdk ≥ 1.11.1.
   requireApproval: {
     // Reversible and harmless on every kind of run; a card here only slows the PR flow down.
@@ -123,8 +119,6 @@ export default githubExtension({
     addDiscussionComment: policy,
     addAssignees: assignPolicy,
     removeAssignees: policy,
-    addIssueReaction: policy,
-    addCommentReaction: policy,
     addLabels: autonomousWrite,
     removeLabel: policy,
     createLabel: (ctx) => createLabelPolicy(ctx.session.auth.current, ctx.toolInput),

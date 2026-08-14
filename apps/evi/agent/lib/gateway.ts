@@ -1,12 +1,22 @@
 import { channelName } from './channel'
 import { environment } from './environment'
 
-/** Routing shared by every gateway call. `sort` keeps following the cheapest deployment. */
-export const gatewayRouting = {
-  caching: 'auto',
-  sort: 'cost',
-  zeroDataRetention: true,
-} as const
+/** Scheduled runs answer to nobody in real time; every other surface has someone waiting. */
+function isBatch(kind?: string): boolean {
+  return channelName(kind) === 'schedule'
+}
+
+/**
+ * Routing shared by every gateway call: schedules sort on cost, every
+ * interactive surface sorts on time to first token.
+ */
+export function gatewayRouting(kind?: string) {
+  return {
+    caching: 'auto',
+    sort: isBatch(kind) ? 'cost' : 'ttft',
+    zeroDataRetention: true,
+  } as const
+}
 
 /**
  * Tags stamped on every gateway request. One tag per dimension, not a compound

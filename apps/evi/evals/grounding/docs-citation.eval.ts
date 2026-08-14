@@ -7,7 +7,6 @@ export default defineEval({
   async test(t) {
     await t.send('How does tail sampling work in evlog?')
     t.succeeded()
-    t.loadedSkill('source-research')
     t.calledTool('docs__get-page')
     t.check(t.reply, includes(/evlog\.dev\//))
     t.judge.autoevals.closedQA('cites a documentation URL it retrieved rather than describing the feature generically').atLeast(0.6)

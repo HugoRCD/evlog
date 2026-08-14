@@ -9,7 +9,7 @@ export default defineAgent({
         model: MODEL,
         modelOptions: {
           providerOptions: {
-            gateway: { ...gatewayRouting, tags: sessionTags(ctx.channel.kind) },
+            gateway: { ...gatewayRouting(ctx.channel.kind), tags: sessionTags(ctx.channel.kind) },
           },
         },
       }),

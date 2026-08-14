@@ -26,7 +26,6 @@ export const GITHUB_WRITE_TOOLS = [
   'github__closeIssue',
   'github__addIssueComment',
   'github__updateIssueComment',
-  'github__deleteIssueComment',
   'github__createLabel',
   'github__updateLabel',
   'github__addLabels',
@@ -37,12 +36,9 @@ export const GITHUB_WRITE_TOOLS = [
   'github__updatePullRequest',
   'github__addPullRequestComment',
   'github__updatePullRequestComment',
-  'github__deletePullRequestComment',
   'github__createPullRequestReview',
   'github__requestReviewers',
   'github__addDiscussionComment',
-  'github__createRelease',
-  'github__updateRelease',
 ] as const
 
 /** Repository read tools any source-level question could reasonably reach for. */
@@ -54,10 +50,8 @@ const GITHUB_SOURCE_TOOLS = [
 ] as const
 
 /**
- * Reading source, whichever way. With a sandbox the checkout is the better
- * answer and `source-research` says so, so an eval that accepts only the API
- * gates on the environment rather than on the routing decision. `bash` is left
- * out: it reads source among a hundred other things.
+ * Every tool that reads source, so an eval accepts either route. `bash` is
+ * left out: it reads source among a hundred other things.
  */
 export const SOURCE_READ_TOOLS = [
   ...GITHUB_SOURCE_TOOLS,
