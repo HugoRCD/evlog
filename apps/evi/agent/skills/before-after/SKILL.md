@@ -14,6 +14,7 @@ When "after" needs a dev server, start it in the background **as soon as the bra
 ## 1. Decide what "before" and "after" are
 
 - The current state of the code is **after**. Never switch branches, stash, or revert to fabricate a "before".
+- **A pure addition has no before.** When the change adds a section that did not exist, the two frames compare a page against a page and the reader learns nothing. Capture the new thing alone and say what it replaces in prose. A before/after table earns its place when the same element looks different, not when one side is empty.
 - **Before** is the deployed production page (`evlog.dev`, `evlog.dev/docs/...`) or the last merged preview.
 - **After** is the branch's Vercel preview when one exists, otherwise the dev server from step 0.
 - A `*.vercel.app` URL can be protected: probe it with `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --connect-timeout 5 --max-time 15 '<url>'` (single quotes; refuse a URL containing a single quote, backslash, whitespace, `$`, or backtick). 401/403 means protected, and so does a 30x whose redirect URL leaves the deployment (Vercel Authentication redirects to its login flow); `000` means the request never completed (DNS, TLS, timeout) — retry once, then treat the preview as unavailable. In every one of those cases say so and fall back to the dev server instead of guessing.
@@ -30,6 +31,9 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 `capture__before_after({ beforeUrl, afterUrl, selector, caption })`
 
 - Omit `selector` only for page-level changes (layout, theme, redesign).
+- **Look at both returned frames before you paste anything.** A capture that silently falls back to the top of the page is the failure mode of this tool, and a landing page hero looks like a successful screenshot. Read the two images back and name, to yourself, the element you changed in each one. If you cannot point at it, the selector did not match: fix it and capture again rather than shipping a frame that proves nothing.
+- A `selector` that resolves but sits below the fold needs the element's position in the **document**, not in the viewport. Anything driving Chrome directly must add `window.scrollY` to `getBoundingClientRect().top` before using it as a `Page.captureScreenshot` clip; the two coordinate systems only agree at the top of the page, which is why a mis-framed capture always lands on the hero.
+- A section that reveals on scroll (every `Motion` block on the landing) has to be scrolled into view and given a beat to settle, or the frame catches it mid-transition or fully transparent.
 - For responsive changes, call it again with `viewport: 'mobile'`.
 - Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.
