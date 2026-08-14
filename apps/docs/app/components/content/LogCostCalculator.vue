@@ -5,6 +5,7 @@ import { Motion } from 'motion-v'
 interface Provider {
   id: string
   name: string
+  icon: string
   perGb: number
   perMillionIndexed: number
   note: string
@@ -17,12 +18,12 @@ interface Provider {
  */
 const PRICES_READ_ON = '14 August 2026'
 const PROVIDERS: Provider[] = [
-  { id: 'datadog', name: 'Datadog', perGb: 0.10, perMillionIndexed: 1.70, note: 'ingest + indexing, 15-day retention' },
-  { id: 'grafana', name: 'Grafana Cloud', perGb: 0.50, perMillionIndexed: 0, note: 'Loki ingest' },
-  { id: 'sentry', name: 'Sentry', perGb: 0.50, perMillionIndexed: 0, note: 'beyond the 5 GB included' },
-  { id: 'posthog', name: 'PostHog', perGb: 0.25, perMillionIndexed: 0, note: '50-300 GB tier' },
-  { id: 'betterstack', name: 'Better Stack', perGb: 0.15, perMillionIndexed: 0, note: 'ingest, before retention' },
-  { id: 'axiom', name: 'Axiom', perGb: 0.12, perMillionIndexed: 0, note: 'credits per GB loaded' },
+  { id: 'datadog', name: 'Datadog', icon: 'i-simple-icons-datadog', perGb: 0.10, perMillionIndexed: 1.70, note: 'ingest + indexing, 15-day retention' },
+  { id: 'grafana', name: 'Grafana', icon: 'i-simple-icons-grafana', perGb: 0.50, perMillionIndexed: 0, note: 'Loki ingest' },
+  { id: 'sentry', name: 'Sentry', icon: 'i-simple-icons-sentry', perGb: 0.50, perMillionIndexed: 0, note: 'beyond the 5 GB included' },
+  { id: 'posthog', name: 'PostHog', icon: 'i-simple-icons-posthog', perGb: 0.25, perMillionIndexed: 0, note: '50-300 GB tier' },
+  { id: 'betterstack', name: 'Better Stack', icon: 'i-simple-icons-betterstack', perGb: 0.15, perMillionIndexed: 0, note: 'ingest, before retention' },
+  { id: 'axiom', name: 'Axiom', icon: 'i-custom-axiom', perGb: 0.12, perMillionIndexed: 0, note: 'credits per GB loaded' },
 ]
 
 /**
@@ -49,24 +50,32 @@ const keptRatio = computed(() => sampled.value ? 0.145 : 1)
 
 const before = computed(() => {
   const events = requests.value * linesPerRequest.value
-  const bytes = events * PINO_LINE_BYTES
-  return { events, gb: bytes / 1e9 }
+  return { events, gb: events * PINO_LINE_BYTES / 1e9 }
 })
 const after = computed(() => {
   const events = requests.value * keptRatio.value
-  const bytes = events * EVLOG_EVENT_BYTES
-  return { events, gb: bytes / 1e9 }
+  return { events, gb: events * EVLOG_EVENT_BYTES / 1e9 }
 })
 
 function bill(shape: { events: number, gb: number }) {
   return shape.gb * perGb.value + (shape.events / 1e6) * perMillionIndexed.value
 }
-const beforeCost = computed(() => bill(before.value))
-const afterCost = computed(() => bill(after.value))
+/**
+ * Costs are rounded to the precision they are displayed at before the saving
+ * is taken from them, so the three figures on screen add up. Subtracting the
+ * raw floats and rounding afterwards leaves the reader a cent short.
+ */
+const cents = computed(() => bill(before.value) < 100 ? 2 : 0)
+function round(value: number) {
+  const factor = 10 ** cents.value
+  return Math.round(value * factor) / factor
+}
+const beforeCost = computed(() => round(bill(before.value)))
+const afterCost = computed(() => round(bill(after.value)))
 const saved = computed(() => Math.max(0, beforeCost.value - afterCost.value))
 const savedPct = computed(() => beforeCost.value === 0 ? 0 : saved.value / beforeCost.value)
-/** Width of the "after" bar against the "before" bar, floored so it stays visible. */
-const afterWidth = computed(() => `${Math.max(2, (afterCost.value / (beforeCost.value || 1)) * 100)}%`)
+/** Floored so the shorter bar stays visible at extreme ratios. */
+const afterWidth = computed(() => `${Math.max(3, (afterCost.value / (beforeCost.value || 1)) * 100)}%`)
 
 function selectProvider(next: Provider) {
   provider.value = next
@@ -91,11 +100,12 @@ function tick() {
 
 const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
 const percent = { style: 'percent' as const, maximumFractionDigits: 0 }
-/** Cents below $100, where rounding to whole dollars would stop the row adding up. */
+/** Cents below $100, where rounding to whole dollars would stop the rows adding up. */
 const money = computed(() => ({
   style: 'currency' as const,
   currency: 'USD',
-  maximumFractionDigits: beforeCost.value < 100 ? 2 : 0,
+  minimumFractionDigits: cents.value,
+  maximumFractionDigits: cents.value,
 }))
 </script>
 
@@ -111,139 +121,170 @@ const money = computed(() => ({
     <div class="overflow-hidden rounded-lg border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2">
         <span class="font-mono text-[10px] uppercase tracking-widest text-dimmed">Monthly log bill</span>
-        <span class="ml-auto flex items-center gap-2">
-          <button
-            type="button"
-            class="text-dimmed transition-colors hover:text-default"
-            :aria-pressed="sound"
-            :aria-label="sound ? 'Mute interaction sound' : 'Unmute interaction sound'"
-            @click="sound = !sound; tick()"
-          >
-            <UIcon :name="sound ? 'i-lucide-volume-2' : 'i-lucide-volume-off'" class="size-3.5" />
-          </button>
-        </span>
+        <button
+          type="button"
+          class="ml-auto text-dimmed transition-colors hover:text-default"
+          :aria-pressed="sound"
+          :aria-label="sound ? 'Mute interaction sound' : 'Unmute interaction sound'"
+          @click="sound = !sound; tick()"
+        >
+          <UIcon :name="sound ? 'i-lucide-volume-2' : 'i-lucide-volume-off'" class="size-3.5" />
+        </button>
       </div>
 
-      <div class="space-y-3 px-4 py-3">
-        <div class="flex flex-wrap gap-1">
+      <div class="space-y-3 border-b border-muted px-4 py-3">
+        <div class="flex flex-wrap gap-1.5">
           <button
             v-for="p in PROVIDERS"
             :key="p.id"
             type="button"
-            class="border px-2 py-1 font-mono text-[10px] transition-colors"
+            class="flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] transition-colors"
             :class="provider.id === p.id
               ? 'border-primary/60 bg-primary/10 text-highlighted'
-              : 'border-muted bg-elevated/40 text-muted hover:text-default'"
+              : 'border-muted bg-elevated/40 text-muted hover:border-default hover:text-default'"
             @click="selectProvider(p)"
           >
+            <UIcon :name="p.icon" class="size-3.5 shrink-0" :class="provider.id === p.id ? 'text-primary' : 'text-dimmed'" />
             {{ p.name }}
           </button>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
+        <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-8">
           <label class="block">
-            <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">Requests / month</span>
+            <span class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
+              Requests / month
+              <span class="text-[11px] normal-case tracking-normal text-highlighted tabular-nums">
+                <NumberFlow :value="requests" :format="compact" />
+              </span>
+            </span>
             <input
               v-model.number="requestStep"
               type="range"
               min="0"
               :max="REQUEST_STEPS.length - 1"
               step="1"
-              class="mt-1 w-full accent-primary"
+              class="mt-1.5 w-full accent-primary"
               @input="tick"
             >
-            <span class="font-mono text-[11px] text-highlighted tabular-nums">
-              <NumberFlow :value="requests" :format="compact" />
-            </span>
           </label>
 
           <label class="block">
-            <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">Log lines per request, before</span>
+            <span class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
+              Log lines per request, today
+              <span class="text-[11px] normal-case tracking-normal text-highlighted tabular-nums">{{ linesPerRequest }}</span>
+            </span>
             <input
               v-model.number="linesPerRequest"
               type="range"
               min="2"
               max="10"
               step="1"
-              class="mt-1 w-full accent-primary"
+              class="mt-1.5 w-full accent-primary"
               @input="tick"
             >
-            <span class="font-mono text-[11px] text-highlighted tabular-nums">{{ linesPerRequest }} lines</span>
           </label>
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2">
-          <label class="flex items-center gap-2">
+        <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
+          <label class="flex items-center gap-1.5">
             <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">$ / GB</span>
             <input
               v-model.number="perGb"
               type="number"
               min="0"
               step="0.01"
-              class="w-20 border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
+              class="w-16 rounded border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
             >
           </label>
-          <label class="flex items-center gap-2">
+          <label class="flex items-center gap-1.5">
             <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">$ / M indexed</span>
             <input
               v-model.number="perMillionIndexed"
               type="number"
               min="0"
               step="0.01"
-              class="w-20 border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
+              class="w-16 rounded border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
             >
           </label>
+          <label class="ml-auto flex items-center gap-1.5 font-mono text-[10px] text-muted">
+            <input v-model="sampled" type="checkbox" class="accent-primary" @change="tick">
+            Sampling
+          </label>
         </div>
-
-        <label class="flex items-center gap-2 font-mono text-[10px] text-muted">
-          <input v-model="sampled" type="checkbox" class="accent-primary" @change="tick">
-          Head sampling on, keeping every error and 10% of successes
-        </label>
       </div>
 
-      <div class="border-t border-muted px-4 py-3">
-        <div class="grid grid-cols-3 gap-2 font-mono text-[9px] uppercase tracking-widest text-dimmed">
-          <span />
-          <span>{{ linesPerRequest }} lines / request</span>
-          <span class="text-primary">evlog, 1 event</span>
-        </div>
-
-        <div class="mt-1.5 grid grid-cols-3 items-baseline gap-2 font-mono text-[11px] tabular-nums">
-          <span class="text-dimmed">Events</span>
-          <span class="text-muted"><NumberFlow :value="before.events" :format="compact" /></span>
-          <span class="text-highlighted"><NumberFlow :value="after.events" :format="compact" /></span>
-        </div>
-        <div class="mt-1 grid grid-cols-3 items-baseline gap-2 font-mono text-[11px] tabular-nums">
-          <span class="text-dimmed">Data</span>
-          <span class="text-muted"><NumberFlow :value="before.gb" :format="compact" suffix=" GB" /></span>
-          <span class="text-highlighted"><NumberFlow :value="after.gb" :format="compact" suffix=" GB" /></span>
-        </div>
-        <div class="mt-1 grid grid-cols-3 items-baseline gap-2 font-mono text-[13px] tabular-nums">
-          <span class="text-dimmed text-[11px]">Cost</span>
-          <span class="text-muted"><NumberFlow :value="beforeCost" :format="money" /></span>
-          <span class="text-highlighted"><NumberFlow :value="afterCost" :format="money" /></span>
-        </div>
-
-        <div class="mt-3 space-y-1">
-          <div class="flex items-center gap-2">
-            <span class="w-10 shrink-0 font-mono text-[9px] uppercase tracking-widest text-dimmed">before</span>
-            <div class="h-1.5 w-full rounded-full bg-muted" />
-          </div>
-          <div class="flex items-center gap-2">
-            <span class="w-10 shrink-0 font-mono text-[9px] uppercase tracking-widest text-primary">after</span>
-            <div class="h-1.5 w-full overflow-hidden rounded-full bg-elevated">
-              <div class="h-full rounded-full bg-primary transition-[width] duration-500 ease-out" :style="{ width: afterWidth }" />
-            </div>
-          </div>
-        </div>
-
-        <p class="mt-2 font-mono text-[11px] tabular-nums text-highlighted">
-          <NumberFlow :value="saved" :format="money" /> saved per month
-          <span class="text-dimmed">(<NumberFlow :value="savedPct" :format="percent" /> less)</span>
+      <div class="border-b border-muted bg-emerald-500/[0.06] px-4 py-4 text-center">
+        <p class="font-mono text-[9px] uppercase tracking-widest text-emerald-500/70">
+          You save
+        </p>
+        <p class="mt-1 font-mono text-[32px] leading-none text-emerald-400 tabular-nums">
+          <NumberFlow :value="saved" :format="money" />
+        </p>
+        <p class="mt-1.5 font-mono text-[10px] text-muted">
+          every month, <span class="text-emerald-400"><NumberFlow :value="savedPct" :format="percent" /> less</span>
+          than {{ linesPerRequest }} lines per request
         </p>
       </div>
 
-      <div class="border-t border-muted bg-elevated/30 px-4 py-2.5 font-mono text-[9px] leading-relaxed text-dimmed">
+      <div class="grid grid-cols-2 divide-x divide-muted border-b border-muted">
+        <div class="space-y-2 bg-amber-500/[0.03] px-4 py-3">
+          <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-amber-500/80">
+            <UIcon name="i-lucide-layers" class="size-3" />
+            {{ linesPerRequest }} lines / request
+          </p>
+          <p class="font-mono text-[20px] leading-none text-amber-400 tabular-nums">
+            <NumberFlow :value="beforeCost" :format="money" />
+          </p>
+          <div class="h-1 rounded-full bg-amber-500/60" />
+          <dl class="space-y-0.5 font-mono text-[10px] tabular-nums">
+            <div class="flex justify-between">
+              <dt class="text-dimmed">
+                Events
+              </dt><dd class="text-muted">
+                <NumberFlow :value="before.events" :format="compact" />
+              </dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-dimmed">
+                Data
+              </dt><dd class="text-muted">
+                <NumberFlow :value="before.gb" :format="compact" suffix=" GB" />
+              </dd>
+            </div>
+          </dl>
+        </div>
+
+        <div class="space-y-2 bg-primary/[0.05] px-4 py-3">
+          <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-primary">
+            <UIcon name="i-lucide-zap" class="size-3" />
+            evlog, 1 event
+          </p>
+          <p class="font-mono text-[20px] leading-none text-highlighted tabular-nums">
+            <NumberFlow :value="afterCost" :format="money" />
+          </p>
+          <div class="h-1 rounded-full bg-elevated">
+            <div class="h-full rounded-full bg-primary transition-[width] duration-500 ease-out" :style="{ width: afterWidth }" />
+          </div>
+          <dl class="space-y-0.5 font-mono text-[10px] tabular-nums">
+            <div class="flex justify-between">
+              <dt class="text-dimmed">
+                Events
+              </dt><dd class="text-highlighted">
+                <NumberFlow :value="after.events" :format="compact" />
+              </dd>
+            </div>
+            <div class="flex justify-between">
+              <dt class="text-dimmed">
+                Data
+              </dt><dd class="text-highlighted">
+                <NumberFlow :value="after.gb" :format="compact" suffix=" GB" />
+              </dd>
+            </div>
+          </dl>
+        </div>
+      </div>
+
+      <div class="bg-elevated/30 px-4 py-2.5 font-mono text-[9px] leading-relaxed text-dimmed">
         <p>
           Byte counts measured by serializing the checkout request above through pino 10 and evlog:
           4 lines totalling 736 B against 1 event of 322 B, so {{ PINO_LINE_BYTES }} B per line and
@@ -252,8 +293,8 @@ const money = computed(() => ({
         <p class="mt-1">
           List rates read on {{ PRICES_READ_ON }} ({{ provider.name }}: {{ provider.note }}). Vendors change
           pricing without notice, which is why every rate here is editable. Free tiers, committed-use discounts
-          and retention add-ons are not modelled. Sampling assumes a 5% error rate: every error kept, plus a
-          tenth of the successes.
+          and retention add-ons are not modelled. Sampling keeps every error and a tenth of the successes,
+          assuming a 5% error rate.
         </p>
       </div>
     </div>
