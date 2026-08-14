@@ -5,7 +5,7 @@ description: Produce a before/after visual comparison of an evlog surface (landi
 
 # Before/after captures
 
-One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, screenshots (cropped to the selector), validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt.
+One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, frames the selector (scrolling it into view, resizing the viewport to it, then parking on it), validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt. It returns only that block, so there is nothing to reassemble by hand.
 
 ## 0. Start the dev server first
 
@@ -26,14 +26,13 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 
 ## 3. Capture and deliver
 
-**Frame the change, not the page.** Find the tightest stable container around the change with `browser__snapshot` (a section class or landmark, not a hashed utility class), then:
+**Frame the change, not the page.** The selector is derived from what you edited, not discovered: every section on the landing and every doc content component carries `data-section="<its MDC tag>"`. You edited `::landing-faq` in `0.landing.md`, so the selector is `[data-section="landing-faq"]`. Reach for `browser__snapshot` only when the surface has no hook yet, and add one to the component in the same PR rather than selecting on utility classes: eleven landing sections render the identical `section.py-24.md:py-32`, so a class selector there frames the wrong section or none.
 
 `capture__before_after({ beforeUrl, afterUrl, selector, caption })`
 
 - Omit `selector` only for page-level changes (layout, theme, redesign).
-- **Look at both returned frames before you paste anything.** A capture that silently falls back to the top of the page is the failure mode of this tool, and a landing page hero looks like a successful screenshot. Read the two images back and name, to yourself, the element you changed in each one. If you cannot point at it, the selector did not match: fix it and capture again rather than shipping a frame that proves nothing.
-- A `selector` that resolves but sits below the fold needs the element's position in the **document**, not in the viewport. Anything driving Chrome directly must add `window.scrollY` to `getBoundingClientRect().top` before using it as a `Page.captureScreenshot` clip; the two coordinate systems only agree at the top of the page, which is why a mis-framed capture always lands on the hero.
-- A section that reveals on scroll (every `Motion` block on the landing) has to be scrolled into view and given a beat to settle, or the frame catches it mid-transition or fully transparent.
+- The tool resizes the viewport to the element and parks on it, so the frame holds that element and nothing else. A selector matching nothing **fails the call** and the error lists the `data-section` hooks the page does expose; take one of those rather than retrying with a guess.
+- **Look at both returned frames before you paste anything.** The tool now refuses the failure that produced a hero shot, but it cannot tell you the frame is the wrong element, or that the "before" side has no counterpart. Read the two images back and name, to yourself, the thing you changed in each one.
 - For responsive changes, call it again with `viewport: 'mobile'`.
 - Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.

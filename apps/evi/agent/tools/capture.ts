@@ -4,7 +4,7 @@ import { defineDynamic, defineTool } from 'eve/tools'
 import type { SandboxSession } from 'eve/sandbox'
 import { z } from 'zod'
 import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from '../lib/blob'
-import { CAPTURE_SETTLE_MS, CAPTURE_VIEWPORTS, captureMarkdown, sensitiveCaptureReason, validateCaptureUrl, type CaptureViewport } from '../lib/capture'
+import { CAPTURE_SETTLE_MS, CAPTURE_VIEWPORTS, captureMarkdown, frameHeight, frameParkExpression, frameProbeExpression, missingSelectorMessage, readFrameProbe, sensitiveCaptureReason, validateCaptureUrl, type CaptureViewport } from '../lib/capture'
 import { canAccessAdminTools } from '../lib/trust'
 
 const SCREENSHOT_DIR = '/workspace/screenshots'
@@ -22,8 +22,12 @@ async function captureFrame(
   await runAgentBrowser(ctx, ['open', url])
   await runAgentBrowser(ctx, ['wait', String(CAPTURE_SETTLE_MS)])
   if (selector !== null) {
-    await runAgentBrowser(ctx, ['scrollintoview', selector])
+    const probe = readFrameProbe((await runAgentBrowser(ctx, ['eval', frameProbeExpression(selector)])).json)
+    if (!probe.found) throw new Error(missingSelectorMessage(selector, probe.hooks))
     await runAgentBrowser(ctx, ['wait', '500'])
+    await runAgentBrowser(ctx, ['set', 'viewport', String(width), String(frameHeight(probe.height))])
+    await runAgentBrowser(ctx, ['eval', frameParkExpression(selector)])
+    await runAgentBrowser(ctx, ['wait', '300'])
   }
   await runAgentBrowser(ctx, ['screenshot', path])
   return path
@@ -53,7 +57,7 @@ export default defineDynamic({
       if (!canAccessAdminTools(ctx.session.auth.current)) return null
       return {
         capture__before_after: defineTool({
-      description: 'Capture a before/after comparison of an evlog surface in one call: for each URL, open it in the sandbox browser, wait 5s for animations to settle, screenshot (cropped to the selector when given), validate and upload both frames to the Blob store, and return the finished markdown table with an attestation receipt. Origins are restricted to evlog domains, Vercel previews, and sandbox dev servers. For surfaces that can show real user data (telemetry), review the pages with browser__screenshot before calling this: the returned URLs are public immediately.',
+      description: 'Capture a before/after comparison of an evlog surface in one call: for each URL, open it in the sandbox browser, wait 5s for animations to settle, frame the selector (the viewport is resized to the element and parked on it, so the frame holds that element and nothing else), validate and upload both frames to the Blob store, and return the finished markdown table with an attestation receipt. A selector that matches nothing fails the call rather than framing the top of the page. Origins are restricted to evlog domains, Vercel previews, and sandbox dev servers. For surfaces that can show real user data (telemetry), review the pages with browser__screenshot before calling this: the returned URLs are public immediately.',
       inputSchema: z.object({
         beforeUrl: z.string().min(1).describe('URL of the before state, e.g. https://evlog.dev'),
         afterUrl: z.string().min(1).describe('URL of the after state, e.g. http://localhost:3000'),
@@ -98,6 +102,8 @@ export default defineDynamic({
         const beforeImageUrl = await hostFrame(sandbox, beforePath)
         const afterImageUrl = await hostFrame(sandbox, afterPath)
         const capturedAt = new Date().toISOString()
+        // Only the composed block is returned: handing back the bare image URLs
+        // invites a hand-assembled table that drops the attestation receipt.
         return {
           success: true as const,
           markdown: captureMarkdown({
@@ -110,8 +116,6 @@ export default defineDynamic({
             viewport,
             capturedAt,
           }),
-          before: { sourceUrl: input.beforeUrl, imageUrl: beforeImageUrl },
-          after: { sourceUrl: input.afterUrl, imageUrl: afterImageUrl },
         }
       },
     }),

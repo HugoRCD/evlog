@@ -24,6 +24,91 @@ export type CaptureViewport = keyof typeof CAPTURE_VIEWPORTS
 /** Entrance animations and font swaps settle before the frame is taken. */
 export const CAPTURE_SETTLE_MS = 5000
 
+/**
+ * Bounds on the viewport height used to frame a selector. The floor keeps a
+ * short section from producing a sliver, the ceiling keeps a long one inside
+ * the Blob size limit.
+ */
+export const FRAME_HEIGHT_BOUNDS = { min: 320, max: 2400 } as const
+
+export interface FrameProbe {
+  readonly found: boolean
+  /** Rendered height of the element, in CSS pixels. */
+  readonly height: number
+  /** Every `data-section` on the page, offered when the selector missed. */
+  readonly hooks: readonly string[]
+}
+
+/**
+ * JavaScript run in the page to reveal the target and measure it. It scrolls
+ * the element into view in the same call, so a section that only animates in
+ * on scroll has started before the frame is measured.
+ *
+ * @param selector - CSS selector framing the change
+ */
+export function frameProbeExpression(selector: string): string {
+  const literal = JSON.stringify(selector)
+  return `(() => {
+    const el = document.querySelector(${literal})
+    if (!el) {
+      const hooks = [...document.querySelectorAll('[data-section]')].map(n => n.getAttribute('data-section'))
+      return { found: false, height: 0, hooks: [...new Set(hooks)] }
+    }
+    el.scrollIntoView({ block: 'start' })
+    return { found: true, height: Math.ceil(el.getBoundingClientRect().height), hooks: [] }
+  })()`
+}
+
+/**
+ * JavaScript that parks the element's top edge at the top of the viewport.
+ * Run after the viewport has been resized to the element, so the frame holds
+ * the element and nothing else. `getBoundingClientRect` is viewport-relative,
+ * so the page offset has to be added back before scrolling.
+ *
+ * @param selector - CSS selector framing the change
+ */
+export function frameParkExpression(selector: string): string {
+  const literal = JSON.stringify(selector)
+  return `(() => {
+    const el = document.querySelector(${literal})
+    if (!el) return { found: false }
+    window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY)
+    return { found: true }
+  })()`
+}
+
+/** Reads the agent-browser envelope returned by a probe expression. */
+export function readFrameProbe(envelope: unknown): FrameProbe {
+  const data = (envelope as { data?: unknown } | null | undefined)?.data
+  if (data === null || typeof data !== 'object') {
+    throw new Error('The browser returned no frame probe. The page did not load, or the expression failed.')
+  }
+  const probe = data as Record<string, unknown>
+  const hooks = Array.isArray(probe.hooks) ? probe.hooks.filter((hook): hook is string => typeof hook === 'string') : []
+  return {
+    found: probe.found === true,
+    height: typeof probe.height === 'number' ? probe.height : 0,
+    hooks,
+  }
+}
+
+/**
+ * The error raised when a selector matches nothing. It names the hooks the
+ * page does offer, so the next attempt is a correction rather than a guess.
+ */
+export function missingSelectorMessage(selector: string, hooks: readonly string[]): string {
+  const available = hooks.length === 0
+    ? 'That page exposes no [data-section] hooks; add one to the section component before capturing it.'
+    : `That page exposes: ${hooks.map(hook => `[data-section="${hook}"]`).join(', ')}.`
+  return `The selector "${selector}" matched nothing, so the capture would have framed the top of the page. ${available}`
+}
+
+/** Viewport height that frames the element, within the supported bounds. */
+export function frameHeight(elementHeight: number): number {
+  const { min, max } = FRAME_HEIGHT_BOUNDS
+  return Math.min(Math.max(Math.ceil(elementHeight), min), max)
+}
+
 /** Returns the refusal reason, or null when the URL may be captured. */
 export function validateCaptureUrl(raw: string): string | null {
   let url: URL
