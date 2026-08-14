@@ -29,7 +29,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="relative overflow-hidden flex flex-col">
+  <section class="relative overflow-hidden flex flex-col" data-section="landing-cta">
     <div
       class="absolute inset-x-0 top-0 h-24 z-[1] pointer-events-none"
       style="background: linear-gradient(180deg, #09090b 0%, transparent 100%)"

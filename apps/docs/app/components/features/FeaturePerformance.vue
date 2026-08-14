@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="py-24 md:py-32">
+  <section class="py-24 md:py-32" data-section="features-feature-performance">
     <Motion
       :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"
