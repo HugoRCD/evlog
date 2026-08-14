@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const pills = [
   { label: 'Zero-alloc hot path', icon: 'i-lucide-zap' },
-  { label: 'CodSpeed CI', icon: 'i-lucide-shield-check' },
+  { label: 'Reproducible benchmarks', icon: 'i-lucide-shield-check' },
   { label: 'Open source benchmarks', icon: 'i-lucide-code' },
 ]
 
