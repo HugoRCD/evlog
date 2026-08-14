@@ -64,6 +64,62 @@ export default defineNuxtConfig({
     name: 'evlog',
     url: 'https://www.evlog.dev',
   },
+  // Curate /llms.txt (and /llms-full.txt) for answer engines. Docus registers
+  // `nuxt-llms` but with empty defaults, so without this block the footer's
+  // `/llms.txt` link is a 404 (the module skips the route when `domain` is unset).
+  llms: {
+    domain: 'https://www.evlog.dev',
+    title: 'evlog',
+    description:
+      'A modern TypeScript logger for everything you ship. Simple structured logs, wide events, and structured errors in one API - for scripts, libraries, jobs, edge, and requests.',
+    notes: [
+      'evlog is MIT-licensed and drop-in for console.log, pino, or consola.',
+      'Wide events replace log lines: log.set accumulates context, createError carries why and fix.',
+      'The CLI ships `evlog map`, a deterministic observability score that gates in CI.',
+    ],
+    sections: [
+      {
+        title: 'Get started',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/start/%' }],
+      },
+      {
+        title: 'Learn',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/learn/%' }],
+      },
+      {
+        title: 'CLI',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/cli/%' }],
+      },
+      {
+        title: 'Integrate',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/integrate/%' }],
+      },
+      {
+        title: 'Use cases',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/use-cases/%' }],
+      },
+      {
+        title: 'Extend',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/extend/%' }],
+      },
+      {
+        title: 'Reference',
+        contentCollection: 'docs',
+        contentFilters: [{ field: 'path', operator: 'LIKE', value: '/reference/%' }],
+      },
+    ],
+    full: {
+      title: 'evlog - full documentation',
+      description: 'Complete evlog documentation as structured markdown for deep retrieval.',
+    },
+  },
+
 
   ogImage: {
     // Cache prerendered OG image output between CI builds. Cache misses spend most of
