@@ -1,83 +1,38 @@
 <script setup lang="ts">
 import NumberFlow from '@number-flow/vue'
 import { Motion } from 'motion-v'
-
-interface Provider {
-  id: string
-  name: string
-  icon: string
-  perGb: number
-  perMillionIndexed: number
-  note: string
-}
-
-/**
- * Published list rates, in USD, as read on the date in `PRICES_READ_ON`. They
- * are starting points the reader overwrites: every rate in the panel is an
- * input, so a stale figure costs a correction rather than a wrong answer.
- */
-const PRICES_READ_ON = '14 August 2026'
-const PROVIDERS: Provider[] = [
-  { id: 'datadog', name: 'Datadog', icon: 'i-simple-icons-datadog', perGb: 0.10, perMillionIndexed: 1.70, note: 'ingest + indexing, 15-day retention' },
-  { id: 'grafana', name: 'Grafana', icon: 'i-simple-icons-grafana', perGb: 0.50, perMillionIndexed: 0, note: 'Loki ingest' },
-  { id: 'sentry', name: 'Sentry', icon: 'i-simple-icons-sentry', perGb: 0.50, perMillionIndexed: 0, note: 'beyond the 5 GB included' },
-  { id: 'posthog', name: 'PostHog', icon: 'i-simple-icons-posthog', perGb: 0.25, perMillionIndexed: 0, note: '50-300 GB tier' },
-  { id: 'betterstack', name: 'Better Stack', icon: 'i-simple-icons-betterstack', perGb: 0.15, perMillionIndexed: 0, note: 'ingest, before retention' },
-  { id: 'axiom', name: 'Axiom', icon: 'i-custom-axiom', perGb: 0.12, perMillionIndexed: 0, note: 'credits per GB loaded' },
-]
-
-/**
- * Bytes of serialized JSON per shape, measured by running the checkout request
- * documented on this page through pino 10 and evlog: 4 lines of 736 bytes
- * total against 1 event of 322 bytes. The line figure is the mean of the four.
- */
-const PINO_LINE_BYTES = 184
-const EVLOG_EVENT_BYTES = 322
+import {
+  estimateLogCost,
+  EVLOG_EVENT_BYTES,
+  LOG_COST_PROVIDERS,
+  PINO_LINE_BYTES,
+  PRICES_READ_ON,
+  type LogCostProvider,
+} from '~~/shared/utils/log-cost'
 
 const REQUEST_STEPS = [1e5, 3e5, 1e6, 3e6, 1e7, 3e7, 1e8, 3e8, 1e9]
 
-const provider = ref<Provider>(PROVIDERS[0]!)
-const perGb = ref(PROVIDERS[0]!.perGb)
-const perMillionIndexed = ref(PROVIDERS[0]!.perMillionIndexed)
+const provider = ref<LogCostProvider>(LOG_COST_PROVIDERS[0]!)
+const perGb = ref(LOG_COST_PROVIDERS[0]!.perGb)
+const perMillionIndexed = ref(LOG_COST_PROVIDERS[0]!.perMillionIndexed)
 const requestStep = ref(4)
 const linesPerRequest = ref(4)
-const sampled = ref(false)
 const sound = ref(false)
 
 const requests = computed(() => REQUEST_STEPS[requestStep.value] ?? 1e7)
-/** Head sampling keeps every error and a tenth of the successful requests. */
-const keptRatio = computed(() => sampled.value ? 0.145 : 1)
-
-const before = computed(() => {
-  const events = requests.value * linesPerRequest.value
-  return { events, gb: events * PINO_LINE_BYTES / 1e9 }
-})
-const after = computed(() => {
-  const events = requests.value * keptRatio.value
-  return { events, gb: events * EVLOG_EVENT_BYTES / 1e9 }
-})
-
-function bill(shape: { events: number, gb: number }) {
-  return shape.gb * perGb.value + (shape.events / 1e6) * perMillionIndexed.value
-}
-/**
- * Costs are rounded to the precision they are displayed at before the saving
- * is taken from them, so the three figures on screen add up. Subtracting the
- * raw floats and rounding afterwards leaves the reader a cent short.
- */
-const cents = computed(() => bill(before.value) < 100 ? 2 : 0)
-function round(value: number) {
-  const factor = 10 ** cents.value
-  return Math.round(value * factor) / factor
-}
-const beforeCost = computed(() => round(bill(before.value)))
-const afterCost = computed(() => round(bill(after.value)))
-const saved = computed(() => Math.max(0, beforeCost.value - afterCost.value))
-const savedPct = computed(() => beforeCost.value === 0 ? 0 : saved.value / beforeCost.value)
+const estimate = computed(() => estimateLogCost({
+  requestsPerMonth: requests.value,
+  linesPerRequest: linesPerRequest.value,
+  perGb: perGb.value,
+  perMillionIndexed: perMillionIndexed.value,
+}))
 /** Floored so the shorter bar stays visible at extreme ratios. */
-const afterWidth = computed(() => `${Math.max(3, (afterCost.value / (beforeCost.value || 1)) * 100)}%`)
+const afterWidth = computed(() => {
+  const { before, after } = estimate.value
+  return `${Math.max(3, (after.cost / (before.cost || 1)) * 100)}%`
+})
 
-function selectProvider(next: Provider) {
+function selectProvider(next: LogCostProvider) {
   provider.value = next
   perGb.value = next.perGb
   perMillionIndexed.value = next.perMillionIndexed
@@ -100,13 +55,10 @@ function tick() {
 
 const compact = { notation: 'compact' as const, maximumFractionDigits: 1 }
 const percent = { style: 'percent' as const, maximumFractionDigits: 0 }
-/** Cents below $100, where rounding to whole dollars would stop the rows adding up. */
-const money = computed(() => ({
-  style: 'currency' as const,
-  currency: 'USD',
-  minimumFractionDigits: cents.value,
-  maximumFractionDigits: cents.value,
-}))
+const money = computed(() => {
+  const digits = estimate.value.before.cost < 100 ? 2 : 0
+  return { style: 'currency' as const, currency: 'USD', minimumFractionDigits: digits, maximumFractionDigits: digits }
+})
 </script>
 
 <template>
@@ -135,7 +87,7 @@ const money = computed(() => ({
       <div class="space-y-3 border-b border-muted px-4 py-3">
         <div class="flex flex-wrap gap-1">
           <UButton
-            v-for="p in PROVIDERS"
+            v-for="p in LOG_COST_PROVIDERS"
             :key="p.id"
             :icon="p.icon"
             :label="p.name"
@@ -206,82 +158,76 @@ const money = computed(() => ({
               :ui="{ base: 'w-20 font-mono text-[11px] tabular-nums' }"
             />
           </div>
-          <USwitch
-            v-model="sampled"
-            size="xs"
-            label="Sampling"
-            class="ml-auto"
-            :ui="{ label: 'font-mono text-[10px] text-muted' }"
-            @update:model-value="tick"
-          />
         </div>
       </div>
 
-      <div class="border-b border-muted bg-emerald-500/[0.06] px-4 py-4 text-center">
-        <p class="font-mono text-[9px] uppercase tracking-widest text-emerald-500/70">
-          You save
-        </p>
-        <p class="mt-1 font-mono text-[32px] leading-none text-emerald-400 tabular-nums">
-          <NumberFlow :value="saved" :format="money" />
-        </p>
-        <p class="mt-1.5 font-mono text-[10px] text-muted">
-          every month, <span class="text-emerald-400"><NumberFlow :value="savedPct" :format="percent" /> less</span>
+      <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1 border-b border-muted bg-emerald-500/6 px-4 py-2.5">
+        <span class="font-mono text-[9px] uppercase tracking-widest text-emerald-500/70">You save</span>
+        <span class="font-mono text-[26px] leading-none text-emerald-400 tabular-nums">
+          <NumberFlow :value="estimate.saved" :format="money" />
+        </span>
+        <span class="font-mono text-[10px] text-muted">
+          a month, <span class="text-emerald-400"><NumberFlow :value="estimate.savedRatio" :format="percent" /> less</span>
           than {{ linesPerRequest }} lines per request
-        </p>
+        </span>
       </div>
 
       <div class="grid grid-cols-2 divide-x divide-muted border-b border-muted">
-        <div class="space-y-2 bg-elevated/20 px-4 py-3">
+        <div class="space-y-2 px-4 py-3">
           <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-dimmed">
             <UIcon name="i-lucide-layers" class="size-3" />
             {{ linesPerRequest }} lines / request
           </p>
           <p class="font-mono text-[20px] leading-none text-muted tabular-nums">
-            <NumberFlow :value="beforeCost" :format="money" />
+            <NumberFlow :value="estimate.before.cost" :format="money" />
           </p>
-          <div class="h-1 rounded-full bg-muted" />
+          <div class="h-1 rounded-full bg-accented" />
           <dl class="space-y-0.5 font-mono text-[10px] tabular-nums">
             <div class="flex justify-between">
               <dt class="text-dimmed">
                 Events
-              </dt><dd class="text-muted">
-                <NumberFlow :value="before.events" :format="compact" />
+              </dt>
+              <dd class="text-muted">
+                <NumberFlow :value="estimate.before.events" :format="compact" />
               </dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-dimmed">
                 Data
-              </dt><dd class="text-muted">
-                <NumberFlow :value="before.gb" :format="compact" suffix=" GB" />
+              </dt>
+              <dd class="text-muted">
+                <NumberFlow :value="estimate.before.gb" :format="compact" suffix=" GB" />
               </dd>
             </div>
           </dl>
         </div>
 
-        <div class="space-y-2 bg-primary/[0.05] px-4 py-3">
+        <div class="space-y-2 bg-primary/5 px-4 py-3">
           <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-primary">
             <UIcon name="i-lucide-zap" class="size-3" />
             evlog, 1 event
           </p>
           <p class="font-mono text-[20px] leading-none text-highlighted tabular-nums">
-            <NumberFlow :value="afterCost" :format="money" />
+            <NumberFlow :value="estimate.after.cost" :format="money" />
           </p>
-          <div class="h-1 rounded-full bg-elevated">
+          <div class="h-1 overflow-hidden rounded-full bg-accented">
             <div class="h-full rounded-full bg-primary transition-[width] duration-500 ease-out" :style="{ width: afterWidth }" />
           </div>
           <dl class="space-y-0.5 font-mono text-[10px] tabular-nums">
             <div class="flex justify-between">
               <dt class="text-dimmed">
                 Events
-              </dt><dd class="text-highlighted">
-                <NumberFlow :value="after.events" :format="compact" />
+              </dt>
+              <dd class="text-highlighted">
+                <NumberFlow :value="estimate.after.events" :format="compact" />
               </dd>
             </div>
             <div class="flex justify-between">
               <dt class="text-dimmed">
                 Data
-              </dt><dd class="text-highlighted">
-                <NumberFlow :value="after.gb" :format="compact" suffix=" GB" />
+              </dt>
+              <dd class="text-highlighted">
+                <NumberFlow :value="estimate.after.gb" :format="compact" suffix=" GB" />
               </dd>
             </div>
           </dl>
@@ -297,8 +243,8 @@ const money = computed(() => ({
         <p class="mt-1">
           List rates read on {{ PRICES_READ_ON }} ({{ provider.name }}: {{ provider.note }}). Vendors change
           pricing without notice, which is why every rate here is editable. Free tiers, committed-use discounts
-          and retention add-ons are not modelled. Sampling keeps every error and a tenth of the successes,
-          assuming a 5% error rate.
+          and retention add-ons are not modelled. Neither is sampling: it drops events for any logger, so it
+          moves both columns and cancels out of the comparison.
         </p>
       </div>
     </div>
