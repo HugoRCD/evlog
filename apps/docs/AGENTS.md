@@ -13,7 +13,7 @@ Nuxt UI ships the components this site renders inside markdown. Use them as the 
 
 ## Structured data
 
-JSON-LD on a page is generated from the content that page renders, never hand-maintained beside it. `app/pages/index.vue` builds its `FAQPage` entities from the landing markdown with `collectFaqEntries`, so the machine-readable answers cannot drift from the visible ones. A second copy of the same prose in a `.vue` file is the defect, not the feature.
+JSON-LD carries the facts that are **not** already in the page text: the license, the price, the application category. Never restate the page's own prose in it. Copy is crawlable where it is written, so a second copy in a `.vue` file buys nothing and drifts. That rules out `FAQPage`, which is why the landing has none: Google restricted FAQ rich results to authoritative government and health sites in 2023, and the answers are already in the served HTML.
 
 ## Doc animation components (`app/components/content/`)
 
