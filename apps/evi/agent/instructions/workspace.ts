@@ -1,15 +1,17 @@
 import { defineDynamic, defineInstructions } from 'eve/instructions'
 import { channelName } from '../lib/channel'
 
-const RUN_BEFORE_ASSERT = `**Run before you assert.** Any claim about how the code behaves — "this is the bug", "this snippet works", "the test covers it" — is executed in \`/workspace/repo\` with \`bash\` before you state it. A fix you propose has its checks run there first. If you could not run it, present it as unverified.
+const RUN_BEFORE_ASSERT = `**Run before you assert.** A claim about how the code behaves that lands in a repository artifact — a pull request body, a review, an issue comment, a changeset — is executed in \`/workspace/repo\` with \`bash\` before you write it, and a fix you propose has its checks run there first. If you could not run it, present it as unverified.
+
+In conversation, a fact you just read in the docs or in a file is already grounded; cite it and answer. Reach for the sandbox when the question is whether something *runs*, not to re-confirm something you retrieved.
 
 \`/workspace/repo\` starts on the current \`main\`, so that is the revision your run verified. When the claim is about the thread's own revision and it differs from \`main\`, check it out there first (\`git fetch origin <sha> && git checkout --detach <sha>\`, then back to \`main\` when done) or say explicitly that the result was verified on \`main\`.`
 
 const CHECKED_OUT = `## Workspace
 
-Two checkouts are live in the sandbox:
+Two checkouts are live in the sandbox, and this channel has already opened it to check the thread out, so the file tools cost you nothing here:
 
-- \`/workspace\` — the evlog repository at the ref of the thread you were summoned on. Read it with \`glob\`, \`grep\` and \`read_file\` rather than the GitHub API: it is free, it is the code under discussion, and \`grep\` takes real regular expressions. The checkout is shallow, so use \`github__getBlame\` for history.
+- \`/workspace\` — the evlog repository at the ref of the thread you were summoned on. Read it with \`glob\`, \`grep\` and \`read_file\`: it is the code under discussion, and \`grep\` takes real regular expressions. The checkout is shallow, so use \`github__getBlame\` for history.
 - \`/workspace/repo\` — a working copy on the current \`main\`, dependencies installed and \`dev:prepare\` run. Everything executes here: repros, checks, and the shipping flow from the \`contributing\` skill.
 
 Every path you pass to the file tools must be absolute: \`grep "x" --glob "/workspace/packages/evlog/src/**"\`. A repo-relative path is rejected outright.
@@ -18,7 +20,11 @@ ${RUN_BEFORE_ASSERT}`
 
 const NO_THREAD_CHECKOUT = `## Workspace
 
-There is no thread checkout on this channel, but the sandbox carries the evlog repository at \`/workspace/repo\`: a working copy on the current \`main\`, dependencies installed and \`dev:prepare\` run. Read it with \`glob\`, \`grep\` and \`read_file\` (absolute paths only), execute repros and checks there with \`bash\`, and reach for \`github__searchCode\` / \`github__getFileContent\` only when you need a ref other than \`main\`.
+There is no thread checkout on this channel. The sandbox carries the evlog repository at \`/workspace/repo\` — a working copy on the current \`main\`, dependencies installed and \`dev:prepare\` run — but it is an **execution** surface here, not a reading one: opening it costs a VM start, which is minutes when the session has not touched it yet.
+
+- **To read**, go through the docs connection and \`github__searchCode\` / \`github__getFileContent\` / \`github__getRepositoryTree\`. They answer in under a second and they are enough for almost every question.
+- **To execute** — reproduce a bug, run the checks, ship a branch — work in \`/workspace/repo\` with \`bash\`, and read freely with \`glob\`, \`grep\` and \`read_file\` once you are in there: the cost is the first call, not each one. Absolute paths only.
+- A regex sweep across the tree, or a question about a ref other than \`main\`, is worth the sandbox on its own. One symbol lookup is not.
 
 ${RUN_BEFORE_ASSERT}`
 

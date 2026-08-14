@@ -13,7 +13,19 @@ beforeEach(() => {
 describe('gatewayRouting', () => {
   it('routes with zero data retention enabled', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting.zeroDataRetention).toBe(true)
+    expect(gatewayRouting().zeroDataRetention).toBe(true)
+  })
+
+  it('sorts an interactive surface on time to first token', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting('channel:photon').sort).toBe('ttft')
+    expect(gatewayRouting('http').sort).toBe('ttft')
+    expect(gatewayRouting().sort).toBe('ttft')
+  })
+
+  it('leaves scheduled runs on the cheapest deployment', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting('schedule').sort).toBe('cost')
   })
 })
 

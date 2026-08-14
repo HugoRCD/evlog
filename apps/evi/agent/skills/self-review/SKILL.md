@@ -93,7 +93,7 @@ Look outward, not only at the agent.
 - `telemetry-adoption`: a flag or custom field nobody uses two releases in is a deprecation candidate; a custom field spreading on its own is a workflow worth making first-class.
 - The top error code from `telemetry-stats` with no docs page covering it is a docs proposal with a number attached.
 - Community issues and discussions asking for the same integration, adapter or option a third time.
-- A gap `source-research` hit: retrieval that came up empty usually means a page is missing.
+- A gap retrieval hit: a docs lookup that came up empty usually means a page is missing.
 
 ## I. Ideas already written down and never filed
 

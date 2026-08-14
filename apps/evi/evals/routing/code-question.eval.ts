@@ -9,7 +9,6 @@ export default defineEval({
   async test(t) {
     await t.send('How is the batching in evlog/pipeline actually implemented — what triggers a flush?')
     t.succeeded()
-    t.loadedSkill('source-research')
     calledAnyTool(t, 'read the repository', SOURCE_READ_TOOLS)
   },
 })

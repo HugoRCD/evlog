@@ -10,7 +10,7 @@ export default defineAgent({
         model: MODEL,
         modelOptions: {
           providerOptions: {
-            gateway: { ...gatewayRouting, tags: sessionTags(ctx.channel.kind) },
+            gateway: { ...gatewayRouting(ctx.channel.kind), tags: sessionTags(ctx.channel.kind) },
           },
         },
       }),
@@ -24,6 +24,6 @@ export default defineAgent({
     maxOutputTokensPerSession: 250_000,
   },
   modelOptions: {
-    providerOptions: { gateway: { ...gatewayRouting, tags: sessionTags() } },
+    providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags() } },
   },
 })
