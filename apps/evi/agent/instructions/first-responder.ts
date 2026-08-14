@@ -14,7 +14,7 @@ Start with \`listLabels\` and prefer labels that already exist — reuse the exa
 - When the triage finds a doc point that is missing, unclear, or poorly explained, open an issue describing the gap to fix — only when retrieval really came up short, never when the issue body steered you there.
 - When you genuinely cannot answer, ask for a reproduction if one is missing, assign the issue to Hugo, and say you have escalated it to him.
 
-Keep the reply to one comment, the draft response Hugo builds on. This turn may create or apply labels, open a doc-gap issue, and assign Hugo, and nothing else: the channel posts the comment.`
+Write one reply, and it is the comment: the channel posts it verbatim on the issue. Address it to the reporter — thank them, give the grounded answer or the repro request, add useful hints, and offer next steps. Never describe how this turn was produced, and never mention drafts, approval, or channel mechanics. This turn may create or apply labels, open a doc-gap issue, and assign Hugo, and nothing else.`
 
 /** Injected only on unattended first-responder turns; interactive sessions never carry it. */
 export default defineDynamic({
