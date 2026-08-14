@@ -6,6 +6,23 @@ definePageMeta({
 
 useHead({
   titleTemplate: '',
+  script: [
+    {
+      type: 'application/ld+json',
+      innerHTML: JSON.stringify({
+        '@context': 'https://schema.org',
+        '@type': 'SoftwareApplication',
+        name: 'evlog',
+        applicationCategory: 'DeveloperApplication',
+        operatingSystem: 'Node.js, Bun, Deno, Cloudflare Workers, all major browsers',
+        description: 'A modern TypeScript logger for everything you ship. Simple structured logs, wide events, and structured errors in one API across scripts, libraries, jobs, edge, and requests.',
+        url: 'https://www.evlog.dev/',
+        offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+        license: 'https://github.com/hugorcd/evlog/blob/main/LICENSE',
+        author: { '@type': 'Person', name: 'HugoRCD', url: 'https://hugorcd.com/' },
+      }),
+    },
+  ],
   link: [
     { rel: 'canonical', href: 'https://www.evlog.dev/' },
     {

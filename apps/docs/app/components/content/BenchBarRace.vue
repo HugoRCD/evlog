@@ -300,8 +300,8 @@ const collapsed = computed(() => phase.value === 'collapsed' || phase.value === 
           <span class="text-primary">14.1× faster</span>
         </div>
         <div class="flex flex-col gap-0.5 text-right">
-          <span class="text-dimmed text-[9px] tracking-widest uppercase">CI tracking</span>
-          <span class="text-emerald-400">CodSpeed · per PR</span>
+          <span class="text-dimmed text-[9px] tracking-widest uppercase">Benchmarks</span>
+          <span class="text-emerald-400">open source · reproducible</span>
         </div>
       </div>
     </div>

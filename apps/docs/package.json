@@ -12,6 +12,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@number-flow/vue": "^0.5.2",
     "@nuxt/fonts": "0.14.0",
     "@nuxt/icon": "^2.3.1",
     "@nuxt/ui": "^4.10.0",
