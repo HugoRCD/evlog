@@ -133,83 +133,87 @@ const money = computed(() => ({
       </div>
 
       <div class="space-y-3 border-b border-muted px-4 py-3">
-        <div class="flex flex-wrap gap-1.5">
-          <button
+        <div class="flex flex-wrap gap-1">
+          <UButton
             v-for="p in PROVIDERS"
             :key="p.id"
-            type="button"
-            class="flex items-center gap-1.5 rounded-md border px-2 py-1 font-mono text-[10px] transition-colors"
-            :class="provider.id === p.id
-              ? 'border-primary/60 bg-primary/10 text-highlighted'
-              : 'border-muted bg-elevated/40 text-muted hover:border-default hover:text-default'"
+            :icon="p.icon"
+            :label="p.name"
+            size="xs"
+            :color="provider.id === p.id ? 'primary' : 'neutral'"
+            :variant="provider.id === p.id ? 'subtle' : 'ghost'"
+            :ui="{ label: 'font-mono text-[10px]' }"
             @click="selectProvider(p)"
-          >
-            <UIcon :name="p.icon" class="size-3.5 shrink-0" :class="provider.id === p.id ? 'text-primary' : 'text-dimmed'" />
-            {{ p.name }}
-          </button>
+          />
         </div>
 
-        <div class="grid gap-3 sm:grid-cols-2 sm:gap-x-8">
-          <label class="block">
-            <span class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
+        <div class="grid gap-x-8 gap-y-3 sm:grid-cols-2">
+          <div>
+            <p class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
               Requests / month
               <span class="text-[11px] normal-case tracking-normal text-highlighted tabular-nums">
                 <NumberFlow :value="requests" :format="compact" />
               </span>
-            </span>
-            <input
-              v-model.number="requestStep"
-              type="range"
-              min="0"
+            </p>
+            <USlider
+              v-model="requestStep"
+              :min="0"
               :max="REQUEST_STEPS.length - 1"
-              step="1"
-              class="mt-1.5 w-full accent-primary"
-              @input="tick"
-            >
-          </label>
+              :step="1"
+              size="xs"
+              class="mt-2"
+              @update:model-value="tick"
+            />
+          </div>
 
-          <label class="block">
-            <span class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
+          <div>
+            <p class="flex items-baseline justify-between font-mono text-[9px] uppercase tracking-widest text-dimmed">
               Log lines per request, today
               <span class="text-[11px] normal-case tracking-normal text-highlighted tabular-nums">{{ linesPerRequest }}</span>
-            </span>
-            <input
-              v-model.number="linesPerRequest"
-              type="range"
-              min="2"
-              max="10"
-              step="1"
-              class="mt-1.5 w-full accent-primary"
-              @input="tick"
-            >
-          </label>
+            </p>
+            <USlider
+              v-model="linesPerRequest"
+              :min="2"
+              :max="10"
+              :step="1"
+              size="xs"
+              class="mt-2"
+              @update:model-value="tick"
+            />
+          </div>
         </div>
 
         <div class="flex flex-wrap items-center gap-x-4 gap-y-2">
-          <label class="flex items-center gap-1.5">
+          <div class="flex items-center gap-1.5">
             <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">$ / GB</span>
-            <input
-              v-model.number="perGb"
-              type="number"
-              min="0"
-              step="0.01"
-              class="w-16 rounded border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
-            >
-          </label>
-          <label class="flex items-center gap-1.5">
+            <UInputNumber
+              v-model="perGb"
+              :min="0"
+              :step="0.01"
+              size="xs"
+              orientation="vertical"
+              :ui="{ base: 'w-20 font-mono text-[11px] tabular-nums' }"
+            />
+          </div>
+          <div class="flex items-center gap-1.5">
             <span class="font-mono text-[9px] uppercase tracking-widest text-dimmed">$ / M indexed</span>
-            <input
-              v-model.number="perMillionIndexed"
-              type="number"
-              min="0"
-              step="0.01"
-              class="w-16 rounded border border-muted bg-elevated/40 px-1.5 py-0.5 font-mono text-[11px] text-highlighted tabular-nums"
-            >
-          </label>
-          <label class="ml-auto flex items-center gap-1.5 font-mono text-[10px] text-muted">
-            <input v-model="sampled" type="checkbox" class="accent-primary" @change="tick">
-            Sampling
-          </label>
+            <UInputNumber
+              v-model="perMillionIndexed"
+              :min="0"
+              :step="0.01"
+              size="xs"
+              orientation="vertical"
+              :ui="{ base: 'w-20 font-mono text-[11px] tabular-nums' }"
+            />
+          </div>
+          <USwitch
+            v-model="sampled"
+            size="xs"
+            label="Sampling"
+            class="ml-auto"
+            :ui="{ label: 'font-mono text-[10px] text-muted' }"
+            @update:model-value="tick"
+          />
         </div>
       </div>
 
@@ -227,15 +231,15 @@ const money = computed(() => ({
       </div>
 
       <div class="grid grid-cols-2 divide-x divide-muted border-b border-muted">
-        <div class="space-y-2 bg-amber-500/[0.03] px-4 py-3">
-          <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-amber-500/80">
+        <div class="space-y-2 bg-elevated/20 px-4 py-3">
+          <p class="flex items-center gap-1.5 font-mono text-[9px] uppercase tracking-widest text-dimmed">
             <UIcon name="i-lucide-layers" class="size-3" />
             {{ linesPerRequest }} lines / request
           </p>
-          <p class="font-mono text-[20px] leading-none text-amber-400 tabular-nums">
+          <p class="font-mono text-[20px] leading-none text-muted tabular-nums">
             <NumberFlow :value="beforeCost" :format="money" />
           </p>
-          <div class="h-1 rounded-full bg-amber-500/60" />
+          <div class="h-1 rounded-full bg-muted" />
           <dl class="space-y-0.5 font-mono text-[10px] tabular-nums">
             <div class="flex justify-between">
               <dt class="text-dimmed">
