@@ -5,11 +5,10 @@ description: Bi-weekly housekeeping pass over the evlog team's Linear backlog â€
 
 # Linear maintenance
 
-This is the workflow EVL-284 was created to own. It replaces the manual
-bi-weekly pass that ran on that issue: a regular housekeeping sweep over the
-evlog team's Linear backlog so it stays readable and current between passes.
-The goal is a tidy, trustworthy backlog, not a census. Listing every issue is
-not the point; correcting the drift and flagging what needs a decision is.
+A regular housekeeping sweep over the evlog team's Linear backlog so it stays
+readable and current between passes. The goal is a tidy, trustworthy backlog,
+not a census. Listing every issue is not the point; correcting the drift and
+flagging what needs a decision is.
 
 Where the other skills draw the line: `self-review` owns the coherence and
 reach of the agent's own surface, `repo-health-sweep` owns the repository and
