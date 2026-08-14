@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { captureAttestation, captureMarkdown, escapeInline, markdownUrl, sensitiveCaptureReason, validateCaptureUrl } from './capture'
+import { CAPTURE_MARK, captureAttestation, captureMarkdown, describeTarget, escapeInline, markdownUrl, readTargetProbe, resolveTargetExpression, sensitiveCaptureReason, unresolvedTargetMessage, validateCaptureUrl } from './capture'
 
 describe('validateCaptureUrl', () => {
   it('accepts evlog surfaces, previews, and local dev servers', () => {
@@ -46,7 +46,7 @@ describe('escaping', () => {
       beforeImageUrl: 'https://blob/x.png',
       afterImageUrl: 'https://blob/y.png',
       caption: 'ok\n\n## Forged section\n<script>x</script>',
-      selector: null,
+      frame: 'full viewport',
       viewport: 'desktop',
       capturedAt: 't',
     })
@@ -63,7 +63,7 @@ describe('captureMarkdown', () => {
       beforeImageUrl: 'https://blob/x.png',
       afterImageUrl: 'https://blob/y.png',
       caption: 'Landing hero, desktop viewport.',
-      selector: '.hero',
+      frame: '.hero',
       viewport: 'desktop',
       capturedAt: '2026-08-09T15:00:00.000Z',
     })
@@ -77,10 +77,143 @@ describe('captureMarkdown', () => {
       captureAttestation({
         beforeUrl: 'https://evlog.dev/',
         afterUrl: 'https://evlog.cloud/',
-        selector: null,
+        frame: 'full viewport',
         viewport: 'mobile',
         capturedAt: 't',
       }),
     ).toBe('captured by agent-browser · https://evlog.dev/ → https://evlog.cloud/ · mobile · full viewport · t')
+  })
+})
+
+
+/** Evaluates a resolver expression against a stubbed page. */
+function runInPage(expression: string, page: { document: unknown, window: unknown }): unknown {
+  return new Function('document', 'window', `return ${expression}`)(page.document, page.window)
+}
+
+function element(text: string, section?: Record<string, unknown>) {
+  const marks: Record<string, string> = {}
+  return {
+    textContent: text,
+    marks,
+    setAttribute: (name: string, value: string) => {
+      marks[name] = value 
+    },
+    removeAttribute: (name: string) => {
+      delete marks[name] 
+    },
+    closest: () => section ?? null,
+  }
+}
+
+function pageWith(options: {
+  bySelector?: Record<string, unknown> | null
+  nodes?: Record<string, unknown>[]
+  hooks?: string[]
+  headings?: string[]
+}) {
+  const { bySelector = null, nodes = [], hooks = [], headings = [] } = options
+  return {
+    document: {
+      querySelector: () => bySelector,
+      querySelectorAll: (query: string) => {
+        if (query.includes(CAPTURE_MARK)) return []
+        if (query === '[data-section]') return hooks.map(hook => ({ getAttribute: () => hook }))
+        if (query === 'h1, h2') return headings.map(heading => ({ textContent: heading }))
+        return nodes
+      },
+    },
+    window: {},
+  }
+}
+
+describe('resolveTargetExpression', () => {
+  it('marks the element the selector matched', () => {
+    const target = element('anything')
+    const probe = runInPage(resolveTargetExpression({ selector: '[data-section="landing-faq"]' }), pageWith({ bySelector: target }))
+    expect(probe).toMatchObject({ found: true, how: 'selector' })
+    expect(target.marks[CAPTURE_MARK]).toBe('')
+  })
+
+  it('falls back to the visible copy and widens it to the section', () => {
+    const section = element('the whole section')
+    const heading = element('Before you install', section)
+    const probe = runInPage(resolveTargetExpression({ text: 'before you INSTALL' }), pageWith({ nodes: [element('unrelated'), heading] }))
+    expect(probe).toMatchObject({ found: true, how: 'text' })
+    expect(section.marks[CAPTURE_MARK]).toBe('')
+    expect(heading.marks[CAPTURE_MARK]).toBeUndefined()
+  })
+
+  it('prefers the selector and keeps text as the fallback', () => {
+    const target = element('matched by selector')
+    const heading = element('Before you install')
+    const probe = runInPage(
+      resolveTargetExpression({ selector: '#faq', text: 'Before you install' }),
+      pageWith({ bySelector: target, nodes: [heading] }),
+    )
+    expect(probe).toMatchObject({ found: true, how: 'selector' })
+    expect(heading.marks[CAPTURE_MARK]).toBeUndefined()
+  })
+
+  it('marks the text match itself when it has no sectioning ancestor', () => {
+    const orphan = element('Before you install')
+    runInPage(resolveTargetExpression({ text: 'Before you install' }), pageWith({ nodes: [orphan] }))
+    expect(orphan.marks[CAPTURE_MARK]).toBe('')
+  })
+
+  it('reports the page hooks and headings when nothing resolves', () => {
+    const probe = runInPage(
+      resolveTargetExpression({ selector: '.missing', text: 'absent copy' }),
+      pageWith({ nodes: [element('something else')], hooks: ['landing-hero', 'landing-hero'], headings: ['One command'] }),
+    )
+    expect(probe).toEqual({ found: false, how: null, hooks: ['landing-hero'], headings: ['One command'] })
+  })
+
+  it('embeds selector and text as literals, so a quote cannot break out', () => {
+    const expression = resolveTargetExpression({ selector: '[data-x="a\'b\\"c"]', text: '") + alert(1) + ("' })
+    expect(() => runInPage(expression, pageWith({}))).not.toThrow()
+  })
+})
+
+describe('readTargetProbe', () => {
+  it('reads the agent-browser envelope', () => {
+    expect(readTargetProbe({ data: { found: true, how: 'text', hooks: [], headings: [] } })).toEqual({
+      found: true,
+      how: 'text',
+      hooks: [],
+      headings: [],
+    })
+  })
+
+  it('treats a malformed probe as unresolved rather than as a frame', () => {
+    expect(readTargetProbe({ data: {} })).toEqual({ found: false, how: null, hooks: [], headings: [] })
+    expect(() => readTargetProbe({ data: null })).toThrow(/no target probe/)
+    expect(() => readTargetProbe(null)).toThrow(/no target probe/)
+  })
+})
+
+describe('describeTarget', () => {
+  it('records how the frame was located', () => {
+    expect(describeTarget({ selector: '[data-section="landing-faq"]' }, 'selector')).toBe('[data-section="landing-faq"]')
+    expect(describeTarget({ text: 'Before you install' }, 'text')).toBe('text "Before you install"')
+    expect(describeTarget({}, null)).toBe('full viewport')
+  })
+})
+
+describe('unresolvedTargetMessage', () => {
+  it('names what was asked for and what the page offers', () => {
+    const message = unresolvedTargetMessage(
+      { selector: '.py-24', text: 'Before you install' },
+      { found: false, how: null, hooks: ['landing-hero'], headings: ['One command'] },
+    )
+    expect(message).toContain('selector ".py-24" nor text "Before you install"')
+    expect(message).toContain('[data-section="landing-hero"]')
+    expect(message).toContain('"One command"')
+  })
+
+  it('says so when the page offers neither', () => {
+    expect(
+      unresolvedTargetMessage({ selector: '.py-24' }, { found: false, how: null, hooks: [], headings: [] }),
+    ).toMatch(/no hooks and no headings/)
   })
 })

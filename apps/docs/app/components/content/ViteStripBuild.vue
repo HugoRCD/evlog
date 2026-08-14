@@ -133,7 +133,7 @@ const injectCount = computed(() => sourceLines.filter(l => l.kind === 'info-obj'
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="vite-strip-build">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2">
         <div class="flex gap-1.5">

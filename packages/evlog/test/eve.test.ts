@@ -390,6 +390,113 @@ describe('evlog/eve', () => {
     })
   })
 
+  it('attributes input tokens to the tool result that added them', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+
+    events['turn.started']!({ type: 'turn.started', data: { sequence: 0, turnId: TURN_ID } }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'tool-calls', sequence: 1, stepIndex: 0, turnId: TURN_ID, usage: { inputTokens: 5_000, outputTokens: 50 } },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: { result: { callId: 'call_pages', kind: 'tool-result', toolName: 'docs__list-pages', output: {} }, sequence: 2, stepIndex: 0, status: 'completed', turnId: TURN_ID },
+    }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'tool-calls', sequence: 3, stepIndex: 1, turnId: TURN_ID, usage: { inputTokens: 70_000, outputTokens: 50 } },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: { result: { callId: 'call_weather', kind: 'tool-result', toolName: 'get_weather', output: {} }, sequence: 4, stepIndex: 1, status: 'completed', turnId: TURN_ID },
+    }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'stop', sequence: 5, stepIndex: 2, turnId: TURN_ID, usage: { inputTokens: 72_000, outputTokens: 120 } },
+    }, ctx)
+    await events['turn.completed']!({ type: 'turn.completed', data: { sequence: 6, turnId: TURN_ID } }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.ai?.tools?.[0]).toMatchObject({
+      name: 'docs__list-pages',
+      inputTokens: 65_000,
+    })
+    expect(event?.ai?.tools?.[1]).toMatchObject({
+      name: 'get_weather',
+      inputTokens: 2_000,
+    })
+  })
+
+  it('splits a step input delta across parallel tool results', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+
+    events['turn.started']!({ type: 'turn.started', data: { sequence: 0, turnId: TURN_ID } }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'tool-calls', sequence: 1, stepIndex: 0, turnId: TURN_ID, usage: { inputTokens: 1_000, outputTokens: 30 } },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: { result: { callId: 'call_a', kind: 'tool-result', toolName: 'search_a', output: {} }, sequence: 2, stepIndex: 0, status: 'completed', turnId: TURN_ID },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: { result: { callId: 'call_b', kind: 'tool-result', toolName: 'search_b', output: {} }, sequence: 3, stepIndex: 0, status: 'completed', turnId: TURN_ID },
+    }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'stop', sequence: 4, stepIndex: 1, turnId: TURN_ID, usage: { inputTokens: 3_000, outputTokens: 30 } },
+    }, ctx)
+    await events['turn.completed']!({ type: 'turn.completed', data: { sequence: 5, turnId: TURN_ID } }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    expect(event?.ai?.tools?.[0]?.inputTokens).toBe(1_000)
+    expect(event?.ai?.tools?.[1]?.inputTokens).toBe(1_000)
+  })
+
+  it('re-bases tool attribution after a compaction', async () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+    const ctx = hookContext()
+    const events = hook.events!
+
+    events['turn.started']!({ type: 'turn.started', data: { sequence: 0, turnId: TURN_ID } }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'tool-calls', sequence: 1, stepIndex: 0, turnId: TURN_ID, usage: { inputTokens: 5_000, outputTokens: 30 } },
+    }, ctx)
+    events['action.result']!({
+      type: 'action.result',
+      data: { result: { callId: 'call_big', kind: 'tool-result', toolName: 'big_search', output: {} }, sequence: 2, stepIndex: 0, status: 'completed', turnId: TURN_ID },
+    }, ctx)
+    events['compaction.requested']!({
+      type: 'compaction.requested',
+      data: { modelId: 'gpt-5-mini', sequence: 3, sessionId: SESSION_ID, turnId: TURN_ID, usageInputTokens: 40_000 },
+    }, ctx)
+    events['compaction.completed']!({
+      type: 'compaction.completed',
+      data: { modelId: 'gpt-5-mini', sequence: 4, sessionId: SESSION_ID, turnId: TURN_ID },
+    }, ctx)
+    events['step.completed']!({
+      type: 'step.completed',
+      data: { finishReason: 'stop', sequence: 5, stepIndex: 1, turnId: TURN_ID, usage: { inputTokens: 50_000, outputTokens: 30 } },
+    }, ctx)
+    await events['turn.completed']!({ type: 'turn.completed', data: { sequence: 6, turnId: TURN_ID } }, ctx)
+
+    await waitForDrainCalls(spies.drain)
+    const event = findEventViaDrain(spies.drain, () => true)
+    // big_search returned before the compaction; its linear contribution is gone
+    expect(event?.ai?.tools?.[0]?.inputTokens).toBeUndefined()
+  })
+
   it('emits a valid wide event on turn.completed', async () => {
     const spies = createPipelineSpies()
     const hook = defineEvlogHook({ drain: spies.drain })

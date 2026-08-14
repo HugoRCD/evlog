@@ -50,10 +50,8 @@ const GITHUB_SOURCE_TOOLS = [
 ] as const
 
 /**
- * Reading source, whichever way. The API is the cheaper route off the GitHub
- * channel and the checkout is the cheaper one on it, so an eval that accepts
- * only one of them gates on the environment rather than on the routing
- * decision. `bash` is left out: it reads source among a hundred other things.
+ * Every tool that reads source, so an eval accepts either route. `bash` is
+ * left out: it reads source among a hundred other things.
  */
 export const SOURCE_READ_TOOLS = [
   ...GITHUB_SOURCE_TOOLS,

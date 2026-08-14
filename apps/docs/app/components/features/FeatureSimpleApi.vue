@@ -52,7 +52,7 @@ function setOutput(type: 'success' | 'error') {
 </script>
 
 <template>
-  <section class="pt-16 md:pt-20 pb-24 md:pb-32">
+  <section class="pt-16 md:pt-20 pb-24 md:pb-32" data-section="features-feature-simple-api">
     <Motion
       :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"

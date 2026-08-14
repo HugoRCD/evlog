@@ -185,7 +185,7 @@ const stats = computed(() => {
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="tail-sample-decision">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2.5">
         <UIcon name="i-lucide-funnel" class="size-3.5 text-primary" />

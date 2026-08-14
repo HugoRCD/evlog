@@ -165,7 +165,7 @@ const status = computed(() => {
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="map-scan-flow">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-2">
         <UIcon name="i-lucide-radar" class="size-3 text-primary shrink-0" />

@@ -168,7 +168,7 @@ function valueColor(value: string) {
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="better-auth-identify">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-2">
         <div class="flex gap-1.5">

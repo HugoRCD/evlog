@@ -11,7 +11,7 @@ async function copyCommand() {
 </script>
 
 <template>
-  <section class="relative overflow-hidden bg-default">
+  <section class="relative overflow-hidden bg-default" data-section="landing-hero">
     <div class="absolute top-0 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[600px] h-[300px] rounded-full blur-3xl pointer-events-none" />
     <div class="relative z-10 flex flex-col items-center text-center max-w-4xl mx-auto pt-28 lg:pt-32 pb-4 px-6">
       <button

@@ -4,7 +4,6 @@ import { MODEL } from './lib/model'
 
 export default defineAgent({
   model: defineDynamic({
-    fallback: MODEL,
     events: {
       'session.started': (_event, ctx) => ({
         model: MODEL,
@@ -22,8 +21,5 @@ export default defineAgent({
   limits: {
     maxInputTokensPerSession: 20_000_000,
     maxOutputTokensPerSession: 250_000,
-  },
-  modelOptions: {
-    providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags() } },
   },
 })

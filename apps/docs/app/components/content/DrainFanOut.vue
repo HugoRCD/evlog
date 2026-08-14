@@ -186,7 +186,7 @@ function statusLabel(adapter: Adapter, s: AdapterState) {
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="drain-fan-out">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-4 py-3">
         <div class="flex gap-1.5">

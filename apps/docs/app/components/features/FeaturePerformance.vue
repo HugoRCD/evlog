@@ -12,7 +12,7 @@ const props = defineProps<{
 
 const pills = [
   { label: 'Zero-alloc hot path', icon: 'i-lucide-zap' },
-  { label: 'CodSpeed CI', icon: 'i-lucide-shield-check' },
+  { label: 'Reproducible benchmarks', icon: 'i-lucide-shield-check' },
   { label: 'Open source benchmarks', icon: 'i-lucide-code' },
 ]
 
@@ -88,7 +88,7 @@ onBeforeUnmount(() => {
 </script>
 
 <template>
-  <section class="py-24 md:py-32">
+  <section class="py-24 md:py-32" data-section="features-feature-performance">
     <Motion
       :initial="false"
       :while-in-view="{ opacity: 1, y: 0 }"

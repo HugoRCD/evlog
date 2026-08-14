@@ -5,7 +5,7 @@ description: Produce a before/after visual comparison of an evlog surface (landi
 
 # Before/after captures
 
-One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, screenshots (cropped to the selector), validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt.
+One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, scrolls the change into view, screenshots the viewport, validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt. It returns only that block, so there is nothing to reassemble by hand.
 
 ## 0. Start the dev server first
 
@@ -14,6 +14,7 @@ When "after" needs a dev server, start it in the background **as soon as the bra
 ## 1. Decide what "before" and "after" are
 
 - The current state of the code is **after**. Never switch branches, stash, or revert to fabricate a "before".
+- **A pure addition has no before.** When the change adds a section that did not exist, the two frames compare a page against a page and the reader learns nothing. Capture the new thing alone and say what it replaces in prose. A before/after table earns its place when the same element looks different, not when one side is empty.
 - **Before** is the deployed production page (`evlog.dev`, `evlog.dev/docs/...`) or the last merged preview.
 - **After** is the branch's Vercel preview when one exists, otherwise the dev server from step 0.
 - A `*.vercel.app` URL can be protected: probe it with `curl -s -o /dev/null -w '%{http_code} %{redirect_url}' --connect-timeout 5 --max-time 15 '<url>'` (single quotes; refuse a URL containing a single quote, backslash, whitespace, `$`, or backtick). 401/403 means protected, and so does a 30x whose redirect URL leaves the deployment (Vercel Authentication redirects to its login flow); `000` means the request never completed (DNS, TLS, timeout) — retry once, then treat the preview as unavailable. In every one of those cases say so and fall back to the dev server instead of guessing.
@@ -25,12 +26,17 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 
 ## 3. Capture and deliver
 
-**Frame the change, not the page.** Find the tightest stable container around the change with `browser__snapshot` (a section class or landmark, not a hashed utility class), then:
+**Point at the change, do not go hunting for it.** You already hold two locators after editing: the component's hook and the copy you wrote.
 
-`capture__before_after({ beforeUrl, afterUrl, selector, caption })`
+`capture__before_after({ beforeUrl, afterUrl, selector, text, caption })`
 
-- Omit `selector` only for page-level changes (layout, theme, redesign).
+- **`selector` when the surface has a hook.** Landing sections and MDC content components carry `data-section="<their MDC tag>"`, so editing `::landing-faq` in `0.landing.md` gives `[data-section="landing-faq"]` with nothing to look up.
+- **`text` when it does not.** Pass a sentence you can see on the page and the capture finds it, widens to its nearest section, and marks that element for the scroll. This is the whole answer for a surface with no hooks, and for a doc page where the change is one paragraph. Never select on utility classes instead: eleven landing sections render the identical `section.py-24.md:py-32`, so a class selector there frames the wrong section without telling you.
+- Give both and the selector wins, with `text` as the fallback. Omit both only for page-level changes (layout, theme, redesign).
+- The frame is the normal viewport, scrolled to the change. When neither locator resolves the call **fails**, listing the hooks and headings the page does offer; take one of those rather than retrying with a guess.
+- **Look at both returned frames before you paste anything.** The tool refuses the failure that produced a hero shot, but it cannot tell you the frame caught the wrong element, or that the "before" side has no counterpart. Read the two images back and name, to yourself, the thing you changed in each one.
 - For responsive changes, call it again with `viewport: 'mobile'`.
+- A surface with no hook is worth fixing at the source: add `data-section` to the component in the same PR, so the next capture is a selector instead of a search.
 - Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.
 

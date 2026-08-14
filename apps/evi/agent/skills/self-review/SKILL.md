@@ -57,6 +57,8 @@ Read-only, and these become issues, never PRs.
 
 - `telemetry-stats`: an error code climbing week over week, a command whose success rate is falling.
 - CI on `main`: a job failing intermittently is a finding even when the reruns go green.
+- `vercel__get_runtime_errors` (production): a runtime error cluster growing week over week, or one whose route has no docs page explaining it, is a docs proposal with a number attached.
+- Evi's own production runs: `vercel__list_agent_run_projects` to find the eve service project, then `vercel__list_agent_runs` for sessions that ended badly or never answered and the failed tool calls inside them. Drill into a failure with `vercel__get_runtime_logs`.
 
 ---
 
@@ -93,7 +95,7 @@ Look outward, not only at the agent.
 - `telemetry-adoption`: a flag or custom field nobody uses two releases in is a deprecation candidate; a custom field spreading on its own is a workflow worth making first-class.
 - The top error code from `telemetry-stats` with no docs page covering it is a docs proposal with a number attached.
 - Community issues and discussions asking for the same integration, adapter or option a third time.
-- A gap retrieval hit: a docs lookup that came up empty usually means a page is missing.
+- A docs lookup that came up empty during a session: it usually means a page is missing.
 
 ## I. Ideas already written down and never filed
 

@@ -7,10 +7,8 @@ function isBatch(kind?: string): boolean {
 }
 
 /**
- * Routing shared by every gateway call. A turn is prefill-bound — tens of
- * thousands of prompt tokens against a few hundred generated ones — so an
- * interactive surface sorts on time to first token rather than on price.
- * Schedules keep following the cheapest deployment.
+ * Routing shared by every gateway call: schedules sort on cost, every
+ * interactive surface sorts on time to first token.
  */
 export function gatewayRouting(kind?: string) {
   return {

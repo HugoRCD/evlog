@@ -15,6 +15,7 @@ What follows is the shape of the answer, so you know what to look for and what t
 
 - **A changeset is required** for anything a consumer of evlog would notice: a feature, a bug fix, a breaking change. `pnpm changeset`, committed alongside the code. Changes confined to `apps/*` or `examples/*` never need one. A PR without a changeset for a user-facing change does not merge.
 - **Conventional Commits, lowercase subject.** `feat: add stream server`, not `feat: Add stream server`. Omit the scope when the change is cross-cutting; never use `evlog` as a scope. A new subsystem needs its scope registered in both `.github/workflows/semantic-pull-request.yml` and `.github/pull_request_template.md`, and because title validation reads the base branch, that registration has to land in an earlier PR.
+- **The scope list is a closed set, and you read it before you write the title.** `.github/workflows/semantic-pull-request.yml` holds the only scopes CI accepts. Anything else fails `Validate PR title`, and a scope that merely sounds plausible (`evlog`, the package name, the app directory) is the usual way that happens. A change confined to `apps/docs` is `docs:`, with no scope: `docs` is already the type.
 - **A bug fix needs a failing regression test first**, then the fix.
 - **New exports** go in `packages/evlog/package.json` (`exports` and `typesVersions`) *and* `tsdown.config.ts`.
 - **Skills must stay in sync.** If a change touches something a skill documents, the SKILL.md changes in the same PR, both the internal `.agents/skills/` and the published `apps/docs/skills/`.
@@ -57,8 +58,11 @@ The whole flow runs in `/workspace/repo`; nothing ships through the GitHub file 
 2. Edit, then run the checks above. A bug fix commits its failing regression test first, then the fix. For a visual change, start the dev server in the background before the checks (see `before-after`, step 0) so it warms while they run. Before the first check of the session, call `turbo__enable_remote_cache` once, then prefix each check with `TURBO_REMOTE_CACHE_READ_ONLY=true`: turbo reuses the artifacts CI already built, and the template cache covers the rest, so only what the diff affects actually runs.
 3. When a consumer of evlog would notice the change, add a changeset: write `.changeset/<some-name>.md` by hand with the `---` frontmatter naming the package and bump plus a consumer-facing description (`pnpm changeset` is interactive and cannot run here). Look at an existing file in `.changeset/` for the exact shape.
 4. Commit with a Conventional Commits subject: lowercase, a registered scope or none.
-5. Push with `git__push`. It refuses `main` and `master`, and only maintainer sessions have it.
+5. **Push the branch with `git__push`.** That tool is the only way code reaches the remote: never the GitHub file API. It refuses `main` and `master`, and only maintainer sessions have it.
 6. Open the pull request with `github__createPullRequest`, report each check result in the body, and request `hugorcd` via `github__requestReviewers` unless it is a draft.
+7. **Read CI back once it has run.** `Validate PR title` settles in seconds and is the check your own title most often breaks. A pull request announced as ready while a required check is red costs the maintainer the review; fix the title or the code and say so, rather than leaving it for them to find.
+
+A pull request is not finished when it is open. Before you report it, the local checks are green, CI is green, and you have looked at the rendered result of anything visual. "Lint and typecheck pass" is a claim about the build, not about whether the thing you wrote is correct or reads well.
 
 `pnpm --filter @evlog/cli exec evlog map --json --no-write` scores an entry point's observability and is built for exactly this: it is the fastest way to ground a "should this be logged" answer in the tree you are working in. Run the workspace copy rather than `npx @evlog/cli`, which would fetch and execute whatever version the registry currently serves.
 

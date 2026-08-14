@@ -176,6 +176,10 @@ interface TurnAccumulator {
   stepStartedAt?: number
   costMap?: Record<string, ModelCost>
   costModel?: string
+  /** Cumulative input tokens of the most recent completed model step, the baseline for per-tool attribution. */
+  lastStepInputTokens?: number
+  /** Tools whose results were fed to the model since the last step, awaiting input-token attribution. */
+  pendingToolAttribution: AIToolExecution[]
 }
 
 interface TurnState {
@@ -239,6 +243,7 @@ function freshAccumulator(options: EvlogEveOptions): TurnAccumulator {
     reasoningChars: 0,
     responseChars: 0,
     pausedForInput: false,
+    pendingToolAttribution: [],
     costMap: options.cost,
     costModel: resolveCostModel(options),
   }
@@ -263,6 +268,29 @@ function computeEstimatedCost(state: TurnAccumulator): number | undefined {
   const outputCost = (state.outputTokens / 1_000_000) * pricing.output
   const total = inputCost + outputCost
   return total > 0 ? Math.round(total * 1_000_000) / 1_000_000 : undefined
+}
+
+/**
+ * Attribute the input a model step consumed as a delta over the previous step
+ * to the tool results that returned in between. A step delta is split evenly
+ * across tools that ran in parallel, so a single dominant result is reported
+ * in full.
+ */
+function attributeToolInputTokens(acc: TurnAccumulator, inputTokens: number): void {
+  if (acc.lastStepInputTokens === undefined) {
+    // A compaction or context clear reset the baseline; re-base and drop the
+    // results whose contribution left the linear context.
+    acc.pendingToolAttribution = []
+    acc.lastStepInputTokens = inputTokens
+    return
+  }
+  if (acc.pendingToolAttribution.length > 0) {
+    const delta = Math.max(0, inputTokens - acc.lastStepInputTokens)
+    const each = Math.round(delta / acc.pendingToolAttribution.length)
+    for (const tool of acc.pendingToolAttribution) tool.inputTokens = each
+    acc.pendingToolAttribution = []
+  }
+  acc.lastStepInputTokens = inputTokens
 }
 
 function buildAiField(state: TurnAccumulator): AIEventData {
@@ -1096,6 +1124,9 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
             acc.cacheReadTokens += usage.cacheReadTokens ?? 0
             acc.cacheWriteTokens += usage.cacheWriteTokens ?? 0
             acc.costUsd += usage.costUsd ?? 0
+            if (usage.inputTokens !== undefined) {
+              attributeToolInputTokens(acc, usage.inputTokens)
+            }
           }
         })
       },
@@ -1154,6 +1185,8 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           if (!state) return
           const acc = state.accumulator
           acc.compactionsRequested += 1
+          acc.lastStepInputTokens = undefined
+          acc.pendingToolAttribution = []
           // Keep the first trigger of the turn: `inputTokensAtTrigger` reports
           // how full the context was when compaction first kicked in.
           if (acc.compactionModel === undefined) {
@@ -1178,6 +1211,8 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
           const state = getTurnState(ctx.session.id, event.data.turnId)
           if (!state) return
           state.accumulator.contextCleared = true
+          state.accumulator.lastStepInputTokens = undefined
+          state.accumulator.pendingToolAttribution = []
         })
       },
 
@@ -1288,6 +1323,7 @@ export function defineEvlogHook(options: EvlogEveOptions = {}): HookDefinition {
             execution.error = event.data.error.message
           }
           state.accumulator.toolExecutions.push(execution)
+          if (!rejected) state.accumulator.pendingToolAttribution.push(execution)
         })
       },
 
