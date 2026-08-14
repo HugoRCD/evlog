@@ -938,7 +938,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | ClickHouse | `evlog/clickhouse` | `CLICKHOUSE_ENDPOINT`, optional `CLICKHOUSE_USER` / `CLICKHOUSE_PASSWORD` / `CLICKHOUSE_DATABASE` / `CLICKHOUSE_TABLE` |
 | File System | `evlog/fs` | None (local file system) |
 | Memory | `evlog/memory` | None (in-process ring buffer; optional `EVLOG_MEMORY_STORE`, `EVLOG_MEMORY_MAX_EVENTS`). Read back with `readMemoryLogs()` — ideal for dev-only log endpoints agents can query |
-| NuxtHub | `@evlog/nuxthub` (separate package, Nuxt module) | None — stores wide events in the NuxtHub database with retention-based cleanup (`evlog.nuxthub: { retentionDays, batchSize }`) |
+| NuxtHub | `@evlog/nuxthub` (separate package, Nuxt module) | None — stores wide events in the NuxtHub database with retention-based cleanup (set `evlog.retention: '7d'` in the module options; accepts `d`/`h`/`m`) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
 Use canonical env var names (e.g. `AXIOM_API_KEY`, `BETTER_STACK_API_KEY`) — the same names work in every framework.

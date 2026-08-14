@@ -225,13 +225,16 @@ Three patterns, in order of preference:
 ```ts
 import { withAudit, AuditDeniedError } from 'evlog'
 
-export const refundInvoice = withAudit({
-  action: 'invoice.refund',
-  target: ({ id }: { id: string }) => ({ type: 'invoice', id }),
-})(async ({ id }, ctx) => {
-  if (!ctx.actor) throw new AuditDeniedError('Anonymous refund denied')
-  return db.invoices.refund(id)
-})
+export const refundInvoice = withAudit(
+  {
+    action: 'invoice.refund',
+    target: ({ id }: { id: string }) => ({ type: 'invoice', id }),
+  },
+  async ({ id }, ctx) => {
+    if (!ctx.actor) throw new AuditDeniedError('Anonymous refund denied')
+    return db.invoices.refund(id)
+  },
+)
 ```
 
 Outcome resolution:
