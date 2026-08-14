@@ -5,7 +5,7 @@ import {
   LOG_COST_PROVIDERS,
   PINO_LINE_BYTES,
   PRICES_READ_ON,
-} from '../../../shared/utils/log-cost'
+} from '../../../app/utils/log-cost'
 
 const PROVIDER_IDS = LOG_COST_PROVIDERS.map(p => p.id) as [string, ...string[]]
 
@@ -16,7 +16,7 @@ WHEN TO USE: someone asks whether evlog would lower their log bill, how much the
 
 HOW IT WORKS: the byte counts are measured, not assumed. Serializing the same checkout request gives ${PINO_LINE_BYTES} B per pino line against ${EVLOG_EVENT_BYTES} B for one evlog event, so consolidation removes duplicated envelope (level, timestamp, host, request bindings) rather than payload. Which figure moves a bill depends on the provider: most meter gigabytes, so the byte saving applies; a provider that also bills per million events indexed rewards the event count instead.
 
-Pass a provider id to start from its published list rate, or pass perGb and perMillionIndexed directly. Rates were read on ${PRICES_READ_ON} and vendors change pricing without notice, so an explicit rate always beats the stored one. Sampling is deliberately not modelled: it drops events for any logger, so it moves both sides and cancels out of the comparison.`,
+Pass a provider id to start from its published list rate, or pass perGb and perMillionIndexed directly. Rates were read on ${PRICES_READ_ON} and vendors change pricing without notice, so an explicit rate always beats the stored one. Sampling is applied to both shapes through keepPercent, because any logger can drop events: it lowers each bill without changing the ratio between them.`,
   annotations: {
     readOnlyHint: true,
     idempotentHint: true,
@@ -28,6 +28,7 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
     provider: z.enum(PROVIDER_IDS).optional().describe(`Provider whose list rates to start from: ${PROVIDER_IDS.join(', ')}`),
     perGb: z.number().min(0).optional().describe('USD per gigabyte ingested. Overrides the provider rate'),
     perMillionIndexed: z.number().min(0).optional().describe('USD per million events indexed. Overrides the provider rate. Zero for providers that do not meter events'),
+    keepPercent: z.number().min(1).max(100).default(100).describe('Percentage of traffic kept after sampling. Applied to both shapes, since any logger can drop events'),
   },
   inputExamples: [
     { requestsPerMonth: 10_000_000, linesPerRequest: 4, provider: 'datadog' },
@@ -46,9 +47,10 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
       ratesReadOn: z.string(),
       perGb: z.number(),
       perMillionIndexed: z.number(),
+      keepPercent: z.number(),
     }),
   },
-  handler: ({ requestsPerMonth, linesPerRequest, provider, perGb, perMillionIndexed }) => {
+  handler: ({ requestsPerMonth, linesPerRequest, provider, perGb, perMillionIndexed, keepPercent }) => {
     const preset = LOG_COST_PROVIDERS.find(p => p.id === provider)
     if (provider && !preset) {
       throw createError({ statusCode: 400, message: `Unknown provider "${provider}". Known: ${PROVIDER_IDS.join(', ')}.` })
@@ -64,6 +66,7 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
       linesPerRequest,
       perGb: gbRate,
       perMillionIndexed: indexedRate,
+      keepRatio: keepPercent / 100,
     })
 
     return {
@@ -80,6 +83,7 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
           ratesReadOn: PRICES_READ_ON,
           perGb: gbRate,
           perMillionIndexed: indexedRate,
+          keepPercent,
         },
       },
     }

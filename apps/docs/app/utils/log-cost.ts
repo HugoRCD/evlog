@@ -58,6 +58,12 @@ export interface LogCostInput {
   linesPerRequest: number
   perGb: number
   perMillionIndexed: number
+  /**
+   * Fraction of traffic kept after sampling, `1` for none. Applied to both
+   * shapes: any logger can drop events, so sampling lowers both bills and
+   * leaves the ratio between them alone.
+   */
+  keepRatio?: number
 }
 
 /** Cents below $100, where whole dollars would stop the figures adding up. */
@@ -80,8 +86,9 @@ function round(value: number, digits: number) {
  * @returns Both shapes, the saving, and the saving as a ratio of the current bill
  */
 export function estimateLogCost(input: LogCostInput): LogCostEstimate {
-  const beforeEvents = input.requestsPerMonth * input.linesPerRequest
-  const afterEvents = input.requestsPerMonth
+  const kept = input.keepRatio ?? 1
+  const beforeEvents = input.requestsPerMonth * input.linesPerRequest * kept
+  const afterEvents = input.requestsPerMonth * kept
   const bill = (events: number, bytes: number) =>
     (events * bytes / 1e9) * input.perGb + (events / 1e6) * input.perMillionIndexed
 
