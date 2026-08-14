@@ -1,5 +1,8 @@
+import { mkdirSync, mkdtempSync, writeFileSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
-import { checkDrift } from './drift.mjs'
+import { checkDrift, loadApiSurface } from './drift.mjs'
 import { parseMarkdown } from './mdc.mjs'
 
 const api = {
@@ -9,6 +12,20 @@ const api = {
 const routes = new Set(['/', '/learn/sampling', '/extend/drain-pipeline'])
 
 const check = source => checkDrift(parseMarkdown(source), api, routes)
+
+describe('loadApiSurface', () => {
+  it('counts a type-only re-export as an export', () => {
+    const root = mkdtempSync(join(tmpdir(), 'content-lint-'))
+    mkdirSync(join(root, 'packages/evlog/src'), { recursive: true })
+    writeFileSync(join(root, 'packages/evlog/package.json'), JSON.stringify({ name: 'evlog', exports: { '.': './dist/index.mjs' } }))
+    writeFileSync(join(root, 'packages/evlog/src/index.ts'), 'export type { EvlogOptions } from \'./types\'\nexport { createLogger } from \'./logger\'\n')
+
+    const api = loadApiSurface(root)
+
+    expect(api.symbols.has('EvlogOptions')).toBe(true)
+    expect(api.symbols.has('createLogger')).toBe(true)
+  })
+})
 
 describe('import checks', () => {
   it('flags an entry point that is not exported', () => {

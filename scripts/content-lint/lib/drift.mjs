@@ -15,7 +15,9 @@ import { readFileSync, readdirSync, statSync } from 'node:fs'
 import { dirname, join, relative, sep } from 'node:path'
 
 const EXPORT_DECLARATION = /export\s+(?:declare\s+)?(?:default\s+)?(?:async\s+)?(?:function\s*\*?|const|let|var|class|interface|type|enum)\s+([A-Za-z_$][\w$]*)/g
-const EXPORT_LIST = /export\s*\{([^}]*)\}/g
+// `export type { Foo }` counts: a page importing a type-only re-export would
+// otherwise read as importing a symbol the package does not have.
+const EXPORT_LIST = /export\s*(?:type\s+)?\{([^}]*)\}/g
 const IMPORT_STATEMENT = /import\s+(?:type\s+)?(?:\{([^}]*)\}|([A-Za-z_$][\w$]*))\s+from\s+['"]([^'"]+)['"]/g
 const EVLOG_SPECIFIER = /['"](evlog(?:\/[\w-]+)*|@evlog\/[\w-]+(?:\/[\w-]+)*)['"]/g
 const IMPORT_PATH = /^(evlog(\/[\w-]+)*|@evlog\/[\w-]+(\/[\w-]+)*)$/
