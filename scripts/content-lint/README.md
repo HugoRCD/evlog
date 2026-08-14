@@ -17,6 +17,24 @@ pnpm content:lint --url https://… --as blog    # a page that is not in the rep
 cat draft.md | pnpm content:lint --stdin       # prose that is not a file yet
 ```
 
+## Fixing what is derivable
+
+```bash
+pnpm content:lint <paths…> --fix             # rewrite in place, report every change
+pnpm content:lint <paths…> --fix --dry-run   # print what it would do, write nothing
+```
+
+A rule reaches `lib/fix.mjs` only when the corrected text follows from the rule rather than from taste:
+
+| Rule | Fixed | Left to a reader |
+| --- | --- | --- |
+| `T-15` | `evlog/shared` → `evlog/toolkit`, `evlog/browser` → `evlog/http` | a page documenting the deprecation, which is skipped |
+| `U-15` | `sink` → `drain`, `error registry` → `error catalog` | `child logger`, which does not slot into the same sentence |
+| `U-16` | a link with a redirect behind it | a link with no destination |
+| `U-14` | `A — B — C` → `A, B, C` | the single elaborating dash, which wants a comma here and a colon there |
+
+After writing, each file is re-scanned. If the score dropped or a new finding id appeared, the file is reverted and reported as unfixed — that check is the whole argument for running this before a reviewer sees the file. `--fix` refuses to run without explicit paths: a corpus-wide rewrite is a maintainer's decision.
+
 `--url` fetches, drops nav, header, footer, and aside, prefers `<main>` then `<article>`, and turns what is left back into markdown so every check downstream is the one that runs on a docs page. A script-rendered page yields nothing and says so rather than reporting clean. An external scan drops the evlog-specific checks (`T-15`, `U-12`, `U-15`, link resolution): someone else's entry points, links, and vocabulary are theirs.
 
 The baseline is always the whole corpus, never the selection: a single-file run returns what a full sweep would say about that file. Rates are compared within a surface, so a reference page is not measured against a blog post.

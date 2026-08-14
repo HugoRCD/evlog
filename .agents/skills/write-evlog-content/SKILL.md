@@ -73,6 +73,8 @@ pnpm content:lint --url https://example.com/post --as blog   # a page outside th
 cat draft.md | pnpm content:lint --stdin                     # prose that is not a file yet
 ```
 
+Some findings are fixed before anyone reads them. `pnpm content:lint <paths> --fix` applies the rules whose corrected text follows from the rule itself: a retired entry point, a term with one replacement, a link with a redirect behind it, a dash pair around a parenthetical. It re-scans and reverts anything that scored worse. Run it before reviewing, so a review spends its attention on what a codemod cannot decide.
+
 Rates are compared per surface. A reference page and a skill file have different natural rhythms, and one median over both flatters whichever is looser. A `--url` scan drops every evlog-specific check: someone else's entry points, links, and vocabulary are theirs, so what comes back is how the page reads.
 
 Every scan returns two lists. The findings are what tripped a counter. `modelChecks` is what no counter reached on that page, chosen for its surface and its shape: whether the claims carry a mechanism, whether the opening states a situation, whether a skill's `description` would route to it, whether the code runs. Answer all of them. A review that only works the findings reviews only what was measurable, and a page can satisfy every count while answering nothing.
