@@ -5,7 +5,7 @@ description: Produce a before/after visual comparison of an evlog surface (landi
 
 # Before/after captures
 
-One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, frames the selector (scrolling it into view, resizing the viewport to it, then parking on it), validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt. It returns only that block, so there is nothing to reassemble by hand.
+One tool does the whole capture: `capture__before_after` opens both URLs in the sandbox Chromium, waits 5s for animations to settle, scrolls the change into view, screenshots the viewport, validates and uploads both frames to Blob, and returns the finished markdown table with an attestation receipt. It returns only that block, so there is nothing to reassemble by hand.
 
 ## 0. Start the dev server first
 
@@ -26,14 +26,17 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 
 ## 3. Capture and deliver
 
-**Frame the change, not the page.** The selector is derived from what you edited, not discovered: every section on the landing and every doc content component carries `data-section="<its MDC tag>"`. You edited `::landing-faq` in `0.landing.md`, so the selector is `[data-section="landing-faq"]`. Reach for `browser__snapshot` only when the surface has no hook yet, and add one to the component in the same PR rather than selecting on utility classes: eleven landing sections render the identical `section.py-24.md:py-32`, so a class selector there frames the wrong section or none.
+**Point at the change, do not go hunting for it.** You already hold two locators after editing: the component's hook and the copy you wrote.
 
-`capture__before_after({ beforeUrl, afterUrl, selector, caption })`
+`capture__before_after({ beforeUrl, afterUrl, selector, text, caption })`
 
-- Omit `selector` only for page-level changes (layout, theme, redesign).
-- The tool resizes the viewport to the element and parks on it, so the frame holds that element and nothing else. A selector matching nothing **fails the call** and the error lists the `data-section` hooks the page does expose; take one of those rather than retrying with a guess.
-- **Look at both returned frames before you paste anything.** The tool now refuses the failure that produced a hero shot, but it cannot tell you the frame is the wrong element, or that the "before" side has no counterpart. Read the two images back and name, to yourself, the thing you changed in each one.
+- **`selector` when the surface has a hook.** Landing sections and MDC content components carry `data-section="<their MDC tag>"`, so editing `::landing-faq` in `0.landing.md` gives `[data-section="landing-faq"]` with nothing to look up.
+- **`text` when it does not.** Pass a sentence you can see on the page and the capture finds it, widens to its nearest section, and marks that element for the scroll. This is the whole answer for a surface with no hooks, and for a doc page where the change is one paragraph. Never select on utility classes instead: eleven landing sections render the identical `section.py-24.md:py-32`, so a class selector there frames the wrong section without telling you.
+- Give both and the selector wins, with `text` as the fallback. Omit both only for page-level changes (layout, theme, redesign).
+- The frame is the normal viewport, scrolled to the change. When neither locator resolves the call **fails**, listing the hooks and headings the page does offer; take one of those rather than retrying with a guess.
+- **Look at both returned frames before you paste anything.** The tool refuses the failure that produced a hero shot, but it cannot tell you the frame caught the wrong element, or that the "before" side has no counterpart. Read the two images back and name, to yourself, the thing you changed in each one.
 - For responsive changes, call it again with `viewport: 'mobile'`.
+- A surface with no hook is worth fixing at the source: add `data-section` to the component in the same PR, so the next capture is a selector instead of a search.
 - Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.
 

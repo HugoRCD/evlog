@@ -25,88 +25,112 @@ export type CaptureViewport = keyof typeof CAPTURE_VIEWPORTS
 export const CAPTURE_SETTLE_MS = 5000
 
 /**
- * Bounds on the viewport height used to frame a selector. The floor keeps a
- * short section from producing a sliver, the ceiling keeps a long one inside
- * the Blob size limit.
+ * Attribute the capture stamps on the resolved element, so the scroll can
+ * address it by selector even when the page offers nothing stable to select.
+ * It exists for the length of one capture and never reaches the repository.
  */
-export const FRAME_HEIGHT_BOUNDS = { min: 320, max: 2400 } as const
+export const CAPTURE_MARK = 'data-evi-capture'
 
-export interface FrameProbe {
+/** What the target resolved to, or what the page offered instead. */
+export interface TargetProbe {
   readonly found: boolean
-  /** Rendered height of the element, in CSS pixels. */
-  readonly height: number
-  /** Every `data-section` on the page, offered when the selector missed. */
+  /** How the element was located, for the attestation receipt. */
+  readonly how: 'selector' | 'text' | null
+  /** `data-section` hooks on the page, offered when nothing resolved. */
   readonly hooks: readonly string[]
+  /** Headings on the page, offered when nothing resolved. */
+  readonly headings: readonly string[]
+}
+
+export interface CaptureTarget {
+  readonly selector?: string
+  readonly text?: string
 }
 
 /**
- * JavaScript run in the page to reveal the target and measure it. It scrolls
- * the element into view in the same call, so a section that only animates in
- * on scroll has started before the frame is measured.
+ * JavaScript that locates the element to frame and marks it.
  *
- * @param selector - CSS selector framing the change
+ * The selector is tried first. When it matches nothing, or when only `text`
+ * was given, the visible copy is searched instead and the match is widened to
+ * its nearest sectioning ancestor. A change is usually authored as prose, so
+ * the text the author just wrote is a locator they already hold, and it works
+ * on a page whose components carry no hook.
+ *
+ * The element is stamped with {@link CAPTURE_MARK} rather than returned, so
+ * the scroll that follows can use agent-browser's own `scrollintoview`, which
+ * handles scroll containers and sticky headers that a hand-rolled
+ * `window.scrollTo` gets wrong.
  */
-export function frameProbeExpression(selector: string): string {
-  const literal = JSON.stringify(selector)
+export function resolveTargetExpression(target: CaptureTarget): string {
+  const selector = JSON.stringify(target.selector ?? '')
+  const text = JSON.stringify(target.text ?? '')
   return `(() => {
-    const el = document.querySelector(${literal})
+    const MARK = ${JSON.stringify(CAPTURE_MARK)}
+    document.querySelectorAll('[' + MARK + ']').forEach(n => n.removeAttribute(MARK))
+    const selector = ${selector}
+    const text = ${text}
+    let el = selector ? document.querySelector(selector) : null
+    let how = el ? 'selector' : null
+    if (!el && text) {
+      const needle = text.trim().toLowerCase()
+      const nodes = [...document.querySelectorAll('h1, h2, h3, h4, p, li, summary, button, a, figcaption')]
+      const hit = nodes.find(n => (n.textContent || '').trim().toLowerCase().includes(needle))
+      if (hit) {
+        el = hit.closest('section, article, [data-section], [class*="not-prose"]') || hit
+        how = 'text'
+      }
+    }
     if (!el) {
       const hooks = [...document.querySelectorAll('[data-section]')].map(n => n.getAttribute('data-section'))
-      return { found: false, height: 0, hooks: [...new Set(hooks)] }
+      const headings = [...document.querySelectorAll('h1, h2')].map(n => (n.textContent || '').trim()).filter(Boolean)
+      return { found: false, how: null, hooks: [...new Set(hooks)], headings: headings.slice(0, 12) }
     }
-    el.scrollIntoView({ block: 'start' })
-    return { found: true, height: Math.ceil(el.getBoundingClientRect().height), hooks: [] }
+    el.setAttribute(MARK, '')
+    return { found: true, how, hooks: [], headings: [] }
   })()`
 }
 
-/**
- * JavaScript that parks the element's top edge at the top of the viewport.
- * Run after the viewport has been resized to the element, so the frame holds
- * the element and nothing else. `getBoundingClientRect` is viewport-relative,
- * so the page offset has to be added back before scrolling.
- *
- * @param selector - CSS selector framing the change
- */
-export function frameParkExpression(selector: string): string {
-  const literal = JSON.stringify(selector)
-  return `(() => {
-    const el = document.querySelector(${literal})
-    if (!el) return { found: false }
-    window.scrollTo(0, el.getBoundingClientRect().top + window.scrollY)
-    return { found: true }
-  })()`
-}
-
-/** Reads the agent-browser envelope returned by a probe expression. */
-export function readFrameProbe(envelope: unknown): FrameProbe {
+/** Reads the agent-browser envelope returned by {@link resolveTargetExpression}. */
+export function readTargetProbe(envelope: unknown): TargetProbe {
   const data = (envelope as { data?: unknown } | null | undefined)?.data
   if (data === null || typeof data !== 'object') {
-    throw new Error('The browser returned no frame probe. The page did not load, or the expression failed.')
+    throw new Error('The browser returned no target probe. The page did not load, or the expression failed.')
   }
   const probe = data as Record<string, unknown>
-  const hooks = Array.isArray(probe.hooks) ? probe.hooks.filter((hook): hook is string => typeof hook === 'string') : []
+  const strings = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((item): item is string => typeof item === 'string') : []
   return {
     found: probe.found === true,
-    height: typeof probe.height === 'number' ? probe.height : 0,
-    hooks,
+    how: probe.how === 'selector' || probe.how === 'text' ? probe.how : null,
+    hooks: strings(probe.hooks),
+    headings: strings(probe.headings),
   }
+}
+
+/** How the frame is described in the attestation receipt. */
+export function describeTarget(target: CaptureTarget, how: TargetProbe['how']): string {
+  if (how === 'text') return `text "${escapeInline(target.text ?? '')}"`
+  if (how === 'selector') return escapeInline(target.selector ?? '')
+  return 'full viewport'
 }
 
 /**
- * The error raised when a selector matches nothing. It names the hooks the
+ * The error raised when nothing resolved. It names the hooks and headings the
  * page does offer, so the next attempt is a correction rather than a guess.
  */
-export function missingSelectorMessage(selector: string, hooks: readonly string[]): string {
-  const available = hooks.length === 0
-    ? 'That page exposes no [data-section] hooks; add one to the section component before capturing it.'
-    : `That page exposes: ${hooks.map(hook => `[data-section="${hook}"]`).join(', ')}.`
-  return `The selector "${selector}" matched nothing, so the capture would have framed the top of the page. ${available}`
-}
-
-/** Viewport height that frames the element, within the supported bounds. */
-export function frameHeight(elementHeight: number): number {
-  const { min, max } = FRAME_HEIGHT_BOUNDS
-  return Math.min(Math.max(Math.ceil(elementHeight), min), max)
+export function unresolvedTargetMessage(target: CaptureTarget, probe: TargetProbe): string {
+  const asked = [
+    target.selector ? `selector "${target.selector}"` : null,
+    target.text ? `text "${target.text}"` : null,
+  ].filter(Boolean).join(' nor ')
+  const offered = [
+    probe.hooks.length > 0 ? `hooks: ${probe.hooks.map(hook => `[data-section="${hook}"]`).join(', ')}` : null,
+    probe.headings.length > 0 ? `headings: ${probe.headings.map(heading => `"${heading}"`).join(', ')}` : null,
+  ].filter(Boolean).join('; ')
+  const available = offered === ''
+    ? 'That page offers no hooks and no headings to locate one by.'
+    : `That page offers ${offered}.`
+  return `No ${asked} matched, so the capture would have framed the top of the page. ${available}`
 }
 
 /** Returns the refusal reason, or null when the URL may be captured. */
@@ -168,14 +192,14 @@ interface AttestationInput {
   readonly afterUrl: string
   readonly beforeUrl: string
   readonly capturedAt: string
-  readonly selector: string | null
+  /** How the frame was located, from {@link describeTarget}. */
+  readonly frame: string
   readonly viewport: CaptureViewport
 }
 
 /** Human-readable receipt embedded under the comparison table. */
 export function captureAttestation(input: AttestationInput): string {
-  const frame = input.selector === null ? 'full viewport' : escapeInline(input.selector)
-  return `captured by agent-browser · ${markdownUrl(input.beforeUrl)} → ${markdownUrl(input.afterUrl)} · ${input.viewport} · ${frame} · ${input.capturedAt}`
+  return `captured by agent-browser · ${markdownUrl(input.beforeUrl)} → ${markdownUrl(input.afterUrl)} · ${input.viewport} · ${escapeInline(input.frame)} · ${input.capturedAt}`
 }
 
 /** The finished markdown block: table, caption, attestation receipt. */
