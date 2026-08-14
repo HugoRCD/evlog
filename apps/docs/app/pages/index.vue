@@ -28,34 +28,50 @@ useHead({
             mainEntity: [
               {
                 '@type': 'Question',
-                name: 'What is evlog?',
+                name: 'What does evlog do that console.log or pino can\'t?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'evlog is a modern TypeScript logger that replaces log lines with wide events. Simple structured logs, structured errors, and lifecycle tracking in one API, across scripts, libraries, jobs, edge, and requests.',
+                  text: 'evlog turns log lines into wide events: one request, one event, carrying context, results, and errors together instead of a dozen separate lines. You keep a console-like API, so it is drop-in for console.log, pino, or consola, but the output is a single correlated event you can search, sample, and alert on.',
                 },
               },
               {
                 '@type': 'Question',
-                name: 'Is evlog a drop-in replacement for console.log, pino, or consola?',
+                name: 'How is evlog different from an observability platform?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'Yes. evlog is MIT-licensed and drop-in for console.log, pino, or consola, so you can start using it without rewriting your existing calls.',
+                  text: 'A platform observes a running app and needs traffic, agents, or instrumentation before it can reveal a gap. evlog is a library with a CLI: evlog map scans your entry points statically and finds missing observability before any traffic exists. Platforms and evlog work well together: evlog makes the events, a drain ships them.',
                 },
               },
               {
                 '@type': 'Question',
-                name: 'How fast is evlog?',
+                name: 'Can I adopt it without rewriting everything?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'evlog adds about 3 microseconds of overhead per request, zero dependencies, and roughly 6 kB gzip. It is 7.7x faster than pino in the wide event pattern while sending correlated events instead of separate log lines.',
+                  text: 'Yes. Because the API mirrors console, pino, and consola, you can drop evlog in and keep working logs from the first minute. Structured errors use createError instead of new Error, so errors carry a why and a fix field, not just a stack.',
                 },
               },
               {
                 '@type': 'Question',
-                name: 'What is evlog map?',
+                name: 'Does it work in edge runtimes?',
                 acceptedAnswer: {
                   '@type': 'Answer',
-                  text: 'evlog map is a deterministic observability test for your app. It statically scans every entry point, scores wide-event coverage, and gates in CI, so the same code always produces the same score.',
+                  text: 'Yes. evlog targets scripts, libraries, jobs, edge, and HTTP requests. It has zero runtime dependencies, so there is no dependency tree to audit just to log, and it deploys cleanly to edge runtimes where footprint and cold start matter.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'Is evlog fast?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'evlog adds roughly 3µs of overhead per request and is around 6 kB gzip. In the wide event pattern it is 7.7x faster than pino, because it sends one correlated event instead of several separate lines.',
+                },
+              },
+              {
+                '@type': 'Question',
+                name: 'Is evlog free and open source?',
+                acceptedAnswer: {
+                  '@type': 'Answer',
+                  text: 'Yes. evlog is MIT-licensed and open source with zero dependencies. Nothing pulls in a dependency tree you have to audit just to log.',
                 },
               },
             ],
