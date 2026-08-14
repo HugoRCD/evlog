@@ -106,7 +106,7 @@ const replayCount = computed(() => visible.value.filter((v, i) => v && frames[i]
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="sse-wire">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-2">
         <UIcon name="i-lucide-radio" class="size-3 text-primary" />

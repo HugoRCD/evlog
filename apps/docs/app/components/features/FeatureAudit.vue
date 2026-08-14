@@ -40,7 +40,7 @@ const benefits = [
 </script>
 
 <template>
-  <section class="py-24 md:py-32">
+  <section class="py-24 md:py-32" data-section="features-feature-audit">
     <div class="grid gap-6 lg:grid-cols-2 *:min-w-0">
       <div class="flex flex-col gap-6">
         <Motion

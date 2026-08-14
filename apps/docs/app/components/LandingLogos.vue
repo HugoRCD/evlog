@@ -19,6 +19,7 @@ const logos: LogoItem[] = [
 <template>
   <section
     class="relative -mt-4 pt-4"
+    data-section="landing-logos"
     aria-label="Companies using evlog"
   >
     <div

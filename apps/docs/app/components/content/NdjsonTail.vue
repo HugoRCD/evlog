@@ -124,7 +124,7 @@ const progress = computed(() => cursor.value < 0 ? 0 : ((cursor.value + 1) / lin
 </script>
 
 <template>
-  <div class="not-prose my-8">
+  <div class="not-prose my-8" data-section="ndjson-tail">
     <div ref="wrapperRef" class="overflow-hidden border border-muted bg-default">
       <div class="flex items-center gap-2 border-b border-muted px-3 py-1.5">
         <UIcon name="i-lucide-folder-search" class="size-3 text-primary" />
