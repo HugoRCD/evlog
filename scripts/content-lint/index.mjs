@@ -108,8 +108,12 @@ if (files.length === 0 && loose === null) fail('no markdown files matched')
 const scanned = [...files.map(scan), ...(loose ? [loose] : [])]
 
 // The baseline is the corpus, never the selection: a single-page run has to
-// return the same verdict it would inside a full sweep.
-const baseline = buildBaseline(files.length >= corpus.length ? scanned : corpus.map(file => scan(file)))
+// return the same verdict it would inside a full sweep. Reuse the scan already
+// done only when the selection *is* the corpus, by identity. A count would let
+// a repeated path or an unrelated directory of the right size redefine the
+// house rhythm, which is the one number a page cannot argue with.
+const selectionIsCorpus = isSameSet(files, corpus)
+const baseline = buildBaseline(selectionIsCorpus ? files.map((_file, index) => scanned[index]) : corpus.map(file => scan(file)))
 const pages = scanned
   .map(page => ({ ...page, ...evaluate(page, baseline) }))
   .map(page => ({ ...page, modelChecks: modelChecks(page) }))
@@ -197,6 +201,16 @@ async function readCapped(stream, limit, what) {
  */
 function readStdin() {
   return readCapped(process.stdin, MAX_FETCH_BYTES, 'stdin')
+}
+
+/**
+ * @param {string[]} a
+ * @param {string[]} b
+ * @returns {boolean}
+ */
+function isSameSet(a, b) {
+  const left = new Set(a)
+  return left.size === new Set(b).size && b.every(item => left.has(item))
 }
 
 /**

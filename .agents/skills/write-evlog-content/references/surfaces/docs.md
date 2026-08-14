@@ -1,6 +1,6 @@
 # Surface: docs page
 
-`apps/docs/content/`. Docus + MDC. Read `apps/docs/AGENTS.md` before touching components.
+`apps/docs/content/`. Docus + MDC. Read `apps/docs/AGENTS.md` before changing anything under `apps/docs/`, prose included: its MDC rules govern the content files, not only the components.
 
 ## What the reader owes you: nothing
 

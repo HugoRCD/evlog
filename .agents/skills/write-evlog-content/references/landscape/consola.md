@@ -2,7 +2,7 @@
 
 Checked: 2026-08-14 · Source: https://github.com/unjs/consola
 
-The one evlog's own audience already has installed. Nuxt users meet consola before they meet any logger they chose, so the comparison has to be about scope rather than quality.
+consola is the logger evlog's own audience already has installed. Nuxt users meet it before they meet any logger they chose, so the comparison has to be about scope rather than quality.
 
 ## What it does
 
@@ -14,7 +14,7 @@ The one evlog's own audience already has installed. Nuxt users meet consola befo
 
 ## What evlog does differently
 
-- consola renders for a human at a terminal. evlog serializes for a query engine.
+- A reporter writes each call as it happens, whatever the format. evlog accumulates fields over a unit of work and emits one event at the end, including when the handler throws.
 - No pipeline, no batching, no sampling, no drain adapters. Reporters write, they do not retry or drop.
 - No request lifecycle and no accumulated context.
 

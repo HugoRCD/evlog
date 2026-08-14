@@ -45,14 +45,16 @@ Everything evlog ships as prose, on both sides of the line:
 
 The house rules cross the line: punctuation, terminology, accuracy, dead links. Rhythm does not. A skill whose four steps read as four parallel imperatives is a procedure, and the scanner leaves rhythm alone there. See `rules/machine.md`.
 
-Evi's own operating skills under `apps/evi/agent/skills/` are outside the corpus on purpose. The pass that would rewrite them is the pass they instruct.
+Two parts of that table are excluded from the scan. Evi's own operating skills under `apps/evi/agent/skills/` are outside the corpus because the pass that would rewrite them is the pass they instruct. This skill's own `references/` are outside it because they quote the prose they ban, worked pair by worked pair, and scanning them measures the examples. Both exclusions live in `scripts/content-lint/lib/surfaces.mjs`, and both mean the scanner will never tell you these files drifted. Read them yourself.
 
 ## Severity
 
 - `critical` blocks publishing: a wrong code sample, a phantom API, a claim the source contradicts, a landing promise no page delivers.
 - `standard` is fixed when the page is touched: voice, rhythm, structure, punctuation.
 
-A tell is never critical on its own. Tells describe how prose reads; only facts and broken promises block.
+**A tell about rhythm is never critical on its own.** Epigram density, heading shape, bullet frames, and sentence uniformity describe how prose reads, and prose that reads a certain way has never broken anything.
+
+Two entries in the tell corpus are not rhythm and do not follow that rule. `T-15` is drift: a symbol or entry point the package does not export, which is a fact the source settles and always critical. `T-13` is a house rule the maintainer decided, and one occurrence is a finding. They live in `ai-tells.md` because that is where the scanner's ids are documented, not because they are matters of taste.
 
 ## Reviewing
 

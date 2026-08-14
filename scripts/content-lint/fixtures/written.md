@@ -18,7 +18,7 @@ export default createAxiomDrain({
 })
 ```
 
-The drain holds events in memory and flushes on a 2 second timer or at 100 events, whichever comes first. Flushing runs outside the response, so a slow Axiom never shows up in your p99.
+The drain holds events in memory and flushes on a 2-second timer or at 100 events, whichever comes first. Flushing runs outside the response, so a slow Axiom never shows up in your p99.
 
 ## What it costs
 

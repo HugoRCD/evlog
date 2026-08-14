@@ -22,4 +22,4 @@ The incumbent. A reader naming winston usually inherited it rather than chose it
 
 - That winston cannot do structured output. `format.json()` is core.
 - That it is unmaintained. Check the repository before writing anything about its activity.
-- Anything about its overhead without a number and a source. It is the heavier of the two mainstream loggers, and that is exactly the claim a reader will check.
+- Anything about its overhead without a number and a source, this file included. Overhead is the claim a reader checks first, and the published comparisons are pino's ([benchmarks](https://github.com/pinojs/pino/blob/main/docs/benchmarks.md)), which name their setup. Reproduce one against the versions you are writing about, cite what you ran, or leave the subject alone.
