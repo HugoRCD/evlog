@@ -57,6 +57,8 @@ Read-only, and these become issues, never PRs.
 
 - `telemetry-stats`: an error code climbing week over week, a command whose success rate is falling.
 - CI on `main`: a job failing intermittently is a finding even when the reruns go green.
+- `vercel__get_runtime_errors` (production): a runtime error cluster growing week over week, or one whose route has no docs page explaining it, is a docs proposal with a number attached.
+- Evi's own production runs: `vercel__list_agent_run_projects` to find the eve service project, then `vercel__list_agent_runs` for sessions that ended badly or never answered and the failed tool calls inside them. Drill into a failure with `vercel__get_runtime_logs`.
 
 ---
 
