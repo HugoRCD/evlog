@@ -15,6 +15,12 @@ Nuxt UI ships the components this site renders inside markdown. Use them as the 
 
 JSON-LD carries the facts that are **not** already in the page text: the license, the price, the application category. Never restate the page's own prose in it. Copy is crawlable where it is written, so a second copy in a `.vue` file buys nothing and drifts. That rules out `FAQPage`, which is why the landing has none: Google restricted FAQ rich results to authoritative government and health sites in 2023, and the answers are already in the served HTML.
 
+## Interactive doc components
+
+A component the reader operates (`LogCostCalculator`) is not a looping animation and does not follow the rules below: it has no timeline, and it is as tall as its controls need. Two rules do carry over: it must not shift the layout while the reader uses it, and it stays inside `sm:` breakpoints.
+
+What is specific to it: **a component that computes a number shows where the number came from.** Measured constants carry the measurement in a comment and on screen, third-party figures carry the date they were read, and any rate that can go stale is an input the reader can overwrite rather than a claim the page makes.
+
 ## Doc animation components (`app/components/content/`)
 
 MDC animation components (e.g. `EnricherChain`, `DrainFanOut`, `StreamBus`) follow a strict set of rules:
