@@ -3,7 +3,7 @@ import { Motion } from 'motion-v'
 </script>
 
 <template>
-  <section class="py-24 md:py-32">
+  <section class="py-24 md:py-32" data-section="landing-faq">
     <div class="mx-auto max-w-3xl px-6">
       <Motion
         :initial="false"
