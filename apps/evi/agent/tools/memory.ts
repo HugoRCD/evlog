@@ -26,9 +26,18 @@ export default defineDynamic({
     'turn.started': async (_event, ctx) => {
       if (!memoryAvailable()) return null
       const auth = ctx.session.auth.current
-      const session = await openMemorySession(auth)
+
       // An autonomous turn does not see a refused tool; it sees no tool, and
-      // pays nothing for the schema.
+      // pays nothing for the schema. A store that cannot answer costs the
+      // tools, never the turn.
+      let session
+      try {
+        session = await openMemorySession(auth)
+      }
+      catch (error) {
+        console.error('[evi:memory] tools unavailable', error)
+        return null
+      }
       if (session === null) return null
 
       const source: MemorySource = {
