@@ -110,3 +110,9 @@ Applies to: every surface. `metrics.mjs` only reports a seam between paragraphs 
 Flagged: nothing. `--` between spaces reached nothing at all, and the README carried five of them.
 Actual: `is auto-imported -- no import needed` is the same mark written with the keys at hand. Table cells and fenced code keep theirs, since `evlog-map-disable-next-line wide-event -- reason` is the CLI's own syntax.
 Applies to: prose on every surface.
+
+## 2026-08-15 · D-12 · Renaming a heading breaks the links to it
+
+Flagged: nothing. Three anchors across two pages pointed at headings this branch had renamed, and one had been dead since before it.
+Actual: a broken fragment reports no error anywhere. The page loads, the link resolves, and the reader arrives at the top of it. The scanner checked no anchor at all, and the audit written by hand only compared cross-page links, so same-page ones stayed invisible twice.
+Applies to: `apps/docs/content/`. `reach.mjs` now resolves every fragment against the headings of the page it targets. Rename a heading and the link is a second edit, not an optional one.

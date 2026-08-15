@@ -36,6 +36,23 @@ export function routeOf(path) {
 }
 
 /**
+ * Punctuation the renderer drops before it joins the words with dashes. It is
+ * removed rather than collapsed, which is why `Drain & Enrichers` anchors as
+ * `drain--enrichers` and `The ratchet: --baseline` as `the-ratchet---baseline`.
+ */
+const NOT_IN_A_SLUG = /[`*_~[\]()!"'#$%^&+=,.:;?<>{}|\\/@]/g
+
+/**
+ * The fragment a heading answers to.
+ *
+ * @param {string} heading Raw heading text, symbols and all.
+ * @returns {string}
+ */
+export function slugOf(heading) {
+  return heading.trim().toLowerCase().replace(NOT_IN_A_SLUG, '').replace(/\s/g, '-')
+}
+
+/**
  * Findings that only exist when the whole corpus is in view.
  *
  * A page nobody links to in prose is a page the docs never suggest. The nav can
@@ -66,8 +83,32 @@ export function corpusFindings(pages) {
     findings.get(path).push(finding)
   }
 
+  // Every fragment the corpus offers, so a link can be checked against the page
+  // it points at rather than only against its own.
+  const anchors = new Map()
   for (const page of pages) {
     const route = routeOf(page.path)
+    if (route !== null) anchors.set(route, new Set((page.headings ?? []).map(heading => slugOf(heading.raw))))
+  }
+
+  for (const page of pages) {
+    const route = routeOf(page.path)
+
+    // A renamed heading takes its anchor with it, and the link that pointed at
+    // the old one now lands at the top of the page with no error anywhere.
+    for (const link of page.links ?? []) {
+      const [target, fragment] = (link.href ?? '').split('#')
+      if (!fragment || (target && !target.startsWith('/'))) continue
+      const destination = target ? target.replace(/\/$/, '') : route
+      const known = anchors.get(destination)
+      if (!known || known.has(fragment)) continue
+      add(page.path, {
+        id: 'D-12',
+        severity: 'critical',
+        line: link.line,
+        message: `no heading on ${destination} anchors as #${fragment}`,
+      })
+    }
 
     // Only a page that serves a route has a search result to fill. A skill's
     // `description` is a routing decision for an agent (`M-06`) and is long on

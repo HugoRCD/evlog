@@ -20,7 +20,7 @@ const TABLE_ROW = /^\s*\|.*\|\s*$/
 /**
  * @typedef {object} ParsedDoc
  * @property {Record<string, string>} frontmatter Raw scalar frontmatter values.
- * @property {{ depth: number, text: string, line: number }[]} headings
+ * @property {{ depth: number, text: string, raw: string, line: number }[]} headings
  * @property {{ text: string, line: number, component: string | null }[]} paragraphs
  * @property {{ line: number, component: string | null, items: { text: string, line: number }[] }[]} lists
  * @property {{ lang: string, file: string | null, text: string, line: number }[]} code
@@ -154,6 +154,9 @@ export function parseMarkdown(source) {
       doc.headings.push({
         depth: heading[1].length,
         text: cleanInline(heading[2], lineNumber, doc),
+        // Kept unmasked: the anchor a link targets is slugged from what the
+        // heading says, and `cleanInline` has already replaced the symbols.
+        raw: heading[2],
         line: lineNumber,
       })
       continue
