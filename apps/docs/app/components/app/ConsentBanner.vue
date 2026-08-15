@@ -35,9 +35,8 @@ function decide(granted: boolean) {
         Cookies
       </p>
       <p class="mt-1.5 text-xs/5 text-muted font-sans">
-        We count visits without cookies either way: nothing is stored on your
-        device. Allow cookies and we also get anonymous session replays, which
-        show where the docs lose people.
+        This site stores nothing on your device. Allow cookies and we also get
+        anonymous session replays, which show where the docs lose people.
       </p>
       <div class="mt-3 flex items-center gap-3">
         <UButton
