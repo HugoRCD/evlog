@@ -31,7 +31,7 @@ import { measure } from './lib/metrics.mjs'
 import { checkDrift, loadApiSurface, loadRoutes, walk } from './lib/drift.mjs'
 import { buildBaseline, evaluate } from './lib/score.mjs'
 import { SURFACES, corpusFiles, surfaceOf } from './lib/surfaces.mjs'
-import { modelChecks } from './lib/model-checks.mjs'
+import { corpusChecks, modelChecks } from './lib/model-checks.mjs'
 import { corpusFindings } from './lib/reach.mjs'
 import { compare, render } from './lib/ratchet.mjs'
 import { extract } from './lib/extract.mjs'
@@ -195,7 +195,7 @@ if (options.since !== null) {
 }
 
 if (options.json) {
-  process.stdout.write(`${JSON.stringify({ baseline, fixed: fixes, pages: selected }, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify({ baseline, fixed: fixes, corpusChecks: corpusChecks(corpus_), pages: selected }, null, 2)}\n`)
 } else if (options.fix) {
   process.stdout.write(renderFixes(fixes))
 } else if (selected.length === 1) {
