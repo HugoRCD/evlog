@@ -215,7 +215,7 @@ On top of the matrix, cover the framework-specific surface:
 4. Context accumulation. `logger.set()` data appears in the emitted event
 5. Drain / enrich / keep callbacks (use `createPipelineSpies()`, `assertHttpEventEmitted`, `waitForDrainCalls`, `findEventViaDrain` from `test/helpers/framework.ts`)
 6. Drain/enrich error resilience. Errors there never break the request
-7. `useLogger()`: same logger as the native accessor, works across async boundaries, throws outside context
+7. `useLogger()`: same logger as the native accessor, works across async boundaries, throws outside context. Skip it for an integration without ALS, and test the accessor it ships instead: on Workers that is the handler's fourth argument, from `defineWorkerFetch` / `withEvlog`
 8. Streaming (if applicable). Event deferred until the body closes
 
 Use fake timers for anything time-based; `defined()` instead of `!`.
@@ -246,7 +246,7 @@ links:
 
 1. **Quick Start**: install + register middleware (copy-paste minimum setup)
 2. **Wide Events**: progressive `log.set()` usage
-3. **useLogger()**: accessing logger from services without passing the request
+3. **useLogger()**: accessing the logger from services without passing the request, or, for an integration without ALS, the accessor it ships in its place
 4. **Error Handling**: `createError()` + `parseError()` + framework error handler
 5. **Drain & Enrichers**: middleware options with inline example
 6. **Pipeline (Batching & Retry)**: `createDrainPipeline` example
@@ -290,7 +290,7 @@ Icons use Simple Icons format: `i-simple-icons-{name}`.
 In `apps/docs/skills/review-logging-patterns/SKILL.md` (published on evlog.dev):
 
 1. Add `### {Framework}` in the **"Framework Setup"** section, in the same order as the docs
-2. Include: import + `initLogger` + middleware setup; native logger access; `useLogger()` snippet; full pipeline example (`drain`, `enrich`, `keep`)
+2. Include: import + `initLogger` + middleware setup; native logger access; a `useLogger()` snippet, or the accessor that replaces it when the integration has no ALS; full pipeline example (`drain`, `enrich`, `keep`)
 3. Update the `description:` line in the YAML frontmatter to mention the new framework name
 
 ## Step 10: Update README
@@ -310,7 +310,7 @@ The app must include:
 
 1. **`evlog()` middleware** with `drain` (PostHog) and `enrich` callbacks
 2. **Health route**: basic `log.set()` usage
-3. **Data route**: context accumulation with user/business data, using `useLogger()` in a service function
+3. **Data route**: context accumulation with user/business data, using `useLogger()` in a service function, or the integration's own accessor when it has no ALS
 4. **Error route**: `createError()` with status/why/fix/link
 5. **Error handler**: framework's error handler with `parseError()` + manual `log.error()`
 6. **Test UI**: served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses

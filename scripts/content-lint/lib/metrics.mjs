@@ -192,8 +192,11 @@ function epigrams(doc) {
   return { eligible, count: candidates.length, ratio: eligible === 0 ? 0 : round(candidates.length / eligible), candidates }
 }
 
-/** An en dash between two numbers is a range, and the only mark that reads as one. */
-const NUMERIC_RANGE = /(\d)\s*[—–]\s*(\d)/g
+/**
+ * An en dash between two numbers is a range, and the only mark that reads as
+ * one. The em dash is not: `30—80` is the banned mark with digits around it.
+ */
+const NUMERIC_RANGE = /(\d)\s*–\s*(\d)/g
 
 /**
  * Every em dash and en dash in the prose, located (U-14). Not a rate: evlog
@@ -345,7 +348,7 @@ function bulletFrames(doc) {
     const share = top / firsts.length
     const lengths = list.items.map(item => wordCount(item.text))
     if (share >= 0.75 || coefficientOfVariation(lengths) < 0.15) {
-      locked.push({ line: list.line, items: list.items.length, opening: firsts.length, anaphoraShare: round(share) })
+      locked.push({ line: list.line, items: list.items.length, opening: firsts.length, anaphora: top, anaphoraShare: round(share) })
     }
   }
 

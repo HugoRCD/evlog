@@ -182,6 +182,22 @@ describe('evaluate', () => {
     expect(result.findings.map(finding => finding.id)).not.toContain('T-06')
   })
 
+  it('pins the enumerating share at its inclusive boundary', () => {
+    // Five sections, so 3 lists exactly 0.6 and 2 falls under it. The rule is
+    // `>= 0.6`, and this is the pair that says so.
+    const titles = ['Exit codes', 'The JSON contract', 'The map file', 'Monorepos', 'Options']
+    const prose = 'The gate reads the map file and compares it against the baseline the previous run wrote, so a rule that moved is never counted as a regression by mistake, and the exit code stays the contract.'
+    const build = listed => titles
+      .map((title, index) => `## ${title}\n\n${index < listed ? '| Key | Meaning |\n|---|---|\n| a | b |' : prose}`)
+      .join('\n\n')
+
+    const atTheBoundary = evaluate(page('apps/docs/content/3.cli/a.md', build(3)), quiet)
+    const underIt = evaluate(page('apps/docs/content/3.cli/a.md', build(2)), quiet)
+
+    expect(atTheBoundary.findings.map(finding => finding.id)).not.toContain('T-06')
+    expect(underIt.findings.map(finding => finding.id)).toContain('T-06')
+  })
+
   it('still flags one mould over sections that argue', () => {
     const sections = ['Exit codes', 'The JSON contract', 'The map file', 'Monorepos', 'Options']
     const prose = 'The gate reads the map file and compares it against the baseline the previous run wrote, so a rule that moved is never counted as a regression by mistake, and the exit code stays the contract.'
