@@ -39,7 +39,45 @@ export function buildBaseline(pages) {
     if (group.length >= MIN_SURFACE_SAMPLE) bySurface[surface] = rates(group)
   }
 
-  return { ...rates(usable), bySurface }
+  return { ...rates(usable), bySurface, templates: buildTemplates(pages) }
+}
+
+/** Below this, two pages sharing a heading is a coincidence rather than a shape. */
+const TEMPLATE_SIBLINGS = 3
+
+/**
+ * Headings a directory uses on most of its pages.
+ *
+ * A page set written to one shape is not a page written from a mould. The
+ * adapter pages all carry Installation, Quick Start, Configuration and
+ * Troubleshooting on purpose: a reader comparing two of them wants to land on
+ * the same section twice. `T-06` is about a single page whose headings all came
+ * out of one grammatical stamp, so the shared part is subtracted first.
+ *
+ * @param {{ path: string, metrics: object }[]} pages
+ * @returns {Record<string, Set<string>>}
+ */
+function buildTemplates(pages) {
+  const byDirectory = new Map()
+  for (const page of pages) {
+    const directory = page.path.split('/').slice(0, -1).join('/')
+    if (!byDirectory.has(directory)) byDirectory.set(directory, [])
+    byDirectory.get(directory).push(page)
+  }
+
+  const templates = {}
+  for (const [directory, siblings] of byDirectory) {
+    if (siblings.length < TEMPLATE_SIBLINGS) continue
+    const seen = new Map()
+    for (const page of siblings) {
+      for (const text of new Set(page.metrics.headings.texts ?? [])) {
+        seen.set(text, (seen.get(text) ?? 0) + 1)
+      }
+    }
+    const shared = [...seen.entries()].filter(([, n]) => n >= TEMPLATE_SIBLINGS).map(([text]) => text)
+    if (shared.length > 0) templates[directory] = new Set(shared)
+  }
+  return templates
 }
 
 /**
@@ -143,7 +181,8 @@ export function evaluate(page, baseline) {
     })
   }
 
-  if (profile.rhythm) findings.push(...rhythm(metrics, profile, rates))
+  const template = baseline.templates?.[page.path.split('/').slice(0, -1).join('/')]
+  if (profile.rhythm) findings.push(...rhythm(metrics, profile, rates, template))
 
   const penalty = findings.reduce((total, finding) => total + (finding.severity === 'critical' ? 15 : 5), 0)
   return { surface, score: Math.max(0, 100 - penalty), findings: findings.sort((a, b) => a.line - b.line) }
@@ -156,9 +195,10 @@ export function evaluate(page, baseline) {
  * @param {object} metrics
  * @param {{ epigramRatio: number, uniformity: boolean }} profile
  * @param {{ epigramRatio: number }} rates
+ * @param {Set<string>} [template] Headings this page shares with its siblings.
  * @returns {object[]}
  */
-function rhythm(metrics, profile, rates) {
+function rhythm(metrics, profile, rates, template) {
   const findings = []
 
   if (metrics.epigrams.eligible >= 6 && metrics.epigrams.ratio > Math.max(profile.epigramRatio, rates.epigramRatio * 1.5)) {
@@ -171,12 +211,13 @@ function rhythm(metrics, profile, rates) {
     })
   }
 
-  if (metrics.headings.count >= 4 && metrics.headings.share >= 0.9 && metrics.headings.dominant !== 'symbol') {
+  const own = ownHeadings(metrics.headings, template)
+  if (own.count >= 4 && own.share >= 0.9 && own.dominant !== 'symbol') {
     findings.push({
       id: 'T-06',
       severity: 'standard',
       line: 0,
-      message: `all ${metrics.headings.count} headings are ${metrics.headings.dominant}; check the content is as parallel as the headings`,
+      message: `${own.count} of this page's own headings are ${own.dominant}; the rest are its section's shared shape`,
     })
   }
 
@@ -219,6 +260,28 @@ function rhythm(metrics, profile, rates) {
   }
 
   return findings
+}
+
+/**
+ * The headings a page did not inherit from its directory's shape.
+ *
+ * @param {{ count: number, share: number, texts?: string[] }} headings
+ * @param {Set<string>} [template]
+ * @returns {{ count: number, share: number }}
+ */
+function ownHeadings(headings, template) {
+  const texts = headings.texts ?? []
+  const shapes = headings.shapes ?? []
+  if (template === undefined || texts.length === 0) return headings
+
+  const kept = shapes.filter((_shape, index) => !template.has(texts[index]))
+  if (kept.length === texts.length) return headings
+  if (kept.length === 0) return { count: 0, share: 0, dominant: null }
+
+  const tally = new Map()
+  for (const shape of kept) tally.set(shape, (tally.get(shape) ?? 0) + 1)
+  const [dominant, top] = [...tally.entries()].sort((a, b) => b[1] - a[1])[0]
+  return { count: kept.length, share: top / kept.length, dominant }
 }
 
 /**
