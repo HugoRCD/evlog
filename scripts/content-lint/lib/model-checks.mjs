@@ -25,6 +25,7 @@ const BY_SURFACE = {
     { id: 'U-05', ask: 'Does the opening state the reader\'s situation, or define the topic?' },
     { id: 'U-11', ask: 'Do the headings name what the section does for the reader, or are they noun labels?' },
     { id: 'U-13', ask: 'Where the page describes a feature with a price (a flag, a dependency, a runtime constraint, a field to maintain), is the price next to it?' },
+    { id: 'D-01', ask: 'Are the sections ordered by what the reader does, or by how evlog is built? A page whose outline mirrors the module graph was written from the inside.' },
   ],
   reference: [
     { id: 'U-13', ask: 'Are the constraints stated where the reader hits them, rather than in a note at the end?' },
@@ -95,5 +96,47 @@ export function modelChecks(page) {
     })
   }
 
+  // The second audience reads one page and writes code from it. Nothing about
+  // that is measurable, and it is the page's whole job on this corpus.
+  if (metrics.codeBlocks > 0 && (page.surface === 'docs' || page.surface === 'reference')) {
+    checks.push({
+      id: 'M-05',
+      ask: 'An agent opens only this page and writes the integration. Does it have the import path, the option names, and the failure mode, or does it have to guess one of them from a page it was never sent to?',
+    })
+  }
+
+  if (metrics.links > 0) {
+    checks.push({
+      id: 'D-08',
+      ask: 'Is the next step the one a reader who finished this page actually needs, or the next file in the section? An agent follows it literally.',
+    })
+  }
+
   return checks
+}
+
+/**
+ * What no single page can answer, asked once per run.
+ *
+ * Duplication and drift only exist between pages, so they cannot be conditioned
+ * on one file's metrics the way everything above is. `corpusFindings` covers the
+ * two that a link graph settles; these are the two that need a reader.
+ *
+ * @param {{ path: string, surface: string }[]} pages Every page in the corpus.
+ * @returns {{ id: string, ask: string }[]}
+ */
+export function corpusChecks(pages) {
+  const docs = pages.filter(page => page.surface === 'docs' || page.surface === 'reference')
+  if (docs.length < 2) return []
+
+  return [
+    {
+      id: 'U-15',
+      ask: `Across ${docs.length} pages, does one mechanism get described in two vocabularies? \`terminology.md\` catches the words it lists; drift invents new ones.`,
+    },
+    {
+      id: 'D-01',
+      ask: 'Which two pages answer the same question? A reader arriving by search lands on one of them and cannot tell whether the other has the rest.',
+    },
+  ]
 }
