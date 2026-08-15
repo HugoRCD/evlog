@@ -86,3 +86,9 @@ Applies to: list items on every surface. Table cells stay out: a cell is a fragm
 Flagged: `~30–80 lines of glue`.
 Actual: an en dash between two numbers is the mark that reads as a range, and no comma, colon or period replaces it. The rule was never about that dash.
 Applies to: every surface. `metrics.mjs` ignores a dash with a digit on each side.
+
+## 2026-08-15 · T-06 · A question does not need its mark, and the verb list was too short
+
+Flagged: `Where the byte counts come from`, `Which number moves your bill`, `Try it against your numbers`, `Ask it from your editor`, and 8 pages of the same kind.
+Actual: the classifier only saw a question when the heading ended on `?`, and its verb list held 42 words while the corpus writes with far more. Both made a page of answers look like a page of nouns.
+Applies to: every surface. `classifyHeading` reads an interrogative opener as a question, and the verb list grew to 89. Words that are evlog's own nouns first (`log`, `route`, `stream`, `trace`, `filter`, `drain`) are kept out of it, since counting `## Route filtering` as an imperative would weaken the rule rather than correct it.
