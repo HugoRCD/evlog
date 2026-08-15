@@ -56,3 +56,15 @@ Applies to: any heading opening with a number or `Step N`. `metrics.mjs` classif
 Flagged: a codemod replacing `A — B — C` with `A, B, C`.
 Actual: 25 of 38 replacements turned a parenthetical list into a sentence whose subject was followed by four bare nouns. The correct mark depends on whether the dashed span is an appositive, a list, a cause, or a second thought, and only a reader can tell.
 Applies to: every surface. The rule now ranks the replacements and the codemod does not touch punctuation at all.
+
+## 2026-08-15 · U-15 · A term attached to its owner belongs to the owner
+
+Flagged: `exporter` on the HyperDX and eve pages.
+Actual: every occurrence named someone else's part. An `otlphttp` exporter is a key in a collector config and PostHog's exporter is PostHog's. Renaming either to `drain` would send a reader looking for a config key that does not exist.
+Applies to: every term in `terminology.md`. `corpus.mjs` drops a hit whose paragraph names a product evlog documents, the same shape as the exception the alternatives already had, with the collector and the adapter vendors added to the list.
+
+## 2026-08-15 · T-03 · A card body is a caption
+
+Flagged: `Zero config.` closing a `::card` on the frameworks overview.
+Actual: a card is a link tile and its body is sized to the tile, so every one of them ends on a short line. Counting them measures the component, not the page's rhythm.
+Applies to: `::card` on every surface. `metrics.mjs` leaves card bodies out of the eligible population.

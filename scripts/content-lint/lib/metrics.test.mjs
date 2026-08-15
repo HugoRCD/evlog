@@ -96,6 +96,12 @@ describe('dashes', () => {
 })
 
 describe('epigram closers', () => {
+  it('leaves a card body out of the rhythm', () => {
+    const source = ['::card-group', '  :::card', '  ---', '  title: Nuxt', '  ---', '  Auto-imported helpers. Zero config.', '  :::', '::'].join('\n')
+
+    expect(measureSource(source).epigrams.eligible).toBe(0)
+  })
+
   it('spares a closer that introduces what comes next', () => {
     const source = 'Some categories never belong in an event, whatever the environment. **Never log:**\n\n| Category | Risk |\n| --- | --- |\n| Credentials | Account compromise |'
 

@@ -80,7 +80,7 @@ function offName(doc) {
 
   for (const span of proseSpans(doc)) {
     for (const sentence of sentences(span.text)) {
-      for (const term of offNameTerms(sentence)) {
+      for (const term of offNameTerms(sentence, span.text)) {
         hits.push({ ...term, line: span.line, excerpt: sentence })
       }
     }
@@ -160,6 +160,9 @@ function epigrams(doc) {
   let eligible = 0
 
   for (const paragraph of doc.paragraphs) {
+    // A card body is a caption for the link it sits on, sized to the tile. It
+    // has no place in the page's rhythm and every one of them would close short.
+    if (paragraph.component === 'card') continue
     const parts = sentences(paragraph.text)
     if (parts.length < 2) continue
     eligible += 1

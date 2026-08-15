@@ -251,20 +251,47 @@ export function comparativeClaim(text) {
 }
 
 /**
+ * Products whose own pipelines evlog documents. A term owned by one of these is
+ * their word for their own part, not evlog's concept renamed.
+ */
+const FOREIGN_OWNERS = [
+  ...ALTERNATIVES,
+  'otlp',
+  'otlphttp',
+  'otlpgrpc',
+  'collector',
+  'hyperdx',
+  'datadog',
+  'axiom',
+  'posthog',
+  'sentry',
+  'loki',
+  'clickhouse',
+  'better stack',
+]
+
+/**
  * Names evlog gave a concept, used under someone else's name.
  *
+ * A paragraph that names another product is documenting that product's
+ * pipeline, and `otlphttp`'s exporter is a key in a collector config rather than
+ * evlog's drain renamed. The owner is looked for across `context`, since a
+ * paragraph names the product once and then keeps describing it.
+ *
  * @param {string} text
+ * @param {string} [context] Prose around the sentence. Defaults to the sentence.
  * @returns {{ canonical: string, wrong: string }[]}
  */
-export function offNameTerms(text) {
+export function offNameTerms(text, context = text) {
   const lower = text.toLowerCase()
+  const owned = new RegExp(`\\b(?:${FOREIGN_OWNERS.join('|')})\\b`).test(context.toLowerCase())
   const hits = []
 
   for (const entry of TERMINOLOGY) {
     for (const wrong of entry.wrong) {
-      if (new RegExp(`\\b${wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`).test(lower)) {
-        hits.push({ canonical: entry.canonical, wrong })
-      }
+      const term = wrong.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+      if (owned || !new RegExp(`\\b${term}\\b`).test(lower)) continue
+      hits.push({ canonical: entry.canonical, wrong })
     }
   }
 
