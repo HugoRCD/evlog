@@ -2,17 +2,24 @@ import { defineAgent, defineDynamic } from 'eve'
 import { gatewayRouting, sessionTags } from './lib/gateway'
 import { MODEL } from './lib/model'
 
+function selectModel(_event: unknown, ctx: { channel: { kind?: string } }) {
+  return {
+    model: MODEL,
+    modelOptions: {
+      providerOptions: {
+        gateway: { ...gatewayRouting(ctx.channel.kind), tags: sessionTags(ctx.channel.kind) },
+      },
+    },
+  }
+}
+
 export default defineAgent({
+  // Also on turn.started: a session whose process died before the selection
+  // committed resumes with none, and eve fails the turn rather than guess.
   model: defineDynamic({
     events: {
-      'session.started': (_event, ctx) => ({
-        model: MODEL,
-        modelOptions: {
-          providerOptions: {
-            gateway: { ...gatewayRouting(ctx.channel.kind), tags: sessionTags(ctx.channel.kind) },
-          },
-        },
-      }),
+      'session.started': selectModel,
+      'turn.started': selectModel,
     },
   }),
   /** This model honors only `high` and `xhigh`. */
