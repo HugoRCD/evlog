@@ -53,7 +53,7 @@ describe('dashes', () => {
   })
 
   it('counts en dashes too', () => {
-    expect(measureSource('The window is 5–10 seconds wide.').dashes.count).toBe(1)
+    expect(measureSource('The drain retries – then it drops the batch.').dashes.count).toBe(1)
   })
 
   it('leaves a hyphen alone', () => {
@@ -83,6 +83,10 @@ describe('contraction seam', () => {
 })
 
 describe('dashes', () => {
+  it('reads a dash between two numbers as a range', () => {
+    expect(measureSource('Manifest mode is ~30–80 lines of glue.').dashes.count).toBe(0)
+  })
+
   it('counts a dash hiding in a heading', () => {
     // Headings never reached this metric, so 46 of them carried one.
     expect(measureSource('## Network bridge — stream server\n\nProse.').dashes.count).toBe(1)

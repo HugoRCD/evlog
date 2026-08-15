@@ -87,11 +87,11 @@ export const {camelId}Rule = {
 Key rules:
 
 - **Reporting nothing means the rule passed.** `context.report()` only for gaps.
-- **Read `FileFacts` first** (`../facts.ts`) — if the answer isn't there, consider extending the facts rather than writing AST listeners; facts are computed once per file for all rules.
+- **Read `FileFacts` first** (`../facts.ts`). If the answer isn't there, consider extending the facts rather than writing AST listeners; facts are computed once per file for all rules.
 - **`project` (`ProjectFacts`) is the gate for opportunities**: `project.features` (evlog features in use), `project.pairable` (installed packages evlog integrates with), `project.catalogs` (for naming things in suggestions).
-- **Messages are report copy.** Concrete, lowercase, pointing at the evidence (`"X is spelled out here and in 2 other files — one catalog entry would cover them"`). No exclamation marks, no advice-column tone.
+- **Messages are report copy.** Concrete, lowercase, pointing at the evidence (`"X is spelled out here and in 2 other files, and one catalog entry would cover them"`). No exclamation marks, no advice-column tone.
 - **Weights are a scoring decision**: look at `score.ts` and the existing spread (40 down to 15) and discuss the number in the PR rather than inventing precedent.
-- Every rule id is also a suppression target (`evlog-map-disable {id}`) and part of the public `evlog.map.json` contract — renaming later is a breaking change.
+- Every rule id is also a suppression target (`evlog-map-disable {id}`) and part of the public `evlog.map.json` contract. Renaming later is a breaking change.
 
 ## Steps 2 and 3: Registry + CheckId
 
@@ -105,10 +105,10 @@ Cover at minimum:
 
 1. The gap fires (with the message and line you expect)
 2. The compliant version passes
-3. The `n/a` boundaries — wrong `kind`, gated `when` returning false, `hasEvlog: false` phrasing if the rule branches on it
-4. Opportunity gating — does NOT fire when the project doesn't use the feature
+3. The `n/a` boundaries: wrong `kind`, gated `when` returning false, `hasEvlog: false` phrasing if the rule branches on it
+4. Opportunity gating. Does NOT fire when the project doesn't use the feature
 5. `suggest()` output when it adapts to the project (e.g. names an existing catalog)
-6. Suppression (`evlog-map-disable {id}`) behaves like the other rules — usually free via the shared harness
+6. Suppression (`evlog-map-disable {id}`) behaves like the other rules. Usually free via the shared harness
 
 Run: `pnpm --filter @evlog/cli exec vitest run test/map/rules.test.ts`
 

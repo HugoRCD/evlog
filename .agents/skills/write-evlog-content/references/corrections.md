@@ -80,3 +80,9 @@ Applies to: every surface. `metrics.mjs` measures the share of sections that lis
 Flagged: nothing, for a year. The rule only ever read headings and paragraphs, so 273 dashes sat in list items untouched, most of them in the `Next steps` list at the bottom of a page.
 Actual: 159 were a bold term glossed after a dash, which the corpus elsewhere writes with a colon. The remaining 117 put a full clause after the dash and need a reader.
 Applies to: list items on every surface. Table cells stay out: a cell is a fragment and a dash between two of its parts is layout.
+
+## 2026-08-15 · U-14 · A dash between two numbers is a range
+
+Flagged: `~30–80 lines of glue`.
+Actual: an en dash between two numbers is the mark that reads as a range, and no comma, colon or period replaces it. The rule was never about that dash.
+Applies to: every surface. `metrics.mjs` ignores a dash with a digit on each side.

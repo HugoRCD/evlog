@@ -149,7 +149,7 @@ Maintainer notes on frictions / wishlist: [`DEBUG-DX.md`](./DEBUG-DX.md).
 
 ## Adding a command
 
-1. Create `src/commands/<name>.ts` with `defineEvlogCommand('name', { run({ args, cli, log, ui }) { … } })` — header, `--json` / `--debug` / `--no-header`, and debug filet are automatic. Use `log.step` / `log.finding` for diagnostics; `ui.done` / `ui.human` / `ui.json` for output.
+1. Create `src/commands/<name>.ts` with `defineEvlogCommand('name', { run({ args, cli, log, ui }) { … } })`: the header, `--json` / `--debug` / `--no-header`, and debug filet are automatic. Use `log.step` / `log.finding` for diagnostics; `ui.done` / `ui.human` / `ui.json` for output.
 2. Register it with one import + one line in [`src/commands/index.ts`](src/commands/index.ts).
 
 `src/index.ts` stays a thin shell (meta + `withTelemetry`). Do not embed command bodies there.

@@ -119,7 +119,7 @@ Why: the admission is what makes the rest of the page believable, and evlog's co
 
 **U-14 · No em dashes, no en dashes** · `standard`
 
-Rule: no `—` and no `–` in prose, in any language, on any surface. Hyphens in compound words are fine, and so are dashes inside code blocks and inside a verbatim quote.
+Rule: no `—` and no `–` in prose, in any language, on any surface. Hyphens in compound words are fine, and so are dashes inside code blocks, inside a verbatim quote, and between two numbers, where the en dash is the mark that reads as a range (`~30–80 lines`).
 Bad: "The drain batches events, then retries with backoff, before it gives up."  written as "The drain batches events — then retries with backoff — before it gives up."
 Better: "The drain batches events, retries with backoff, then gives up."
 Why: this is a maintainer decision about how evlog sounds, and it is the punctuation most associated with machine-written prose. Every occurrence is a finding, and there is no density threshold to argue about.
