@@ -1418,24 +1418,24 @@ try {
 | Framework | Integration |
 |-----------|-------------|
 | **Nuxt** | `modules: ['evlog/nuxt']` |
-| **Next.js** | `createEvlog()` factory with `import { createEvlog } from 'evlog/next'` ([example](./examples/nextjs)) |
-| **SvelteKit** | `export const { handle, handleError } = createEvlogHooks()` with `import { createEvlogHooks } from 'evlog/sveltekit'` ([example](./examples/sveltekit)) |
+| **Next.js** | `createEvlog()` factory with `import { createEvlog } from 'evlog/next'` ([docs](https://evlog.dev/integrate/frameworks/nextjs)) |
+| **SvelteKit** | `export const { handle, handleError } = createEvlogHooks()` with `import { createEvlogHooks } from 'evlog/sveltekit'` ([docs](https://evlog.dev/integrate/frameworks/sveltekit)) |
 | **Nitro v3** | `modules: [evlog()]` with `import evlog from 'evlog/nitro/v3'` |
 | **Nitro v2** | `modules: [evlog()]` with `import evlog from 'evlog/nitro'` |
-| **TanStack Start** | Nitro v3 module setup ([example](./examples/tanstack-start)) |
-| **React Router** | `evlog()` middleware with `import { evlog } from 'evlog/react-router'` ([example](./examples/react-router)) |
-| **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([example](./examples/nestjs)) |
-| **Express** | `app.use(evlog())` with `import { evlog } from 'evlog/express'` ([example](./examples/express)) |
-| **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([example](./examples/hono)) |
-| **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([example](./examples/fastify)) |
-| **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([example](./examples/elysia)) |
-| **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([example](./examples/orpc)) |
-| **eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useLogger } from 'evlog/eve'` ([example](./examples/eve)) |
-| **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([example](./examples/workers)) |
+| **TanStack Start** | Nitro v3 module setup ([docs](https://evlog.dev/integrate/frameworks/tanstack-start)) |
+| **React Router** | `evlog()` middleware with `import { evlog } from 'evlog/react-router'` ([docs](https://evlog.dev/integrate/frameworks/react-router)) |
+| **NestJS** | `EvlogModule.forRoot()` with `import { EvlogModule } from 'evlog/nestjs'` ([docs](https://evlog.dev/integrate/frameworks/nestjs)) |
+| **Express** | `app.use(evlog())` with `import { evlog } from 'evlog/express'` ([docs](https://evlog.dev/integrate/frameworks/express)) |
+| **Hono** | `app.use(evlog())` with `import { evlog } from 'evlog/hono'` ([docs](https://evlog.dev/integrate/frameworks/hono)) |
+| **Fastify** | `app.register(evlog)` with `import { evlog } from 'evlog/fastify'` ([docs](https://evlog.dev/integrate/frameworks/fastify)) |
+| **Elysia** | `.use(evlog())` with `import { evlog } from 'evlog/elysia'` ([docs](https://evlog.dev/integrate/frameworks/elysia)) |
+| **oRPC** | `withEvlog(handler)` + `os.use(evlog())` with `import { evlog, withEvlog } from 'evlog/orpc'` ([docs](https://evlog.dev/integrate/frameworks/orpc)) |
+| **eve** | `defineEvlogHook()` in `agent/hooks/evlog.ts` with `import { defineEvlogHook, useLogger } from 'evlog/eve'` ([docs](https://evlog.dev/use-cases/eve)) |
+| **Cloudflare Workers** | Manual setup with `import { initWorkersLogger, createWorkersLogger } from 'evlog/workers'` ([docs](https://evlog.dev/integrate/frameworks/cloudflare-workers)) |
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
-| **SolidStart** | Nitro v2 module setup ([example](./examples/solidstart)) |
+| **SolidStart** | Nitro v2 module setup ([example](https://github.com/HugoRCD/evlog/tree/main/examples/solidstart)) |
 
 ## CLI
 

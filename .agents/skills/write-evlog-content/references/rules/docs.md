@@ -17,6 +17,8 @@ Rule: `description:` in frontmatter states what the reader gets, in a full sente
 Bad: `description: Documentation for the sampling feature.`
 Better: `description: Drop low-importance events at emit time and force-keep slow requests and errors, so your bill scales with signal instead of traffic.`
 Why: it is the highest-leverage sentence on the page and the one most often written last.
+Length: between 50 and 160 characters. A search result shows about 160, so anything past that is a sentence nobody finishes reading, and anything under 50 pays for a slot it does not use. The scanner measures both.
+Note: this applies to pages that serve a route. A `SKILL.md` description is a routing decision for an agent (`M-06`) and is long on purpose.
 
 ---
 
@@ -71,3 +73,11 @@ Rule: keys, order, `navigation.icon`, and `links:` entries survive an edit uncha
 
 Rule: symbols, option names, defaults, and error codes are verified against `packages/evlog/src` at review time. A rename in the package is a docs bug the moment it ships.
 Why: this is the only class of docs defect that silently converts a correct reader into a wrong one.
+
+---
+
+**D-11 · Every page is suggested by another page** · `standard`
+
+Rule: at least one other page links to this one in prose, a table, or a card. The navigation is not a substitute: it lists what exists, it does not tell a reader when they need it.
+Why: `voice.md` promises that the docs suggest the next move rather than waiting to be searched. A page nothing points at is a page that only answers a search someone already knew how to run.
+Note: the scanner reads links from prose, from table cells, and from `to:` / `href:` props in MDC components, so a card group counts. A section index is exempt, since the navigation is how it is meant to be reached, and a page linking to its own route does not count as being suggested.
