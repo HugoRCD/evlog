@@ -17,6 +17,7 @@ export interface MemoryRecord extends MemoryTarget {
   sourceKind: SourceKind
   source: MemorySource
   invalidatedAt: Date | null
+  validTo: Date | null
   updatedAt: Date
 }
 

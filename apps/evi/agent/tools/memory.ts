@@ -102,7 +102,7 @@ export default defineDynamic({
                 id: record.id,
                 title: record.title,
                 text: record.text,
-                current: record.invalidatedAt === null,
+                current: record.invalidatedAt === null && (record.validTo === null || record.validTo > new Date()),
                 recordedOn: record.source.surface,
                 updatedAt: record.updatedAt.toISOString(),
               })),

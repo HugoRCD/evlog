@@ -18,6 +18,7 @@ const COLUMNS = {
   sourceKind: memories.sourceKind,
   source: memories.source,
   invalidatedAt: memories.invalidatedAt,
+  validTo: memories.validTo,
   updatedAt: memories.updatedAt,
 }
 
@@ -42,6 +43,7 @@ function live() {
   )
 }
 
+/** The store over Evi's Postgres; targets scope every query, `getMemoryStore` memoizes it. */
 export function createMemoryStore(db: Db): MemoryStore {
   return {
     async remember(input: RememberInput): Promise<MemoryRecord> {
@@ -116,7 +118,7 @@ export function createMemoryStore(db: Db): MemoryStore {
       const rows = await db
         .update(memories)
         .set({ invalidatedAt: sql`now()` })
-        .where(and(eq(memories.id, id), within(targets), isNull(memories.invalidatedAt)))
+        .where(and(eq(memories.id, id), within(targets), live()))
         .returning({ id: memories.id })
       return rows.length > 0
     },

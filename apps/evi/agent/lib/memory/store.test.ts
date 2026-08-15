@@ -1,6 +1,6 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { describe, expect, it } from 'vitest'
-import { eq } from 'drizzle-orm'
+import { and, eq, gt, isNull, or, sql as drizzleSql } from 'drizzle-orm'
 import { schema, identities, memories } from '../../../db/schema'
 
 /**
@@ -15,6 +15,22 @@ import { schema, identities, memories } from '../../../db/schema'
 const db = drizzle.mock({ schema, casing: 'snake_case' })
 
 describe('column naming', () => {
+  it('treats an expired memory as gone for forgetting, like everywhere else', () => {
+    // The live predicate forget shares with list: invalidation AND expiry.
+    const { sql } = db
+      .update(memories)
+      .set({ invalidatedAt: new Date() })
+      .where(and(
+        isNull(memories.invalidatedAt),
+        or(isNull(memories.validTo), gt(memories.validTo, drizzleSql`now()`)),
+      ))
+      .toSQL()
+
+    expect(sql).toContain('"invalidated_at" is null')
+    expect(sql).toContain('"valid_to"')
+  })
+
+
   it('reads identities by their snake_case columns', () => {
     const { sql } = db
       .select({ id: identities.personId })
