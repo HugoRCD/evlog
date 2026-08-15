@@ -25,10 +25,10 @@ function isExtensionException(properties: CaptureResult['properties']): boolean 
 
 /**
  * Consent-tiered analytics: while consent is pending or refused, PostHog runs
- * cookieless — nothing on the device, visitors counted from a server-side
- * hash that rotates daily — so base analytics never depends on the banner.
- * An explicit opt-in (AppConsentBanner) upgrades to cookie-based tracking,
- * which is what unlocks session replay, surveys and full heatmaps.
+ * cookieless (nothing on the device, visitors counted from a server-side hash
+ * that rotates daily), so base analytics never depends on the banner. An
+ * explicit opt-in (AppConsentBanner) upgrades to cookie-based tracking, which
+ * is what unlocks session replay, surveys and full heatmaps.
  *
  * Requires "Cookieless server hash mode" in the project's web analytics
  * settings.

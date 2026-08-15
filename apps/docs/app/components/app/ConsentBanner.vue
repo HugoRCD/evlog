@@ -29,16 +29,19 @@ function decide(granted: boolean) {
   >
     <div
       v-if="visible"
-      class="fixed bottom-4 left-4 right-4 sm:right-auto sm:max-w-sm z-50 rounded-lg border border-muted bg-default/95 p-4 shadow-lg backdrop-blur"
+      class="fixed bottom-4 left-4 right-4 sm:right-auto sm:max-w-xs z-50 rounded-lg border border-muted bg-default/95 p-4 shadow-lg backdrop-blur"
     >
-      <p class="text-xs/5 text-muted font-sans">
-        Analytics on this site runs cookie-free. Allow cookies to also enable
-        anonymous session replay — it shows us where the docs confuse people.
+      <p class="font-mono text-[10px] uppercase tracking-widest text-dimmed">
+        Cookies
       </p>
-      <div class="mt-3 flex gap-2">
+      <p class="mt-1.5 text-xs/5 text-muted font-sans">
+        This site stores nothing on your device. Allow cookies and we also get
+        anonymous session replays, which show where the docs lose people.
+      </p>
+      <div class="mt-3 flex items-center gap-3">
         <UButton
           size="xs"
-          label="Allow replay"
+          label="Allow replays"
           class="text-white"
           @click="decide(true)"
         />
@@ -46,7 +49,7 @@ function decide(granted: boolean) {
           size="xs"
           color="neutral"
           variant="ghost"
-          label="Stay cookie-free"
+          label="No cookies"
           @click="decide(false)"
         />
       </div>
