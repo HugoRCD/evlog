@@ -63,6 +63,7 @@ if (options.url !== null && !/^https?:\/\//i.test(options.url)) {
 if (options.fix && (options.url !== null || options.stdin)) fail('--fix writes files, so it takes paths.')
 // A corpus-wide rewrite is a maintainer's decision, not a default.
 if (options.fix && options.targets.length === 0) fail('--fix needs the files to fix. It never sweeps the corpus on its own.')
+if (options.dryRun && !options.fix) fail('--dry-run belongs with --fix.')
 
 const REDIRECTS_FILE = resolve(REPO_ROOT, 'apps/docs/config/redirects.ts')
 const api = loadApiSurface(REPO_ROOT)
@@ -122,7 +123,14 @@ if (files.length === 0 && loose === null) fail('no markdown files matched')
 let corpusRates = null
 const corpusBaseline = () => (corpusRates ??= buildBaseline(corpus.map(file => scan(file))))
 
-const fixes = options.fix ? files.map(fixFile) : []
+// Only the corpus is rewritable. A path argument can reach a generated file
+// (a CHANGELOG, a lockfile's neighbour) that no rule was written for, and a
+// codemod editing generated output is a diff nobody can explain.
+const rewritable = new Set(corpus)
+const fixes = options.fix ? files.filter(file => rewritable.has(file)).map(fixFile) : []
+if (options.fix && fixes.length === 0 && files.length > 0) {
+  fail('none of those paths are in the content corpus; see lib/surfaces.mjs')
+}
 
 const scanned = [...files.map(scan), ...(loose ? [loose] : [])]
 
