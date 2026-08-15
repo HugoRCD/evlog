@@ -21,6 +21,12 @@ Flagged: 51 pages, "all N headings are noun". The adapter and framework pages ca
 Actual: a page set written to one shape is not a page written from a mould. A reader comparing Axiom and Datadog wants to land on the same section twice, and 14 of those headings are linked by anchor from elsewhere in the docs.
 Applies to: any directory of sibling pages. `scripts/content-lint/lib/score.mjs` now subtracts the headings a page shares with three or more siblings before judging the shape of what is left, which took the finding count from 51 to 47. The 47 that remain each have ten or more headings of their own, all nouns, and those are real.
 
+## 2026-08-15 · T-06 · A numbered sequence is not a mould
+
+Flagged: pages whose headings read `1. Route filtering`, `2. Logger creation`, `3. Emit`.
+Actual: the steps of one procedure share a shape because they are one procedure. `ai-tells.md` already named the ordered guide as the twin; the scanner did not know it.
+Applies to: any heading opening with a number or `Step N`. `metrics.mjs` classifies those as `sequence` and `T-06` ignores that shape, which took the count from 44 to 35.
+
 ## 2026-08-15 · U-14 · Punctuation is never mechanical
 
 Flagged: a codemod replacing `A — B — C` with `A, B, C`.

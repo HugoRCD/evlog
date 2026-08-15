@@ -54,6 +54,22 @@ describe('heading templates', () => {
   })
 })
 
+describe('numbered headings', () => {
+  it('reads an ordered guide as a sequence, not a mould', () => {
+    const steps = ['1. Route filtering', '2. Logger creation', '3. Context accumulation', '4. Request end', '5. Emit']
+    const source = steps.map(h => `## ${h}\n\nProse about the step.`).join('\n\n')
+
+    expect(evaluate(page('apps/docs/content/2.learn/a.md', source), quiet).findings.map(f => f.id)).not.toContain('T-06')
+  })
+
+  it('still flags five noun headings that are not a sequence', () => {
+    const labels = ['Configuration', 'Options', 'Reference', 'Limitations', 'Notes']
+    const source = labels.map(h => `## ${h}\n\nProse about it.`).join('\n\n')
+
+    expect(evaluate(page('apps/docs/content/2.learn/a.md', source), quiet).findings.map(f => f.id)).toContain('T-06')
+  })
+})
+
 describe('evaluate', () => {
   it('carries drift findings through and deducts for them', () => {
     const drift = [{ id: 'T-15', severity: 'critical', line: 4, message: 'gone' }]
