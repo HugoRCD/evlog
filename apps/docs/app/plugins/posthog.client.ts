@@ -50,7 +50,9 @@ export default defineNuxtPlugin(() => {
     // captures every SPA navigation. A router hook on top of it counts each
     // page twice.
     defaults: '2026-05-30',
-    capture_exceptions: true,
+    // Off in the local dev server: a Vite module error or any other dev-only
+    // failure must not ship to the same error tracking project as production.
+    capture_exceptions: !import.meta.dev,
     // Drop uncaught exceptions thrown by browser extensions on the page; they
     // are not the site's code and only add noise to error tracking.
     before_send: (event) => {
