@@ -28,9 +28,8 @@ export default defineDynamic({
       if (!memoryAvailable()) return null
       const auth = ctx.session.auth.current
 
-      // An autonomous turn does not see a refused tool; it sees no tool, and
-      // pays nothing for the schema. A store that cannot answer costs the
-      // tools, never the turn.
+      // An autonomous turn sees no tools; a store that cannot answer costs
+      // the tools, never the turn.
       let session
       try {
         session = await openMemorySession(auth)
@@ -98,8 +97,6 @@ export default defineDynamic({
           }),
           async execute(input, toolCtx) {
             const records = await session.store.search(session.targets, input.query, input.limit)
-            // A search that keeps coming back empty is the signal that the core
-            // block is not carrying what the turn actually needs.
             useLogger(toolCtx).set({ memory: { searched: true, hits: records.length } })
             return {
               success: true as const,

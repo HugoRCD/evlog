@@ -17,12 +17,8 @@ export interface ExternalIdentity {
 }
 
 /**
- * Splits a principal id into the surface it came from and the id on it.
- *
- * eve principals are `<surface>:<id>`, and the id half may itself contain
- * colons, so the split is on the first one only. An unknown prefix returns null
- * rather than inventing a surface: an identity row is a join key, and a wrong
- * one merges two people.
+ * Splits on the first colon only (ids may contain colons). An unknown surface
+ * returns null: a wrong identity row is a join key that merges two people.
  */
 export function parsePrincipal(principalId: string | undefined): ExternalIdentity | null {
   if (principalId === undefined) return null
@@ -36,11 +32,8 @@ export function parsePrincipal(principalId: string | undefined): ExternalIdentit
 }
 
 /**
- * The surface a channel kind belongs to.
- *
- * `photon` is the iMessage channel, and the mapping matters: `trust.ts` mints
- * `imessage:<phone>` principals, so a source recorded as `photon` would not
- * line up with the identity rows seeded from them.
+ * `photon` maps to `imessage` because `trust.ts` mints `imessage:<phone>`
+ * principals; a `photon` source would not join with the seeded identities.
  */
 const CHANNEL_SURFACES: Readonly<Record<string, Surface>> = {
   github: 'github',
@@ -74,10 +67,8 @@ async function findPerson(db: Db, tenantId: string, identity: ExternalIdentity) 
 }
 
 /**
- * Creates the maintainer person with every principal `trust.ts` knows, so a
- * preference stated on iMessage is readable on GitHub whichever surface Evi
- * happened to meet first. Idempotent: seeding runs on first contact rather than
- * in the migration, so it picks up an environment variable added later.
+ * Seeds the maintainer with every principal `trust.ts` knows, on first contact
+ * rather than in the migration so a later-added env var is picked up.
  */
 async function seedMaintainer(db: Db, tenantId: string): Promise<string | null> {
   const rows = maintainerIdentities()
@@ -105,18 +96,11 @@ async function seedMaintainer(db: Db, tenantId: string): Promise<string | null> 
   return person.id
 }
 
-/**
- * A principal's person id never changes, and this runs on every turn through
- * the tool resolver. Without the cache the maintainer path costs a seed pass
- * against the database before the first token of every reply.
- */
+// Runs on every turn through the tool resolver; without the cache the seed
+// pass hits the database before the first token of every reply.
 const resolved = new Map<string, string | null>()
 
-/**
- * The person id for this session's caller, or null when there is none to
- * resolve. Callers treat null as "no person realm", never as an error: a
- * missing person costs memory, not the turn.
- */
+/** Null means "no person realm", never an error: a missing person costs memory, not the turn. */
 export async function resolvePersonId(
   db: Db,
   tenantId: string,

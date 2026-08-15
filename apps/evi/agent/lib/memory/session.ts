@@ -14,11 +14,8 @@ export interface MemorySession {
 }
 
 /**
- * Everything a turn needs to reach memory, resolved once from verified auth.
- *
- * Null when this session has no claim to any memory at all — no tenant, no
- * database, or an autonomous turn. Callers treat that as "no memory", never as
- * an error.
+ * Resolved once from verified auth. Null means no claim to any memory (no
+ * tenant, no database, or an autonomous turn) — never an error.
  */
 export async function openMemorySession(
   auth: SessionAuthContext | null,

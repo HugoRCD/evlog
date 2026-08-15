@@ -9,12 +9,8 @@ export const HOME_TENANT = 'evlog'
 export const SINGLETON = ''
 
 /**
- * The tenant a session belongs to, or null when it belongs to none.
- *
- * Only the home tenant exists today, so this reads the caller. When
- * installations arrive it reads the tenant off verified route auth instead, and
- * nothing else in this file moves: every caller already asks this question here
- * rather than assuming an answer.
+ * Only the home tenant exists today. When installations arrive this reads the
+ * tenant off verified route auth instead, and nothing else here moves.
  */
 export function tenantOf(auth: SessionAuthContext | null): string | null {
   if (isAutonomous(auth)) return null
@@ -23,11 +19,8 @@ export function tenantOf(auth: SessionAuthContext | null): string | null {
 }
 
 /**
- * What this session may read.
- *
  * An autonomous turn reads nothing: it runs unattended on an untrusted issue
- * body and posts publicly, so there is no memory it could use that it could not
- * also leak or be steered by.
+ * body and posts publicly.
  */
 export function readableTargets(
   auth: SessionAuthContext | null,
@@ -41,13 +34,7 @@ export function readableTargets(
   return targets
 }
 
-/**
- * Where this session may write, or null when it may not.
- *
- * Only a maintainer writes at this phase. Schedules read community threads, so
- * what they propose has to arrive as a candidate a person confirms, and that
- * queue does not exist yet.
- */
+/** Only a maintainer writes at this phase; the schedule candidate queue does not exist yet. */
 export function writableTarget(
   auth: SessionAuthContext | null,
   realm: Extract<Realm, 'agent' | 'person'>,

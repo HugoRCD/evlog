@@ -2,11 +2,7 @@ import type { MemorySource, Realm, SourceKind, Volatility } from '../../../db/sc
 
 export type { MemorySource, Realm, SourceKind, Volatility }
 
-/**
- * The address of a set of memories. Every store method takes these; none
- * resolves one itself, so a caller cannot reach rows its session has no claim
- * to by forgetting an argument.
- */
+/** Every store method takes targets; none resolves its own, so a forgotten argument cannot widen a query. */
 export interface MemoryTarget {
   tenantId: string
   realm: Realm

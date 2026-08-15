@@ -9,11 +9,7 @@ export class MemoryRejected extends Error {
 
 export type RejectionReason = 'empty' | 'too_long' | 'secret'
 
-/**
- * Credentials this repository actually handles, plus the generic shapes. A
- * memory is injected into every later prompt, so a secret stored once leaks on
- * every turn afterwards.
- */
+// A stored secret leaks into every later prompt, so these refuse outright.
 const SECRET_PATTERNS: readonly RegExp[] = [
   /\bsk-[a-z0-9_-]{20,}\b/iu,
   /\bgh[pousr]_[a-z0-9]{30,}\b/iu,
@@ -39,9 +35,8 @@ export interface AdmittedMemory {
 }
 
 /**
- * The whole admission gate at this phase: deterministic, no model call. What
- * belongs in memory rather than in the repository is a judgement, and it lives
- * in the tool description where the model reads it.
+ * Deterministic, no model call. The memory-vs-repository judgement lives in
+ * the tool description, where the model reads it.
  */
 export function admit(input: { text: string, title?: string }): AdmittedMemory {
   const text = normalizeText(input.text)

@@ -3,13 +3,8 @@ import { memoryAvailable } from '../lib/memory/config'
 import { buildCoreBlock, openMemorySession } from '../lib/memory/session'
 
 /**
- * Resolved once per session, not per turn.
- *
- * eve lowers each fragment to a system message and keeps session-scoped ones
- * ahead of turn-scoped ones, so a block resolved here sits in the stable half
- * of the prompt prefix and stays cached for every turn of the session. Evi's
- * prompt cache hit rate is the thing memory is most able to damage; a block
- * that changed per turn would invalidate everything behind it.
+ * Session-scoped on purpose: the block sits in the cached prompt prefix, and
+ * resolving it per turn would invalidate everything behind it.
  */
 export default defineDynamic({
   events: {

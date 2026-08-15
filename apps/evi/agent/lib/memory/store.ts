@@ -21,12 +21,8 @@ const COLUMNS = {
 }
 
 /**
- * The targets a query is allowed to touch, as a single predicate.
- *
- * Built from the caller's resolved targets and never from anything the model
- * supplied. An empty target list yields `false` rather than an absent
- * predicate: a scope that resolved to nothing must return nothing, not
- * everything.
+ * Built from resolved targets, never from model input. An empty list yields
+ * `false`: a scope that resolved to nothing must return nothing, not everything.
  */
 function within(targets: readonly MemoryTarget[]) {
   if (targets.length === 0) return sql`false`
