@@ -99,6 +99,9 @@ export function corpusFindings(pages) {
       add(page.path, {
         id: 'D-11',
         severity: 'standard',
+        // A page cannot fix this alone: another page has to link to it. The
+        // ratchet drops it for that reason.
+        corpus: true,
         line: 0,
         message: `no page links to ${route} in prose; the nav can reach it, the docs never suggest it`,
       })
