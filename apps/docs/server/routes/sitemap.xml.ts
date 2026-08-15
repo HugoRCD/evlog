@@ -1,11 +1,7 @@
 import { defineEventHandler, setResponseHeader } from 'h3'
 import { queryCollection } from '@nuxt/content/server'
 import { withHttps } from 'ufo'
-
-interface SitemapUrl {
-  loc: string
-  lastmod?: string
-}
+import { type SitemapUrl, collectSitemapUrls } from '../utils/sitemap'
 
 /**
  * Overrides the default Docus sitemap (`node_modules/docus/server/routes/sitemap.xml.ts`).
@@ -21,32 +17,10 @@ interface SitemapUrl {
 export default defineEventHandler(async (event) => {
   const siteUrl = inferSiteURL() || ''
 
-  const urls: SitemapUrl[] = []
-  const seen = new Set<string>()
+  let urls: SitemapUrl[] = []
 
   try {
-    const pages = await queryCollection(event, 'docs').all()
-
-    for (const page of pages) {
-      let pagePath = page.path || '/'
-
-      if (page.sitemap === false) continue
-      if (pagePath.endsWith('.navigation') || pagePath.includes('/.navigation')) continue
-
-      if (pagePath === '/landing') pagePath = '/'
-
-      if (seen.has(pagePath)) continue
-      seen.add(pagePath)
-
-      const urlEntry: SitemapUrl = { loc: pagePath }
-
-      if (page.modifiedAt && typeof page.modifiedAt === 'string') {
-        const [datePart] = page.modifiedAt.split('T')
-        urlEntry.lastmod = datePart
-      }
-
-      urls.push(urlEntry)
-    }
+    urls = collectSitemapUrls(await queryCollection(event, 'docs').all())
   } catch {
     // Collection might not exist, skip silently.
   }
