@@ -1509,6 +1509,6 @@ Inspired by [Logging Sucks](https://loggingsucks.com/) by [Boris Tane](https://x
 
 ## License
 
-[MIT](./LICENSE)
+[MIT](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
 
 Made by [@HugoRCD](https://github.com/HugoRCD)
