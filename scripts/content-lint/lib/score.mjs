@@ -212,7 +212,8 @@ function rhythm(metrics, profile, rates, template) {
   }
 
   const own = ownHeadings(metrics.headings, template)
-  if (own.count >= 4 && own.share >= 0.9 && own.dominant !== 'symbol' && own.dominant !== 'sequence') {
+  const enumerates = metrics.headings.enumerationShare >= 0.6
+  if (own.count >= 4 && own.share >= 0.9 && !enumerates && own.dominant !== 'symbol' && own.dominant !== 'sequence') {
     findings.push({
       id: 'T-06',
       severity: 'standard',

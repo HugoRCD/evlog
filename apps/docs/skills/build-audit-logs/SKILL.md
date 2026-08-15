@@ -108,8 +108,8 @@ Skip if:
 
 Strategies:
 
-- `'hmac'` — per-event signature; quick to verify; rotate `secret` annually and embed a key id (extend `AuditFields`).
-- `'hash-chain'` — sequence integrity; deleting a row breaks the chain forward; persist `state.{load,save}` if you run multiple processes (Redis is the typical store).
+- `'hmac'`: per-event signature; quick to verify; rotate `secret` annually and embed a key id (extend `AuditFields`).
+- `'hash-chain'`: sequence integrity; deleting a row breaks the chain forward; persist `state.{load,save}` if you run multiple processes (Redis is the typical store).
 
 ### 3. Multi-tenancy?
 
@@ -453,14 +453,14 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 
 ## Glossary
 
-- **Action** — `audit.action`, the verb-on-noun identifier (`invoice.refund`).
-- **Actor** — who/what performed the action (`user`, `system`, `api`, `agent`).
-- **Target** — the resource the action was performed on.
-- **Outcome** — `success`, `failure`, or `denied`.
-- **Idempotency key** — auto-derived hash of `action + actor + target + timestamp`; safe retries across drains.
-- **Causation id** — id of the action that caused this one (admin action → system reactions).
-- **Correlation id** — shared by every action in one logical operation.
-- **Hash-chain** — each event's `prevHash` matches the previous event's `hash`, forming a verifiable sequence.
+- **Action**: `audit.action`, the verb-on-noun identifier (`invoice.refund`).
+- **Actor**: who/what performed the action (`user`, `system`, `api`, `agent`).
+- **Target**: the resource the action was performed on.
+- **Outcome**: `success`, `failure`, or `denied`.
+- **Idempotency key**: auto-derived hash of `action + actor + target + timestamp`; safe retries across drains.
+- **Causation id**: id of the action that caused this one (admin action → system reactions).
+- **Correlation id**: shared by every action in one logical operation.
+- **Hash-chain**: each event's `prevHash` matches the previous event's `hash`, forming a verifiable sequence.
 
 ## Reference
 

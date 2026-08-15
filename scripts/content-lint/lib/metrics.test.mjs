@@ -95,6 +95,15 @@ describe('dashes', () => {
   })
 })
 
+describe('bullet frames', () => {
+  it('reads a bolded symbol as the symbol it is', () => {
+    const items = ['`message`', '`evlog`', '`dd`', '`service`', '`timestamp`']
+    const source = items.map(name => `- **${name}**: what the field carries and why`).join('\n')
+
+    expect(measureSource(source).bulletFrames).toEqual([])
+  })
+})
+
 describe('epigram closers', () => {
   it('leaves a card body out of the rhythm', () => {
     const source = ['::card-group', '  :::card', '  ---', '  title: Nuxt', '  ---', '  Auto-imported helpers. Zero config.', '  :::', '::'].join('\n')

@@ -73,9 +73,9 @@ For lower-level merging (rarely needed) the toolkit also exports `mergeEventFiel
 
 Enrichers typically read from `ctx`:
 
-- **`ctx.headers`** — HTTP request headers (sensitive headers already filtered)
-- **`ctx.response?.headers`** — HTTP response headers
-- **`ctx.response?.status`** — HTTP response status code
-- **`ctx.request`** — Request metadata (method, path, requestId)
-- **`process.env`** — Environment variables (for deployment metadata)
-- **`ctx.event`** — The event itself (for computed/derived fields)
+- **`ctx.headers`**: HTTP request headers (sensitive headers already filtered)
+- **`ctx.response?.headers`**: HTTP response headers
+- **`ctx.response?.status`**: HTTP response status code
+- **`ctx.request`**: Request metadata (method, path, requestId)
+- **`process.env`**: Environment variables (for deployment metadata)
+- **`ctx.event`**: The event itself (for computed/derived fields)
