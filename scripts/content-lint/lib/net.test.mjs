@@ -8,6 +8,19 @@ describe('isPrivateAddress', () => {
     }
   })
 
+  it('reads the address, not the way it was spelled', () => {
+    // Same destinations, written so no prefix match would catch them.
+    for (const address of ['::ffff:7f00:1', '0:0:0:0:0:ffff:127.0.0.1', 'febf::1', 'fdff::1', '0:0:0:0:0:0:0:1', '::127.0.0.1', 'ff02::1', '::ffff:a00:1']) {
+      expect(isPrivateAddress(address), address).toBe(true)
+    }
+  })
+
+  it('refuses an address it cannot parse', () => {
+    for (const address of ['::ffff:999.1.1.1', '1::2::3', 'fe80:::1']) {
+      expect(isPrivateAddress(address), address).toBe(true)
+    }
+  })
+
   it('allows a public address', () => {
     for (const address of ['93.184.216.34', '1.1.1.1', '172.32.0.1', '2606:4700::1111']) {
       expect(isPrivateAddress(address), address).toBe(false)
