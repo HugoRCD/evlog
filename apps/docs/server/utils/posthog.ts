@@ -1,8 +1,11 @@
 /**
  * Fire a PostHog custom event from the server. The capture API accepts the
  * public project key, so this reuses the browser one instead of adding a
- * secret. Failures are logged and swallowed: analytics never decides a
- * request's outcome.
+ * secret. A no-op when no key is configured, and failures are logged and
+ * swallowed: analytics never decides a request's outcome.
+ *
+ * @param event Event name, e.g. `mcp_tool_called`
+ * @param properties Event properties; sent anonymously, no person profile
  */
 export async function captureServerEvent(event: string, properties: Record<string, unknown>): Promise<void> {
   const key = useRuntimeConfig().public.posthogKey
