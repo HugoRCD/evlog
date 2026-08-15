@@ -1,11 +1,11 @@
 <script setup lang="ts">
 import posthog from 'posthog-js'
 
-const visible = ref(false)
+const { visible } = useConsentBanner()
 
 onMounted(() => {
   if (!posthog.__loaded) return
-  visible.value = posthog.get_explicit_consent_status() === 'pending'
+  if (posthog.get_explicit_consent_status() === 'pending') visible.value = true
 })
 
 function decide(granted: boolean) {
@@ -42,7 +42,7 @@ function decide(granted: boolean) {
         <UButton
           size="xs"
           label="Allow replays"
-          class="text-white"
+          :ui="{ base: 'text-white' }"
           @click="decide(true)"
         />
         <UButton

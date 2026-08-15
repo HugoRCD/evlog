@@ -11,6 +11,9 @@ export async function captureServerEvent(event: string, properties: Record<strin
   try {
     await $fetch('https://eu.i.posthog.com/batch/', {
       method: 'POST',
+      // The caller awaits this inside a request handler; a slow ingest
+      // endpoint must not hold the response open.
+      timeout: 2000,
       body: {
         api_key: key,
         batch: [

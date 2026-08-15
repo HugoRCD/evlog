@@ -86,6 +86,9 @@ importers:
       '@vercel/speed-insights':
         specifier: ^2.0.0
         version: 2.0.0(@sveltejs/kit@2.69.3(@opentelemetry/api@1.9.1)(@sveltejs/vite-plugin-svelte@5.1.1(svelte@5.55.5(@typescript-eslint/types@8.59.1))(vite@8.1.4(@types/node@25.9.5)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))(svelte@5.55.5(@typescript-eslint/types@8.59.1))(typescript@6.0.3)(vite@8.1.4(@types/node@25.9.5)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.1)(yaml@2.9.0)))(next@16.2.10(@babel/core@7.29.0)(@opentelemetry/api@1.9.1)(react-dom@19.2.7(react@19.2.7))(react@19.2.7))(nuxt@4.4.4(d87e6bb542f80f3dab8255dda1ad55fb))(react@19.2.6)(svelte@5.55.5(@typescript-eslint/types@8.59.1))(vue@3.5.40(typescript@6.0.3))
+      '@vueuse/core':
+        specifier: ^14.3.0
+        version: 14.3.0(vue@3.5.40(typescript@6.0.3))
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
@@ -792,16 +795,6 @@ importers:
       vite:
         specifier: ^6.0.0
         version: 6.4.2(@types/node@25.9.5)(jiti@2.7.0)(lightningcss@1.32.0)(terser@5.46.2)(tsx@4.21.0)(yaml@2.8.4)
-
-  examples/repro:
-    dependencies:
-      evlog:
-        specifier: workspace:*
-        version: link:../../packages/evlog
-    devDependencies:
-      tsx:
-        specifier: ^4.20.7
-        version: 4.23.1
 
   examples/solidstart:
     dependencies:

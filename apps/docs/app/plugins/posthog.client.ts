@@ -42,6 +42,10 @@ export default defineNuxtPlugin(() => {
     api_host: '/_ph',
     ui_host: 'https://eu.posthog.com',
     cookieless_mode: 'on_reject',
+    // Required with on_reject: pending consent only falls back to cookieless
+    // capture when the default is opt-out; without this flag pending visitors
+    // send nothing at all until they answer the banner.
+    opt_out_capturing_by_default: true,
     // Carries `capture_pageview: 'history_change'`, so posthog-js already
     // captures every SPA navigation. A router hook on top of it counts each
     // page twice.

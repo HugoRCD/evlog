@@ -3,6 +3,7 @@ import type { FooterColumn } from '@nuxt/ui'
 
 const route = useRoute()
 const isLanding = computed(() => route.path === '/')
+const { open: openConsent } = useConsentBanner()
 const { public: pub } = useRuntimeConfig()
 const justUseEvlogUrl = computed(() =>
   typeof pub.justUseEvlogUrl === 'string' ? pub.justUseEvlogUrl.trim() : '',
@@ -72,6 +73,10 @@ const columns = computed<FooterColumn[]>(() => [
         <ULink to="https://hrcd.fr/" target="_blank" class="hover:underline">
           HugoRCD
         </ULink>
+        <span class="text-muted"> · </span>
+        <button type="button" class="text-muted hover:underline cursor-pointer" @click="openConsent">
+          Cookies
+        </button>
       </div>
     </template>
 
