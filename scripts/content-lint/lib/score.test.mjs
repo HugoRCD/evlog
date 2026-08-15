@@ -153,6 +153,13 @@ describe('evaluate', () => {
     expect(result.findings.map(finding => finding.id)).toContain('U-15')
   })
 
+  it("leaves another product its own vocabulary", () => {
+    const source = "Set `endpoint` to the same value as HyperDX's `otlphttp` exporter."
+    const result = evaluate(page('apps/docs/content/4.integrate/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).not.toContain('U-15')
+  })
+
   it('spares the sentence that is describing the other tool', () => {
     const result = evaluate(page('apps/docs/content/7.reference/a.md', 'pino writes through a transport, which runs in a worker thread.'), quiet)
 
