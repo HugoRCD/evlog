@@ -290,7 +290,10 @@ function classifyHeading(text) {
   // procedure share a shape because they are one procedure, which is the twin
   // `T-06` is meant to spare.
   if (/^(?:step\s+)?\d+\s*[.):—–]?\s/i.test(trimmed)) return 'sequence'
-  if (trimmed.endsWith('?')) return 'question'
+  // A question does not need its mark. `Where the byte counts come from` and
+  // `Which number moves your bill` are the same shape as the ones that carry it,
+  // and a page built on them is a set of answers rather than one mould.
+  if (trimmed.endsWith('?') || /^(what|where|which|when|why|how|who|whether)\b/i.test(trimmed)) return 'question'
   const first = trimmed.toLowerCase().split(/\s+/)[0]
   if (IMPERATIVE_VERBS.includes(first)) return 'imperative'
   if (/\b(is|are|was|were|has|have|does|do|can|will|becomes|makes|gives|takes)\b/i.test(trimmed)) {
