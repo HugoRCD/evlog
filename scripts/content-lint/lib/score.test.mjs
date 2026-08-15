@@ -32,6 +32,28 @@ describe('buildBaseline', () => {
   })
 })
 
+describe('heading templates', () => {
+  const withHeadings = (path, headings) => page(path, headings.map(h => `## ${h}\n\nProse about it.`).join('\n\n'))
+
+  it('subtracts the headings a page shares with its siblings', () => {
+    const template = ['Installation', 'Quick Start', 'Configuration', 'Troubleshooting']
+    const siblings = ['a', 'b', 'c', 'd'].map(name => withHeadings(`apps/docs/content/4.integrate/adapters/${name}.md`, template))
+    const baseline = buildBaseline(siblings)
+
+    // Four noun headings, all of them the directory's shape: not a mould.
+    expect(evaluate(siblings[0], baseline).findings.map(finding => finding.id)).not.toContain('T-06')
+  })
+
+  it('still flags a page whose own headings all came from one stamp', () => {
+    const template = ['Installation', 'Quick Start']
+    const siblings = ['a', 'b', 'c'].map(name => withHeadings(`apps/docs/content/4.integrate/adapters/${name}.md`, template))
+    const offender = withHeadings('apps/docs/content/4.integrate/adapters/d.md', [...template, 'Options', 'Reference', 'Limitations', 'Notes'])
+    const baseline = buildBaseline([...siblings, offender])
+
+    expect(evaluate(offender, baseline).findings.map(finding => finding.id)).toContain('T-06')
+  })
+})
+
 describe('evaluate', () => {
   it('carries drift findings through and deducts for them', () => {
     const drift = [{ id: 'T-15', severity: 'critical', line: 4, message: 'gone' }]

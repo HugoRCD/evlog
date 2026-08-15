@@ -218,6 +218,10 @@ function headingShape(doc) {
     dominant,
     share: round(top / targets.length),
     symbolShare: round(shapes.filter(shape => shape === 'symbol').length / targets.length),
+    // Kept so the scorer can subtract the headings this page shares with its
+    // siblings and re-judge the shape of what is left.
+    texts: targets.map(heading => heading.text.trim().toLowerCase()),
+    shapes,
   }
 }
 
