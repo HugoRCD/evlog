@@ -10,7 +10,7 @@
 
 Self-hosted log retention for [evlog](https://evlog.dev) using [NuxtHub](https://hub.nuxt.com) database storage. Store, query, and automatically clean up your structured logs with zero external dependencies.
 
-## Setup
+## Install and wire it
 
 Install the packages:
 
@@ -40,7 +40,7 @@ export default defineNuxtConfig({
 
 The cleanup cron schedule is automatically derived from the retention value.
 
-## Database Support
+## Which databases work
 
 NuxtHub supports multiple database dialects. The `evlog_events` table schema is automatically registered for:
 
@@ -48,7 +48,7 @@ NuxtHub supports multiple database dialects. The `evlog_events` table schema is 
 - **MySQL**
 - **PostgreSQL**
 
-## Deployment
+## Deploy it
 
 For Vercel deployments, the module can create a `vercel.json` with the appropriate cron schedule during `nuxi module add`. For Cloudflare and other platforms, the Nitro scheduled task handles cleanup automatically.
 

@@ -68,6 +68,26 @@ describe('headings', () => {
     expect(metrics.headings.dominant).toBe('imperative')
     expect(metrics.headings.share).toBe(1)
   })
+
+  it('reads a heading opening on an interrogative as a question', () => {
+    const titles = ['Where the byte counts come from', 'Which number moves your bill', 'What a retained event costs']
+    const source = titles.map(title => `## ${title}\n\nProse under it.`).join('\n\n')
+
+    expect(measureSource(source).headings.dominant).toBe('question')
+  })
+
+  it('leaves evlog\'s own nouns out of the verb list', () => {
+    const titles = ['Route filtering', 'Trace context', 'Drain pipeline']
+    const source = titles.map(title => `## ${title}\n\nProse under it.`).join('\n\n')
+
+    expect(measureSource(source).headings.dominant).toBe('noun')
+  })
+
+  it('reads a heading opening on a symbol as an API entry', () => {
+    const source = ['## `getMetadata()`: final snapshot', '## `getEstimatedCost()`: quick check', '## `onUpdate()`: incremental', '## `shape`: the record'].map(h => `${h}\n\nProse about it.`).join('\n\n')
+
+    expect(measureSource(source).headings.dominant).toBe('symbol')
+  })
 })
 
 describe('contraction seam', () => {
@@ -82,7 +102,7 @@ describe('contraction seam', () => {
   })
 })
 
-describe('dashes', () => {
+describe('dashes, twins', () => {
   it('reads a dash between two numbers as a range', () => {
     expect(measureSource('Manifest mode is ~30–80 lines of glue.').dashes.count).toBe(0)
   })
@@ -92,14 +112,12 @@ describe('dashes', () => {
     expect(measureSource('## Network bridge — stream server\n\nProse.').dashes.count).toBe(1)
   })
 
-  it('reads a heading opening on a symbol as an API entry', () => {
-    const source = ['## `getMetadata()`: final snapshot', '## `getEstimatedCost()`: quick check', '## `onUpdate()`: incremental', '## `shape`: the record'].map(h => `${h}\n\nProse about it.`).join('\n\n')
-
-    expect(measureSource(source).headings.dominant).toBe('symbol')
+  it('counts a dash hiding in a bullet', () => {
+    expect(measureSource('- Skip on serverless — the stream is in-process').dashes.count).toBe(1)
   })
 })
 
-describe('bullet frames', () => {
+describe('bullet frames, symbols', () => {
   it('reads a bolded symbol as the symbol it is', () => {
     const items = ['`message`', '`evlog`', '`dd`', '`service`', '`timestamp`']
     const source = items.map(name => `- **${name}**: what the field carries and why`).join('\n')
@@ -108,7 +126,7 @@ describe('bullet frames', () => {
   })
 })
 
-describe('epigram closers', () => {
+describe('epigrams, twins', () => {
   it('leaves a card body out of the rhythm', () => {
     const source = ['::card-group', '  :::card', '  ---', '  title: Nuxt', '  ---', '  Auto-imported helpers. Zero config.', '  :::', '::'].join('\n')
 
