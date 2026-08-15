@@ -160,10 +160,12 @@ describe('touchedPaths', () => {
 })
 
 describe('cooldownCommand', () => {
-  it('excludes parentless commits, which a shallow clone always has', () => {
-    // Without this the graft boundary lists the whole repository and every
-    // file reads as recently touched.
+  it('passes --min-parents=1, which is what skips a shallow boundary commit', () => {
     expect(cooldownCommand('/workspace/repo', 14)).toContain('--min-parents=1')
+  })
+
+  it('quotes the repository path', () => {
+    expect(cooldownCommand('/tmp/a dir; rm -rf /', 14)).toContain(`'/tmp/a dir; rm -rf /'`)
   })
 
   it('asks for the window it was given', () => {
