@@ -88,6 +88,24 @@ describe('what it never touches', () => {
     expect(fix(source).source).toBe(source)
   })
 
+  it('leaves a component embedded in a line of prose', () => {
+    const source = '| :feature-label[Drain]{tip="Ships to a sink without wiring"} | Yes |'
+
+    expect(fix(source).source).toBe(source)
+  })
+
+  it('fixes the prose on a line that also carries a component', () => {
+    expect(fix('Register the sink. :br Then read it.').source).toBe('Register the drain. :br Then read it.')
+  })
+
+  it('does not read a slot marker as a component with props', () => {
+    // `#title` is a slot, so the `---` after it is a thematic break and the
+    // prose below it is still prose.
+    const source = '#title\n\n---\n\nRegister the sink.'
+
+    expect(fix(source).source).toBe('#title\n\n---\n\nRegister the drain.')
+  })
+
   it('still fixes the prose around a component block', () => {
     const source = '::note\nRegister the sink.\n::'
 

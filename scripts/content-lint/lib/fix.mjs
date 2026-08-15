@@ -19,8 +19,12 @@ import { readFileSync } from 'node:fs'
 import { ALTERNATIVES } from './corpus.mjs'
 
 const FENCE = /^\s*(`{3,}|~{3,})/
-/** A component invocation, a slot marker, or an inline component: structure, never prose. */
-const MDC_LINE = /^\s*(:{1,}[a-z][\w-]*|#[\w-]+\s*$)/i
+/** A block component. Only this one can be followed by a `---` prop block. */
+const MDC_BLOCK = /^\s*:{2,}[a-z][\w-]*/i
+/** A slot marker, or a component alone on its line. Structure, but no prop block follows. */
+const MDC_STANDALONE = /^\s*(#[\w-]+|:[a-z][\w-]*(\{.*\})?)\s*$/i
+/** A component embedded in a line of prose, with its optional slot and props. */
+const MDC_INLINE = /(:[a-z][\w-]*(?:\[[^\]]*\])?(?:\{[^}]*\})?)/i
 const DOCUMENTING_A_DEPRECATION = /\b(deprecat\w*|removed|retired|renamed|legacy|instead of|prefer|migrat\w*|never|not\b)/i
 const REDIRECT_ENTRY = /['"](\/[^'"]*)['"]\s*:\s*r\(\s*['"]([^'"]*)['"]\s*\)/g
 
@@ -139,10 +143,11 @@ export function applyFixes(source, context = {}) {
     // file is named for it, and renaming the term in the invocation gives a
     // page that no longer resolves. Prop blocks are configuration for the same
     // reason.
-    if (MDC_LINE.test(line)) {
+    if (MDC_BLOCK.test(line)) {
       atComponent = true
       return line
     }
+    if (MDC_STANDALONE.test(line)) return line
 
     return record(line, fixProse(line, redirects), null)
 
@@ -215,6 +220,15 @@ function fixProse(line, redirects) {
  * @returns {string}
  */
 function prose(segment, redirects, ids) {
+  // An inline component carries a name and props, not prose. Splitting on the
+  // capture keeps the odd entries intact while the rest is fixed.
+  if (MDC_INLINE.test(segment)) {
+    return segment
+      .split(new RegExp(MDC_INLINE.source, 'gi'))
+      .map((part, index) => (index % 2 === 1 ? part : prose(part, redirects, ids)))
+      .join('')
+  }
+
   let text = segment
 
   const relinked = text.replace(/\]\((\/[^)#?]*)([#?][^)]*)?\)/g, (match, path, suffix) => {
