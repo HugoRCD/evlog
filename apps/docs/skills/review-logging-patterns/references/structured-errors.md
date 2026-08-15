@@ -438,7 +438,7 @@ try {
 
 ## Error Message Templates
 
-Common patterns -- adapt fields to each specific case:
+Common patterns, with the fields adapted to each case:
 
 | Pattern | Status | Fields |
 |---------|--------|--------|

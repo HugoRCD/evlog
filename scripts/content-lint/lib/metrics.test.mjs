@@ -91,6 +91,13 @@ describe('headings', () => {
 })
 
 describe('contraction seam', () => {
+  it('ignores two registers at opposite ends of a page', () => {
+    const far = Array.from({ length: 6 }, () => 'A table row and a code fence sit here, with nothing to contract.')
+    const source = ["You don't need a transport. You won't write glue either.", ...far, 'You do not need a transport. It is not required.'].join('\n\n')
+
+    expect(measureSource(source).contractionSeam).toBeNull()
+  })
+
   it('measures the sharpest jump between adjacent paragraphs', () => {
     const source = [
       "You don't need a transport. You won't write glue either.",

@@ -111,6 +111,9 @@ function comparisons(doc) {
   return unbacked
 }
 
+/** Beyond this many paragraphs apart, two registers are not stitched together. */
+const ADJACENT_PARAGRAPHS = 3
+
 /**
  * Contraction ratio for the page, plus the sharpest jump between two adjacent
  * paragraphs that both had opportunities, which is the register seam of T-11.
@@ -123,21 +126,26 @@ function contractionMetrics(doc) {
   /** @type {{ ratio: number, line: number }[]} */
   const perParagraph = []
 
-  for (const paragraph of doc.paragraphs) {
+  for (const [index, paragraph] of doc.paragraphs.entries()) {
     const counts = contractionCounts(paragraph.text)
     contracted += counts.contracted
     expanded += counts.expanded
     const opportunities = counts.contracted + counts.expanded
     if (opportunities >= 2) {
-      perParagraph.push({ ratio: counts.contracted / opportunities, line: paragraph.line })
+      perParagraph.push({ ratio: counts.contracted / opportunities, line: paragraph.line, index })
     }
   }
 
   let seam = null
   for (let index = 1; index < perParagraph.length; index += 1) {
-    const delta = Math.abs(perParagraph[index].ratio - perParagraph[index - 1].ratio)
+    const [before, after] = [perParagraph[index - 1], perParagraph[index]]
+    // A seam is a stitch: two passages a reader meets one after the other. Two
+    // paragraphs with a table and four sections between them are two registers
+    // on one page, which is not what this tell is about.
+    if (after.index - before.index > ADJACENT_PARAGRAPHS) continue
+    const delta = Math.abs(after.ratio - before.ratio)
     if (!seam || delta > seam.delta) {
-      seam = { delta: round(delta), line: perParagraph[index].line }
+      seam = { delta: round(delta), line: after.line }
     }
   }
 
@@ -196,7 +204,7 @@ const NUMERIC_RANGE = /(\d)\s*[—–]\s*(\d)/g
  */
 function dashes(doc) {
   const found = []
-  const dashed = text => /[—–]/.test(text.replace(NUMERIC_RANGE, '$1$2'))
+  const dashed = text => /[—–]|\s--\s/.test(text.replace(NUMERIC_RANGE, '$1$2'))
 
   // Headings count. They are the first prose a reader sees and the rule says
   // any surface, so a dash hiding in `## Network bridge — stream server` is the
