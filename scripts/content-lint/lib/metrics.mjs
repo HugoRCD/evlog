@@ -259,15 +259,14 @@ function bulletFrames(doc) {
 
   for (const list of doc.lists) {
     if (list.items.length < 3) continue
-    // Three openers are shared by construction rather than by voice: a task
-    // list's checkbox, an ordinal in a numbered sequence, and the `code`
-    // placeholder every item starting with a symbol or a code-labelled link
-    // leaves behind.
+    // Two openers are shared by construction rather than by voice: a task
+    // list's checkbox, and the `code` placeholder every item starting with a
+    // symbol or a code-labelled link leaves behind. An ordinal never reaches
+    // here, since `parseMarkdown` strips it off an ordered list.
     const firsts = list.items
       .map(item => item.text
         .toLowerCase()
         .replace(/^\[[ x]?\]\s*/, '')
-        .replace(/^\d+[.)]\s*/, '')
         .split(/\s+/)[0] ?? '')
       // `code` is the placeholder a symbol or a code-labelled link leaves
       // behind. Several items opening on one carries no voice, so it cannot be
@@ -280,7 +279,7 @@ function bulletFrames(doc) {
     const share = top / firsts.length
     const lengths = list.items.map(item => wordCount(item.text))
     if (share >= 0.75 || coefficientOfVariation(lengths) < 0.15) {
-      locked.push({ line: list.line, items: list.items.length, anaphoraShare: round(share) })
+      locked.push({ line: list.line, items: list.items.length, opening: firsts.length, anaphoraShare: round(share) })
     }
   }
 
