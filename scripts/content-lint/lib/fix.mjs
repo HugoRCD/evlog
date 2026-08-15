@@ -2,10 +2,12 @@
  * The fixes with a derivable answer.
  *
  * A rule belongs here only when the corrected text follows from the rule
- * itself, never from taste. `evlog/shared` has exactly one replacement.
- * `sink` has exactly one. A single elaborating em dash does not: it wants a
- * comma here and a colon there, and picking wrong makes a comma splice, so it
- * stays a finding for someone who can read the sentence.
+ * itself, never from taste. `evlog/shared` has exactly one replacement. `sink`
+ * has exactly one. Punctuation never does, which is why `U-14` is absent: a
+ * dashed span is sometimes an appositive and sometimes a list, and swapping the
+ * dashes for commas turns the second kind into a sentence whose subject is
+ * followed by four nouns. Measured over this corpus, that was 25 replacements
+ * out of 38. Dashes stay a finding for someone who can read the sentence.
  *
  * Everything works on raw text, line by line, because formatting has to survive
  * exactly and a round trip through `parseMarkdown` would not preserve it. Code
@@ -17,6 +19,12 @@ import { readFileSync } from 'node:fs'
 import { ALTERNATIVES } from './corpus.mjs'
 
 const FENCE = /^\s*(`{3,}|~{3,})/
+/** A block component. Only this one can be followed by a `---` prop block. */
+const MDC_BLOCK = /^\s*:{2,}[a-z][\w-]*/i
+/** A slot marker, or a component alone on its line. Structure, but no prop block follows. */
+const MDC_STANDALONE = /^\s*(#[\w-]+|:[a-z][\w-]*(\{.*\})?)\s*$/i
+/** A component embedded in a line of prose, with its optional slot and props. */
+const MDC_INLINE = /(:[a-z][\w-]*(?:\[[^\]]*\])?(?:\{[^}]*\})?)/i
 const DOCUMENTING_A_DEPRECATION = /\b(deprecat\w*|removed|retired|renamed|legacy|instead of|prefer|migrat\w*|never|not\b)/i
 const REDIRECT_ENTRY = /['"](\/[^'"]*)['"]\s*:\s*r\(\s*['"]([^'"]*)['"]\s*\)/g
 
@@ -38,12 +46,6 @@ const TERMS = [
   { from: 'error registry', to: 'error catalog' },
   { from: 'error registries', to: 'error catalogs' },
 ]
-
-/**
- * A parenthetical wrapped in dashes, which becomes a pair of commas without
- * touching the clause structure (`U-14`). The single dash is not here.
- */
-const PAIRED_DASH = /(\S) [—–] ([^—–]+?) [—–] (?=\S)/g
 
 /**
  * Old path to new, from the docs redirect table. A dead link with a redirect
@@ -104,6 +106,8 @@ export function applyFixes(source, context = {}) {
 
   let fence = null
   let frontmatter = lines[0]?.trim() === '---'
+  let propBlock = false
+  let atComponent = false
 
   const fixed = lines.map((line, index) => {
     const number = index + 1
@@ -112,6 +116,18 @@ export function applyFixes(source, context = {}) {
       if (number > 1 && line.trim() === '---') frontmatter = false
       return line
     }
+
+    // A `---` block opening right after a component is that component's props.
+    if (propBlock) {
+      if (line.trim() === '---') propBlock = false
+      return line
+    }
+    if (atComponent && line.trim() === '---') {
+      atComponent = false
+      propBlock = true
+      return line
+    }
+    atComponent = false
 
     const opener = FENCE.exec(line)
     if (fence === null && opener) {
@@ -123,6 +139,15 @@ export function applyFixes(source, context = {}) {
       else return record(line, fixCode(line), 'T-15')
     }
     if (fence !== null || opener) return line
+    // MDC structure is not prose. `::audit-dual-sink` is a Vue component whose
+    // file is named for it, and renaming the term in the invocation gives a
+    // page that no longer resolves. Prop blocks are configuration for the same
+    // reason.
+    if (MDC_BLOCK.test(line)) {
+      atComponent = true
+      return line
+    }
+    if (MDC_STANDALONE.test(line)) return line
 
     return record(line, fixProse(line, redirects), null)
 
@@ -195,6 +220,15 @@ function fixProse(line, redirects) {
  * @returns {string}
  */
 function prose(segment, redirects, ids) {
+  // An inline component carries a name and props, not prose. Splitting on the
+  // capture keeps the odd entries intact while the rest is fixed.
+  if (MDC_INLINE.test(segment)) {
+    return segment
+      .split(new RegExp(MDC_INLINE.source, 'gi'))
+      .map((part, index) => (index % 2 === 1 ? part : prose(part, redirects, ids)))
+      .join('')
+  }
+
   let text = segment
 
   const relinked = text.replace(/\]\((\/[^)#?]*)([#?][^)]*)?\)/g, (match, path, suffix) => {
@@ -204,12 +238,6 @@ function prose(segment, redirects, ids) {
   if (relinked !== text) {
     ids.add('U-16')
     text = relinked
-  }
-
-  const undashed = text.replace(PAIRED_DASH, '$1, $2, ')
-  if (undashed !== text) {
-    ids.add('U-14')
-    text = undashed
   }
 
   // A sentence naming another logger is allowed to use that logger's words.

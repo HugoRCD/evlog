@@ -73,7 +73,7 @@ pnpm content:lint --url https://example.com/post --as blog   # a page outside th
 cat draft.md | pnpm content:lint --stdin                     # prose that is not a file yet
 ```
 
-Some findings are fixed before anyone reads them. `pnpm content:lint <paths> --fix` applies the rules whose corrected text follows from the rule itself: a retired entry point, a term with one replacement, a link with a redirect behind it, a dash pair around a parenthetical. It re-scans and reverts anything that scored worse. Run it before reviewing, so a review spends its attention on what a codemod cannot decide.
+Some findings are fixed before anyone reads them. `pnpm content:lint <paths> --fix` applies the rules whose corrected text follows from the rule itself: a retired entry point, a term with one replacement, a link with a redirect behind it. Punctuation is not among them, so every dash reaches you. It re-scans afterwards and reverts any file that scored worse or that introduced a finding id the page did not have, so a fix that trades one problem for another never lands. Run it before reviewing, so a review spends its attention on what a codemod cannot decide.
 
 Rates are compared per surface. A reference page and a skill file have different natural rhythms, and one median over both flatters whichever is looser. A `--url` scan drops every evlog-specific check: someone else's entry points, links, and vocabulary are theirs, so what comes back is how the page reads.
 

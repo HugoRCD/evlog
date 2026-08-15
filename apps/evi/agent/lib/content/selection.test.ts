@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupOf, selectTargets, touchedPaths } from './selection'
+import { cooldownCommand, groupOf, selectTargets, touchedPaths } from './selection'
 
 const page = (path: string, score: number, criticals = 0, surface = 'docs') => ({
   path,
@@ -156,5 +156,19 @@ describe('touchedPaths', () => {
     const log = ['apps/docs/content/2.learn/a.md', '', 'packages/evlog/src/index.ts', 'AGENTS.md', 'apps/docs/content/2.learn/a.md']
 
     expect(touchedPaths(log.join('\n'))).toEqual(['apps/docs/content/2.learn/a.md', 'AGENTS.md'])
+  })
+})
+
+describe('cooldownCommand', () => {
+  it('passes --min-parents=1, which is what skips a shallow boundary commit', () => {
+    expect(cooldownCommand('/workspace/repo', 14)).toContain('--min-parents=1')
+  })
+
+  it('quotes the repository path', () => {
+    expect(cooldownCommand('/tmp/a dir; rm -rf /', 14)).toContain(`'/tmp/a dir; rm -rf /'`)
+  })
+
+  it('asks for the window it was given', () => {
+    expect(cooldownCommand('/workspace/repo', 30)).toContain('--since=\'30 days ago\'')
   })
 })

@@ -1,4 +1,3 @@
-// A declared subagent inherits nothing from the root, sandbox included, and
-// the framework default has no checkout. Both content subagents read and write
-// pages in the repository, so they share the root's workspace.
-export { default } from '../../../sandbox'
+// A checkout without the root's build tooling. See `lib/content-sandbox.ts`
+// for why these two do not reuse the root sandbox.
+export { default } from '../../../lib/content-sandbox'

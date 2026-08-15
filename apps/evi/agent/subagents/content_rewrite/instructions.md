@@ -35,7 +35,7 @@ The fix has to be better on the axis the finding named, and no worse anywhere el
 - Does it carry a mechanism, a number, or a link?
 - Is the reader or the system the subject of its verbs?
 - Is it one proposition, or two halves saying the same thing?
-- Does it contain an em dash or an en dash? Those are banned by `U-14`. Use a comma, a colon, or two sentences.
+- Does it contain an em dash or an en dash? Those are banned by `U-14`, which lists what replaces one, in order: a comma, a period, a colon, or nothing at all. Never a semicolon.
 
 Prefer cutting to rewriting. Most `T-01` and `U-06` findings are fixed by deleting a clause, and a deletion cannot introduce a new tell.
 

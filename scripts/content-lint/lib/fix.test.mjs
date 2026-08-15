@@ -42,15 +42,14 @@ describe('U-15 terminology', () => {
 })
 
 describe('U-14 dashes', () => {
-  it('replaces a parenthetical pair with commas', () => {
-    expect(fix('The drain batches — then retries with backoff — before it gives up.').source)
-      .toBe('The drain batches, then retries with backoff, before it gives up.')
-  })
+  it('leaves every dash to someone who can read the sentence', () => {
+    // A dashed span is sometimes an appositive and sometimes a list. Commas fix
+    // the first and wreck the second, and the second was the majority here.
+    const appositive = 'The drain batches — then retries with backoff — before it gives up.'
+    const list = 'It finds every entry point — handlers, pages, middleware — and scores each one.'
+    const single = 'evlog is built for the day-zero choice — pick it once.'
 
-  it('leaves a single dash for someone who can read the sentence', () => {
-    const source = 'evlog is built for the day-zero choice — pick it once.'
-
-    expect(fix(source).source).toBe(source)
+    for (const source of [appositive, list, single]) expect(fix(source).source).toBe(source)
   })
 })
 
@@ -79,6 +78,38 @@ describe('what it never touches', () => {
     const source = '---\ntitle: The sink\n---\n\nRegister the sink.'
 
     expect(fix(source).source).toBe('---\ntitle: The sink\n---\n\nRegister the drain.')
+  })
+
+  it('leaves an MDC component name alone, however much it looks like prose', () => {
+    // The Vue file is named for the invocation, so renaming the term here
+    // gives a page that no longer resolves.
+    const source = '::audit-dual-sink\n---\ntitle: The sink\n---\n::'
+
+    expect(fix(source).source).toBe(source)
+  })
+
+  it('leaves a component embedded in a line of prose', () => {
+    const source = '| :feature-label[Drain]{tip="Ships to a sink without wiring"} | Yes |'
+
+    expect(fix(source).source).toBe(source)
+  })
+
+  it('fixes the prose on a line that also carries a component', () => {
+    expect(fix('Register the sink. :br Then read it.').source).toBe('Register the drain. :br Then read it.')
+  })
+
+  it('does not read a slot marker as a component with props', () => {
+    // `#title` is a slot, so the `---` after it is a thematic break and the
+    // prose below it is still prose.
+    const source = '#title\n\n---\n\nRegister the sink.'
+
+    expect(fix(source).source).toBe('#title\n\n---\n\nRegister the drain.')
+  })
+
+  it('still fixes the prose around a component block', () => {
+    const source = '::note\nRegister the sink.\n::'
+
+    expect(fix(source).source).toBe('::note\nRegister the drain.\n::')
   })
 
   it('leaves prose words inside a fence alone', () => {

@@ -22,7 +22,7 @@ evlog writes to someone in the middle of doing something. They arrived with a qu
 - Not enthusiastic. No exclamation marks, no emoji in prose, no "excited to announce".
 - Not hedged. If the mechanism is deterministic, say it happens. `often`, `typically`, `generally` on a guaranteed behavior is a lie that sounds careful.
 - Not abstract. Nothing "leverages", "empowers", or "unlocks". Things run, retry, drop, batch, fail.
-- Not punctuated with dashes. No em dash, no en dash, anywhere. A comma, a colon, or two sentences say the same thing without the tic. See `U-14`.
+- Not punctuated with dashes. No em dash, no en dash, anywhere. `U-14` ranks what goes in its place, and a semicolon is never on that list.
 
 ## The five tests
 

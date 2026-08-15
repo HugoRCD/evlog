@@ -1,3 +1,5 @@
+import { shellQuote } from './scan'
+
 /**
  * Which pages the next content pass works on.
  *
@@ -49,7 +51,7 @@ export interface Selection {
 }
 
 const CONTENT_ROOT = 'apps/docs/content'
-const DEFAULT_LIMIT = 3
+const DEFAULT_LIMIT = 5
 
 /** Findings a pass may fix on a file an agent reads. Everything else goes back as a proposal. */
 const HOUSE_RULES = new Set(['U-14', 'U-15', 'U-16', 'T-13', 'T-15'])
@@ -136,6 +138,18 @@ export function selectTargets(input: {
   }
 
   return { targets, group, held, ...counts }
+}
+
+/**
+ * The log that says which files are resting.
+ *
+ * `--min-parents=1` is load-bearing. In a shallow clone the boundary commit has
+ * no recorded parent, so `--name-only` diffs it against nothing and lists every
+ * file in the repository. Without the flag the cooldown holds the whole corpus
+ * and the rewrite half is empty on every run.
+ */
+export function cooldownCommand(repoDir: string, days: number): string {
+  return `git -C ${shellQuote(repoDir)} log --since='${days} days ago' --min-parents=1 --name-only --pretty=format:`
 }
 
 /**
