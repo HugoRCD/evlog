@@ -1,7 +1,7 @@
 import { defineTool } from 'eve/tools'
 import { z } from 'zod'
 import type { LintPage } from '../lib/content/selection'
-import { selectTargets, touchedPaths } from '../lib/content/selection'
+import { cooldownCommand, selectTargets, touchedPaths } from '../lib/content/selection'
 
 /** The template clone; every session inherits it with dependencies installed. */
 const REPO_DIR = '/workspace/repo'
@@ -15,7 +15,7 @@ const DEFAULT_COOLDOWN_DAYS = 14
 export default defineTool({
   description: `Pick the files the next content pass should work on. Runs the repository's content-lint over every written surface in ${REPO_DIR} (docs pages, the landing, the package READMEs, the skills, the AGENTS.md files), drops files changed inside the cooldown window, and returns the highest-priority files from a single group with their findings. Criticals (a broken import, a dead link) outrank a low score. Landing findings come back as \`report\` rather than \`rewrite\`, and so does anything on a skill or an AGENTS.md that is not a house rule, because those files govern the agent running the pass. Pass \`surface\` to work one kind of file. Also returns \`candidates\` (files with findings) and \`eligible\` (those outside the cooldown): the rewrite half is empty only when \`eligible\` is 0, whatever the top of the ranking looks like. Call this before reviewing or rewriting anything; the findings it returns are candidates to judge against the write-evlog-content skill, not verdicts.`,
   inputSchema: z.object({
-    limit: z.number().int().min(1).max(5).optional().describe('How many files this pass may open. Default 3.'),
+    limit: z.number().int().min(1).max(8).optional().describe('How many files this pass may open. Default 5.'),
     cooldownDays: z.number().int().min(1).max(90).optional().describe(`Days a file rests after any change touches it. Default ${DEFAULT_COOLDOWN_DAYS}.`),
     surface: z.enum(['docs', 'reference', 'landing', 'blog', 'readme', 'skill', 'agents']).optional().describe('Restrict the scan to one surface. Omit to rank the whole corpus.'),
   }),
@@ -41,9 +41,7 @@ export default defineTool({
       return { success: false as const, error: 'content-lint returned no pages array.' }
     }
 
-    const log = await sandbox.run({
-      command: `git -C ${REPO_DIR} log --since='${cooldownDays} days ago' --name-only --pretty=format:`,
-    })
+    const log = await sandbox.run({ command: cooldownCommand(REPO_DIR, cooldownDays) })
     if (log.exitCode !== 0) {
       return { success: false as const, error: `git log exited ${log.exitCode}: ${String(log.stderr || log.stdout).trim()}` }
     }

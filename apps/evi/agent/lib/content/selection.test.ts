@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { groupOf, selectTargets, touchedPaths } from './selection'
+import { cooldownCommand, groupOf, selectTargets, touchedPaths } from './selection'
 
 const page = (path: string, score: number, criticals = 0, surface = 'docs') => ({
   path,
@@ -156,5 +156,17 @@ describe('touchedPaths', () => {
     const log = ['apps/docs/content/2.learn/a.md', '', 'packages/evlog/src/index.ts', 'AGENTS.md', 'apps/docs/content/2.learn/a.md']
 
     expect(touchedPaths(log.join('\n'))).toEqual(['apps/docs/content/2.learn/a.md', 'AGENTS.md'])
+  })
+})
+
+describe('cooldownCommand', () => {
+  it('excludes parentless commits, which a shallow clone always has', () => {
+    // Without this the graft boundary lists the whole repository and every
+    // file reads as recently touched.
+    expect(cooldownCommand('/workspace/repo', 14)).toContain('--min-parents=1')
+  })
+
+  it('asks for the window it was given', () => {
+    expect(cooldownCommand('/workspace/repo', 30)).toContain('--since=\'30 days ago\'')
   })
 })

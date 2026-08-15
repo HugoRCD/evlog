@@ -119,10 +119,19 @@ Why: the admission is what makes the rest of the page believable, and evlog's co
 
 **U-14 · No em dashes, no en dashes** · `standard`
 
-Rule: no `—` and no `–` in prose, in any language, on any surface. Use a comma, a colon, a period, or two sentences. Hyphens in compound words are fine, and so are dashes inside code blocks and inside a verbatim quote.
+Rule: no `—` and no `–` in prose, in any language, on any surface. Hyphens in compound words are fine, and so are dashes inside code blocks and inside a verbatim quote.
 Bad: "The drain batches events, then retries with backoff, before it gives up."  written as "The drain batches events — then retries with backoff — before it gives up."
 Better: "The drain batches events, retries with backoff, then gives up."
-Why: this is a maintainer decision about how evlog sounds, and it is the punctuation most associated with machine-written prose. Every occurrence is a finding; there is no density threshold to argue about.
+Why: this is a maintainer decision about how evlog sounds, and it is the punctuation most associated with machine-written prose. Every occurrence is a finding, and there is no density threshold to argue about.
+
+**What replaces it**, in the order to try:
+
+1. **A comma**, when the clause continues the sentence. "the integration path for oRPC v1, and it remains the entrypoint".
+2. **A period**, when the second half is its own thought. Two short sentences beat one hinged sentence.
+3. **A colon**, when the second half explains or lists what the first half named.
+4. **Nothing**, when the dash was joining two things that did not need joining. Cutting is a valid fix and the only one that cannot introduce a new tell.
+
+**Never a semicolon.** It is not in this register, it reads as a writer who could not choose between a comma and a period, and swapping one unusual mark for another leaves the sentence exactly as stiff as it was. A replacement that a reader would notice is not a fix.
 Note: the corpus predates the rule, so most pages still carry them. A content pass removes the ones on the pages it touches and does not open a PR just to sweep them.
 
 ---

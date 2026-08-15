@@ -49,7 +49,7 @@ export interface Selection {
 }
 
 const CONTENT_ROOT = 'apps/docs/content'
-const DEFAULT_LIMIT = 3
+const DEFAULT_LIMIT = 5
 
 /** Findings a pass may fix on a file an agent reads. Everything else goes back as a proposal. */
 const HOUSE_RULES = new Set(['U-14', 'U-15', 'U-16', 'T-13', 'T-15'])
@@ -136,6 +136,18 @@ export function selectTargets(input: {
   }
 
   return { targets, group, held, ...counts }
+}
+
+/**
+ * The log that says which files are resting.
+ *
+ * `--min-parents=1` is load-bearing. The sandbox template clones `--depth 50`,
+ * so the oldest commit has no recorded parent and `--name-only` diffs it
+ * against nothing, listing every file in the repository. Without the flag the
+ * cooldown holds the whole corpus and the rewrite half is empty on every run.
+ */
+export function cooldownCommand(repoDir: string, days: number): string {
+  return `git -C ${repoDir} log --since='${days} days ago' --min-parents=1 --name-only --pretty=format:`
 }
 
 /**
