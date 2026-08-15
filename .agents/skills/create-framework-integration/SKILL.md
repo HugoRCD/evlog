@@ -5,7 +5,7 @@ description: Create a new evlog framework integration to add automatic wide-even
 
 # Create evlog Framework Integration
 
-Add a new framework integration to evlog. The recommended path is the **manifest mode** built on `defineFrameworkIntegration` from `evlog/toolkit` — for any framework with a request/response middleware shape. For frameworks with a fundamentally different lifecycle you'll fall back to the lower-level `createMiddlewareLogger`.
+Add a new framework integration to evlog. The recommended path is the **manifest mode** built on `defineFrameworkIntegration` from `evlog/toolkit`, for any framework with a request/response middleware shape. For frameworks with a fundamentally different lifecycle you'll fall back to the lower-level `createMiddlewareLogger`.
 
 ## Two paths
 
@@ -200,7 +200,7 @@ Exports without matching `tsdown.config.ts` entries fail `test/toolkit/api-surfa
 
 ## Step 4: Tests
 
-Create `packages/evlog/test/frameworks/{framework}.test.ts`. Read `packages/evlog/test/README.md` first — especially the **Framework runtime fidelity** table.
+Create `packages/evlog/test/frameworks/{framework}.test.ts`. Read `packages/evlog/test/README.md` first, especially the **Framework runtime fidelity** table.
 
 Two non-negotiables:
 
@@ -300,11 +300,11 @@ In `packages/evlog/README.md` (root `README.md` is a symlink):
 1. Add a `## {Framework}` section near the other framework sections with a minimal setup snippet and a link to the example app
 2. Add a row to the **Framework Support** table
 
-Keep the snippet short — init, register middleware, one route handler showing logger access.
+Keep the snippet short: init, register middleware, one route handler showing logger access.
 
 ## Step 11: Example App
 
-Create `examples/{framework}/` with a runnable app demonstrating all evlog features. It is auto-discovered by the root runner: `pnpm example {framework}` (which loads the root `.env` via dotenv — no root `package.json` change needed).
+Create `examples/{framework}/` with a runnable app demonstrating all evlog features. It is auto-discovered by the root runner: `pnpm example {framework}` (which loads the root `.env` via dotenv, so no root `package.json` change is needed).
 
 The app must include:
 
@@ -315,13 +315,13 @@ The app must include:
 5. **Error handler** — framework's error handler with `parseError()` + manual `log.error()`
 6. **Test UI** — served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses
 
-**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`) — `POSTHOG_API_KEY` is set in the root `.env` (maintainer's key, not committed), so every example exercises a real external drain. Without the env var the drain resolves to `null` and skips — someone cloning the repo sends nothing anywhere unless they opt in with their own key. Enable pretty printing for readable local output.
+**Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`). `POSTHOG_API_KEY` is set in the root `.env` (maintainer's key, not committed), so every example exercises a real external drain. Without the env var the drain resolves to `null` and skips, so someone cloning the repo sends nothing anywhere unless they opt in with their own key. Enable pretty printing for readable local output.
 
-**Type the `enrich` callback parameter explicitly** — `(ctx: EnrichContext) => ...` with `type EnrichContext` imported from `evlog`.
+**Type the `enrich` callback parameter explicitly**, as `(ctx: EnrichContext) => ...` with `type EnrichContext` imported from `evlog`.
 
 ### Test UI
 
-Reference: `examples/hono/src/ui.ts` — a single `src/ui.ts` exporting `testUI()` returning a self-contained dark-theme HTML string (route list with method badges, click-to-fetch, JSON display, status colors, response time). Register the `/` route **before** the evlog middleware so it isn't logged.
+Reference: `examples/hono/src/ui.ts`, a single `src/ui.ts` exporting `testUI()` returning a self-contained dark-theme HTML string (route list with method badges, click-to-fetch, JSON display, status colors, response time). Register the `/` route **before** the evlog middleware so it isn't logged.
 
 ### Required files
 
@@ -333,7 +333,7 @@ Reference: `examples/hono/src/ui.ts` — a single `src/ui.ts` exporting `testUI(
 | `tsconfig.json` | TypeScript config (if needed) |
 | `README.md` | How to run + link to the UI |
 
-There is also `examples/community-framework-skeleton/` showing the community-facing (toolkit-only) variant — keep it in mind if the new integration changes the toolkit contract.
+There is also `examples/community-framework-skeleton/` showing the community-facing (toolkit-only) variant, so keep it in mind if the new integration changes the toolkit contract.
 
 ## Step 12: Changeset
 

@@ -88,7 +88,7 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, co
 - **Bump type:** `patch` for fixes, `minor` for features, `major` for breaking changes.
 - **Description:** write from the consumer's perspective — what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
 
-A PR without a changeset for a user-facing change will not be merged. Changes confined to `apps/*` or `examples/*` — docs included — never need one. For the rare published-package change that genuinely needs no release note, run `pnpm changeset add --empty`.
+A PR without a changeset for a user-facing change will not be merged. Changes confined to `apps/*` or `examples/*`, docs included, never need one. For the rare published-package change that genuinely needs no release note, run `pnpm changeset add --empty`.
 
 ### Commits & PR titles
 
@@ -101,11 +101,11 @@ PR titles and commits follow [Conventional Commits](https://conventionalcommits.
 
 ### Docs app
 
-Working in `apps/docs/`? Read `apps/docs/AGENTS.md` first — it has the (strict) rules for MDC animation components.
+Working in `apps/docs/`? Read `apps/docs/AGENTS.md` first. It has the (strict) rules for MDC animation components.
 
 ## Testing
 
-Tests live in `packages/evlog/test/` (mirrors `src/`) and use Vitest. **Read `packages/evlog/test/README.md` before writing or editing tests** — it has the file layout, the framework runtime fidelity matrix, and the helper decision table.
+Tests live in `packages/evlog/test/` (mirrors `src/`) and use Vitest. **Read `packages/evlog/test/README.md` before writing or editing tests**. It has the file layout, the framework runtime fidelity matrix, and the helper decision table.
 
 ```bash
 pnpm run test                                          # full suite (~1.5s)
@@ -116,7 +116,7 @@ pnpm mutate                                            # Stryker (slow; weekly c
 pnpm test:e2e                                          # adapters vs real endpoints (needs pnpm sandbox:up first — Docker Loki/ClickHouse; sandbox:down to clean up)
 ```
 
-> CI typecheck excludes `evlog-telemetry` (`--filter='!evlog-telemetry'`), so local `pnpm run typecheck` is stricter than CI — a local pass is the real bar.
+> CI typecheck excludes `evlog-telemetry` (`--filter='!evlog-telemetry'`), so local `pnpm run typecheck` is stricter than CI, and a local pass is the real bar.
 
 Rules:
 1. Every change has a matching test. Bug fixes require a *failing* regression test before the fix.
@@ -161,7 +161,7 @@ A task is complete when **all** of the following pass:
 
 ## Git & PRs — local always OK, remote on explicit instruction
 
-Default: anything that stays on the local clone is fine, anything that touches the remote or GitHub requires an explicit instruction in the task at hand. Never act on assumption — if the maintainer didn't ask for a push or a PR, prepare the branch locally and stop there.
+Default: anything that stays on the local clone is fine, anything that touches the remote or GitHub requires an explicit instruction in the task at hand. Never act on assumption. If the maintainer didn't ask for a push or a PR, prepare the branch locally and stop there.
 
 **OK (local-only, no ask needed):**
 - `git branch`, `git checkout`, `git switch`, `git checkout -b` — create and move between branches freely
@@ -188,11 +188,11 @@ Default: anything that stays on the local clone is fine, anything that touches t
 
 ## Feedback & Self-Maintenance
 
-**You are expected to submit feedback.** Report DX friction, documentation gaps, or anything that made your task harder than it should be — mid-work, not at the end. When in doubt, report it; no feedback being submitted is itself a problem.
+**You are expected to submit feedback.** Report DX friction, documentation gaps, or anything that made your task harder than it should be, mid-work rather than at the end. When in doubt, report it; no feedback being submitted is itself a problem.
 
-**This file is living documentation — keep it true.** If you catch it contradicting the repo (a command that doesn't exist, a path that moved, a described workflow that isn't real), flag it immediately and propose the fix, even if it's unrelated to your task. Update it when you encounter:
+**This file is living documentation, so keep it true.** If you catch it contradicting the repo (a command that doesn't exist, a path that moved, a described workflow that isn't real), flag it immediately and propose the fix, even if it's unrelated to your task. Update it when you encounter:
 - A recurring mistake or easy-to-get-wrong pattern
 - Explicit guidance from the maintainer
 - A new convention that should be applied consistently
 
-Rules for updating: a correction is a few lines, not a rewrite — keep this file lean. App- or package-specific guidance goes in a nested `AGENTS.md` next to the code (see `apps/docs/AGENTS.md`), not here.
+Rules for updating: a correction is a few lines, not a rewrite. Keep this file lean. App- or package-specific guidance goes in a nested `AGENTS.md` next to the code (see `apps/docs/AGENTS.md`), not here.

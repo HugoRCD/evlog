@@ -1,6 +1,6 @@
 # evlog docs (Docus site)
 
-Read the root `AGENTS.md` first — this file only adds docs-specific rules.
+Read the root `AGENTS.md` first. This file only adds docs-specific rules.
 
 ## Nuxt UI components in MDC
 

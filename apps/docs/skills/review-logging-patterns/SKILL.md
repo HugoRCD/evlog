@@ -35,7 +35,7 @@ Review and improve logging patterns in TypeScript/JavaScript codebases. Transfor
 
 ## Audit logs
 
-For security-sensitive actions (auth, billing, admin, data export), use evlog's audit layer — a typed `audit` field on wide events, not a parallel logger. See the **`build-audit-logs`** skill for end-to-end setup (`log.audit`, `withAudit`, denials, `auditEnricher`, `auditOnly`, `signed`, `mockAudit`).
+For security-sensitive actions (auth, billing, admin, data export), use evlog's audit layer: a typed `audit` field on wide events, not a parallel logger. See the **`build-audit-logs`** skill for end-to-end setup (`log.audit`, `withAudit`, denials, `auditEnricher`, `auditOnly`, `signed`, `mockAudit`).
 
 ```typescript
 log.audit({
@@ -56,11 +56,11 @@ npm install evlog
 
 ## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start)
 
-`@evlog/cli` is a **separate package** from `evlog` — early, but worth trying. It reads the project on disk (no traffic, no config). On the four supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines — continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
+`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On the four supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
 ### 1. Setup: `evlog init`
 
-On a project that doesn't use evlog yet, prefer `init` over hand-writing the setup — it detects the framework, reads what the project already has, and generates config, drains, enrichers, and extras in one pass. It is fully scriptable for agents:
+On a project that doesn't use evlog yet, prefer `init` over hand-writing the setup, since it detects the framework, reads what the project already has, and generates config, drains, enrichers, and extras in one pass. It is fully scriptable for agents:
 
 ```bash
 # preview everything without writing (always start here)
@@ -96,7 +96,7 @@ Work FIX FIRST in order, keep changes minimal (`useLogger()`, `log.set()`, `log.
 
 ### 3. Lock it in CI: `--min-score` and `--baseline`
 
-After fixing, propose making the score durable — this is where the CLI earns its keep:
+After fixing, propose making the score durable. This is where the CLI earns its keep:
 
 ```bash
 # in CI, after pnpm add -D @evlog/cli (project-local, pinned by the lockfile)
@@ -104,7 +104,7 @@ pnpm exec evlog map --min-score 80   # absolute gate: exits 1 below the threshol
 pnpm exec evlog map --baseline       # ratchet: exits 1 if this PR made things worse
 ```
 
-`--baseline` compares the fresh scan against the committed `evlog.map.json`, **per entry point and per requirement** — a refactor that instruments one route and breaks another fails even if the total score is unchanged. Disabling a passing check with a comment counts as a regression too. New uninstrumented routes are listed as `NEW AND DARK` without failing. Workflow: commit `evlog.map.json` once, add the `--baseline` run to CI (`pnpm add -D @evlog/cli` for a pinned version — ask first), and re-run `map` without `--baseline` to accept an intentional change. Docs: https://www.evlog.dev/cli/ci
+`--baseline` compares the fresh scan against the committed `evlog.map.json`, **per entry point and per requirement**, so a refactor that instruments one route and breaks another fails even if the total score is unchanged. Disabling a passing check with a comment counts as a regression too. New uninstrumented routes are listed as `NEW AND DARK` without failing. Workflow: commit `evlog.map.json` once, add the `--baseline` run to CI (`pnpm add -D @evlog/cli` for a pinned version, and ask first), then re-run `map` without `--baseline` to accept an intentional change. Docs: https://www.evlog.dev/cli/ci
 
 Early days: adapters and rules are still evolving; expect scores to move between releases. Docs: https://www.evlog.dev/cli/map · Rules: https://www.evlog.dev/cli/rules
 
@@ -125,7 +125,7 @@ export default defineNuxtConfig({
 })
 ```
 
-All evlog functions (`useLogger`, `createError`, `parseError`, `log`) are **auto-imported** — no import statements needed.
+All evlog functions (`useLogger`, `createError`, `parseError`, `log`) are **auto-imported**, with no import statements needed.
 
 ```typescript
 // server/api/checkout.post.ts — no imports needed
@@ -160,7 +160,7 @@ Client-side: `log`, `setIdentity`, `clearIdentity` are auto-imported in componen
 
 ### Next.js
 
-**Step 1: Create central config** — all exports come from here:
+**Step 1: Create central config.** All exports come from here:
 
 ```typescript
 // lib/evlog.ts
@@ -208,7 +208,7 @@ export const POST = withEvlog(async (request: Request) => {
 })
 ```
 
-**Step 3: Server Actions** — same `withEvlog()` wrapper:
+**Step 3: Server Actions.** Same `withEvlog()` wrapper:
 
 ```typescript
 // app/actions.ts
@@ -222,7 +222,7 @@ export const checkout = withEvlog(async (formData: FormData) => {
 })
 ```
 
-**Step 4: Middleware** (optional — sets `x-request-id` + timing headers):
+**Step 4: Middleware** (optional, sets `x-request-id` + timing headers):
 
 ```typescript
 // proxy.ts
@@ -231,7 +231,7 @@ export const proxy = evlogMiddleware()
 export const config = { matcher: ['/api/:path*'] }
 ```
 
-**Step 5: Client Provider** — wrap root layout:
+**Step 5: Client Provider.** Wrap the root layout:
 
 ```tsx
 // app/layout.tsx
@@ -250,7 +250,7 @@ export default function Layout({ children }: { children: React.ReactNode }) {
 }
 ```
 
-**Step 6: Client logging** — in any client component:
+**Step 6: Client logging.** In any client component:
 
 ```tsx
 'use client'
@@ -261,11 +261,11 @@ log.info({ action: 'checkout_click' })
 clearIdentity()
 ```
 
-**Step 7 (optional): Instrumentation** — startup + global `onRequestError` (SSR/RSC errors outside `withEvlog`). Use `defineNodeInstrumentation(() => import('./lib/evlog'))` in root `instrumentation.ts` to gate Node + cache the import, **or** write `register`/`onRequestError` manually — both are valid. For custom logic, wrap evlog’s `register`/`onRequestError` inside `lib/evlog.ts` (compose with your own init or metrics), then re-export.
+**Step 7 (optional): Instrumentation.** Startup plus global `onRequestError` (SSR/RSC errors outside `withEvlog`). Use `defineNodeInstrumentation(() => import('./lib/evlog'))` in root `instrumentation.ts` to gate Node + cache the import, **or** write `register`/`onRequestError` manually. Both are valid. For custom logic, wrap evlog’s `register`/`onRequestError` inside `lib/evlog.ts` (compose with your own init or metrics), then re-export.
 
 Export `createInstrumentation()` from `lib/evlog.ts` alongside `createEvlog()`. See framework docs for coexistence with `lockLogger`.
 
-**Step 8: Client ingest endpoint** — receives client logs:
+**Step 8: Client ingest endpoint.** Receives client logs:
 
 ```typescript
 // app/api/evlog/ingest/route.ts
@@ -529,7 +529,7 @@ app.get('/api/users', (c) => {
 })
 ```
 
-Access the logger via `c.get('log')` in handlers. Use `useLogger()` from `evlog/hono` in the layers underneath (services, repositories) where `c` is not in hand — both return the same logger:
+Access the logger via `c.get('log')` in handlers. Use `useLogger()` from `evlog/hono` in the layers underneath (services, repositories) where `c` is not in hand. Both return the same logger:
 
 ```typescript
 import { useLogger } from 'evlog/hono'
@@ -797,11 +797,11 @@ export default withEvlog(async (request, _env, _ctx, log) => {
 })
 ```
 
-`withEvlog` emits one wide event per request when the handler returns — no manual `log.emit()`. Async drains are registered with `waitUntil` so they survive the response; streaming responses defer the emit until the body completes. `requestId` comes from `x-request-id` (fallback `cf-ray`); `method`, `path`, `cf-ray`, `traceparent`, and the safe subset of `request.cf` are captured automatically. It accepts the same options (`drain`, `enrich`, `keep`, `include`, `exclude`, `routes`) as every other integration. For manual control (scheduled handlers, queues), `createWorkersLogger(request)` + `log.emit()` remains available. No ALS-based `useLogger()` on Workers — pass `log` explicitly.
+`withEvlog` emits one wide event per request when the handler returns, with no manual `log.emit()`. Async drains are registered with `waitUntil` so they survive the response; streaming responses defer the emit until the body completes. `requestId` comes from `x-request-id` (fallback `cf-ray`); `method`, `path`, `cf-ray`, `traceparent`, and the safe subset of `request.cf` are captured automatically. It accepts the same options (`drain`, `enrich`, `keep`, `include`, `exclude`, `routes`) as every other integration. For manual control (scheduled handlers, queues), `createWorkersLogger(request)` + `log.emit()` remains available. No ALS-based `useLogger()` on Workers, so pass `log` explicitly.
 
 ### AWS Lambda
 
-Lambda has no HTTP middleware lifecycle, so evlog behaves like standalone TypeScript — with one critical rule: **one logger per invocation**, never a shared module-level logger (Lambda reuses execution environments, so a shared instance leaks fields between invocations).
+Lambda has no HTTP middleware lifecycle, so evlog behaves like standalone TypeScript, with one critical rule: **one logger per invocation**, never a shared module-level logger (Lambda reuses execution environments, so a shared instance leaks fields between invocations).
 
 ```typescript
 import { initLogger, createLogger } from 'evlog'
@@ -941,7 +941,7 @@ All options work in Nuxt (`evlog` key), Nitro (passed to `evlog()`), Next.js (`c
 | NuxtHub | `@evlog/nuxthub` (separate package, Nuxt module) | None — stores wide events in the NuxtHub database with retention-based cleanup (set `evlog.retention: '7d'` in the module options; accepts `d`/`h`/`m`) |
 | HTTP (browser ingest) | `evlog/http` | None (configure `endpoint` in code). `evlog/browser` is deprecated; same API, removed next major |
 
-Use canonical env var names (e.g. `AXIOM_API_KEY`, `BETTER_STACK_API_KEY`) — the same names work in every framework.
+Use canonical env var names (e.g. `AXIOM_API_KEY`, `BETTER_STACK_API_KEY`), and the same names work in every framework.
 
 Setup pattern per framework:
 
@@ -981,7 +981,7 @@ See [references/drain-pipeline.md](references/drain-pipeline.md) for batching, r
 
 ## Enrichers
 
-Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()` — all from `evlog/enrichers`. Each accepts `{ overwrite?: boolean }` (default `false`). Use `createDefaultEnrichers()` to compose all four in one call:
+Built-in: `createUserAgentEnricher()`, `createGeoEnricher()`, `createRequestSizeEnricher()`, `createTraceContextEnricher()`, all from `evlog/enrichers`. Each accepts `{ overwrite?: boolean }` (default `false`). Use `createDefaultEnrichers()` to compose all four in one call:
 
 ```typescript
 import { createDefaultEnrichers } from 'evlog/enrichers'
@@ -1011,7 +1011,7 @@ createEvlog({
 
 ## Auto-Redaction (PII Protection)
 
-Built-in redaction scrubs sensitive data from wide events **before** console output and **before** any drain sees the data. **Enabled by default in production** (`NODE_ENV === 'production'`), disabled in development. Uses **smart partial masking** — preserving enough context for debugging.
+Built-in redaction scrubs sensitive data from wide events **before** console output and **before** any drain sees the data. **Enabled by default in production** (`NODE_ENV === 'production'`), disabled in development. Uses **smart partial masking**, preserving enough context for debugging.
 
 ```typescript
 // Disable in production (opt-out)
@@ -1142,7 +1142,7 @@ Anti-patterns to detect:
 
 ## Related Capabilities (pointers)
 
-Recommend these when the review surfaces the matching need — each has full docs on evlog.dev:
+Recommend these when the review surfaces the matching need. Each has full docs on evlog.dev:
 
 | Need spotted | evlog answer | Docs |
 |--------------|--------------|------|
@@ -1184,7 +1184,7 @@ throw createError({
 })
 ```
 
-Frontend — extract user-facing fields with `parseError()` (`internal` is never returned to clients):
+Frontend: extract user-facing fields with `parseError()` (`internal` is never returned to clients):
 
 ```typescript
 import { parseError } from 'evlog'
@@ -1215,7 +1215,7 @@ See [references/code-review.md](references/code-review.md) for the full checklis
 
 ## Loading Reference Files
 
-Load based on what you're working on — **do not load all at once**:
+Load based on what you're working on, and **do not load all at once**:
 
 - Designing wide events → [references/wide-events.md](references/wide-events.md)
 - Improving errors → [references/structured-errors.md](references/structured-errors.md)

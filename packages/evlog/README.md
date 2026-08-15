@@ -13,7 +13,7 @@
 
 **Digging through logs is not observability. It's hope.**
 
-A single request generates 10+ log lines. When production breaks at 3am, you're sifting scattered lines for a needle of signal. Your errors say "Something went wrong" — thanks, very helpful.
+A single request generates 10+ log lines. When production breaks at 3am, you're sifting scattered lines for a needle of signal. Your errors say "Something went wrong", which helps nobody.
 
 **evlog is different.** One wide event per operation. All the context. Errors that explain *why* and what to do next.
 
@@ -339,7 +339,7 @@ async function processSyncJob(job: Job) {
 
 ## Cloudflare Workers
 
-Use the Workers adapter for structured logs and correct platform severity. With `initWorkersLogger({ drain })`, use **`defineWorkerFetch`** so async drains are registered with `waitUntil` automatically (Cloudflare only passes `ExecutionContext` as the third `fetch` argument — there is no global).
+Use the Workers adapter for structured logs and correct platform severity. With `initWorkersLogger({ drain })`, use **`defineWorkerFetch`** so async drains are registered with `waitUntil` automatically (Cloudflare only passes `ExecutionContext` as the third `fetch` argument, and there is no global).
 
 ```typescript
 // src/index.ts
@@ -592,11 +592,11 @@ import { defineEvlogInstrumentation } from 'evlog/eve'
 export default defineEvlogInstrumentation()
 ```
 
-`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools — the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override.
+`defineEvlogHook()` maps eve turn lifecycle events to one wide event per turn. Call `useLogger()` in tools, where the logger is bound via AsyncLocalStorage on `turn.started`. Pass `ctx` only when ALS is unavailable (`useLogger(ctx)`). Pretty-printing follows `isDev()` by default (tree locally, JSON in production); set `init.pretty: false` explicitly if you need to override.
 
-`defineEvlogInstrumentation()` is optional: it stamps `evlog.request_id` onto eve's AI SDK spans so a trace joins back to its wide event, and back. It owns `agent/instrumentation.ts`, so when another observability backend needs that file, use eve's own `defineInstrumentation` and spread `evlogRuntimeContext(input)` into your runtime context instead. Requires eve 0.30 or later. Complements eve Agent Runs — see the [eve use case](https://evlog.dev/use-cases/eve).
+`defineEvlogInstrumentation()` is optional: it stamps `evlog.request_id` onto eve's AI SDK spans so a trace joins back to its wide event, and back. It owns `agent/instrumentation.ts`, so when another observability backend needs that file, use eve's own `defineInstrumentation` and spread `evlogRuntimeContext(input)` into your runtime context instead. Requires eve 0.30 or later. Complements eve Agent Runs. See the [eve use case](https://evlog.dev/use-cases/eve).
 
-Every turn event carries `eve.caller` — `principalId`, `principalType` and `authenticator` — so cost and volume group by who triggered the turn.
+Every turn event carries `eve.caller` (`principalId`, `principalType` and `authenticator`), so cost and volume group by who triggered the turn.
 
 See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
 
@@ -623,7 +623,7 @@ Client logs output to the browser console with colored tags in development.
 
 ### Client Transport
 
-To send client logs to the server for centralized logging, enable the transport:
+To send client logs to the server for centralized logging, enable the HTTP drain:
 
 ```typescript
 // nuxt.config.ts
@@ -828,7 +828,7 @@ export default defineEventHandler(async (event) => {
 | `signed(drain, { strategy: 'hmac' \| 'hash-chain', ... })` | wrapper | Tamper-evident integrity |
 | `auditRedactPreset` | preset | Strict PII for audit events |
 
-`AuditFields` is exported and merges with `BaseWideEvent` — augment it with `declare module` if you need extra typed fields. Audit events are always force-kept by tail sampling and get a deterministic `idempotencyKey` so retries are safe across drains.
+`AuditFields` is exported and merges with `BaseWideEvent`, so augment it with `declare module` if you need extra typed fields. Audit events are always force-kept by tail sampling and get a deterministic `idempotencyKey` so retries are safe across drains.
 
 See [the Audit Logs guide](https://evlog.dev/use-cases/audit/overview) for compliance, GDPR, and recipe details.
 
@@ -1031,7 +1031,7 @@ EVLOG_FS_DIR=.evlog/logs
 
 ### Memory
 
-In-memory ring buffer — works in any runtime, including Cloudflare Workers:
+In-memory ring buffer that works in any runtime, including Cloudflare Workers:
 
 ```typescript
 // server/plugins/evlog-drain.ts
@@ -1284,7 +1284,7 @@ log.getContext()                   // Get current context
 
 ### Wide event lifecycle and `log.fork()`
 
-The framework emits **one wide event per HTTP request** when the response finishes (or on error). After `emit()` runs — including when head sampling drops the event (`emit()` returns `null`) — that logger instance is **sealed**: further `set`, `error`, `info`, and `warn` calls are ignored and emit a **`[evlog]` console warning** listing dropped keys. A second `emit()` is ignored with a warning. This avoids silent data loss when async work (unawaited promises, `setTimeout`, etc.) still resolves `useLogger()` to the same logger via `AsyncLocalStorage` after the response has already been logged.
+The framework emits **one wide event per HTTP request** when the response finishes (or on error). After `emit()` runs, including when head sampling drops the event (`emit()` returns `null`), that logger instance is **sealed**: further `set`, `error`, `info`, and `warn` calls are ignored and emit a **`[evlog]` console warning** listing dropped keys. A second `emit()` is ignored with a warning. This avoids silent data loss when async work (unawaited promises, `setTimeout`, etc.) still resolves `useLogger()` to the same logger via `AsyncLocalStorage` after the response has already been logged.
 
 **`log.fork(label, fn)`** runs work under a **child** request logger: inside `fn`, `useLogger()` returns the child. When `fn` settles, the child emits its **own** wide event with `operation` set to `label` and `_parentRequestId` set to the parent’s `requestId` (query and dashboard correlation). The parent event may be emitted **before** the child event; they are two separate events ordered by time.
 
@@ -1330,7 +1330,7 @@ initWorkersLogger({
 
 ### `defineWorkerFetch(handler)`
 
-Recommended for Workers when using **`initWorkersLogger({ drain })`**. Wraps your handler so `createWorkersLogger` always receives `executionCtx` — you do not pass `ctx` into the factory yourself. Cloudflare does not expose `ExecutionContext` globally (only as `fetch`’s third argument), so this is the “automatic” option for plain Workers scripts.
+Recommended for Workers when using **`initWorkersLogger({ drain })`**. Wraps your handler so `createWorkersLogger` always receives `executionCtx`, so you do not pass `ctx` into the factory yourself. Cloudflare does not expose `ExecutionContext` globally (only as `fetch`’s third argument), so this is the “automatic” option for plain Workers scripts.
 
 ```typescript
 import { defineWorkerFetch, initWorkersLogger } from 'evlog/workers'
@@ -1383,7 +1383,7 @@ createError({
 })
 ```
 
-**`internal`** — Optional context for support, auditing, or debugging (IDs, gateway codes, raw diagnostics). It is stored on `EvlogError` and exposed as `error.internal` in server code. It is **not** included in JSON error responses, `toJSON()`, or `parseError()` results. When the error is passed to `log.error()` (or thrown in integrations that record errors on the wide event), `internal` is copied into the emitted event under `error.internal`.
+**`internal`.** Optional context for support, auditing, or debugging (IDs, gateway codes, raw diagnostics). It is stored on `EvlogError` and exposed as `error.internal` in server code. It is **not** included in JSON error responses, `toJSON()`, or `parseError()` results. When the error is passed to `log.error()` (or thrown in integrations that record errors on the wide event), `internal` is copied into the emitted event under `error.internal`.
 
 ### `parseError(error)`
 
@@ -1439,7 +1439,7 @@ try {
 
 ## CLI
 
-[`@evlog/cli`](https://npmjs.com/package/@evlog/cli) is a **separate package** — still early — that scores what your app can tell you when something goes wrong. It reads your project on disk — no traffic, no instrumentation — finds every entry point, and names the ones to fix first. Worth trying once you have anything wired; hand the report to an agent if you like.
+[`@evlog/cli`](https://npmjs.com/package/@evlog/cli) is a **separate package**, still early, that scores what your app can tell you when something goes wrong. It reads your project on disk, with no traffic and no instrumentation, and finds every entry point, and names the ones to fix first. Worth trying once you have anything wired; hand the report to an agent if you like.
 
 ```bash
 npx @evlog/cli map
@@ -1464,9 +1464,9 @@ FIX FIRST
 | `evlog map --min-score <n>` | Exit 1 below the threshold — a CI gate |
 | `evlog doctor` | Diagnose the install: Node, workspace, evlog version, local logs |
 
-Same code in, same verdict out, with the file and line for every finding — which also makes it something you can hand to an agent: run it, fix the list, run it again.
+Same code in, same verdict out, with the file and line for every finding, which also makes it something you can hand to an agent: run it, fix the list, run it again.
 
-> **Early days:** the CLI is tested and safe to run on any project, but it is young — four framework adapters today, rules still being refined. Expect verdicts and scores to move between releases; pin it as a dev dependency when you gate CI on the number.
+> **Early days:** the CLI is tested and safe to run on any project, but it is young: four framework adapters today, rules still being refined. Expect verdicts and scores to move between releases; pin it as a dev dependency when you gate CI on the number.
 
 Docs: [CLI](https://www.evlog.dev/cli/overview) · [`evlog map`](https://www.evlog.dev/cli/map) · [Rules](https://www.evlog.dev/cli/rules) · [Scoring](https://www.evlog.dev/cli/scoring) · [CI](https://www.evlog.dev/cli/ci)
 

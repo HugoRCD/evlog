@@ -16,7 +16,7 @@ Extend the coverage scanner in `@evlog/cli`. Two kinds of extension:
 feat(cli): add the {id} map rule
 ```
 
-The `cli` scope already exists — no scope registration needed.
+The `cli` scope already exists, so no scope registration is needed.
 
 ## Requirement or opportunity? Decide first
 
@@ -95,7 +95,7 @@ Key rules:
 
 ## Step 2–3: Registry + CheckId
 
-Add the import and one `REGISTRY` line in `rules/index.ts` (report order matters — requirements before opportunities, heaviest first), and the id to the `CheckId` union in `types.ts`. The `AssertIdsMatch` type in `index.ts` fails the build if you forget either side.
+Add the import and one `REGISTRY` line in `rules/index.ts` (report order matters: requirements before opportunities, heaviest first), and the id to the `CheckId` union in `types.ts`. The `AssertIdsMatch` type in `index.ts` fails the build if you forget either side.
 
 ## Step 4: Tests
 
@@ -114,7 +114,7 @@ Run: `pnpm --filter @evlog/cli exec vitest run test/map/rules.test.ts`
 
 ## Step 5–6: Docs
 
-Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/`. Then in `apps/docs/content/3.cli/3.rules.md`: add the row (column title, id, weight/fires-when, expects) and a `### {title} — {question}` section following the existing ones — what it checks, what passes, what fails, the suggested shape. Requirements with a weight also touch the scoring narrative in `4.scoring.md`.
+Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/`. Then in `apps/docs/content/3.cli/3.rules.md`: add the row (column title, id, weight/fires-when, expects) and a `### {title} — {question}` section following the existing ones, covering what it checks, what passes, what fails, the suggested shape. Requirements with a weight also touch the scoring narrative in `4.scoring.md`.
 
 ## Step 7: Published Skill
 
@@ -138,7 +138,7 @@ Then sanity-check on a real project: `pnpm cli map --no-write` from an example a
 
 ## Variant: New Framework Adapter
 
-Teaching `evlog map` a new framework is a different, heavier change — the adapter owns route discovery and framework capabilities.
+Teaching `evlog map` a new framework is a different, heavier change: the adapter owns route discovery and framework capabilities.
 
 | # | File | Action |
 |---|------|--------|
