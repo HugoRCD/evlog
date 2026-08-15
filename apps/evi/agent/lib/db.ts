@@ -36,6 +36,9 @@ let client: ReturnType<typeof drizzle<typeof schema>> | undefined
 export function getDb(): ReturnType<typeof drizzle<typeof schema>> | null {
   const url = databaseUrl()
   if (!url) return null
-  client ??= drizzle(postgres(url), { schema })
+  // `casing` has to be set here as well as in `drizzle.config.ts`: the config
+  // only reaches drizzle-kit, so without this the migration creates
+  // `person_id` while the query builder asks for `"personId"`.
+  client ??= drizzle(postgres(url), { schema, casing: 'snake_case' })
   return client
 }
