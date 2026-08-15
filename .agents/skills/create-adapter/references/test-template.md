@@ -6,10 +6,10 @@ Replace `{Name}`, `{name}`, `{NAME}` with the actual service name.
 
 Rules from the test README that apply here:
 
-- Use `mockFetch()` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `../helpers/fetch` — don't hand-roll fetch spies in adapter tests (a few older files still do; follow the helpers, not them).
-- Delete every env var the adapter reads in `afterEach` — leaked env vars make later tests order-dependent.
-- Test exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) in their own `describe` blocks — but only the ones the adapter actually exports. If the adapter has no converter (service accepts arbitrary JSON), drop the `to{Name}Event` import and its `describe` block entirely.
-- No `!` non-null assertions — use `defined()` from `../helpers/defined` if narrowing is needed.
+- Use `mockFetch()` + `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `../helpers/fetch`, don't hand-roll fetch spies in adapter tests (a few older files still do; follow the helpers, not them).
+- Delete every env var the adapter reads in `afterEach`. Leaked env vars make later tests order-dependent.
+- Test exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) in their own `describe` blocks, but only the ones the adapter actually exports. If the adapter has no converter (service accepts arbitrary JSON), drop the `to{Name}Event` import and its `describe` block entirely.
+- No `!` non-null assertions, use `defined()` from `../helpers/defined` if narrowing is needed.
 - Register the adapter in `encode-parity.test.ts` so the drain and `sendBatchTo{Name}` are pinned to the same encoder (not every existing adapter is registered there yet; new ones should be).
 
 ```typescript
@@ -160,9 +160,9 @@ describe('{name} adapter', () => {
 
 - **URL assertions**: Update expected URLs to the actual service API, including the path-already-present case if the encoder tolerates it (see `resolveLokiPushUrl`).
 - **Auth headers**: Match the service (`X-API-Key`, HTTP Basic, `X-ClickHouse-User`, …).
-- **Body format**: Wrapper objects (PostHog `{ api_key, batch }`), raw arrays (Axiom), NDJSON (ClickHouse) — assert the real structure, not just "is an array".
+- **Body format**: Wrapper objects (PostHog `{ api_key, batch }`), raw arrays (Axiom), NDJSON (ClickHouse). Assert the real structure, not just "is an array".
 - **Deprecated aliases**: If the adapter supports one (`token` → `apiKey`), add a test that the alias still resolves and that the canonical name wins when both are set.
-- **Error swallowing**: The drain itself never throws — that contract lives in `defineHttpDrain` and is covered by `test/toolkit/toolkit.test.ts`; don't re-test it per adapter. Only direct helpers surface errors.
+- **Error swallowing**: The drain itself never throws. That contract lives in `defineHttpDrain` and is covered by `test/toolkit/toolkit.test.ts`; don't re-test it per adapter. Only direct helpers surface errors.
 - **Service-specific helpers**: Every exported helper (`buildLokiPayload`, `toClickHouseRow`, severity mappers…) gets its own `describe` with edge cases (empty input, malformed timestamps, cardinality guards).
 
 ## Beyond unit tests

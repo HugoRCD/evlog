@@ -57,9 +57,9 @@ The contract is `defineEnricher<T>({ name, field, compute }, options?)`. You onl
 
 Key rules:
 
-- **Use the toolkit helpers**: `getHeader()` for case-insensitive header lookup, `normalizeNumber()` for numeric strings — both from `../shared/headers` (re-exported by `evlog/toolkit`).
-- **Single event field**: each enricher writes one top-level field on `ctx.event`. If the enricher must additionally pin top-level fields (like `createTraceContextEnricher` does for `event.traceId` / `event.spanId`), wrap the `defineEnricher` result in a closure — see that enricher for the pattern.
-- **Factory pattern**: `create{Name}Enricher(options: EnricherOptions = {})` returns the result of `defineEnricher(...)` — directly in the normal case, or through the thin closure wrapper when the enricher also pins top-level fields (see the single-event-field rule above).
+- **Use the toolkit helpers**: `getHeader()` for case-insensitive header lookup, `normalizeNumber()` for numeric strings. Both from `../shared/headers` (re-exported by `evlog/toolkit`).
+- **Single event field**: each enricher writes one top-level field on `ctx.event`. If the enricher must additionally pin top-level fields (like `createTraceContextEnricher` does for `event.traceId` / `event.spanId`), wrap the `defineEnricher` result in a closure, see that enricher for the pattern.
+- **Factory pattern**: `create{Name}Enricher(options: EnricherOptions = {})` returns the result of `defineEnricher(...)`, directly in the normal case, or through the thin closure wrapper when the enricher also pins top-level fields (see the single-event-field rule above).
 - **No side effects**: never throw, never log; rely on `defineEnricher`'s built-in error handling if something goes wrong.
 - **Export the Info type**: `{Name}Info` describing the field shape, exported alongside the factory.
 
@@ -69,12 +69,12 @@ Add tests to `packages/evlog/test/toolkit/enrichers.test.ts`, following the exis
 
 Required test categories:
 
-1. **Sets field from headers** — verify the enricher populates the event field correctly
-2. **Skips when source data missing** — verify no field is set when the required header/input is absent
-3. **Preserves existing data** — verify `overwrite: false` (default) doesn't replace user-provided fields
-4. **Overwrites when requested** — verify `overwrite: true` replaces existing fields
-5. **Handles edge cases** — empty strings, malformed values, case-insensitive header names
-6. **Default composition** — if the enricher joined `createDefaultEnrichers()`, extend that composition's tests
+1. **Sets field from headers**: verify the enricher populates the event field correctly
+2. **Skips when source data missing**: verify no field is set when the required header/input is absent
+3. **Preserves existing data**: verify `overwrite: false` (default) doesn't replace user-provided fields
+4. **Overwrites when requested**: verify `overwrite: true` replaces existing fields
+5. **Handles edge cases**: empty strings, malformed values, case-insensitive header names
+6. **Default composition**: if the enricher joined `createDefaultEnrichers()`, extend that composition's tests
 
 ## Step 3: Update the Enrichers Docs Page
 

@@ -55,10 +55,10 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, co
 - All code in TypeScript. Follow existing patterns in `packages/evlog/src/`.
 - JSDoc on all public APIs.
 - No HTML comments (`<!-- -->`) in Vue templates.
-- `README.md` at root is a **symlink** to `packages/evlog/README.md` — edit the source directly.
+- `README.md` at root is a **symlink** to `packages/evlog/README.md`. Edit the source directly.
 - `evlog/toolkit` is the public entrypoint for `src/shared/`. Never use `evlog/shared`.
-- `evlog/browser` is deprecated — use `evlog/http` instead.
-- Every framework integration exposes the **same contract**: `evlog()` middleware, `useLogger()`, `log.fork()`, and the full `BaseEvlogOptions` surface. Framework-native accessors (`c.get('log')`, `req.log`, `event.locals.log`, `context.get(loggerContext)`) stay alongside it — they are the idiomatic path inside handlers, `useLogger()` is for the layers underneath. When adding an integration, provide both.
+- `evlog/browser` is deprecated, use `evlog/http` instead.
+- Every framework integration exposes the **same contract**: `evlog()` middleware, `useLogger()`, `log.fork()`, and the full `BaseEvlogOptions` surface. Framework-native accessors (`c.get('log')`, `req.log`, `event.locals.log`, `context.get(loggerContext)`) stay alongside it. They are the idiomatic path inside handlers, `useLogger()` is for the layers underneath. When adding an integration, provide both.
 - `useLogger()` is backed by `AsyncLocalStorage`. On Cloudflare Workers that needs the `nodejs_compat` / `nodejs_als` flag, so `evlog/workers` deliberately has no `useLogger()` and passes the logger as the handler's fourth argument instead.
 - New export? Update both `packages/evlog/package.json` exports and `packages/evlog/tsdown.config.ts`.
 - Creating a new adapter, enricher, or framework integration? Read the matching skill at `.agents/skills/` **before starting**:
@@ -66,17 +66,17 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, co
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
   - `.agents/skills/create-map-rule/SKILL.md` (also covers new `evlog map` framework adapters)
-- Writing or reviewing prose — a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset? Read `.agents/skills/write-evlog-content/SKILL.md` first, and run `pnpm content:lint <path>` before the review. It carries the voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell. These files are content too: `pnpm content:lint --surface skill` and `--surface agents` rank them.
-- **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents — an adapter, enricher, integration, API surface, or workflow — update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
+- Writing or reviewing prose, a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset? Read `.agents/skills/write-evlog-content/SKILL.md` first, and run `pnpm content:lint <path>` before the review. It carries the voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell. These files are content too: `pnpm content:lint --surface skill` and `--surface agents` rank them.
+- **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents (an adapter, enricher, integration, API surface, or workflow), update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
 
 ### Code style: no slop
 
-- **No gratuitous defensive code.** Don't add try/catch, null checks, or input validation the surrounding file doesn't have — especially on paths already validated upstream. Match the file's level of paranoia.
+- **No gratuitous defensive code.** Don't add try/catch, null checks, or input validation the surrounding file doesn't have, especially on paths already validated upstream. Match the file's level of paranoia.
 - **No silent fallbacks.** No empty `catch`, no `?? default` that masks a bug, no `as any` to silence TypeScript. If something can fail, let it fail loudly or handle it explicitly.
 - **Comments are rare and earn their place.** Only for constraints the code can't express (a protocol quirk, a deliberate perf trade-off). Never paraphrase the code, never narrate a change. When in doubt: no comment.
-- **A comment states a durable constraint, not the moment you wrote it.** One or two lines. No issue ids, no measurements, no before/after story, no "I found that…" — that belongs in the PR body, the changeset, or a doc. Code outlives the task that produced it; a paragraph pinned to last Tuesday's investigation reads as noise six months later and nobody dares delete it.
-- **This extends to all prose**: test names, error/log messages, changeset descriptions, PR bodies. Factual and plain — no emoji, no superlatives, no filler.
-- **No speculative code.** No unrequested options or parameters, no "just in case" branches, no keeping the old code path alongside the new one. Delete dead code; public API deprecations are a maintainer decision — ask first.
+- **A comment states a durable constraint, not the moment you wrote it.** One or two lines. No issue ids, no measurements, no before/after story, no "I found that…". That belongs in the PR body, the changeset, or a doc. Code outlives the task that produced it; a paragraph pinned to last Tuesday's investigation reads as noise six months later and nobody dares delete it.
+- **This extends to all prose**: test names, error/log messages, changeset descriptions, PR bodies. Factual and plain, no emoji, no superlatives, no filler.
+- **No speculative code.** No unrequested options or parameters, no "just in case" branches, no keeping the old code path alongside the new one. Delete dead code; public API deprecations are a maintainer decision. Ask first.
 - **Prefer deleting and simplifying over working around.** If the fix needs a workaround, question the design before adding the workaround.
 
 ### Changesets
@@ -86,7 +86,7 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, co
 - **When to add a changeset:** any change that affects the public API, adds a feature, fixes a bug, or introduces a breaking change. If a consumer of evlog would notice the difference, it needs a changeset.
 - **When you can skip:** internal-only changes (CI config, docs typos, test refactors, devDeps bumps) that don't touch the published package.
 - **Bump type:** `patch` for fixes, `minor` for features, `major` for breaking changes.
-- **Description:** write from the consumer's perspective — what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
+- **Description:** write from the consumer's perspective: what changed and how to use it. See existing changesets in `.changeset/` for tone and level of detail.
 
 A PR without a changeset for a user-facing change will not be merged. Changes confined to `apps/*` or `examples/*`, docs included, never need one. For the rare published-package change that genuinely needs no release note, run `pnpm changeset add --empty`.
 
@@ -94,7 +94,7 @@ A PR without a changeset for a user-facing change will not be merged. Changes co
 
 PR titles and commits follow [Conventional Commits](https://conventionalcommits.org). The CI source of truth is `.github/workflows/semantic-pull-request.yml` (lints PR titles via `amannn/action-semantic-pull-request`); `.github/pull_request_template.md` mirrors the same lists for contributors.
 
-- **Subject must not start with an uppercase letter.** `feat: add stream server` ✓ — `feat: Add stream server` ✗.
+- **Subject must not start with an uppercase letter.** `feat: add stream server` ✓. `feat: Add stream server` ✗.
 - **Omit the scope when the change is cross-cutting** (touches multiple subsystems, or is repo-wide). Don't use `evlog` as a scope: the whole monorepo *is* evlog, so a no-scope title already means "evlog itself".
 - **Use a scope only to point at one subsystem.** Adapters get their own scope (one per entrypoint, e.g. `axiom`, `datadog`, `fs`); framework integrations get the framework's name (`nuxt`, `next`, `hono`, ...); core internals (logger, pipeline, error, redact, catalog) go under `core`.
 - **When you add a new subsystem** (adapter, integration, top-level entrypoint), add its scope to **both** the workflow and the template. Keep both lists alphabetically sorted. Because title validation reads the base branch's scope list, either register the scope in a preceding PR or omit the scope from the subsystem PR title.
@@ -122,7 +122,7 @@ Rules:
 1. Every change has a matching test. Bug fixes require a *failing* regression test before the fix.
 2. Always import real source helpers, never re-implement them in tests.
 3. Use the helpers in `test/helpers/` (drain spies, fake timers, fetch mock, framework matrix). The full decision table is in `test/README.md`.
-4. Framework tests must use the framework's real request driver (supertest, `app.inject`, `app.handle`, `Test.createTestingModule`, ...) — see the fidelity matrix in `test/README.md`.
+4. Framework tests must use the framework's real request driver (supertest, `app.inject`, `app.handle`, `Test.createTestingModule`, ...), see the fidelity matrix in `test/README.md`.
 
 ## Definition of Done
 
@@ -141,19 +141,19 @@ A task is complete when **all** of the following pass:
 
 **Always do:**
 - Run lint, typecheck, and test before reporting done
-- Follow existing code patterns — read neighboring files before writing new ones
+- Follow existing code patterns: read neighboring files before writing new ones
 - Use the skills at `.agents/skills/` for new adapters, enrichers, or integrations
-- Add a changeset (`pnpm changeset`) for every user-facing change — features, bug fixes, breaking changes
+- Add a changeset (`pnpm changeset`) for every user-facing change: features, bug fixes, breaking changes
 
 **Ask first:**
-- Adding new dependencies — note `pnpm-workspace.yaml` sets `minimumReleaseAge: 2880`: a package published less than 48h ago fails to install unless added to `minimumReleaseAgeExclude`
+- Adding new dependencies: note `pnpm-workspace.yaml` sets `minimumReleaseAge: 2880`: a package published less than 48h ago fails to install unless added to `minimumReleaseAgeExclude`
 - Changing package exports or build config
 - Architectural decisions that affect multiple packages
 
 **Never:**
 - Commit secrets, `.env` files, or API keys
 - Skip tests or lint to "fix later"
-- Loosen an assertion, widen a type, or delete a test to make it pass — a failing test is a signal; fix the cause
+- Loosen an assertion, widen a type, or delete a test to make it pass: a failing test is a signal; fix the cause
 - Ship a feature, bug fix, or refactor without a matching test
 - Add HTML comments in Vue `<template>` blocks
 - Modify `node_modules/` or generated files
@@ -164,23 +164,23 @@ A task is complete when **all** of the following pass:
 Default: anything that stays on the local clone is fine, anything that touches the remote or GitHub requires an explicit instruction in the task at hand. Never act on assumption. If the maintainer didn't ask for a push or a PR, prepare the branch locally and stop there.
 
 **OK (local-only, no ask needed):**
-- `git branch`, `git checkout`, `git switch`, `git checkout -b` — create and move between branches freely
-- `git add`, `git commit` — staging and local commits are fine
-- `git status`, `git diff`, `git log`, `git show`, `git stash`, `git restore`, `git reset` (local only) — read and rearrange the working tree
-- `gh pr view`, `gh pr list`, `gh pr diff`, `gh issue view`, `gh run view` — read-only GitHub queries
+- `git branch`, `git checkout`, `git switch`, `git checkout -b`: create and move between branches freely
+- `git add`, `git commit`: staging and local commits are fine
+- `git status`, `git diff`, `git log`, `git show`, `git stash`, `git restore`, `git reset` (local only): read and rearrange the working tree
+- `gh pr view`, `gh pr list`, `gh pr diff`, `gh issue view`, `gh run view`: read-only GitHub queries
 
 **OK when the maintainer explicitly asks (in the current task):**
 - `git push -u origin <feature-branch>`: push a feature branch you just prepared
 - `git push --force-with-lease origin <feature-branch>`: only on a feature branch you authored, after a clean rebase
 - `gh pr create --base main --head <feature-branch>`: open a PR
-- Write a **PR title** (Conventional Commits, see above) and a **PR body** — keep the body factual, mirror the changeset, reference the issue (`Closes #X`); no marketing copy
+- Write a **PR title** (Conventional Commits, see above) and a **PR body**: keep the body factual, mirror the changeset, reference the issue (`Closes #X`); no marketing copy
 
 **Never (no exceptions, even when asked):**
-- Push directly to `main` (or `master`) — protected, always goes through a PR
+- Push directly to `main` (or `master`): protected, always goes through a PR
 - `git push --force` without `--with-lease`, `git push --tags`
 - `gh pr merge`, `gh pr close`, `gh pr review`, `gh issue create`, `gh issue edit`, `gh release create`
-- Write a changelog entry, release note, or commit message **body** with multi-paragraph narrative — the changeset is the source of truth; commit subjects stay single-line, PR bodies stay short
-- Add a `Co-authored-by`, `Signed-off-by`, "Generated with…", "🤖", or any signature/attribution that names an agent, model, or tool — **the work is the maintainer's, full stop**
+- Write a changelog entry, release note, or commit message **body** with multi-paragraph narrative. The changeset is the source of truth; commit subjects stay single-line, PR bodies stay short
+- Add a `Co-authored-by`, `Signed-off-by`, "Generated with…", "🤖", or any signature/attribution that names an agent, model, or tool: **the work is the maintainer's, full stop**
 
 ## When Stuck
 - Unsure about architecture → read the relevant SKILL.md or ask

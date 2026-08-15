@@ -9,7 +9,7 @@ Add a new framework integration to evlog. The recommended path is the **manifest
 
 ## Two paths
 
-- **Manifest mode** (preferred, ~30–80 lines of glue) — call `defineFrameworkIntegration({ name, extractRequest, attachLogger, storage? })` once at module level, then write a tiny middleware that calls `integration.start(ctx, options)` and runs the framework's `next()` inside `runWith`. Reference implementations — all of `packages/evlog/src/{hono,express,fastify,elysia,nestjs,orpc,react-router,sveltekit,workers}/index.ts` use it.
+- **Manifest mode** (preferred, ~30–80 lines of glue). Call `defineFrameworkIntegration({ name, extractRequest, attachLogger, storage? })` once at module level, then write a tiny middleware that calls `integration.start(ctx, options)` and runs the framework's `next()` inside `runWith`. Reference implementations: all of `packages/evlog/src/{hono,express,fastify,elysia,nestjs,orpc,react-router,sveltekit,workers}/index.ts` use it.
 - **Custom mode**: use `createMiddlewareLogger` directly when the framework's lifecycle doesn't fit a standard middleware. Current custom-mode integrations: Next.js (`src/next/`), Nitro v2/v3 (`src/nitro/`, `src/nitro-v3/`), Eve (`src/eve/`).
 
 Manifest mode now covers all classic HTTP frameworks. Use custom mode only when you can't extract a request synchronously at the start of the lifecycle (server actions, module-level hooks, agent turns).
@@ -19,7 +19,7 @@ Manifest mode now covers all classic HTTP frameworks. Use custom mode only when 
 Every framework integration must expose:
 
 1. `evlog()` middleware/plugin accepting the full `BaseEvlogOptions` (`drain`, `enrich`, `keep`, `include`, `exclude`, `routes`, `plugins`)
-2. `useLogger()` (ALS-backed) — Workers is the one sanctioned exception (ALS needs a compat flag there; `defineWorkerFetch` attaches the logger instead)
+2. `useLogger()` (ALS-backed). Workers is the one sanctioned exception (ALS needs a compat flag there; `defineWorkerFetch` attaches the logger instead)
 3. `log.fork()` support (automatic when `storage` is provided to the manifest)
 4. The framework-native accessor (`c.get('log')`, `req.log`, `event.locals.log`, …)
 
@@ -141,24 +141,24 @@ export function evlog(options: Evlog{Framework}Options = {}): FrameworkMiddlewar
 
 ### Reference Implementations
 
-- **Hono**: `src/hono/index.ts` — `c.set('log', logger)` + ALS `useLogger()`, streaming deferral via `shouldDeferEmitForResponse`, `waitUntil` detection
-- **Express**: `src/express/index.ts` — `req.log`, ALS storage, `res.on('finish')` for terminal status
-- **Fastify**: `src/fastify/index.ts` — Fastify hooks (`onRequest` / `onResponse` / `onError`), `fastify-plugin` wrapper
-- **Elysia**: `src/elysia/index.ts` — plugin with `.derive({ as: 'global' })`, `storage.enterWith`-style ALS, streaming deferral
-- **NestJS**: `src/nestjs/index.ts` — `EvlogModule.forRoot()` / `forRootAsync()` on top of the manifest
-- **oRPC**: `src/orpc/index.ts` — `evlog()` procedure middleware + `withEvlog(handler)` wrapper
-- **React Router**: `src/react-router/index.ts` — `loggerContext = createContext<AuditableLogger>()`
-- **SvelteKit**: `src/sveltekit/index.ts` — `evlog()` handle + `evlogHandleError()` + `createEvlogHooks()`
-- **Workers**: `src/workers/index.ts` — `defineWorkerFetch` / `withEvlog`, no ALS `useLogger()` (compat-flag constraint)
+- **Hono**: `src/hono/index.ts`. `c.set('log', logger)` + ALS `useLogger()`, streaming deferral via `shouldDeferEmitForResponse`, `waitUntil` detection
+- **Express**: `src/express/index.ts`. `req.log`, ALS storage, `res.on('finish')` for terminal status
+- **Fastify**: `src/fastify/index.ts`. Fastify hooks (`onRequest` / `onResponse` / `onError`), `fastify-plugin` wrapper
+- **Elysia**: `src/elysia/index.ts`. Plugin with `.derive({ as: 'global' })`, `storage.enterWith`-style ALS, streaming deferral
+- **NestJS**: `src/nestjs/index.ts`. `EvlogModule.forRoot()` / `forRootAsync()` on top of the manifest
+- **oRPC**: `src/orpc/index.ts`. `evlog()` procedure middleware + `withEvlog(handler)` wrapper
+- **React Router**: `src/react-router/index.ts`. `loggerContext = createContext<AuditableLogger>()`
+- **SvelteKit**: `src/sveltekit/index.ts`. `evlog()` handle + `evlogHandleError()` + `createEvlogHooks()`
+- **Workers**: `src/workers/index.ts`. `defineWorkerFetch` / `withEvlog`, no ALS `useLogger()` (compat-flag constraint)
 
 ### Key Architecture Rules
 
-1. **Prefer `defineFrameworkIntegration`** — it handles header normalization, request-id generation, ALS, fork attachment, and `waitUntil`.
-2. **Status / error reporting stays framework-side** — call `finish({ status })` on success and `finish({ error })` on failure. `finish` runs emit + enrich + drain + plugin hooks.
+1. **Prefer `defineFrameworkIntegration`**: it handles header normalization, request-id generation, ALS, fork attachment, and `waitUntil`.
+2. **Status / error reporting stays framework-side**: call `finish({ status })` on success and `finish({ error })` on failure. `finish` runs emit + enrich + drain + plugin hooks.
 3. **Re-throw errors** after `finish({ error })` so the framework's own error handler still runs.
-4. **Streaming responses** — if the framework can return streaming bodies, defer the emit until the stream closes (`shouldDeferEmitForResponse`; see Hono and Elysia).
-5. **Framework SDK is an optional peer dependency** — never bundle it.
-6. **Never duplicate pipeline logic** — `runEnrichAndDrain` is internal to `createMiddlewareLogger`/`finish`.
+4. **Streaming responses**: if the framework can return streaming bodies, defer the emit until the stream closes (`shouldDeferEmitForResponse`; see Hono and Elysia).
+5. **Framework SDK is an optional peer dependency**: never bundle it.
+6. **Never duplicate pipeline logic**: `runEnrichAndDrain` is internal to `createMiddlewareLogger`/`finish`.
 7. **Export type helpers** for typed context access (e.g., `EvlogVariables` for Hono).
 
 ### When to fall back to custom mode
@@ -205,18 +205,18 @@ Create `packages/evlog/test/frameworks/{framework}.test.ts`. Read `packages/evlo
 Two non-negotiables:
 
 1. **Real request driver.** Use the framework's own driver: supertest (Express/NestJS), `app.request()` (Hono), `app.inject()` (Fastify), `app.handle(new Request(...))` (Elysia). If no Node-friendly driver exists, call the user-facing contract directly with realistic input shapes (see the SvelteKit and React Router tests). Never extract internals to test a substitute.
-2. **Wire the shared matrix.** Call `describeStandardHttpMatrix({ name, mount })` from `test/helpers/frameworkMatrix.ts` — it covers the standard sweep (event emission, `x-request-id`, route service) for every HTTP framework.
+2. **Wire the shared matrix.** Call `describeStandardHttpMatrix({ name, mount })` from `test/helpers/frameworkMatrix.ts`. It covers the standard sweep (event emission, `x-request-id`, route service) for every HTTP framework.
 
 On top of the matrix, cover the framework-specific surface:
 
 1. Framework-native accessor returns the logger (`c.get('log')`, `req.log`, …)
-2. Error handling — errors captured, event has error level + details, error re-thrown
-3. Route filtering — skipped routes don't create a logger, skip drain/enrich
-4. Context accumulation — `logger.set()` data appears in the emitted event
+2. Error handling. Errors captured, event has error level + details, error re-thrown
+3. Route filtering. Skipped routes don't create a logger, skip drain/enrich
+4. Context accumulation. `logger.set()` data appears in the emitted event
 5. Drain / enrich / keep callbacks (use `createPipelineSpies()`, `assertHttpEventEmitted`, `waitForDrainCalls`, `findEventViaDrain` from `test/helpers/framework.ts`)
-6. Drain/enrich error resilience — errors there never break the request
-7. `useLogger()` — same logger as the native accessor, works across async boundaries, throws outside context
-8. Streaming (if applicable) — event deferred until the body closes
+6. Drain/enrich error resilience. Errors there never break the request
+7. `useLogger()`: same logger as the native accessor, works across async boundaries, throws outside context
+8. Streaming (if applicable). Event deferred until the body closes
 
 Use fake timers for anything time-based; `defined()` instead of `!`.
 
@@ -244,16 +244,16 @@ links:
 
 **Sections** (follow the Express/Hono/Elysia pages as reference):
 
-1. **Quick Start** — install + register middleware (copy-paste minimum setup)
-2. **Wide Events** — progressive `log.set()` usage
-3. **useLogger()** — accessing logger from services without passing the request
-4. **Error Handling** — `createError()` + `parseError()` + framework error handler
-5. **Drain & Enrichers** — middleware options with inline example
-6. **Pipeline (Batching & Retry)** — `createDrainPipeline` example
-7. **Tail Sampling** — `keep` callback
-8. **Route Filtering** — `include` / `exclude` / `routes`
-9. **Client-Side Logging** — HTTP drain (`evlog/http`) (only if the framework has a client-side story)
-10. **Run Locally** — clone + `pnpm example {framework}`
+1. **Quick Start**: install + register middleware (copy-paste minimum setup)
+2. **Wide Events**: progressive `log.set()` usage
+3. **useLogger()**: accessing logger from services without passing the request
+4. **Error Handling**: `createError()` + `parseError()` + framework error handler
+5. **Drain & Enrichers**: middleware options with inline example
+6. **Pipeline (Batching & Retry)**: `createDrainPipeline` example
+7. **Tail Sampling**: `keep` callback
+8. **Route Filtering**: `include` / `exclude` / `routes`
+9. **Client-Side Logging**: HTTP drain (`evlog/http`) (only if the framework has a client-side story)
+10. **Run Locally**: clone + `pnpm example {framework}`
 11. **Card group** linking to GitHub source
 
 ## Step 6: Overview & Installation Cards
@@ -309,11 +309,11 @@ Create `examples/{framework}/` with a runnable app demonstrating all evlog featu
 The app must include:
 
 1. **`evlog()` middleware** with `drain` (PostHog) and `enrich` callbacks
-2. **Health route** — basic `log.set()` usage
-3. **Data route** — context accumulation with user/business data, using `useLogger()` in a service function
-4. **Error route** — `createError()` with status/why/fix/link
-5. **Error handler** — framework's error handler with `parseError()` + manual `log.error()`
-6. **Test UI** — served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses
+2. **Health route**: basic `log.set()` usage
+3. **Data route**: context accumulation with user/business data, using `useLogger()` in a service function
+4. **Error route**: `createError()` with status/why/fix/link
+5. **Error handler**: framework's error handler with `parseError()` + manual `log.error()`
+6. **Test UI**: served at `/`, a self-contained HTML page with buttons to hit each route and display JSON responses
 
 **Drain must use PostHog** (`createPostHogDrain()` from `evlog/posthog`). `POSTHOG_API_KEY` is set in the root `.env` (maintainer's key, not committed), so every example exercises a real external drain. Without the env var the drain resolves to `null` and skips, so someone cloning the repo sends nothing anywhere unless they opt in with their own key. Enable pretty printing for readable local output.
 
