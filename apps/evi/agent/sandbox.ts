@@ -19,11 +19,12 @@ export default defineSandbox({
   backend: defaultBackend({
     vercel: {
       resources: { vcpus: 4 },
-      // Each idled-out session leaves a ~1.5 GB snapshot, billed per GB-month
-      // for 30 days by default. A thread reopened after two days is rare.
-      // This also expires the template snapshot, so a rebuild runs at most
-      // every 48h.
-      snapshotExpiration: 48 * 60 * 60 * 1000,
+      // One snapshot per sandbox keeps storage flat. The old 48h expiration
+      // also killed the template snapshot after any quiet stretch, forcing a
+      // full runtime rebuild that sessions queue behind.
+      keepLastSnapshots: { count: 1, deleteEvicted: true },
+      // Vercel removes unresumable sandboxes after 14 days anyway.
+      snapshotExpiration: 14 * 24 * 60 * 60 * 1000,
     },
   }),
   revalidationKey: () => `evlog-workspace-v5:${agentBrowserRevalidationKey()}:${BEFORE_AFTER_CLI}`,
@@ -32,9 +33,11 @@ export default defineSandbox({
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
     await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
     // Prime the turbo cache so a session's checks only re-run what its diff
-    // (plus the drift since the template build) affects, instead of the whole
-    // monorepo cold. Failures surface at template build, not in sessions.
-    await sandbox.run({ command: 'cd repo && pnpm run lint && pnpm run typecheck && pnpm run test' })
+    // affects. Deployed builds only: locally this is minutes of CPU on every
+    // template rebuild.
+    if (process.env.VERCEL) {
+      await sandbox.run({ command: 'cd repo && pnpm run lint && pnpm run typecheck && pnpm run test' })
+    }
     // Commits authored in the sandbox belong to the bot, on every channel.
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
     // Browser tooling is template-scoped: Chromium is paid once per template
@@ -47,8 +50,6 @@ export default defineSandbox({
     // The template snapshot is owned by the builder uid, not the session user;
     // without these entries every git command, this fetch included, dies on
     // "dubious ownership" and the GitHub channel checkout fails silently.
-    // Written here rather than in bootstrap so they land in the session
-    // identity's own config whatever HOME it resolves to.
     await sandbox.run({ command: 'git config --global --add safe.directory /workspace && git config --global --add safe.directory /workspace/repo' })
     await sandbox.run({ command: 'cd repo && git fetch origin main && git checkout -B main origin/main' })
   },
