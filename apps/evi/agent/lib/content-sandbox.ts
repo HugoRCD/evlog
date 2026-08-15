@@ -20,9 +20,10 @@ export default defineSandbox({
   backend: defaultBackend({
     vercel: {
       resources: { vcpus: 2 },
-      // A reviewer or a rewriter lives for one dispatch. Nothing here is worth
-      // a snapshot the next pass will not reuse.
-      snapshotExpiration: 6 * 60 * 60 * 1000,
+      // One day is the platform floor: Vercel rejects anything between 0 and
+      // 86400000 ms. It also matches the pass's cadence, so a snapshot lives
+      // exactly as long as the gap between two runs.
+      snapshotExpiration: 24 * 60 * 60 * 1000,
     },
   }),
   revalidationKey: () => 'evlog-content-workspace-v1',
