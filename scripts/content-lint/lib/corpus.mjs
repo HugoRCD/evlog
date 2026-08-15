@@ -230,7 +230,14 @@ export const ALTERNATIVES = [
 ]
 
 /** Words that turn naming an alternative into a claim about it. */
-const COMPARATIVE = /\b(unlike|whereas|slower|faster|heavier|lighter|worse|better|lacks?|cannot|can['’]t|does ?n[o'’]t|has no|have no|without|instead of|beats?|outperforms?)\b/i
+const COMPARATIVE = /\b(unlike|whereas|slower|faster|heavier|lighter|worse|better|lacks?|cannot|can['’]t|does ?n[o'’]t|has no|have no|beats?|outperforms?)\b/i
+
+/**
+ * Comparatives that only compare what follows them. `Without setup,
+ * OpenTelemetry export is untouched` states a condition on evlog's own
+ * behaviour, and the tool named after the comma is its subject, not its target.
+ */
+const DIRECTED = /\b(without|instead of)\s+((?:\w+\s+){0,3}\w+)/i
 
 const CONTRACTION = /\b[A-Za-z]+['’](s|t|re|ve|ll|d|m)\b/g
 const EXPANDED = /\b(do not|does not|did not|is not|are not|was not|were not|cannot|can not|will not|would not|should not|could not|have not|has not|had not|it is|that is|there is|you are|we are|they are|you will|we will|let us)\b/gi
@@ -246,8 +253,10 @@ const EXPANDED = /\b(do not|does not|did not|is not|are not|was not|were not|can
 export function comparativeClaim(text) {
   const lower = text.toLowerCase()
   const tool = ALTERNATIVES.find(name => new RegExp(`\\b${name}\\b`).test(lower))
-  if (!tool || !COMPARATIVE.test(text)) return null
-  return tool
+  if (!tool) return null
+  if (COMPARATIVE.test(text)) return tool
+  const directed = lower.match(DIRECTED)
+  return directed && new RegExp(`\\b${tool}\\b`).test(directed[2]) ? tool : null
 }
 
 /**

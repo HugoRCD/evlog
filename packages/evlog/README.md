@@ -611,7 +611,7 @@ log.info('checkout', 'User initiated checkout')
 log.error({ action: 'payment', error: 'validation_failed' })
 ```
 
-In Nuxt, `log` is auto-imported -- no import needed in Vue components:
+In Nuxt, `log` is auto-imported, so a Vue component needs no import:
 
 ```vue
 <script setup>
@@ -735,7 +735,7 @@ Each enricher adds a specific field to the event:
 
 All enrichers accept an optional `{ overwrite?: boolean }` option. By default (`overwrite: false`), user-provided data on the event takes precedence over enricher-computed values. Set `overwrite: true` to always replace existing fields.
 
-> **Cloudflare geo note:** Only `cf-ipcountry` is a real Cloudflare HTTP header. The `cf-region`, `cf-city`, `cf-latitude`, `cf-longitude` headers are NOT standard -- they are properties of `request.cf`. For full geo data on Cloudflare, write a custom enricher that reads `request.cf`, or use a Workers middleware to forward `cf` properties as custom headers.
+> **Cloudflare geo note:** Only `cf-ipcountry` is a real Cloudflare HTTP header. The `cf-region`, `cf-city`, `cf-latitude`, `cf-longitude` headers are NOT standard: they are properties of `request.cf`. For full geo data on Cloudflare, write a custom enricher that reads `request.cf`, or use a Workers middleware to forward `cf` properties as custom headers.
 
 ### Custom Enrichers
 
@@ -1142,9 +1142,9 @@ export default defineNitroPlugin((nitroApp) => {
 
 The function returned by `pipeline(drain)` is hook-compatible and exposes:
 
-- **`drain(ctx)`** -- Push a single event into the buffer
-- **`drain.flush()`** -- Force-flush all buffered events (call on server shutdown)
-- **`drain.pending`** -- Number of events currently buffered
+- **`drain(ctx)`**: push a single event into the buffer
+- **`drain.flush()`**: force-flush all buffered events (call on server shutdown)
+- **`drain.pending`**: number of events currently buffered
 
 ## API Reference
 

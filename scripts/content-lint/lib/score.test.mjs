@@ -160,6 +160,20 @@ describe('evaluate', () => {
     expect(result.findings.map(finding => finding.id)).not.toContain('U-15')
   })
 
+  it('reads a condition on our own behaviour as our own', () => {
+    const source = 'Without `setup`, OpenTelemetry export is untouched: eve keeps writing its local traces.'
+    const result = evaluate(page('apps/docs/content/5.use-cases/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).not.toContain('U-12')
+  })
+
+  it('still flags a claim aimed at the alternative', () => {
+    const source = 'Ship the same request without OpenTelemetry and nothing downstream notices.'
+    const result = evaluate(page('apps/docs/content/5.use-cases/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).toContain('U-12')
+  })
+
   it('spares a page whose sections list rather than argue', () => {
     const sections = ['Exit codes', 'The JSON contract', 'The map file', 'Monorepos', 'Options']
     const source = sections.map(title => `## ${title}\n\n| Key | Meaning |\n|---|---|\n| a | b |`).join('\n\n')

@@ -92,3 +92,21 @@ Applies to: every surface. `metrics.mjs` ignores a dash with a digit on each sid
 Flagged: `Where the byte counts come from`, `Which number moves your bill`, `Try it against your numbers`, `Ask it from your editor`, and 8 pages of the same kind.
 Actual: the classifier only saw a question when the heading ended on `?`, and its verb list held 42 words while the corpus writes with far more. Both made a page of answers look like a page of nouns.
 Applies to: every surface. `classifyHeading` reads an interrogative opener as a question, and the verb list grew to 89. Words that are evlog's own nouns first (`log`, `route`, `stream`, `trace`, `filter`, `drain`) are kept out of it, since counting `## Route filtering` as an imperative would weaken the rule rather than correct it.
+
+## 2026-08-15 · U-12 · `without X` is a condition, not a comparison
+
+Flagged: `Without \`setup\`, OpenTelemetry export is untouched`.
+Actual: the sentence states what evlog does when an option is absent. `without` and `instead of` only compare what directly follows them, and here that is `setup`, not the alternative named after the comma.
+Applies to: every surface. `corpus.mjs` reports those two words only when the alternative is their object, and leaves the unconditional comparatives alone.
+
+## 2026-08-15 · T-11 · A seam is a stitch, not a page
+
+Flagged: two paragraphs 87 and 141 lines apart, on a page whose other paragraphs offered no contraction to count.
+Actual: the metric walked the paragraphs that had opportunities and called any two of them adjacent. Two registers at opposite ends of a page are not what a stitch looks like; the tell is a passage dropped into another one.
+Applies to: every surface. `metrics.mjs` only reports a seam between paragraphs at most three apart on the page.
+
+## 2026-08-15 · U-14 · Two hyphens are an em dash
+
+Flagged: nothing. `--` between spaces reached nothing at all, and the README carried five of them.
+Actual: `is auto-imported -- no import needed` is the same mark written with the keys at hand. Table cells and fenced code keep theirs, since `evlog-map-disable-next-line wide-event -- reason` is the CLI's own syntax.
+Applies to: prose on every surface.
