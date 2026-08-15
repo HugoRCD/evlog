@@ -20,6 +20,7 @@
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
+    "@vueuse/core": "^14.3.0",
     "better-sqlite3": "^12.11.1",
     "docus": "^5.12.3",
     "motion-v": "^2.3.0",

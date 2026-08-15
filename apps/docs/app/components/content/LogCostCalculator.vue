@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import NumberFlow from '@number-flow/vue'
 import { Motion } from 'motion-v'
+import { watchDebounced } from '@vueuse/core'
 import {
   estimateLogCost,
   EVLOG_EVENT_BYTES,
@@ -37,6 +38,23 @@ function selectProvider(next: LogCostProvider) {
   perMillionIndexed.value = next.perMillionIndexed
   tick()
 }
+
+// One event per settled interaction burst: the computed saving is the number
+// this whole page argues for, and sliders are invisible to autocapture.
+watchDebounced(
+  [provider, requests, linesPerRequest, keepPercent, perGb, perMillionIndexed],
+  () => {
+    trackEvent('calculator_used', {
+      provider: provider.value.id,
+      requests_per_month: requests.value,
+      lines_per_request: linesPerRequest.value,
+      keep_percent: keepPercent.value,
+      saved_usd: Math.round(estimate.value.saved),
+      saved_ratio: Math.round(estimate.value.savedRatio * 100) / 100,
+    })
+  },
+  { debounce: 1500 },
+)
 
 let audio: AudioContext | undefined
 function tick() {
