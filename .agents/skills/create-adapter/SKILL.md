@@ -134,9 +134,9 @@ Create `packages/evlog/test/e2e/{name}.e2e.ts`, gated on the adapter's env vars 
 
 If the service is self-hostable, extend the local sandbox so the adapter can be exercised without cloud credentials:
 
-- `packages/evlog/test/e2e/docker-compose.yml` — add the service
-- `packages/evlog/test/e2e/seed.mjs` — fan the seeder out to the new backend
-- `packages/evlog/test/e2e/README.md` — document it
+- `packages/evlog/test/e2e/docker-compose.yml`: add the service
+- `packages/evlog/test/e2e/seed.mjs`: fan the seeder out to the new backend
+- `packages/evlog/test/e2e/README.md`: document it
 - Root `package.json` `sandbox:e2e` script — add the local env var if needed
 
 See the Loki and ClickHouse setups as references.
