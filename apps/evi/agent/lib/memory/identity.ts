@@ -6,10 +6,9 @@ import type { getDb } from '../db'
 import { isMaintainer, MAINTAINER_GITHUB_LOGIN, MAINTAINER_PRINCIPALS } from '../trust'
 
 type Db = NonNullable<ReturnType<typeof getDb>>
+type DbLike = Db | Parameters<Parameters<Db['transaction']>[0]>[0]
 
-const SURFACES: ReadonlySet<string> = new Set<Surface>([
-  'github', 'linear', 'imessage', 'mcp', 'cloud', 'local',
-])
+const SURFACES: ReadonlySet<string> = new Set<Surface>(['github', 'linear', 'imessage', 'mcp', 'cloud', 'local'])
 
 export interface ExternalIdentity {
   surface: Surface
@@ -53,7 +52,7 @@ export function maintainerIdentities(): ExternalIdentity[] {
     .filter((identity): identity is ExternalIdentity => identity !== null)
 }
 
-async function findPerson(db: Db, tenantId: string, identity: ExternalIdentity) {
+async function findPerson(db: DbLike, tenantId: string, identity: ExternalIdentity) {
   const [row] = await db
     .select({ id: identities.personId })
     .from(identities)
@@ -72,28 +71,40 @@ async function findPerson(db: Db, tenantId: string, identity: ExternalIdentity) 
  */
 async function seedMaintainer(db: Db, tenantId: string): Promise<string | null> {
   const rows = maintainerIdentities()
-  if (rows.length === 0) return null
+  const [first] = rows
+  if (first === undefined) return null
 
-  for (const identity of rows) {
-    const existing = await findPerson(db, tenantId, identity)
-    if (existing !== null) {
-      await db.insert(identities).values(
-        rows.map(row => ({ ...row, personId: existing, tenantId })),
-      ).onConflictDoNothing()
-      return existing
+  return await db.transaction(async (tx) => {
+    for (const identity of rows) {
+      const existing = await findPerson(tx, tenantId, identity)
+      if (existing !== null) {
+        await tx.insert(identities).values(
+          rows.map(row => ({ ...row, personId: existing, tenantId })),
+        ).onConflictDoNothing()
+        return existing
+      }
     }
-  }
 
-  const [person] = await db
-    .insert(people)
-    .values({ tenantId, displayName: MAINTAINER_GITHUB_LOGIN, role: 'maintainer' })
-    .returning({ id: people.id })
-  if (person === undefined) return null
+    const [person] = await tx
+      .insert(people)
+      .values({ tenantId, displayName: MAINTAINER_GITHUB_LOGIN, role: 'maintainer' })
+      .returning({ id: people.id })
+    if (person === undefined) return null
 
-  await db.insert(identities).values(
-    rows.map(row => ({ ...row, personId: person.id, tenantId })),
-  ).onConflictDoNothing()
-  return person.id
+    await tx.insert(identities).values(
+      rows.map(row => ({ ...row, personId: person.id, tenantId })),
+    ).onConflictDoNothing()
+
+    // A concurrent seed may have won the identity rows; whoever the first
+    // identity points at is canonical, and the losing person row must not
+    // survive to anchor orphaned memories.
+    const winner = await findPerson(tx, tenantId, first)
+    if (winner !== null && winner !== person.id) {
+      await tx.delete(people).where(eq(people.id, person.id))
+      return winner
+    }
+    return person.id
+  })
 }
 
 // Runs on every turn through the tool resolver; without the cache the seed

@@ -17,6 +17,7 @@ const COLUMNS = {
   volatility: memories.volatility,
   sourceKind: memories.sourceKind,
   source: memories.source,
+  invalidatedAt: memories.invalidatedAt,
   updatedAt: memories.updatedAt,
 }
 
@@ -45,44 +46,48 @@ export function createMemoryStore(db: Db): MemoryStore {
   return {
     async remember(input: RememberInput): Promise<MemoryRecord> {
       const admitted = admit(input)
-      const [row] = await db
-        .insert(memories)
-        .values({
-          tenantId: input.tenantId,
-          realm: input.realm,
-          realmKey: input.realmKey,
-          title: admitted.title,
-          text: admitted.text,
-          contentHash: admitted.contentHash,
-          volatility: input.volatility ?? 'durable',
-          validTo: input.validTo ?? null,
-          supersedes: input.supersedes ?? null,
-          sourceKind: input.sourceKind,
-          source: input.source,
-          createdBy: input.createdBy,
-        })
-        // The same fact restated refreshes it rather than duplicating, and
-        // revives one that had been forgotten.
-        .onConflictDoUpdate({
-          target: [memories.tenantId, memories.realm, memories.realmKey, memories.contentHash],
-          set: {
+      return await db.transaction(async (tx) => {
+        const [row] = await tx
+          .insert(memories)
+          .values({
+            tenantId: input.tenantId,
+            realm: input.realm,
+            realmKey: input.realmKey,
             title: admitted.title,
-            updatedAt: sql`now()`,
-            invalidatedAt: null,
+            text: admitted.text,
+            contentHash: admitted.contentHash,
+            volatility: input.volatility ?? 'durable',
             validTo: input.validTo ?? null,
+            supersedes: input.supersedes ?? null,
+            sourceKind: input.sourceKind,
             source: input.source,
-          },
-        })
-        .returning(COLUMNS)
-      if (row === undefined) throw new Error('The memory could not be written.')
+            createdBy: input.createdBy,
+          })
+          // The same fact restated refreshes it rather than duplicating, and
+          // revives one that had been forgotten.
+          .onConflictDoUpdate({
+            target: [memories.tenantId, memories.realm, memories.realmKey, memories.contentHash],
+            set: {
+              title: admitted.title,
+              updatedAt: sql`now()`,
+              invalidatedAt: null,
+              validTo: input.validTo ?? null,
+              source: input.source,
+            },
+          })
+          .returning(COLUMNS)
+        if (row === undefined) throw new Error('The memory could not be written.')
 
-      if (input.supersedes !== undefined) {
-        await db
-          .update(memories)
-          .set({ invalidatedAt: sql`now()` })
-          .where(and(eq(memories.id, input.supersedes), within([input])))
-      }
-      return row
+        // Guarded against the upsert's own row: superseding the fact you just
+        // restated would invalidate the replacement itself.
+        if (input.supersedes !== undefined && input.supersedes !== row.id) {
+          await tx
+            .update(memories)
+            .set({ invalidatedAt: sql`now()` })
+            .where(and(eq(memories.id, input.supersedes), within([input])))
+        }
+        return row
+      })
     },
 
     async list(targets, limit = DEFAULT_SEARCH_LIMIT): Promise<MemoryRecord[]> {
@@ -101,7 +106,6 @@ export function createMemoryStore(db: Db): MemoryStore {
         .from(memories)
         .where(and(
           within(targets),
-          live(),
           or(ilike(memories.text, term), ilike(memories.title, term)),
         ))
         .orderBy(desc(memories.updatedAt))

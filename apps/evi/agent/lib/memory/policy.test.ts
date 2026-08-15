@@ -55,8 +55,7 @@ describe('admit', () => {
     expect.assertions(1)
     try {
       admit({ text: '' })
-    }
-    catch (error) {
+    } catch (error) {
       expect((error as MemoryRejected).reason).toBe('empty')
     }
   })

@@ -25,7 +25,7 @@ export function normalizeText(value: string): string {
 
 /** Lowercased so the same fact restated with different capitalization dedupes. */
 export function contentHash(value: string): string {
-  return createHash('sha256').update(normalizeText(value).toLocaleLowerCase()).digest('hex')
+  return createHash('sha256').update(normalizeText(value).toLowerCase()).digest('hex')
 }
 
 export interface AdmittedMemory {

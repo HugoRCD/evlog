@@ -1,8 +1,7 @@
 import { drizzle } from 'drizzle-orm/postgres-js'
 import { describe, expect, it } from 'vitest'
-import { schema } from '../../../db/schema'
-import { identities, memories } from '../../../db/schema'
 import { eq } from 'drizzle-orm'
+import { schema, identities, memories } from '../../../db/schema'
 
 /**
  * The query builder is configured here the way `agent/lib/db.ts` configures it,

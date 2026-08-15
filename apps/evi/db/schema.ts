@@ -34,9 +34,7 @@ export const people = pgTable('people', {
   displayName: text().notNull().default(''),
   role: text().$type<PersonRole>().notNull().default('visitor'),
   createdAt: timestamp({ withTimezone: true }).notNull().defaultNow(),
-}, table => [
-  index().on(table.tenantId),
-])
+}, table => [index().on(table.tenantId),])
 
 /**
  * One external identity belongs to one person *within a tenant*. Scoped rather

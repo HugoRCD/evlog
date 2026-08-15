@@ -14,6 +14,7 @@ function record(text: string, title = ''): MemoryRecord {
     volatility: 'durable',
     sourceKind: 'stated',
     source: { surface: 'imessage', sessionId: 's', url: null },
+    invalidatedAt: null,
     updatedAt: new Date('2026-08-14T00:00:00Z'),
   }
 }

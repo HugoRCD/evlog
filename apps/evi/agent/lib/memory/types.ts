@@ -16,6 +16,7 @@ export interface MemoryRecord extends MemoryTarget {
   volatility: Volatility
   sourceKind: SourceKind
   source: MemorySource
+  invalidatedAt: Date | null
   updatedAt: Date
 }
 
@@ -35,6 +36,7 @@ export interface MemoryStore {
   remember(input: RememberInput): Promise<MemoryRecord>
   /** Live rows, most recently updated first. Invalidated and expired rows never appear. */
   list(targets: readonly MemoryTarget[], limit?: number): Promise<MemoryRecord[]>
+  /** Includes invalidated rows: search is the historical surface, `list` the current one. */
   search(targets: readonly MemoryTarget[], query: string, limit?: number): Promise<MemoryRecord[]>
   /** Stamps `invalidatedAt`. The row stays: what Evi was told to drop is worth auditing. */
   forget(targets: readonly MemoryTarget[], id: string): Promise<boolean>

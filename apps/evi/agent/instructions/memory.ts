@@ -15,8 +15,7 @@ export default defineDynamic({
         if (session === null) return null
         const markdown = await buildCoreBlock(session)
         return markdown === null ? null : defineInstructions({ markdown })
-      }
-      catch (error) {
+      } catch (error) {
         // Memory is additive, and a resolver that throws fails the whole turn.
         console.error('[evi:memory] core block failed', error)
         return null

@@ -33,8 +33,7 @@ export default defineDynamic({
       let session
       try {
         session = await openMemorySession(auth)
-      }
-      catch (error) {
+      } catch (error) {
         console.error('[evi:memory] tools unavailable', error)
         return null
       }
@@ -78,8 +77,7 @@ export default defineDynamic({
               })
               log.set({ memory: { saved: input.about } })
               return { success: true as const, id: record.id, about: input.about }
-            }
-            catch (error) {
+            } catch (error) {
               if (error instanceof MemoryRejected) {
                 log.set({ memory: { refused: error.reason } })
                 return { success: false as const, reason: error.reason, error: error.message }
@@ -104,6 +102,7 @@ export default defineDynamic({
                 id: record.id,
                 title: record.title,
                 text: record.text,
+                current: record.invalidatedAt === null,
                 recordedOn: record.source.surface,
                 updatedAt: record.updatedAt.toISOString(),
               })),
