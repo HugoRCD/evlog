@@ -66,6 +66,11 @@ Every heading on a page cut to the same grammatical shape: all imperatives, all 
 
 Note on this corpus: most evlog reference pages are all-noun and that is correct for them. Weigh this tell on pages that argue rather than enumerate.
 
+The scanner subtracts two twins before it reports anything, so a candidate that reaches you has already survived both:
+
+- **The section's shared shape.** Headings a page has in common with three or more of its siblings are the directory's template, not this page's mould. The adapter pages all carry Installation, Quick Start, Configuration and Troubleshooting because a reader comparing two of them wants the same section twice.
+- **A numbered sequence.** `1. Route filtering`, `2. Logger creation`, `3. Emit` are the steps of one procedure. They share a shape because they are one thing, which is the ordered guide named above.
+
 ---
 
 ## T-07 · One-frame bullets

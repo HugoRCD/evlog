@@ -232,6 +232,10 @@ function headingShape(doc) {
 function classifyHeading(text) {
   const trimmed = text.trim()
   if (/^code$/.test(trimmed) || /^[a-z][A-Za-z]*\(\)?$/.test(trimmed)) return 'symbol'
+  // A numbered heading is a position in an ordered guide. The steps of one
+  // procedure share a shape because they are one procedure, which is the twin
+  // `T-06` is meant to spare.
+  if (/^(?:step\s+)?\d+[.):]\s/i.test(trimmed)) return 'sequence'
   if (trimmed.endsWith('?')) return 'question'
   const first = trimmed.toLowerCase().split(/\s+/)[0]
   if (IMPERATIVE_VERBS.includes(first)) return 'imperative'
