@@ -16,4 +16,6 @@ Before writing or approving any sentence that names another logger:
 
 A dossier is refreshed from the tool's own documentation and changelog, never from memory and never from what a competitor's marketing says about it. When a line changes, move the old line to `Was:` with its date rather than deleting it, so a page still carrying the old claim is findable.
 
+The failure mode is specific and it is not laziness: a dossier written from what you remember is fluent, confident, and wrong in the details that matter to the one reader who knows the tool. Its reporter list is plausible. Its delivery model is plausible. Neither was read. Before a dossier claims what a tool does or does not ship, that claim came off a page you opened.
+
 The scanner cannot check any of this. It can only tell you a sentence makes a claim about pino and carries neither a number nor a link.
