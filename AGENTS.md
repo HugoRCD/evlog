@@ -15,6 +15,8 @@ pnpm run typecheck                 # type-check all packages
 pnpm run docs                      # start docs site
 pnpm run telemetry                 # start the telemetry dashboard (apps/telemetry)
 pnpm telemetry:cli <command>       # run this repo's CLI into that local dashboard (--cwd to target an app)
+pnpm content:lint [path]           # rank the written corpus by content findings (see scripts/content-lint/README.md)
+pnpm content:lint:test             # the scanner's own tests, including its two calibration fixtures
 ```
 
 Publishing is automated: changesets + `.github/workflows/release.yml`. Never run `pnpm release` or `changeset publish` manually.
@@ -44,8 +46,8 @@ apps/playground/           Main dev environment (`pnpm dev`)
 apps/docs/                 Docus documentation site — has its own AGENTS.md
 apps/*                     Framework playgrounds (next, nitro, nitro-v2, nuxthub, lab, telemetry, ...) — `pnpm playground` to pick one
 examples/                  ~22 runnable examples, one per framework — includes the community-*-skeleton dirs used by the create-adapter/enricher/framework skills
-scripts/                   Repo tooling (run-app, cli-sandbox, release-notes)
-.agents/skills/            Internal skills for creating adapters, enrichers, and framework integrations
+scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, content-lint)
+.agents/skills/            Internal skills for creating adapters, enrichers, and framework integrations, and for writing content
 ```
 
 ## Conventions
@@ -64,6 +66,7 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes)
   - `.agents/skills/create-enricher/SKILL.md`
   - `.agents/skills/create-framework-integration/SKILL.md`
   - `.agents/skills/create-map-rule/SKILL.md` (also covers new `evlog map` framework adapters)
+- Writing or reviewing prose — a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset? Read `.agents/skills/write-evlog-content/SKILL.md` first, and run `pnpm content:lint <path>` before the review. It carries the voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell. These files are content too: `pnpm content:lint --surface skill` and `--surface agents` rank them.
 - **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents — an adapter, enricher, integration, API surface, or workflow — update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
 
 ### Code style — no slop

@@ -31,6 +31,8 @@
     "sandbox:down": "docker compose -f packages/evlog/test/e2e/docker-compose.yml down -v",
     "sandbox:e2e": "LOKI_ENDPOINT=http://localhost:3100 CLICKHOUSE_ENDPOINT=http://localhost:8123 pnpm run test:e2e",
     "cli": "node packages/cli/bin/evlog.mjs",
+    "content:lint": "node scripts/content-lint/index.mjs",
+    "content:lint:test": "vitest run --root scripts/content-lint",
     "cli:sandbox": "node scripts/cli-sandbox.mjs",
     "test:coverage": "pnpm --filter evlog run test:coverage",
     "test:coverage:open": "pnpm --filter evlog run test:coverage && open packages/evlog/coverage/index.html",
