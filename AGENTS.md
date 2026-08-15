@@ -69,7 +69,7 @@ scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, co
 - Writing or reviewing prose — a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset? Read `.agents/skills/write-evlog-content/SKILL.md` first, and run `pnpm content:lint <path>` before the review. It carries the voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell. These files are content too: `pnpm content:lint --surface skill` and `--surface agents` rank them.
 - **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `apps/docs/skills/` (served from the docs site via `.well-known/skills`). When a change touches something a skill documents — an adapter, enricher, integration, API surface, or workflow — update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
 
-### Code style — no slop
+### Code style: no slop
 
 - **No gratuitous defensive code.** Don't add try/catch, null checks, or input validation the surrounding file doesn't have — especially on paths already validated upstream. Match the file's level of paranoia.
 - **No silent fallbacks.** No empty `catch`, no `?? default` that masks a bug, no `as any` to silence TypeScript. If something can fail, let it fail loudly or handle it explicitly.
@@ -159,7 +159,7 @@ A task is complete when **all** of the following pass:
 - Modify `node_modules/` or generated files
 - Open a PR for a user-facing change without a changeset
 
-## Git & PRs — local always OK, remote on explicit instruction
+## Git & PRs: local always OK, remote on explicit instruction
 
 Default: anything that stays on the local clone is fine, anything that touches the remote or GitHub requires an explicit instruction in the task at hand. Never act on assumption. If the maintainer didn't ask for a push or a PR, prepare the branch locally and stop there.
 

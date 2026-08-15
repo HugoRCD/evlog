@@ -41,7 +41,7 @@ Enrichers live in the core package surface (`evlog/enrichers`), so use the `core
 | `{Name}` | `UserAgent` | PascalCase in function/interface names |
 | `{DISPLAY}` | `User Agent` | Human-readable display name |
 
-## Step 1: Enricher Source — built on `defineEnricher`
+## Step 1: Enricher Source: built on `defineEnricher`
 
 Add the enricher to `packages/evlog/src/enrichers/index.ts`. Read [references/enricher-template.md](references/enricher-template.md) for the full annotated template.
 

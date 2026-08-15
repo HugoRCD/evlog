@@ -191,6 +191,13 @@ function epigrams(doc) {
 function dashes(doc) {
   const found = []
 
+  // Headings count. They are the first prose a reader sees and the rule says
+  // any surface, so a dash hiding in `## Network bridge — stream server` is the
+  // one most likely to be read.
+  for (const heading of doc.headings) {
+    if (/[—–]/.test(heading.text)) found.push({ line: heading.line, text: heading.text })
+  }
+
   for (const paragraph of doc.paragraphs) {
     for (const sentence of sentences(paragraph.text)) {
       if (/[—–]/.test(sentence)) found.push({ line: paragraph.line, text: sentence })
@@ -235,10 +242,13 @@ function headingShape(doc) {
 function classifyHeading(text) {
   const trimmed = text.trim()
   if (/^code$/.test(trimmed) || /^[a-z][A-Za-z]*\(\)?$/.test(trimmed)) return 'symbol'
+  // `cleanInline` leaves `code` where a symbol was, so a heading opening on one
+  // is an API entry however it continues: `` `log.set()` — final snapshot ``.
+  if (/^code\b/.test(trimmed)) return 'symbol'
   // A numbered heading is a position in an ordered guide. The steps of one
   // procedure share a shape because they are one procedure, which is the twin
   // `T-06` is meant to spare.
-  if (/^(?:step\s+)?\d+[.):]\s/i.test(trimmed)) return 'sequence'
+  if (/^(?:step\s+)?\d+\s*[.):—–]?\s/i.test(trimmed)) return 'sequence'
   if (trimmed.endsWith('?')) return 'question'
   const first = trimmed.toLowerCase().split(/\s+/)[0]
   if (IMPERATIVE_VERBS.includes(first)) return 'imperative'

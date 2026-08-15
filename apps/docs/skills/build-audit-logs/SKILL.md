@@ -11,7 +11,7 @@ For **application developers** who either need to add an audit trail to their pr
 
 This skill assumes the audit lives in **your app**. To extend the evlog package itself (new audit helper, new drain wrapper), see the contributor skills under `.agents/skills/`.
 
-## Quick reference — call-site cheat sheet
+## Quick reference: call-site cheat sheet
 
 When you already know the system is wired and just need to remember the API:
 
@@ -152,7 +152,7 @@ A built-in `cryptoShredding` helper is on the roadmap; until then, encrypt in a 
 
 ## Step-by-step buildout
 
-### Step 1 — Wire the pipeline (one-time)
+### Step 1: Wire the pipeline (one-time)
 
 The wiring shape is the same in every framework: register `auditEnricher()` so `event.audit.context` gets `requestId`, `traceId`, `ip`, `userAgent`, and (if configured) `tenantId` automatically, then add a main drain plus an audit-only drain.
 
@@ -182,7 +182,7 @@ export default defineNitroPlugin((nitroApp) => {
 
 For Hono, Express, Next.js, or standalone scripts / workers, see [`references/framework-wiring.md`](references/framework-wiring.md). The pattern is identical. Only the framework integration helper changes.
 
-### Step 2 — Define the action vocabulary
+### Step 2: Define the action vocabulary
 
 Audits get queried and alerted on by `audit.action`. A typo is a missing alert, so centralise the list. For a bounded context with several actions, prefer a catalog: one prefix, typed keys, autocomplete on the wire format `${prefix}.${KEY}`:
 
@@ -216,7 +216,7 @@ Naming conventions:
 - Past tense if the audit is logged after the fact (`invoice.refunded`); present tense when wrapped by `withAudit()` (which resolves the outcome itself).
 - Lowercase, dot-delimited, no spaces — for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND` — that's intentional, don't lowercase the keys.
 
-### Step 3 — Instrument call sites
+### Step 3: Instrument call sites
 
 Three patterns, in order of preference:
 
@@ -281,7 +281,7 @@ audit({
 })
 ```
 
-### Step 4 — Add denial coverage
+### Step 4: Add denial coverage
 
 Auditors care most about denials, because they're how you prove the policy is actually being enforced. Every authorisation check should have a paired `log.audit.deny()`. Pulling the deny into a single helper guarantees coverage parity with successes:
 
@@ -299,7 +299,7 @@ function authorize(actor, action, resource) {
 }
 ```
 
-### Step 5 — Redact
+### Step 5: Redact
 
 Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It redacts HTTP auth headers and common credential field names (`password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn`, plus `cookie` / `set-cookie`) at any nesting depth, including inside `audit.changes.before` / `audit.changes.after`:
 
@@ -313,7 +313,7 @@ initLogger({
 })
 ```
 
-### Step 6 — Test it
+### Step 6: Test it
 
 `mockAudit()` captures audit events for assertions without going through any drain. Make the denial test mandatory in code review, because untested denial paths are the most common cause of audit gaps:
 
@@ -349,7 +349,7 @@ it('denies refund for non-owners and records the denial', async () => {
 })
 ```
 
-### Step 7 — Production readiness checklist
+### Step 7: Production readiness checklist
 
 Walk through this with a security stakeholder before declaring the system production-ready (the same checklist powers the review mode below):
 
@@ -369,7 +369,7 @@ Walk through this with a security stakeholder before declaring the system produc
 
 When the user already has an audit system and wants it reviewed, work through the four passes below in order. Each pass tells you exactly what to grep, what to look for, and what to flag.
 
-### Pass 1 — Pipeline wiring
+### Pass 1: Pipeline wiring
 
 Find where the logger is initialised and where drains / enrichers are registered:
 
@@ -385,7 +385,7 @@ Flag if:
 - `signed()` is used without a persisted `state` while running multiple processes → hash-chain breaks across restarts / instances.
 - `await: true` is missing on the audit-only drain → events may be lost on crash.
 
-### Pass 2 — Coverage (call sites)
+### Pass 2: Coverage (call sites)
 
 Inventory every mutating action and every authorisation check:
 
@@ -405,7 +405,7 @@ For each match, check:
 - `log.set({ audit: ... })` without using the helpers → bypasses force-keep, may be dropped by tail-sampling.
 - `withAudit()` action name in present tense (`invoice.refund`) is fine; manual `log.audit()` after the fact should use past tense (`invoice.refunded`).
 
-### Pass 3 — Redaction & integrity
+### Pass 3: Redaction & integrity
 
 ```bash
 rg -n "auditRedactPreset|RedactConfig|paths:\s*\[" --type ts
@@ -419,7 +419,7 @@ Flag if:
 - HMAC `secret` is hard-coded or read from `process.env.SECRET` without a rotation plan / `keyId` → events become unverifiable after rotation.
 - Hash-chain `state` is in-memory only → chain restarts each process boot, breaking continuity.
 
-### Pass 4 — Tests
+### Pass 4: Tests
 
 ```bash
 rg -n "mockAudit\(|toIncludeAuditOf\(" --type ts

@@ -82,6 +82,19 @@ describe('contraction seam', () => {
   })
 })
 
+describe('dashes', () => {
+  it('counts a dash hiding in a heading', () => {
+    // Headings never reached this metric, so 46 of them carried one.
+    expect(measureSource('## Network bridge — stream server\n\nProse.').dashes.count).toBe(1)
+  })
+
+  it('reads a heading opening on a symbol as an API entry', () => {
+    const source = ['## `getMetadata()`: final snapshot', '## `getEstimatedCost()`: quick check', '## `onUpdate()`: incremental', '## `shape`: the record'].map(h => `${h}\n\nProse about it.`).join('\n\n')
+
+    expect(measureSource(source).headings.dominant).toBe('symbol')
+  })
+})
+
 describe('epigram closers', () => {
   it('spares a closer that introduces what comes next', () => {
     const source = 'Some categories never belong in an event, whatever the environment. **Never log:**\n\n| Category | Risk |\n| --- | --- |\n| Credentials | Account compromise |'
