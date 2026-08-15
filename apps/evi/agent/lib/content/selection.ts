@@ -40,6 +40,10 @@ export interface Target extends LintPage {
 export interface Selection {
   targets: Target[]
   group: string | null
+  /** Files the scanner found something on, before the cooldown and the group filter. */
+  candidates: number
+  /** Files that ranked and were eligible: not in cooldown. Zero is the only reason to skip the rewrite half. */
+  eligible: number
   /** Pages that ranked but were held back, with the reason, so a pass can say what it skipped. */
   held: { path: string, reason: string }[]
 }
@@ -99,9 +103,11 @@ export function selectTargets(input: {
   const touched = new Set(input.recentlyTouched)
   const held: Selection['held'] = []
   const ranked: Target[] = []
+  let candidates = 0
 
   for (const page of input.pages) {
     if (page.findings.length === 0) continue
+    candidates += 1
     if (touched.has(page.path)) {
       held.push({ path: page.path, reason: 'changed inside the cooldown window' })
       continue
@@ -112,8 +118,10 @@ export function selectTargets(input: {
 
   ranked.sort((a, b) => b.criticals - a.criticals || a.score - b.score || a.path.localeCompare(b.path))
 
+  const counts = { candidates, eligible: ranked.length }
+
   const [lead] = ranked
-  if (lead === undefined) return { targets: [], group: null, held }
+  if (lead === undefined) return { targets: [], group: null, held, ...counts }
 
   const group = groupOf(lead)
   const targets = [lead]
@@ -127,7 +135,7 @@ export function selectTargets(input: {
     targets.push(page)
   }
 
-  return { targets, group, held }
+  return { targets, group, held, ...counts }
 }
 
 /**

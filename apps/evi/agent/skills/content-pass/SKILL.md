@@ -27,7 +27,9 @@ Call `content__targets`. It runs the scanner over the whole corpus, drops files 
 
 Pass `surface` when Hugo asked for one, or when the weekly corpus check found a surface drifting. Otherwise take what ranks.
 
-No targets means the rewrite half has nothing to do. Go to **Enrich**.
+**Read `eligible` before deciding anything.** It is the count of files with findings that are outside the cooldown, and it is the only number that says whether there is work. `eligible: 0` sends you to **Enrich**. Anything above zero means the rewrite half has targets, and the pass rewrites.
+
+Write the three numbers into the PR body verbatim: `scanned`, `candidates`, `eligible`. A pass that says the rewrite half was empty without them is asserting, not reporting, and a corpus of 120 files with 47 eligible pages has been called empty before.
 
 ### 2. Branch
 
@@ -96,7 +98,13 @@ If a file came back worse, drop it from the branch (`git checkout -- <path>`) an
 
 Commit with a conventional subject naming the group, push with `git__push`, and open a **draft** PR with `github__createPullRequest`.
 
-- Title: `docs: content pass on <group>`, or `fix(docs):` when the pass fixed a broken sample or a dead link, because that is what it was. A pass over the package README is `docs(core):`, and a pass over the skills carries no scope.
+**The title is validated by CI and a wrong scope means the PR cannot merge.** The accepted list is `scopes:` in `.github/workflows/semantic-pull-request.yml`. Read it rather than guessing, and note what is not in it:
+
+- **`evlog` is never a scope.** The whole monorepo is evlog, so a bare `docs:` already means evlog itself. `docs(evlog):` fails validation.
+- One docs page under `4.integrate/adapters/<name>/` or `4.integrate/frameworks/<name>` takes that subsystem's scope: `docs(posthog):`, `docs(hono):`.
+- Several pages, or a page belonging to no subsystem: `docs:` with no scope.
+- The package READMEs: `docs(core):`. The skills and the `AGENTS.md` files: no scope.
+- `fix(docs):` when the pass fixed a broken sample or a dead link, because that is what it was.
 - A changeset only when the diff leaves `apps/*`. `packages/evlog/README.md` ships with the package, so it gets one; a docs page, a skill under `.agents/`, and an AGENTS.md do not.
 - The body **is** the report:
 
@@ -127,7 +135,9 @@ Report to the thread: what group, how many files, the PR link. Two lines maximum
 
 ## Enrich
 
-Run this when the rewrite half is empty. It needs an observation, not an opinion: name the gap you found and where you found it, or drop it.
+Run this when `eligible` is 0. It needs an observation, not an opinion: name the gap you found and where you found it, or drop it.
+
+**Whatever file you end up editing, run `--fix` on it first.** A page you are already opening does not have "pre-existing" findings, it has findings, and the mechanical ones cost one command. Leaving an em dash on a page you just edited, and writing that it was out of scope, is the pass explaining why it did less than the tool it was given.
 
 Look, in this order, and stop at the first thing that holds:
 
