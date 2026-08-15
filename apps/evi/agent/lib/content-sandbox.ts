@@ -11,10 +11,11 @@ import { defaultBackend, defineSandbox } from 'eve/sandbox'
  * was the slowest way to find out that any of them can fail.
  *
  * These two read pages and write pages. They run no checks, drive no browser,
- * and capture nothing, so the template stops at a checkout with dependencies
- * installed. What they lose against the root template is the primed turbo
- * cache, which they never used: the pass runs its own verification in the root
- * session, after the rewrite comes back.
+ * and capture nothing, so the template stops at a checkout. There is not even
+ * an install: `scripts/content-lint` imports node builtins and its own files,
+ * nothing else, and the pass runs its verification in the root session after
+ * the rewrite comes back. A checkout with no `node_modules` is also a checkout
+ * with nothing to go stale when `onSession` moves it to the current `main`.
  */
 export default defineSandbox({
   backend: defaultBackend({
@@ -26,11 +27,10 @@ export default defineSandbox({
       snapshotExpiration: 24 * 60 * 60 * 1000,
     },
   }),
-  revalidationKey: () => 'evlog-content-workspace-v1',
+  revalidationKey: () => 'evlog-content-workspace-v2',
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
-    await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
   },
   async onSession({ use }) {
