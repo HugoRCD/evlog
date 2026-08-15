@@ -118,6 +118,32 @@ describe('selectTargets', () => {
     expect(selectTargets({ pages: [procedure], recentlyTouched: [] }).targets[0].mode).toBe('report')
   })
 
+  it('counts what it saw, so a pass cannot call a full ranking empty', () => {
+    const selection = selectTargets({
+      pages: [
+        page('apps/docs/content/2.learn/a.md', 40),
+        page('apps/docs/content/2.learn/b.md', 50),
+        page('apps/docs/content/6.extend/c.md', 45),
+        { path: 'apps/docs/content/2.learn/clean.md', surface: 'docs', score: 100, findings: [] },
+      ],
+      recentlyTouched: ['apps/docs/content/2.learn/a.md'],
+    })
+
+    expect(selection.candidates).toBe(3)
+    expect(selection.eligible).toBe(2)
+  })
+
+  it('reports zero eligible when the cooldown holds everything', () => {
+    const selection = selectTargets({
+      pages: [page('apps/docs/content/2.learn/a.md', 40)],
+      recentlyTouched: ['apps/docs/content/2.learn/a.md'],
+    })
+
+    expect(selection.candidates).toBe(1)
+    expect(selection.eligible).toBe(0)
+    expect(selection.targets).toEqual([])
+  })
+
   it('ignores pages the scanner found nothing on', () => {
     const clean = { path: 'apps/docs/content/2.learn/a.md', surface: 'docs', score: 100, findings: [] }
 
