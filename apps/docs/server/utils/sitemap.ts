@@ -1,5 +1,6 @@
 interface SitemapPage {
   path?: string
+  stem?: string
   meta?: Record<string, unknown>
 }
 
@@ -13,7 +14,10 @@ export interface SitemapUrl {
  * itself — reading `page.sitemap` silently never matches, so an excluded page would
  * still ship in the sitemap.
  */
-export function collectSitemapUrls(pages: SitemapPage[]): SitemapUrl[] {
+export function collectSitemapUrls(
+  pages: SitemapPage[],
+  commitDates: Record<string, string> = {},
+): SitemapUrl[] {
   const urls: SitemapUrl[] = []
   const seen = new Set<string>()
 
@@ -32,10 +36,8 @@ export function collectSitemapUrls(pages: SitemapPage[]): SitemapUrl[] {
 
     const urlEntry: SitemapUrl = { loc: pagePath }
 
-    if (typeof meta.modifiedAt === 'string') {
-      const [datePart] = meta.modifiedAt.split('T')
-      urlEntry.lastmod = datePart
-    }
+    const lastmod = page.stem ? commitDates[page.stem] : undefined
+    if (lastmod) urlEntry.lastmod = lastmod
 
     urls.push(urlEntry)
   }

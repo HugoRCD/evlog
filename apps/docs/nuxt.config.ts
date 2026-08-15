@@ -1,4 +1,7 @@
+import { readContentCommitDates } from './config/content-dates'
 import { rawRedirects, redirects } from './config/redirects'
+
+const contentCommitDates = readContentCommitDates(import.meta.dirname)
 
 export default defineNuxtConfig({
   extends: ['docus'],
@@ -193,6 +196,7 @@ export default defineNuxtConfig({
   },
 
   runtimeConfig: {
+    contentCommitDates,
     public: {
       justUseEvlogUrl: process.env.NUXT_PUBLIC_JUST_USE_EVLOG_URL || '',
       posthogKey: process.env.NUXT_PUBLIC_POSTHOG_KEY || '',

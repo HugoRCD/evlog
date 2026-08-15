@@ -20,7 +20,8 @@ export default defineEventHandler(async (event) => {
   let urls: SitemapUrl[] = []
 
   try {
-    urls = collectSitemapUrls(await queryCollection(event, 'docs').all())
+    const { contentCommitDates } = useRuntimeConfig(event)
+    urls = collectSitemapUrls(await queryCollection(event, 'docs').all(), contentCommitDates)
   } catch {
     // Collection might not exist, skip silently.
   }
