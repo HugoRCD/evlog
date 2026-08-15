@@ -19,7 +19,6 @@ const softwareSchema = {
 
 useHead({
   titleTemplate: '',
-  script: [{ type: 'application/ld+json', innerHTML: JSON.stringify(softwareSchema) }],
   link: [
     { rel: 'canonical', href: 'https://www.evlog.dev/' },
     {
@@ -40,13 +39,16 @@ const { data: page } = await useAsyncData('evlog-docs-home', () => {
   },
 })
 
-// Read back from the accordion the page renders, so an answer edited in
-// `0.landing.md` never disagrees with the one search engines are given.
-const faq = computed(() => faqSchema(page.value?.body))
+// The FAQ is read back from the accordion the page renders, so an answer edited
+// in `0.landing.md` never disagrees with the one search engines are given. Both
+// shapes go in one call, after the page resolves: the landing's content does not
+// change at runtime, so there is nothing here for a getter to react to.
+const faq = faqSchema(page.value?.body)
 
-useHead(() => ({
-  script: faq.value ? [{ type: 'application/ld+json', innerHTML: JSON.stringify(faq.value) }] : [],
-}))
+useHead({
+  script: [softwareSchema, ...(faq ? [faq] : [])]
+    .map(schema => ({ type: 'application/ld+json', innerHTML: JSON.stringify(schema) })),
+})
 
 useSeoMeta({
   title:
