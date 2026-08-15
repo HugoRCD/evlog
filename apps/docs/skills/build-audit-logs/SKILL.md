@@ -83,13 +83,13 @@ Make these explicit and write them down somewhere a security reviewer can find. 
 
 ### 1. Where do audits live?
 
-| Sink                              | Use when                                          | Trade-offs                                                                                  |
+| Drain                              | Use when                                          | Trade-offs                                                                                  |
 | --------------------------------- | ------------------------------------------------- | ------------------------------------------------------------------------------------------- |
 | **FS** (`evlog/fs` + `signed`)    | Self-hosted, simple, you control the disk         | Manual rotation/backup; single-process unless you persist hash-chain `state` externally     |
 | **Dedicated Axiom dataset**       | You already use Axiom                             | Easy queries, separate retention/billing; cost scales with volume                           |
 | **Postgres / Neon / Aurora**      | You want SQL queries, joins with app data         | Need a schema, indexes, retention job; idempotency key prevents duplicates                  |
 | **S3 + Object Lock**              | Append-only WORM compliance (HIPAA / FINRA)       | Read latency; pair with a queryable mirror (Athena)                                         |
-| **Multiple sinks**                | Different audiences (engineers ↔ legal)           | Use `auditOnly` per sink; sinks fail in isolation by design                                 |
+| **Multiple drains**                | Different audiences (engineers ↔ legal)           | Use `auditOnly` per drain; drains fail in isolation by design                                 |
 
 > **Rule of thumb.** Pick at least two: a queryable one (Axiom / Postgres) for day-to-day forensics + an append-only one (FS journal with hash-chain, or S3 Object Lock) as the compliance artefact. The two-drain pattern protects against vendor outages and admin mistakes on the queryable side.
 
@@ -98,12 +98,12 @@ Make these explicit and write them down somewhere a security reviewer can find. 
 Yes if any of:
 
 - A compliance framework requires tamper-evidence (SOC2 CC7, HIPAA §164.312(c)(1), PCI 10.5).
-- The sink is mutable by engineers / admins.
+- The drain is mutable by engineers / admins.
 - You may need to prove to a regulator that no events were modified after the fact.
 
 Skip if:
 
-- Sink is already WORM (S3 Object Lock, BigQuery append-only, Postgres with row-level immutability + monitored DDL).
+- Drain is already WORM (S3 Object Lock, BigQuery append-only, Postgres with row-level immutability + monitored DDL).
 - You're prototyping.
 
 Strategies:
@@ -121,11 +121,11 @@ auditEnricher({ tenantId: ctx => resolveTenant(ctx) })
 
 If the app uses Better Auth, `auditEnricher` can also bridge the authenticated session into `audit.context` — see the Better Auth integration (`evlog/better-auth`, https://www.evlog.dev/use-cases/better-auth/overview) for wiring `identifyUser` alongside the audit pipeline.
 
-Then either (a) partition the audit dataset by `audit.context.tenantId`, or (b) one sink per tenant if hard isolation is required. Never query audits without a tenant filter.
+Then either (a) partition the audit dataset by `audit.context.tenantId`, or (b) one drain per tenant if hard isolation is required. Never query audits without a tenant filter.
 
 ### 4. Retention
 
-Pick a window per sink and document it. Enforce at the sink layer, not in app code — the sink already has audited mechanisms for it (lifecycle policies, `DELETE` jobs, dataset retention).
+Pick a window per drain and document it. Enforce at the drain layer, not in app code — the drain already has audited mechanisms for it (lifecycle policies, `DELETE` jobs, dataset retention).
 
 | Framework | Typical retention                                                   |
 | --------- | ------------------------------------------------------------------- |
@@ -134,7 +134,7 @@ Pick a window per sink and document it. Enforce at the sink layer, not in app co
 | PCI DSS   | 1 year (3 months immediately accessible)                            |
 | GDPR      | "As long as necessary" — see "GDPR vs append-only" below            |
 
-How to enforce per sink:
+How to enforce per drain:
 
 - **FS**: `createFsDrain({ maxFiles })` + a daily compactor.
 - **Postgres**: `DELETE FROM audit_events WHERE timestamp < now() - interval '7 years'` on a cron.
@@ -154,7 +154,7 @@ A built-in `cryptoShredding` helper is on the roadmap; until then, encrypt in a 
 
 ### Step 1 — Wire the pipeline (one-time)
 
-The wiring shape is the same in every framework: register `auditEnricher()` so `event.audit.context` gets `requestId`, `traceId`, `ip`, `userAgent`, and (if configured) `tenantId` automatically, then add a main drain plus an audit-only sink.
+The wiring shape is the same in every framework: register `auditEnricher()` so `event.audit.context` gets `requestId`, `traceId`, `ip`, `userAgent`, and (if configured) `tenantId` automatically, then add a main drain plus an audit-only drain.
 
 The minimal Nuxt / Nitro setup looks like this:
 
@@ -356,9 +356,9 @@ Walk through this with a security stakeholder before declaring the system produc
 - [ ] `auditEnricher` is registered on every framework integration.
 - [ ] Every authorisation check has a paired `log.audit.deny()` (greppable).
 - [ ] Every mutating endpoint either uses `withAudit()` or calls `log.audit()` explicitly.
-- [ ] At least two sinks: one queryable (Axiom / Postgres) and one tamper-evident (FS + `signed` hash-chain, or S3 Object Lock).
+- [ ] At least two drains: one queryable (Axiom / Postgres) and one tamper-evident (FS + `signed` hash-chain, or S3 Object Lock).
 - [ ] `auditRedactPreset` (or stricter) is in the global `RedactConfig`.
-- [ ] Retention policy is documented per sink and enforced at the sink layer.
+- [ ] Retention policy is documented per drain and enforced at the drain layer.
 - [ ] Multi-tenant apps: `tenantId` is set on every audit event; queries always filter by tenant.
 - [ ] Hash-chain `state.{load,save}` persists across process restarts (file / Redis / Postgres).
 - [ ] HMAC `secret` rotation procedure is documented; `keyId` is embedded in `AuditFields` (extend via `declare module`).
@@ -380,10 +380,10 @@ rg -n "auditEnricher|auditOnly|signed\(" --type ts
 
 Flag if:
 - `auditEnricher()` is missing → `event.audit.context` is empty, no requestId / IP / tenant correlation.
-- An audit-only sink exists but is not wrapped in `auditOnly(...)` → main events leak into the audit dataset (privacy & cost incident).
-- Only one drain → no tamper-evident copy. Acceptable only if the single sink is WORM (S3 Object Lock, BigQuery append-only, Postgres immutable).
+- An audit-only drain exists but is not wrapped in `auditOnly(...)` → main events leak into the audit dataset (privacy & cost incident).
+- Only one drain → no tamper-evident copy. Acceptable only if the single drain is WORM (S3 Object Lock, BigQuery append-only, Postgres immutable).
 - `signed()` is used without a persisted `state` while running multiple processes → hash-chain breaks across restarts / instances.
-- `await: true` is missing on the audit-only sink → events may be lost on crash.
+- `await: true` is missing on the audit-only drain → events may be lost on crash.
 
 ### Pass 2 — Coverage (call sites)
 
@@ -434,7 +434,7 @@ Flag if:
 
 Group findings by severity for the user:
 
-- **P0 (blocker)**: missing `auditOnly` wrap on an audit sink, missing `auditRedactPreset`, denials not logged, no tamper-evident sink in a regulated context.
+- **P0 (blocker)**: missing `auditOnly` wrap on an audit drain, missing `auditRedactPreset`, denials not logged, no tamper-evident drain in a regulated context.
 - **P1 (compliance gap)**: missing tenant isolation, hash-chain state not persisted, no HMAC rotation, no denial test coverage.
 - **P2 (hygiene)**: action naming inconsistency, in-line actor objects (should use `defineAuditAction`), missing `causationId` / `correlationId` on chained operations.
 
@@ -449,7 +449,7 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 - **Forgetting standalone jobs.** Cron, queue workers, CLIs trigger audit-worthy actions too — use `audit()` or `withAudit()`.
 - **Faking the actor type.** `actor.type: 'user'` for cron jobs gets flagged in audits. Use `'system'`, `'api'`, or `'agent'` accurately.
 - **Single global secret with no rotation.** HMAC keys must rotate; without a `keyId`, old events become unverifiable after rotation.
-- **One drain that fails takes audits down.** Sinks must fail in isolation. The default `drain: [...]` array does this; if you wrap in `Promise.all`, don't throw on a single rejection — log it.
+- **One drain that fails takes audits down.** Drains must fail in isolation. The default `drain: [...]` array does this; if you wrap in `Promise.all`, don't throw on a single rejection — log it.
 
 ## Glossary
 
