@@ -82,6 +82,20 @@ describe('contraction seam', () => {
   })
 })
 
+describe('epigram closers', () => {
+  it('spares a closer that introduces what comes next', () => {
+    const source = 'Some categories never belong in an event, whatever the environment. **Never log:**\n\n| Category | Risk |\n| --- | --- |\n| Credentials | Account compromise |'
+
+    expect(measureSource(source).epigrams.count).toBe(0)
+  })
+
+  it('still counts a closer that only carries rhythm', () => {
+    const source = 'The pipeline batches every event before it leaves the process. That is the whole idea.'
+
+    expect(measureSource(source).epigrams.count).toBe(1)
+  })
+})
+
 describe('bullet frames', () => {
   it('does not read a checklist as an anaphora', () => {
     // Every task item starts with `[`, which is a checkbox. `score.mjs` gates
@@ -92,10 +106,18 @@ describe('bullet frames', () => {
     for (const frame of frames) expect(frame.anaphoraShare).toBeLessThan(0.75)
   })
 
-  it('still catches four bullets that really do share an opener', () => {
+  it('still catches bullets that really do share an opener', () => {
     const list = ['- Powerful drain support', '- Powerful enricher support', '- Powerful catalog support', '- Powerful sampling support'].join('\n')
 
     expect(measureSource(list).bulletFrames).toHaveLength(1)
+  })
+
+  it('ignores an ordinal and the code placeholder when reading the opener', () => {
+    const numbered = ['1. Explicit overrides', '2. Runtime config', '3. Legacy runtime config', '4. Env vars'].join('\n')
+    const linked = ['- `evlog agents` runs the guidelines', '- `evlog doctor` confirms the wiring', '- `evlog map` scores what is dark'].join('\n')
+
+    for (const frame of measureSource(numbered).bulletFrames) expect(frame.anaphoraShare).toBeLessThan(0.75)
+    expect(measureSource(linked).bulletFrames).toEqual([])
   })
 })
 

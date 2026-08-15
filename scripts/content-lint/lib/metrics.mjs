@@ -172,6 +172,9 @@ function epigrams(doc) {
     // A closer pointing somewhere carries something: the destination.
     const labels = doc.links.filter(link => link.line === paragraph.line).map(link => link.text)
     if (labels.some(label => label && last.includes(label))) continue
+    // A closer ending on a colon introduces what comes next. `Never log:` above
+    // a table of categories is the table's sentence, not a flourish.
+    if (last.trimEnd().endsWith(':')) continue
     candidates.push({ line: paragraph.line, text: last })
   }
 
@@ -256,13 +259,25 @@ function bulletFrames(doc) {
 
   for (const list of doc.lists) {
     if (list.items.length < 3) continue
-    // A task list shares `[` on every item by construction, which is a
-    // checkbox, not an anaphora.
-    const firsts = list.items.map(item => item.text.toLowerCase().replace(/^\[[ x]?\]\s*/, '').split(/\s+/)[0] ?? '')
+    // Three openers are shared by construction rather than by voice: a task
+    // list's checkbox, an ordinal in a numbered sequence, and the `code`
+    // placeholder every item starting with a symbol or a code-labelled link
+    // leaves behind.
+    const firsts = list.items
+      .map(item => item.text
+        .toLowerCase()
+        .replace(/^\[[ x]?\]\s*/, '')
+        .replace(/^\d+[.)]\s*/, '')
+        .split(/\s+/)[0] ?? '')
+      // `code` is the placeholder a symbol or a code-labelled link leaves
+      // behind. Several items opening on one carries no voice, so it cannot be
+      // the anaphora this looks for.
+      .filter(first => first !== 'code')
+    if (firsts.length < 3) continue
     const tally = new Map()
     for (const first of firsts) tally.set(first, (tally.get(first) ?? 0) + 1)
     const top = Math.max(...tally.values())
-    const share = top / list.items.length
+    const share = top / firsts.length
     const lengths = list.items.map(item => wordCount(item.text))
     if (share >= 0.75 || coefficientOfVariation(lengths) < 0.15) {
       locked.push({ line: list.line, items: list.items.length, anaphoraShare: round(share) })

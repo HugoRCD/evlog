@@ -204,7 +204,12 @@ export const PHRASE_TELLS = [
  * using the other name for evlog's own concept.
  */
 export const TERMINOLOGY = [
-  { canonical: 'drain', wrong: ['log sink', 'sink', 'transport', 'exporter'] },
+  // `transport` is deliberately absent. It is pino's word for a destination and
+  // also the plain English word for moving bytes, and on this corpus every
+  // occurrence was the second: an HTTP transport, a migration paragraph about
+  // pino, HyperDX's own exporter. A tell that only produces its own false
+  // positives trains a reviewer to skim the list.
+  { canonical: 'drain', wrong: ['log sink', 'sink', 'exporter'] },
   { canonical: 'enricher', wrong: ['enrichment plugin', 'enrichment hook', 'context provider'] },
   { canonical: 'error catalog', wrong: ['error registry', 'error map', 'error dictionary'] },
   { canonical: 'log.fork()', wrong: ['child logger', 'sub-logger', 'subloggers'] },
