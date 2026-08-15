@@ -59,7 +59,7 @@ An audit log answers a forensic question: **who did what, on which resource, whe
 | Audience       | Auditors, security, legal                       | Engineers                          |
 | Storage        | Often dedicated (separate dataset / DB)         | Shared with telemetry              |
 
-evlog ships the audit layer as a thin extension of its wide-event pipeline (a typed `audit` field on `BaseWideEvent` plus a few helpers and drain wrappers). The point is that you compose with the primitives the app already uses — same drains, same enrichers, same redact, same framework integration. There is no parallel system to maintain.
+evlog ships the audit layer as a thin extension of its wide-event pipeline (a typed `audit` field on `BaseWideEvent` plus a few helpers and drain wrappers). The point is that you compose with the primitives the app already uses: same drains, same enrichers, same redact, same framework integration. There is no parallel system to maintain.
 
 ## Mental model
 
@@ -79,7 +79,7 @@ log.audit(...) ──► sets event.audit ──► force-keep ──► auditEn
 
 ## Design calls before writing code
 
-Make these explicit and write them down somewhere a security reviewer can find. Without a written rule, the system can't be audited — auditors look for the policy first, then the enforcement.
+Make these explicit and write them down somewhere a security reviewer can find. Without a written rule, the system can't be audited. Auditors look for the policy first, then the enforcement.
 
 ### 1. Where do audits live?
 
@@ -113,19 +113,19 @@ Strategies:
 
 ### 3. Multi-tenancy?
 
-If the app is multi-tenant, **tenant isolation on every audit event is non-negotiable** — a query that mixes tenants is a privacy incident. Wire it once in the enricher:
+If the app is multi-tenant, **tenant isolation on every audit event is non-negotiable.** A query that mixes tenants is a privacy incident. Wire it once in the enricher:
 
 ```ts
 auditEnricher({ tenantId: ctx => resolveTenant(ctx) })
 ```
 
-If the app uses Better Auth, `auditEnricher` can also bridge the authenticated session into `audit.context` — see the Better Auth integration (`evlog/better-auth`, https://www.evlog.dev/use-cases/better-auth/overview) for wiring `identifyUser` alongside the audit pipeline.
+If the app uses Better Auth, `auditEnricher` can also bridge the authenticated session into `audit.context`. See the Better Auth integration (`evlog/better-auth`, https://www.evlog.dev/use-cases/better-auth/overview) for wiring `identifyUser` alongside the audit pipeline.
 
 Then either (a) partition the audit dataset by `audit.context.tenantId`, or (b) one drain per tenant if hard isolation is required. Never query audits without a tenant filter.
 
 ### 4. Retention
 
-Pick a window per drain and document it. Enforce at the drain layer, not in app code — the drain already has audited mechanisms for it (lifecycle policies, `DELETE` jobs, dataset retention).
+Pick a window per drain and document it. Enforce at the drain layer, not in app code, because the drain already has audited mechanisms for it (lifecycle policies, `DELETE` jobs, dataset retention).
 
 | Framework | Typical retention                                                   |
 | --------- | ------------------------------------------------------------------- |
@@ -180,11 +180,11 @@ export default defineNitroPlugin((nitroApp) => {
 })
 ```
 
-For Hono, Express, Next.js, or standalone scripts / workers, see [`references/framework-wiring.md`](references/framework-wiring.md). The pattern is identical — only the framework integration helper changes.
+For Hono, Express, Next.js, or standalone scripts / workers, see [`references/framework-wiring.md`](references/framework-wiring.md). The pattern is identical. Only the framework integration helper changes.
 
 ### Step 2 — Define the action vocabulary
 
-Audits get queried and alerted on by `audit.action`. A typo is a missing alert, so centralise the list. For a bounded context with several actions, prefer a catalog — one prefix, typed keys, autocomplete on the wire format `${prefix}.${KEY}`:
+Audits get queried and alerted on by `audit.action`. A typo is a missing alert, so centralise the list. For a bounded context with several actions, prefer a catalog: one prefix, typed keys, autocomplete on the wire format `${prefix}.${KEY}`:
 
 ```ts
 // app/audit/billing.ts
@@ -220,7 +220,7 @@ Naming conventions:
 
 Three patterns, in order of preference:
 
-**A. Wrap the action with `withAudit()`** — pure audit-worthy actions (refund, delete, role change, password reset). Outcome resolution is automatic, so you can't forget to log a denial or failure:
+**A. Wrap the action with `withAudit()`.** Pure audit-worthy actions (refund, delete, role change, password reset). Outcome resolution is automatic, so you can't forget to log a denial or failure:
 
 ```ts
 import { withAudit, AuditDeniedError } from 'evlog'
@@ -243,7 +243,7 @@ Outcome resolution:
 - `fn` throws `AuditDeniedError` (or any error with `status === 403`) → `outcome: 'denied'`, error message becomes `reason`.
 - Any other thrown error → `outcome: 'failure'`, then re-thrown.
 
-**B. Manual `log.audit()` inside a handler** — when the audit is one of several decisions in a larger handler, or when you need to emit before the action completes:
+**B. Manual `log.audit()` inside a handler.** Use it when the audit is one of several decisions in a larger handler, or when you need to emit before the action completes:
 
 ```ts
 const log = useLogger(event)
@@ -268,7 +268,7 @@ log.audit({
 })
 ```
 
-**C. Standalone `audit()` for jobs / scripts** — no request, no logger. Same shape, no context auto-fill:
+**C. Standalone `audit()` for jobs / scripts.** No request, no logger. Same shape, no context auto-fill:
 
 ```ts
 import { audit } from 'evlog'
@@ -283,7 +283,7 @@ audit({
 
 ### Step 4 — Add denial coverage
 
-Auditors care most about denials — they're how you prove the policy is actually being enforced. Every authorisation check should have a paired `log.audit.deny()`. Pulling the deny into a single helper guarantees coverage parity with successes:
+Auditors care most about denials, because they're how you prove the policy is actually being enforced. Every authorisation check should have a paired `log.audit.deny()`. Pulling the deny into a single helper guarantees coverage parity with successes:
 
 ```ts
 function authorize(actor, action, resource) {
@@ -301,7 +301,7 @@ function authorize(actor, action, resource) {
 
 ### Step 5 — Redact
 
-Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It redacts HTTP auth headers and common credential field names (`password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn`, plus `cookie` / `set-cookie`) at any nesting depth — including inside `audit.changes.before` / `audit.changes.after`:
+Apply `auditRedactPreset` (or merge it into the existing `RedactConfig`). It redacts HTTP auth headers and common credential field names (`password`, `token`, `apiKey`, `cardNumber`, `cvv`, `ssn`, plus `cookie` / `set-cookie`) at any nesting depth, including inside `audit.changes.before` / `audit.changes.after`:
 
 ```ts
 import { initLogger, auditRedactPreset } from 'evlog'
@@ -315,7 +315,7 @@ initLogger({
 
 ### Step 6 — Test it
 
-`mockAudit()` captures audit events for assertions without going through any drain. Make the denial test mandatory in code review — untested denial paths are the most common cause of audit gaps:
+`mockAudit()` captures audit events for assertions without going through any drain. Make the denial test mandatory in code review, because untested denial paths are the most common cause of audit gaps:
 
 ```ts
 import { mockAudit } from 'evlog'
@@ -395,7 +395,7 @@ rg -n "createError\(.*403|throw .*Forbidden|status:\s*403|statusCode:\s*403" --t
 rg -n "(?i)\b(delete|update|create|refund|grant|revoke|promote|demote|reset|impersonate)\b.*async\s+function|defineEventHandler" --type ts
 ```
 
-On Nuxt, Nitro, Next.js, or TanStack Start, you can also run `npx @evlog/cli map --no-write` — the `audit` / `audit-coverage` checks flag sensitive routes that log nothing. Useful as a second pass; keep the greps above for denials and actor shape, which the CLI does not fully cover.
+On Nuxt, Nitro, Next.js, or TanStack Start, you can also run `npx @evlog/cli map --no-write`, whose `audit` / `audit-coverage` checks flag sensitive routes that log nothing. Useful as a second pass; keep the greps above for denials and actor shape, which the CLI does not fully cover.
 
 For each match, check:
 - Mutating endpoint without a `log.audit()` or `withAudit()` → coverage gap.

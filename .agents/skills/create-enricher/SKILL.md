@@ -5,7 +5,7 @@ description: Create a new built-in evlog enricher to add derived context to wide
 
 # Create evlog Enricher
 
-Add a new built-in enricher to evlog. Every enricher is built on the public toolkit primitive `defineEnricher` from `evlog/toolkit` — so a community enricher has the same shape as a built-in one.
+Add a new built-in enricher to evlog. Every enricher is built on the public toolkit primitive `defineEnricher` from `evlog/toolkit`, so a community enricher has the same shape as a built-in one.
 
 ## PR Title
 
@@ -31,7 +31,7 @@ Enrichers live in the core package surface (`evlog/enrichers`), so use the `core
 
 ### Should it join `createDefaultEnrichers()`?
 
-`createDefaultEnrichers()` composes user agent, geo, request size, and trace context via `composeEnrichers` (from `../shared/compose`). Add the new enricher to the composition only if it is universally applicable and reads nothing but the request (headers/env) — anything requiring service-specific setup or extra cost stays opt-in. Changing the default composition is a behavior change for every existing `createDefaultEnrichers()` user: call it out explicitly in the changeset.
+`createDefaultEnrichers()` composes user agent, geo, request size, and trace context via `composeEnrichers` (from `../shared/compose`). Add the new enricher to the composition only if it is universally applicable and reads nothing but the request (headers/env). Anything requiring service-specific setup or extra cost stays opt-in. Changing the default composition is a behavior change for every existing `createDefaultEnrichers()` user: call it out explicitly in the changeset.
 
 ## Naming Conventions
 
@@ -115,7 +115,7 @@ interface {Name}Info {
 
 3. If the enricher joined the default composition, update the "All built-in enrichers" section text listing what `createDefaultEnrichers()` composes.
 
-Custom-enricher authoring docs live separately at `apps/docs/content/6.extend/5.custom-enrichers.md` — no change needed there unless the toolkit contract itself changed.
+Custom-enricher authoring docs live separately at `apps/docs/content/6.extend/5.custom-enrichers.md`, with no change needed there unless the toolkit contract itself changed.
 
 ## Step 4: Update the Public Skill
 

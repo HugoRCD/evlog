@@ -29,7 +29,7 @@ Logs are written by evlog's file system drain as `.jsonl` files, organized by da
 
 Always check the first few bytes of the file to detect the format: if the second character is a newline or `"`, it's NDJSON; if it's a space or newline followed by spaces, it's pretty-printed.
 
-**Search order** — check these locations relative to the project root:
+**Search order.** Check these locations relative to the project root:
 
 1. `.evlog/logs/` (default)
 2. Any `.evlog/logs/` inside app directories (monorepos: `apps/*/.evlog/logs/`)
@@ -44,15 +44,15 @@ apps/*/.evlog/logs/*.jsonl
 
 Files are named by date: `2026-03-14.jsonl`. Start with the most recent file.
 
-**Programmatic reading**: instead of hand-parsing, a small script can use the readers shipped with evlog — `readFsLogs()` and `tailFsLogs()` from `evlog/fs` are async generators that handle both formats, date ordering, and filtering. Prefer them when the project already has evlog installed and the analysis needs more than a quick grep.
+**Programmatic reading**: instead of hand-parsing, a small script can use the readers shipped with evlog: `readFsLogs()` and `tailFsLogs()` from `evlog/fs` are async generators that handle both formats, date ordering, and filtering. Prefer them when the project already has evlog installed and the analysis needs more than a quick grep.
 
 **Memory drain alternative**: some apps use the Memory adapter (`evlog/memory`) instead of (or alongside) the FS drain, exposing recent events through a dev-only HTTP endpoint via `readMemoryLogs()`. If `.evlog/logs/` is empty but the app wires `createMemoryDrain()`, query that endpoint instead.
 
 ## If no logs are found
 
-Before wiring a new drain, you can try `npx @evlog/cli doctor --json` — it checks whether `evlog` is installed and whether a local `.evlog/logs` drain already exists (read-only). Optional; skip if the CLI is unavailable.
+Before wiring a new drain, you can try `npx @evlog/cli doctor --json`, which checks whether `evlog` is installed and whether a local `.evlog/logs` drain already exists (read-only). Optional; skip if the CLI is unavailable.
 
-The file system drain may not be enabled. On Nuxt, Nitro, Next.js, or TanStack Start, the fastest path is the CLI — it detects the framework and wires the fs drain (its default dev drain) in one pass:
+The file system drain may not be enabled. On Nuxt, Nitro, Next.js, or TanStack Start, the fastest path is the CLI, which detects the framework and wires the fs drain (its default dev drain) in one pass:
 
 ```bash
 npx @evlog/cli init --dry-run --yes   # preview first
@@ -180,5 +180,5 @@ Look for: client errors that don't have corresponding server errors (network iss
 - Each line is a **complete, self-contained event**. Unlike traditional logs, you don't need to correlate multiple lines — one line has all the context for one request.
 - The `error.data.why` and `error.data.fix` fields are evlog-specific structured error fields. When present, they provide the most actionable information.
 - Duration values are strings with units (e.g. `"706ms"`). Parse the numeric part for comparisons.
-- Events with `"source":"client"` originated from browser-side logging and were sent to the server via the transport endpoint.
+- Events with `"source":"client"` originated from browser-side logging and were sent to the server via the HTTP drain endpoint.
 - Log files are `.gitignore`'d automatically — they exist only on the local machine or server where the app runs.

@@ -5,7 +5,7 @@ description: Create a new built-in evlog adapter to send wide events to an exter
 
 # Create evlog Adapter
 
-Add a new built-in adapter to evlog. Every adapter follows the same architecture and is built on the public toolkit primitives in `evlog/toolkit` — so a community adapter has the same shape as a built-in one.
+Add a new built-in adapter to evlog. Every adapter follows the same architecture and is built on the public toolkit primitives in `evlog/toolkit`, so a community adapter has the same shape as a built-in one.
 
 ## PR Title
 
@@ -13,7 +13,7 @@ Add a new built-in adapter to evlog. Every adapter follows the same architecture
 feat({name}): add the {Name} drain adapter
 ```
 
-Recent examples: `feat(loki): add the Grafana Loki drain adapter`, `feat(clickhouse): add the ClickHouse drain adapter`. Use the adapter name as the conventional-commit scope — and register that scope (see touchpoint 11).
+Recent examples: `feat(loki): add the Grafana Loki drain adapter`, `feat(clickhouse): add the ClickHouse drain adapter`. Use the adapter name as the conventional-commit scope, and register that scope (see touchpoint 11).
 
 **Scope timing caveat**: the semantic PR check reads its scope list from the **base branch**, so a brand-new scope can't validate the very PR that introduces it. Either register the scope in a small preceding PR (the Loki/ClickHouse pattern), or use an unscoped title (`feat: add the {Name} drain adapter`) on the introducing PR.
 
@@ -55,7 +55,7 @@ Standard option naming (use these exact names):
 | Request timeout (ms) | `timeout` |
 | Retry attempts on transient failures | `retries` |
 
-If a service historically used a different name (`token`, `sourceToken`, …) keep it as a deprecated alias via `applyDeprecatedAlias` — see Axiom and Better Stack for the pattern.
+If a service historically used a different name (`token`, `sourceToken`, …) keep it as a deprecated alias via `applyDeprecatedAlias`. See Axiom and Better Stack for the pattern.
 
 ## Step 1: Adapter Source — built on `defineHttpDrain`
 
@@ -87,7 +87,7 @@ Follow the existing ordering in that file.
 
 ## Step 3: Package Exports
 
-In `packages/evlog/package.json`, add two entries (after the last adapter — check the current list rather than assuming):
+In `packages/evlog/package.json`, add two entries (after the last adapter, and check the current list rather than assuming):
 
 **In `exports`**:
 
@@ -106,7 +106,7 @@ In `packages/evlog/package.json`, add two entries (after the last adapter — ch
 ]
 ```
 
-Any export added to `package.json` without a matching `tsdown.config.ts` entry (and vice versa) fails `test/toolkit/api-surface.test.ts` — that's touchpoint 6.
+Any export added to `package.json` without a matching `tsdown.config.ts` entry (and vice versa) fails `test/toolkit/api-surface.test.ts`, which is touchpoint 6.
 
 ## Step 4: Unit Tests
 
@@ -143,7 +143,7 @@ See the Loki and ClickHouse setups as references.
 
 ## Step 6: Adapter Documentation Page
 
-Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/` (steps 6–8).
+Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/` (steps 6 to 8).
 
 Adapter docs live in three categories under `apps/docs/content/4.integrate/adapters/`:
 

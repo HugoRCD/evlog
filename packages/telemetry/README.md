@@ -13,9 +13,9 @@
 
 **Digging through logs is not observability. It's hope.**
 
-**Wide-event telemetry for CLIs and automation** — the same one-event-per-run model as [evlog](https://evlog.dev), built for tools that run on someone else's machine.
+**Wide-event telemetry for CLIs and automation**, the same one-event-per-run model as [evlog](https://evlog.dev), built for tools that run on someone else's machine.
 
-Ship usage insight without shipping an analytics SDK: wrap your [citty](https://github.com/unjs/citty) command tree (or call `createTelemetry()` in scripts) and get **one structured event per command** — command name, sanitized flags, duration, outcome, and optional counters via `telemetry.set()`.
+Ship usage insight without shipping an analytics SDK: wrap your [citty](https://github.com/unjs/citty) command tree (or call `createTelemetry()` in scripts) and get **one structured event per command**: command name, sanitized flags, duration, outcome, and optional counters via `telemetry.set()`.
 
 ## Why evlog telemetry
 
@@ -66,10 +66,10 @@ const main = withTelemetry(
 runMain(main)
 ```
 
-Scripts and GitHub Actions: `createTelemetry()` / `createGitHubActionsTelemetry()` — see the [docs](https://evlog.dev/use-cases/telemetry/overview).
+Scripts and GitHub Actions: `createTelemetry()` / `createGitHubActionsTelemetry()`. See the [docs](https://evlog.dev/use-cases/telemetry/overview).
 
 ## Docs
 
-Full guide: [evlog.dev — telemetry](https://evlog.dev/use-cases/telemetry/overview)
+Full guide: [evlog.dev telemetry guide](https://evlog.dev/use-cases/telemetry/overview)
 
 Example playground: [`examples/telemetry-playground`](../../examples/telemetry-playground) in the evlog monorepo.
