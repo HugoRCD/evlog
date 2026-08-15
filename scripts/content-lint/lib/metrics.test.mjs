@@ -126,8 +126,16 @@ describe('dashes, twins', () => {
 
 describe('bullet frames, symbols', () => {
   it('reads a bolded symbol as the symbol it is', () => {
-    const items = ['`message`', '`evlog`', '`dd`', '`service`', '`timestamp`']
-    const source = items.map(name => `- **${name}**: what the field carries and why`).join('\n')
+    // Uneven bodies, so a frame here could only come from the shared opener and
+    // never from `coefficientOfVariation`.
+    const items = [
+      ['`message`', 'the one-line summary the list view shows, built from the method, the path and the status'],
+      ['`evlog`', 'the whole event'],
+      ['`dd`', 'trace and span ids, when the event carries trace context at all'],
+      ['`service`', 'the name'],
+      ['`timestamp`', 'Unix milliseconds'],
+    ]
+    const source = items.map(([name, body]) => `- **${name}**: ${body}`).join('\n')
 
     expect(measureSource(source).bulletFrames).toEqual([])
   })
@@ -175,15 +183,20 @@ describe('bullet frames', () => {
     const [frame] = measureSource(list).bulletFrames
 
     expect(frame.anaphoraShare).toBe(1)
+    expect(frame.anaphora).toBe(5)
     expect(frame.opening).toBe(5)
     expect(frame.items).toBe(5)
   })
 
   it('reads the word after the ordinal, which the parser has already removed', () => {
-    const numbered = ['1. Explicit overrides win', '2. Runtime config', '3. Legacy config', '4. Env vars', '5. Defaults'].join('\n')
-    const [frame] = measureSource(numbered).bulletFrames ?? []
+    // The items share `keep` and nothing else. If the ordinal survived, the
+    // openers would be `1.` through `5.` and the share would be 0.2, so this
+    // assertion fails in exactly the case it exists to catch.
+    const numbered = ['1. Keep the buffer small', '2. Keep the batch small', '3. Keep the retries low', '4. Keep the timeout short', '5. Keep the drain fast'].join('\n')
+    const [frame] = measureSource(numbered).bulletFrames
 
-    expect(frame?.anaphoraShare ?? 0).toBeLessThan(0.75)
+    expect(frame.anaphoraShare).toBe(1)
+    expect(frame.anaphora).toBe(5)
   })
 
   it('leaves the code placeholder out of the population', () => {

@@ -69,11 +69,11 @@ Add tests to `packages/evlog/test/toolkit/enrichers.test.ts`, following the exis
 
 Required test categories:
 
-1. **Sets field from headers**: verify the enricher populates the event field correctly
-2. **Skips when source data missing**: verify no field is set when the required header/input is absent
+1. **Sets the field from its source**: verify the enricher populates the event field correctly, reading whatever it actually reads (`ctx.request`, `ctx.response`, `process.env`, `ctx.event`, or headers)
+2. **Skips when source data missing**: verify no field is set when the required input is absent
 3. **Preserves existing data**: verify `overwrite: false` (default) doesn't replace user-provided fields
 4. **Overwrites when requested**: verify `overwrite: true` replaces existing fields
-5. **Handles edge cases**: empty strings, malformed values, case-insensitive header names
+5. **Handles edge cases**: empty strings and malformed values, plus case-insensitive lookup for a header-based enricher
 6. **Default composition**: if the enricher joined `createDefaultEnrichers()`, extend that composition's tests
 
 ## Step 3: Update the Enrichers Docs Page

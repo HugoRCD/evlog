@@ -231,7 +231,7 @@ function rhythm(metrics, profile, rates, template) {
         id: 'T-07',
         severity: 'standard',
         line: list.line,
-        message: `${list.opening} of ${list.items} bullets share one opener; a table in bullet form?`,
+        message: `${list.anaphora} of ${list.opening} bullets share one opener; a table in bullet form?`,
       })
     }
   }

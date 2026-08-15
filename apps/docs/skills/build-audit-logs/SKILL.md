@@ -214,7 +214,7 @@ Naming conventions:
 
 - `noun.verb` (`invoice.refund`, not `refundInvoice`).
 - Past tense if the audit is logged after the fact (`invoice.refunded`); present tense when wrapped by `withAudit()` (which resolves the outcome itself).
-- Lowercase, dot-delimited, no spaces: for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND`. That's intentional, don't lowercase the keys.
+- Lowercase, dot-delimited, no spaces: for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND`. That is intentional. Do not lowercase the keys.
 
 ### Step 3: Instrument call sites
 
