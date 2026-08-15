@@ -170,9 +170,9 @@ Default: anything that stays on the local clone is fine, anything that touches t
 - `gh pr view`, `gh pr list`, `gh pr diff`, `gh issue view`, `gh run view` — read-only GitHub queries
 
 **OK when the maintainer explicitly asks (in the current task):**
-- `git push -u origin <feature-branch>` — push a feature branch you just prepared
-- `git push --force-with-lease origin <feature-branch>` — only on a feature branch you authored, after a clean rebase
-- `gh pr create --base main --head <feature-branch>` — open a PR
+- `git push -u origin <feature-branch>`: push a feature branch you just prepared
+- `git push --force-with-lease origin <feature-branch>`: only on a feature branch you authored, after a clean rebase
+- `gh pr create --base main --head <feature-branch>`: open a PR
 - Write a **PR title** (Conventional Commits, see above) and a **PR body** — keep the body factual, mirror the changeset, reference the issue (`Closes #X`); no marketing copy
 
 **Never (no exceptions, even when asked):**

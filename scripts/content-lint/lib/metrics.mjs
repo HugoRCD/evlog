@@ -207,7 +207,40 @@ function dashes(doc) {
     }
   }
 
+  // A bullet is prose too, and a `Next steps` list is where the dash survives
+  // longest. Table cells are left alone: a cell is a fragment, and a dash
+  // between two of its parts is layout rather than punctuation.
+  for (const list of doc.lists) {
+    for (const item of list.items) {
+      if (/[—–]/.test(item.text)) found.push({ line: item.line, text: item.text })
+    }
+  }
+
   return { count: found.length, occurrences: found.slice(0, 8) }
+}
+
+/** Above this many words of prose, a section is explaining rather than listing. */
+const ENUMERATING_PROSE = 40
+
+/**
+ * Share of sections that list rather than argue: a table or a fence, and barely
+ * any prose around it. Parallel headings over parallel entries is the twin
+ * `ai-tells.md` names for T-06, and this is what it looks like in the file.
+ *
+ * @param {import('./mdc.mjs').ParsedDoc} doc
+ * @param {{ line: number }[]} targets Headings that open a section.
+ */
+function enumerationShare(doc, targets) {
+  let enumerating = 0
+
+  for (const [index, heading] of targets.entries()) {
+    const end = targets[index + 1]?.line ?? Number.POSITIVE_INFINITY
+    const within = span => span.line > heading.line && span.line < end
+    const prose = doc.paragraphs.filter(within).reduce((total, paragraph) => total + wordCount(paragraph.text), 0)
+    if (prose < ENUMERATING_PROSE && (doc.tableRows.some(within) || doc.code.some(within))) enumerating += 1
+  }
+
+  return round(enumerating / targets.length)
 }
 
 /**
@@ -219,7 +252,7 @@ function dashes(doc) {
  */
 function headingShape(doc) {
   const targets = doc.headings.filter(heading => heading.depth === 2 || heading.depth === 3)
-  if (targets.length < 3) return { count: targets.length, dominant: null, share: 0, symbolShare: 0 }
+  if (targets.length < 3) return { count: targets.length, dominant: null, share: 0, symbolShare: 0, enumerationShare: 0 }
 
   const shapes = targets.map(heading => classifyHeading(heading.text))
   const tally = new Map()
@@ -231,6 +264,7 @@ function headingShape(doc) {
     dominant,
     share: round(top / targets.length),
     symbolShare: round(shapes.filter(shape => shape === 'symbol').length / targets.length),
+    enumerationShare: enumerationShare(doc, targets),
     // Kept so the scorer can subtract the headings this page shares with its
     // siblings and re-judge the shape of what is left.
     texts: targets.map(heading => heading.text.trim().toLowerCase()),
@@ -280,7 +314,11 @@ function bulletFrames(doc) {
       .map(item => item.text
         .toLowerCase()
         .replace(/^\[[ x]?\]\s*/, '')
+        // Emphasis around the opener is styling. `**code**` is the same symbol
+        // as `code` and carries the same absence of voice.
+        .replace(/^[*_]+/, '')
         .split(/\s+/)[0] ?? '')
+      .map(first => first.replace(/^code\b.*/, 'code'))
       // `code` is the placeholder a symbol or a code-labelled link leaves
       // behind. Several items opening on one carries no voice, so it cannot be
       // the anaphora this looks for.

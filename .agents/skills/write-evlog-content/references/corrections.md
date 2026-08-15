@@ -68,3 +68,15 @@ Applies to: every term in `terminology.md`. `corpus.mjs` drops a hit whose parag
 Flagged: `Zero config.` closing a `::card` on the frameworks overview.
 Actual: a card is a link tile and its body is sized to the tile, so every one of them ends on a short line. Counting them measures the component, not the page's rhythm.
 Applies to: `::card` on every surface. `metrics.mjs` leaves card bodies out of the eligible population.
+
+## 2026-08-15 · T-06 · A page that lists is allowed parallel headings
+
+Flagged: `Exit codes`, `The JSON contract`, `The map file`, `Monorepos` on the CLI pages, and 19 other pages of the same shape.
+Actual: `ai-tells.md` already named the twin, parallel headings over parallel entries, and in the file that looks like a section holding a table or a fence and almost no prose. The tell is a mould over sections that argue.
+Applies to: every surface. `metrics.mjs` measures the share of sections that list, and `T-06` drops above 0.6, which cleared 20 pages.
+
+## 2026-08-15 · U-14 · A bullet is prose
+
+Flagged: nothing, for a year. The rule only ever read headings and paragraphs, so 273 dashes sat in list items untouched, most of them in the `Next steps` list at the bottom of a page.
+Actual: 159 were a bold term glossed after a dash, which the corpus elsewhere writes with a colon. The remaining 117 put a full clause after the dash and need a reader.
+Applies to: list items on every surface. Table cells stay out: a cell is a fragment and a dash between two of its parts is layout.

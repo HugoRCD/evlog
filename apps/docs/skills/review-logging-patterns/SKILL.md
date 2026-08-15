@@ -87,8 +87,8 @@ npx @evlog/cli map --no-write
 What you get:
 
 - A project score and which entry points are still dark
-- **FIX FIRST** — the three most valuable places to fix
-- **GOING FURTHER** — opportunities (catalogs, audit coverage, AI logging, auth identity) that never cost points
+- **FIX FIRST**: the three most valuable places to fix
+- **GOING FURTHER**: opportunities (catalogs, audit coverage, AI logging, auth identity) that never cost points
 - Per-file inspect: `npx @evlog/cli map <file> --no-write` shows the shape the handler could take
 - Re-run after fixes and watch the score move
 

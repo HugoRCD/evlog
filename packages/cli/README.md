@@ -165,8 +165,8 @@ src/
 
 ## Docs
 
-- [CLI overview](https://evlog.dev/cli/overview) — commands, global flags, exit codes
-- [`evlog map`](https://evlog.dev/cli/map) — what it scans and how to read the report
-- [Rules](https://evlog.dev/cli/rules) — every check, what satisfies it, how to fix it
-- [Scoring](https://evlog.dev/cli/scoring) — weights, grades, sensitivity
-- [CI](https://evlog.dev/cli/ci) — gate a pull request on the score
+- [CLI overview](https://evlog.dev/cli/overview): commands, global flags, exit codes
+- [`evlog map`](https://evlog.dev/cli/map): what it scans and how to read the report
+- [Rules](https://evlog.dev/cli/rules): every check, what satisfies it, how to fix it
+- [Scoring](https://evlog.dev/cli/scoring): weights, grades, sensitivity
+- [CI](https://evlog.dev/cli/ci): gate a pull request on the score

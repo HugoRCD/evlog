@@ -7,8 +7,8 @@ description: Add a new rule or a new framework adapter to `evlog map` in @evlog/
 
 Extend the coverage scanner in `@evlog/cli`. Two kinds of extension:
 
-- **A rule** — a new question asked of every entry point (`packages/cli/src/lib/map/rules/`). This is the common case.
-- **A framework adapter** — teach `evlog map` to find entry points in a new framework (`packages/cli/src/lib/map/adapters/`). Rarer and heavier; see the last section.
+- **A rule**: a new question asked of every entry point (`packages/cli/src/lib/map/rules/`). This is the common case.
+- **A framework adapter**: teach `evlog map` to find entry points in a new framework (`packages/cli/src/lib/map/adapters/`). Rarer and heavier; see the last section.
 
 ## PR Title
 
@@ -88,9 +88,9 @@ Key rules:
 
 - **Reporting nothing means the rule passed.** `context.report()` only for gaps.
 - **Read `FileFacts` first** (`../facts.ts`) — if the answer isn't there, consider extending the facts rather than writing AST listeners; facts are computed once per file for all rules.
-- **`project` (`ProjectFacts`) is the gate for opportunities** — `project.features` (evlog features in use), `project.pairable` (installed packages evlog integrates with), `project.catalogs` (for naming things in suggestions).
+- **`project` (`ProjectFacts`) is the gate for opportunities**: `project.features` (evlog features in use), `project.pairable` (installed packages evlog integrates with), `project.catalogs` (for naming things in suggestions).
 - **Messages are report copy.** Concrete, lowercase, pointing at the evidence (`"X is spelled out here and in 2 other files — one catalog entry would cover them"`). No exclamation marks, no advice-column tone.
-- **Weights are a scoring decision** — look at `score.ts` and the existing spread (40 down to 15) and discuss the number in the PR rather than inventing precedent.
+- **Weights are a scoring decision**: look at `score.ts` and the existing spread (40 down to 15) and discuss the number in the PR rather than inventing precedent.
 - Every rule id is also a suppression target (`evlog-map-disable {id}`) and part of the public `evlog.map.json` contract — renaming later is a breaking change.
 
 ## Steps 2 and 3: Registry + CheckId

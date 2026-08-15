@@ -160,6 +160,23 @@ describe('evaluate', () => {
     expect(result.findings.map(finding => finding.id)).not.toContain('U-15')
   })
 
+  it('spares a page whose sections list rather than argue', () => {
+    const sections = ['Exit codes', 'The JSON contract', 'The map file', 'Monorepos', 'Options']
+    const source = sections.map(title => `## ${title}\n\n| Key | Meaning |\n|---|---|\n| a | b |`).join('\n\n')
+    const result = evaluate(page('apps/docs/content/3.cli/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).not.toContain('T-06')
+  })
+
+  it('still flags one mould over sections that argue', () => {
+    const sections = ['Exit codes', 'The JSON contract', 'The map file', 'Monorepos', 'Options']
+    const prose = 'The gate reads the map file and compares it against the baseline the previous run wrote, so a rule that moved is never counted as a regression by mistake, and the exit code stays the contract.'
+    const source = sections.map(title => `## ${title}\n\n${prose}`).join('\n\n')
+    const result = evaluate(page('apps/docs/content/3.cli/a.md', source), quiet)
+
+    expect(result.findings.map(finding => finding.id)).toContain('T-06')
+  })
+
   it('spares the sentence that is describing the other tool', () => {
     const result = evaluate(page('apps/docs/content/7.reference/a.md', 'pino writes through a transport, which runs in a worker thread.'), quiet)
 
