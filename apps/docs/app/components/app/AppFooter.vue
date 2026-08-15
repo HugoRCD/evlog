@@ -56,6 +56,9 @@ const columns = computed<FooterColumn[]>(() => [
 </script>
 
 <template>
+  <ClientOnly>
+    <AppConsentBanner />
+  </ClientOnly>
   <UFooter v-if="!isLanding" :ui="{ top: 'border-b border-default', root: 'z-10 border-t border-default' }">
     <template #top>
       <UContainer>

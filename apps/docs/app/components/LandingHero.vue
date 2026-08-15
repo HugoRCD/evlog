@@ -3,6 +3,7 @@ const copied = ref(false)
 
 async function copyCommand() {
   await navigator.clipboard.writeText('npx skills add https://www.evlog.dev')
+  trackEvent('install_command_copied', { source: 'hero' })
   copied.value = true
   setTimeout(() => {
     copied.value = false
