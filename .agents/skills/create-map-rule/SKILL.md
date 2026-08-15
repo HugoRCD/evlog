@@ -93,7 +93,7 @@ Key rules:
 - **Weights are a scoring decision** — look at `score.ts` and the existing spread (40 down to 15) and discuss the number in the PR rather than inventing precedent.
 - Every rule id is also a suppression target (`evlog-map-disable {id}`) and part of the public `evlog.map.json` contract — renaming later is a breaking change.
 
-## Step 2–3: Registry + CheckId
+## Steps 2 and 3: Registry + CheckId
 
 Add the import and one `REGISTRY` line in `rules/index.ts` (report order matters: requirements before opportunities, heaviest first), and the id to the `CheckId` union in `types.ts`. The `AssertIdsMatch` type in `index.ts` fails the build if you forget either side.
 
@@ -112,7 +112,7 @@ Cover at minimum:
 
 Run: `pnpm --filter @evlog/cli exec vitest run test/map/rules.test.ts`
 
-## Step 5–6: Docs
+## Step 5 and 6: Docs
 
 Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/`. Then in `apps/docs/content/3.cli/3.rules.md`: add the row (column title, id, weight/fires-when, expects) and a `### {title} — {question}` section following the existing ones, covering what it checks, what passes, what fails, the suggested shape. Requirements with a weight also touch the scoring narrative in `4.scoring.md`.
 

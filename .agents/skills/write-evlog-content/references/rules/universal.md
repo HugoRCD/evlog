@@ -141,7 +141,7 @@ Note: the corpus predates the rule, so most pages still carry them. A content pa
 **U-15 · evlog's parts keep evlog's names** · `standard`
 
 Rule: drain, enricher, error catalog, `log.fork()`, wide event, pipeline. The full table, and the reason each alternative is wrong, is in `references/terminology.md`.
-Bad: "Register the drain and every event reaches it."
+Bad: "Register the sink and every event reaches it."
 Better: "Register the drain and every event reaches it."
 Why: a term the reader learns here and cannot find in the API costs them the search twice.
 Exception: a sentence describing another tool uses that tool's vocabulary. The scanner already drops any hit in a sentence that names an alternative.

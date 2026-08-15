@@ -222,12 +222,15 @@ function rhythm(metrics, profile, rates, template) {
   }
 
   for (const list of metrics.bulletFrames) {
-    if (list.items >= 4 && list.anaphoraShare >= 0.75) {
+    // Five, not four. At four items a shared opener is three of them, which is
+    // what a decision list, a pitfalls list, or a set of controlled variables
+    // looks like when it is doing its job.
+    if (list.opening >= 5 && list.anaphoraShare >= 0.75) {
       findings.push({
         id: 'T-07',
         severity: 'standard',
         line: list.line,
-        message: `${list.items} bullets sharing one opener; a table in bullet form?`,
+        message: `${list.opening} of ${list.items} bullets share one opener; a table in bullet form?`,
       })
     }
   }

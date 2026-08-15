@@ -70,6 +70,18 @@ describe('numbered headings', () => {
   })
 })
 
+describe('T-07 boundary', () => {
+  const shared = n => page('apps/docs/content/2.learn/a.md', Array.from({ length: n }, (_v, i) => `- Powerful thing number ${'x'.repeat(i * 4)}`).join('\n'))
+
+  it('spares four bullets, where a shared opener is three of them', () => {
+    expect(evaluate(shared(4), quiet).findings.map(f => f.id)).not.toContain('T-07')
+  })
+
+  it('reports five', () => {
+    expect(evaluate(shared(5), quiet).findings.map(f => f.id)).toContain('T-07')
+  })
+})
+
 describe('evaluate', () => {
   it('carries drift findings through and deducts for them', () => {
     const drift = [{ id: 'T-15', severity: 'critical', line: 4, message: 'gone' }]

@@ -172,6 +172,9 @@ function epigrams(doc) {
     // A closer pointing somewhere carries something: the destination.
     const labels = doc.links.filter(link => link.line === paragraph.line).map(link => link.text)
     if (labels.some(label => label && last.includes(label))) continue
+    // A closer ending on a colon introduces what comes next. `Never log:` above
+    // a table of categories is the table's sentence, not a flourish.
+    if (last.trimEnd().endsWith(':')) continue
     candidates.push({ line: paragraph.line, text: last })
   }
 
@@ -187,6 +190,13 @@ function epigrams(doc) {
  */
 function dashes(doc) {
   const found = []
+
+  // Headings count. They are the first prose a reader sees and the rule says
+  // any surface, so a dash hiding in `## Network bridge — stream server` is the
+  // one most likely to be read.
+  for (const heading of doc.headings) {
+    if (/[—–]/.test(heading.text)) found.push({ line: heading.line, text: heading.text })
+  }
 
   for (const paragraph of doc.paragraphs) {
     for (const sentence of sentences(paragraph.text)) {
@@ -232,10 +242,13 @@ function headingShape(doc) {
 function classifyHeading(text) {
   const trimmed = text.trim()
   if (/^code$/.test(trimmed) || /^[a-z][A-Za-z]*\(\)?$/.test(trimmed)) return 'symbol'
+  // `cleanInline` leaves `code` where a symbol was, so a heading opening on one
+  // is an API entry however it continues: `` `log.set()` — final snapshot ``.
+  if (/^code\b/.test(trimmed)) return 'symbol'
   // A numbered heading is a position in an ordered guide. The steps of one
   // procedure share a shape because they are one procedure, which is the twin
   // `T-06` is meant to spare.
-  if (/^(?:step\s+)?\d+[.):]\s/i.test(trimmed)) return 'sequence'
+  if (/^(?:step\s+)?\d+\s*[.):—–]?\s/i.test(trimmed)) return 'sequence'
   if (trimmed.endsWith('?')) return 'question'
   const first = trimmed.toLowerCase().split(/\s+/)[0]
   if (IMPERATIVE_VERBS.includes(first)) return 'imperative'
@@ -256,16 +269,27 @@ function bulletFrames(doc) {
 
   for (const list of doc.lists) {
     if (list.items.length < 3) continue
-    // A task list shares `[` on every item by construction, which is a
-    // checkbox, not an anaphora.
-    const firsts = list.items.map(item => item.text.toLowerCase().replace(/^\[[ x]?\]\s*/, '').split(/\s+/)[0] ?? '')
+    // Two openers are shared by construction rather than by voice: a task
+    // list's checkbox, and the `code` placeholder every item starting with a
+    // symbol or a code-labelled link leaves behind. An ordinal never reaches
+    // here, since `parseMarkdown` strips it off an ordered list.
+    const firsts = list.items
+      .map(item => item.text
+        .toLowerCase()
+        .replace(/^\[[ x]?\]\s*/, '')
+        .split(/\s+/)[0] ?? '')
+      // `code` is the placeholder a symbol or a code-labelled link leaves
+      // behind. Several items opening on one carries no voice, so it cannot be
+      // the anaphora this looks for.
+      .filter(first => first !== 'code')
+    if (firsts.length < 3) continue
     const tally = new Map()
     for (const first of firsts) tally.set(first, (tally.get(first) ?? 0) + 1)
     const top = Math.max(...tally.values())
-    const share = top / list.items.length
+    const share = top / firsts.length
     const lengths = list.items.map(item => wordCount(item.text))
     if (share >= 0.75 || coefficientOfVariation(lengths) < 0.15) {
-      locked.push({ line: list.line, items: list.items.length, anaphoraShare: round(share) })
+      locked.push({ line: list.line, items: list.items.length, opening: firsts.length, anaphoraShare: round(share) })
     }
   }
 

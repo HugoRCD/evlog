@@ -82,20 +82,70 @@ describe('contraction seam', () => {
   })
 })
 
+describe('dashes', () => {
+  it('counts a dash hiding in a heading', () => {
+    // Headings never reached this metric, so 46 of them carried one.
+    expect(measureSource('## Network bridge — stream server\n\nProse.').dashes.count).toBe(1)
+  })
+
+  it('reads a heading opening on a symbol as an API entry', () => {
+    const source = ['## `getMetadata()`: final snapshot', '## `getEstimatedCost()`: quick check', '## `onUpdate()`: incremental', '## `shape`: the record'].map(h => `${h}\n\nProse about it.`).join('\n\n')
+
+    expect(measureSource(source).headings.dominant).toBe('symbol')
+  })
+})
+
+describe('epigram closers', () => {
+  it('spares a closer that introduces what comes next', () => {
+    const source = 'Some categories never belong in an event, whatever the environment. **Never log:**\n\n| Category | Risk |\n| --- | --- |\n| Credentials | Account compromise |'
+
+    expect(measureSource(source).epigrams.count).toBe(0)
+  })
+
+  it('still counts a closer that only carries rhythm', () => {
+    const source = 'The pipeline batches every event before it leaves the process. That is the whole idea.'
+
+    expect(measureSource(source).epigrams.count).toBe(1)
+  })
+})
+
 describe('bullet frames', () => {
   it('does not read a checklist as an anaphora', () => {
     // Every task item starts with `[`, which is a checkbox. `score.mjs` gates
     // T-07 on this share, so it is the number that has to stay low.
-    const list = ['- [ ] Service name is set', '- [ ] Sampling is configured', '- [ ] Draining is set up', '- [ ] Pretty mode is off'].join('\n')
+    const list = ['- [ ] Service name is set', '- [ ] Sampling is configured for the busiest routes', '- [ ] Draining is set up', '- [ ] Pretty mode is off in production'].join('\n')
     const frames = measureSource(list).bulletFrames
 
     for (const frame of frames) expect(frame.anaphoraShare).toBeLessThan(0.75)
   })
 
-  it('still catches four bullets that really do share an opener', () => {
-    const list = ['- Powerful drain support', '- Powerful enricher support', '- Powerful catalog support', '- Powerful sampling support'].join('\n')
+  it('reports the share over the openers it actually counted', () => {
+    // Lengths deliberately uneven, so the frame can only come from the opener.
+    const list = [
+      '- Powerful drain support for absolutely every destination you might ever reach for',
+      '- Powerful enrichers',
+      '- Powerful catalogs that carry a code and a fix and a link',
+      '- Powerful sampling',
+      '- Powerful redaction across every nested field',
+    ].join('\n')
+    const [frame] = measureSource(list).bulletFrames
 
-    expect(measureSource(list).bulletFrames).toHaveLength(1)
+    expect(frame.anaphoraShare).toBe(1)
+    expect(frame.opening).toBe(5)
+    expect(frame.items).toBe(5)
+  })
+
+  it('reads the word after the ordinal, which the parser has already removed', () => {
+    const numbered = ['1. Explicit overrides win', '2. Runtime config', '3. Legacy config', '4. Env vars', '5. Defaults'].join('\n')
+    const [frame] = measureSource(numbered).bulletFrames ?? []
+
+    expect(frame?.anaphoraShare ?? 0).toBeLessThan(0.75)
+  })
+
+  it('leaves the code placeholder out of the population', () => {
+    const linked = ['- `evlog agents` runs the guidelines', '- `evlog doctor` confirms the wiring', '- `evlog map` scores what is dark'].join('\n')
+
+    expect(measureSource(linked).bulletFrames).toEqual([])
   })
 })
 

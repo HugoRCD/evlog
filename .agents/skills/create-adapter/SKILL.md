@@ -57,7 +57,7 @@ Standard option naming (use these exact names):
 
 If a service historically used a different name (`token`, `sourceToken`, …) keep it as a deprecated alias via `applyDeprecatedAlias`. See Axiom and Better Stack for the pattern.
 
-## Step 1: Adapter Source — built on `defineHttpDrain`
+## Step 1: Adapter Source: built on `defineHttpDrain`
 
 Create `packages/evlog/src/adapters/{name}.ts`. Read [references/adapter-template.md](references/adapter-template.md) for the full annotated template. `loki.ts` and `clickhouse.ts` are the most recent reference implementations.
 
