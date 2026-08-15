@@ -80,6 +80,20 @@ describe('what it never touches', () => {
     expect(fix(source).source).toBe('---\ntitle: The sink\n---\n\nRegister the drain.')
   })
 
+  it('leaves an MDC component name alone, however much it looks like prose', () => {
+    // The Vue file is named for the invocation, so renaming the term here
+    // gives a page that no longer resolves.
+    const source = '::audit-dual-sink\n---\ntitle: The sink\n---\n::'
+
+    expect(fix(source).source).toBe(source)
+  })
+
+  it('still fixes the prose around a component block', () => {
+    const source = '::note\nRegister the sink.\n::'
+
+    expect(fix(source).source).toBe('::note\nRegister the drain.\n::')
+  })
+
   it('leaves prose words inside a fence alone', () => {
     const source = '```bash\n# write to a sink\nevlog tail\n```'
 

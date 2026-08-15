@@ -19,6 +19,8 @@ import { readFileSync } from 'node:fs'
 import { ALTERNATIVES } from './corpus.mjs'
 
 const FENCE = /^\s*(`{3,}|~{3,})/
+/** A component invocation, a slot marker, or an inline component: structure, never prose. */
+const MDC_LINE = /^\s*(:{1,}[a-z][\w-]*|#[\w-]+\s*$)/i
 const DOCUMENTING_A_DEPRECATION = /\b(deprecat\w*|removed|retired|renamed|legacy|instead of|prefer|migrat\w*|never|not\b)/i
 const REDIRECT_ENTRY = /['"](\/[^'"]*)['"]\s*:\s*r\(\s*['"]([^'"]*)['"]\s*\)/g
 
@@ -100,6 +102,8 @@ export function applyFixes(source, context = {}) {
 
   let fence = null
   let frontmatter = lines[0]?.trim() === '---'
+  let propBlock = false
+  let atComponent = false
 
   const fixed = lines.map((line, index) => {
     const number = index + 1
@@ -108,6 +112,18 @@ export function applyFixes(source, context = {}) {
       if (number > 1 && line.trim() === '---') frontmatter = false
       return line
     }
+
+    // A `---` block opening right after a component is that component's props.
+    if (propBlock) {
+      if (line.trim() === '---') propBlock = false
+      return line
+    }
+    if (atComponent && line.trim() === '---') {
+      atComponent = false
+      propBlock = true
+      return line
+    }
+    atComponent = false
 
     const opener = FENCE.exec(line)
     if (fence === null && opener) {
@@ -119,6 +135,14 @@ export function applyFixes(source, context = {}) {
       else return record(line, fixCode(line), 'T-15')
     }
     if (fence !== null || opener) return line
+    // MDC structure is not prose. `::audit-dual-sink` is a Vue component whose
+    // file is named for it, and renaming the term in the invocation gives a
+    // page that no longer resolves. Prop blocks are configuration for the same
+    // reason.
+    if (MDC_LINE.test(line)) {
+      atComponent = true
+      return line
+    }
 
     return record(line, fixProse(line, redirects), null)
 
