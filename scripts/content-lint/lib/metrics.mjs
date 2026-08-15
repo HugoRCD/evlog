@@ -248,7 +248,9 @@ function bulletFrames(doc) {
 
   for (const list of doc.lists) {
     if (list.items.length < 3) continue
-    const firsts = list.items.map(item => item.text.toLowerCase().split(/\s+/)[0] ?? '')
+    // A task list shares `[` on every item by construction, which is a
+    // checkbox, not an anaphora.
+    const firsts = list.items.map(item => item.text.toLowerCase().replace(/^\[[ x]?\]\s*/, '').split(/\s+/)[0] ?? '')
     const tally = new Map()
     for (const first of firsts) tally.set(first, (tally.get(first) ?? 0) + 1)
     const top = Math.max(...tally.values())

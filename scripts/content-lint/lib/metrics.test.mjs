@@ -82,6 +82,23 @@ describe('contraction seam', () => {
   })
 })
 
+describe('bullet frames', () => {
+  it('does not read a checklist as an anaphora', () => {
+    // Every task item starts with `[`, which is a checkbox. `score.mjs` gates
+    // T-07 on this share, so it is the number that has to stay low.
+    const list = ['- [ ] Service name is set', '- [ ] Sampling is configured', '- [ ] Draining is set up', '- [ ] Pretty mode is off'].join('\n')
+    const frames = measureSource(list).bulletFrames
+
+    for (const frame of frames) expect(frame.anaphoraShare).toBeLessThan(0.75)
+  })
+
+  it('still catches four bullets that really do share an opener', () => {
+    const list = ['- Powerful drain support', '- Powerful enricher support', '- Powerful catalog support', '- Powerful sampling support'].join('\n')
+
+    expect(measureSource(list).bulletFrames).toHaveLength(1)
+  })
+})
+
 describe('unbacked sections', () => {
   it('flags a section that asserts behavior with nothing to check', () => {
     const filler = 'The system handles high throughput and keeps overhead low for demanding workloads. '
