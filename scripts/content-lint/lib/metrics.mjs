@@ -184,6 +184,9 @@ function epigrams(doc) {
   return { eligible, count: candidates.length, ratio: eligible === 0 ? 0 : round(candidates.length / eligible), candidates }
 }
 
+/** An en dash between two numbers is a range, and the only mark that reads as one. */
+const NUMERIC_RANGE = /(\d)\s*[—–]\s*(\d)/g
+
 /**
  * Every em dash and en dash in the prose, located (U-14). Not a rate: evlog
  * does not use this punctuation, so each one is an occurrence to remove and the
@@ -193,17 +196,18 @@ function epigrams(doc) {
  */
 function dashes(doc) {
   const found = []
+  const dashed = text => /[—–]/.test(text.replace(NUMERIC_RANGE, '$1$2'))
 
   // Headings count. They are the first prose a reader sees and the rule says
   // any surface, so a dash hiding in `## Network bridge — stream server` is the
   // one most likely to be read.
   for (const heading of doc.headings) {
-    if (/[—–]/.test(heading.text)) found.push({ line: heading.line, text: heading.text })
+    if (dashed(heading.text)) found.push({ line: heading.line, text: heading.text })
   }
 
   for (const paragraph of doc.paragraphs) {
     for (const sentence of sentences(paragraph.text)) {
-      if (/[—–]/.test(sentence)) found.push({ line: paragraph.line, text: sentence })
+      if (dashed(sentence)) found.push({ line: paragraph.line, text: sentence })
     }
   }
 
@@ -212,7 +216,7 @@ function dashes(doc) {
   // between two of its parts is layout rather than punctuation.
   for (const list of doc.lists) {
     for (const item of list.items) {
-      if (/[—–]/.test(item.text)) found.push({ line: item.line, text: item.text })
+      if (dashed(item.text)) found.push({ line: item.line, text: item.text })
     }
   }
 

@@ -63,14 +63,14 @@ Create `packages/evlog/src/adapters/{name}.ts`. Read [references/adapter-templat
 
 The contract is `defineHttpDrain<TConfig>({ name, label, resolve, encode })`. You only ship two pieces of logic:
 
-1. **`resolve()`** — produce a fully-resolved config or `null` to skip. Use `resolveAdapterConfig` for the standard precedence (overrides → `runtimeConfig.evlog.{name}` → `runtimeConfig.{name}` → env vars). List `NUXT_{NAME}_*` before `{NAME}_*` in `ConfigField.env` for silent Nuxt compat; show only `{NAME}_*` in user-facing messages via `formatPublicEnvKeys`.
-2. **`encode(events, config)`** — a private `encode{Name}Request(events, config): HttpDrainRequest` returning `{ url, headers, body }` for a batch. HTTP transport, identity headers, retries, timeout, and error logging are handled by `defineHttpDrain` (via `httpPost`).
+1. **`resolve()`**: produce a fully-resolved config or `null` to skip. Use `resolveAdapterConfig` for the standard precedence (overrides → `runtimeConfig.evlog.{name}` → `runtimeConfig.{name}` → env vars). List `NUXT_{NAME}_*` before `{NAME}_*` in `ConfigField.env` for silent Nuxt compat; show only `{NAME}_*` in user-facing messages via `formatPublicEnvKeys`.
+2. **`encode(events, config)`**: a private `encode{Name}Request(events, config): HttpDrainRequest` returning `{ url, headers, body }` for a batch. HTTP transport, identity headers, retries, timeout, and error logging are handled by `defineHttpDrain` (via `httpPost`).
 
 Key rules:
 
 - **Single factory.** Export one `create{Name}Drain(overrides?: Partial<{Name}Config>)`. No dual-API factories: if a service has multiple ingest modes (logs vs events), expose them via a `mode` option (see PostHog).
-- **No HTTP code in the adapter.** Never call `fetch` directly. If the service truly needs custom transport (binary envelopes, non-HTTP), use `defineDrain` from `../shared/drain` instead — see `fs.ts` and `memory.ts`.
-- **Encode parity.** The standalone `sendTo{Name}` / `sendBatchTo{Name}` helpers must reuse the same private `encode{Name}Request()` and go through `sendEncodedDrainRequest(request, { label, source, timeout, retries })` — never a separate fetch path. `test/adapters/encode-parity.test.ts` pins this for a subset of adapters; add the new one to it (not every existing adapter is registered there yet — that's a gap, not a license to skip).
+- **No HTTP code in the adapter.** Never call `fetch` directly. If the service truly needs custom transport (binary envelopes, non-HTTP), use `defineDrain` from `../shared/drain` instead, see `fs.ts` and `memory.ts`.
+- **Encode parity.** The standalone `sendTo{Name}` / `sendBatchTo{Name}` helpers must reuse the same private `encode{Name}Request()` and go through `sendEncodedDrainRequest(request, { label, source, timeout, retries })`, never a separate fetch path. `test/adapters/encode-parity.test.ts` pins this for a subset of adapters; add the new one to it (not every existing adapter is registered there yet, and that is a gap, not a license to skip).
 - **No bespoke config resolution.** Always go through `resolveAdapterConfig`. Deprecated aliases (`token` → `apiKey`) go through `applyDeprecatedAlias`.
 - **Exported converters.** If the service needs a specific event shape, export `to{Name}Event()` / `build{Name}Payload()` helpers so they're testable independently.
 - **Edge-safe.** Adapters run on Cloudflare Workers: no `Buffer` (use `TextEncoder` + `btoa`, see `loki.ts`), no Node-only APIs. `fs.ts` shows the `isEdgeRuntime()` guard pattern when a runtime genuinely can't be supported.
@@ -114,7 +114,7 @@ Create `packages/evlog/test/adapters/{name}.test.ts`. Read [references/test-temp
 
 Non-negotiables from the test README:
 
-- Use `mockFetch()` / `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `test/helpers/fetch.ts` — never hand-roll `vi.spyOn(globalThis, 'fetch')` boilerplate.
+- Use `mockFetch()` / `getFetchCall` / `getFetchJson` / `getFetchHeaders` from `test/helpers/fetch.ts`, never hand-roll `vi.spyOn(globalThis, 'fetch')` boilerplate.
 - Clean up any env vars the adapter reads in `afterEach`.
 - Test the exported pure helpers (`to{Name}Event`, `build{Name}Payload`, URL resolvers) directly, one `describe` per helper.
 
@@ -137,7 +137,7 @@ If the service is self-hostable, extend the local sandbox so the adapter can be 
 - `packages/evlog/test/e2e/docker-compose.yml`: add the service
 - `packages/evlog/test/e2e/seed.mjs`: fan the seeder out to the new backend
 - `packages/evlog/test/e2e/README.md`: document it
-- Root `package.json` `sandbox:e2e` script — add the local env var if needed
+- Root `package.json` `sandbox:e2e` script: add the local env var if needed
 
 See the Loki and ClickHouse setups as references.
 
@@ -161,8 +161,8 @@ Create `{NN}.{name}.md` in the right category with the next available number. Us
 
 Edit `apps/docs/content/4.integrate/adapters/01.overview.md` in **two** places (follow the pattern of existing adapters):
 
-1. **Frontmatter `links` array** — add a link entry with icon and `/integrate/adapters/{category}/{name}` path, in category order
-2. **`::card-group` section** — add a card block in the matching position
+1. **Frontmatter `links` array**: add a link entry with icon and `/integrate/adapters/{category}/{name}` path, in category order
+2. **`::card-group` section**: add a card block in the matching position
 
 ## Step 8: Update the Public Skill
 

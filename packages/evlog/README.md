@@ -1487,7 +1487,7 @@ Once installed, your AI assistant will:
 - Help refactor scattered `console.log` calls into structured events
 - Guide you to use `createError()` for self-documenting errors
 - Ensure proper use of `useLogger(event)` in Nuxt/Nitro routes
-- Optionally run [`evlog map`](https://www.evlog.dev/cli/map) (`npx @evlog/cli map`) to score dark entry points — separate early CLI package, worth trying
+- Optionally run [`evlog map`](https://www.evlog.dev/cli/map) (`npx @evlog/cli map`) to score dark entry points. It is a separate early CLI package, worth trying
 
 ### Examples
 

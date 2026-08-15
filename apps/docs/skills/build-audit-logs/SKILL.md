@@ -214,7 +214,7 @@ Naming conventions:
 
 - `noun.verb` (`invoice.refund`, not `refundInvoice`).
 - Past tense if the audit is logged after the fact (`invoice.refunded`); present tense when wrapped by `withAudit()` (which resolves the outcome itself).
-- Lowercase, dot-delimited, no spaces — for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND` — that's intentional, don't lowercase the keys.
+- Lowercase, dot-delimited, no spaces: for hand-written action ids (`defineAuditAction`, inline `log.audit`). Catalog entries follow the catalog convention instead: UPPER_SNAKE_CASE keys under a lowercase prefix, producing wire actions like `billing.INVOICE_REFUND`. That's intentional, don't lowercase the keys.
 
 ### Step 3: Instrument call sites
 
@@ -363,7 +363,7 @@ Walk through this with a security stakeholder before declaring the system produc
 - [ ] Hash-chain `state.{load,save}` persists across process restarts (file / Redis / Postgres).
 - [ ] HMAC `secret` rotation procedure is documented; `keyId` is embedded in `AuditFields` (extend via `declare module`).
 - [ ] Tests include a denial path for every privileged action.
-- [ ] Audit dataset access is itself logged — meta-auditing matters.
+- [ ] Audit dataset access is itself logged. Meta-auditing matters.
 
 ## Review an existing audit setup
 
@@ -444,12 +444,12 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 
 - **Logging only successes.** Auditors care most about denials. Pair `log.audit()` with `log.audit.deny()` on every negative branch of every check.
 - **Leaking PII through `changes`.** `auditDiff()` runs through `RedactConfig`, but only if the field paths are listed. Add `password`, `token`, `apiKey` once globally so it's never a per-call-site decision.
-- **Treating audits as observability.** Don't sample, downsample, or summarise audit events. Force-keep is on by default — don't disable it.
+- **Treating audits as observability.** Don't sample, downsample, or summarise audit events. Force-keep is on by default, don't disable it.
 - **Conflating `actor.id` with the session id.** `actor.id` is the stable user id (or system identity); correlate sessions via `context.requestId` / `context.traceId`.
-- **Forgetting standalone jobs.** Cron, queue workers, CLIs trigger audit-worthy actions too — use `audit()` or `withAudit()`.
+- **Forgetting standalone jobs.** Cron, queue workers, CLIs trigger audit-worthy actions too, use `audit()` or `withAudit()`.
 - **Faking the actor type.** `actor.type: 'user'` for cron jobs gets flagged in audits. Use `'system'`, `'api'`, or `'agent'` accurately.
 - **Single global secret with no rotation.** HMAC keys must rotate; without a `keyId`, old events become unverifiable after rotation.
-- **One drain that fails takes audits down.** Drains must fail in isolation. The default `drain: [...]` array does this; if you wrap in `Promise.all`, don't throw on a single rejection — log it.
+- **One drain that fails takes audits down.** Drains must fail in isolation. The default `drain: [...]` array does this; if you wrap in `Promise.all`, don't throw on a single rejection. Log it.
 
 ## Glossary
 
@@ -465,6 +465,6 @@ Then map each finding to the relevant step in the buildout above (e.g. P0 → St
 ## Reference
 
 - Per-framework wiring (Hono, Express, Next.js, standalone): [`references/framework-wiring.md`](references/framework-wiring.md)
-- Docs: [Audit logs overview](https://www.evlog.dev/use-cases/audit/overview) — source at [`apps/docs/content/5.use-cases/4.audit/`](../../../../apps/docs/content/5.use-cases/4.audit/)
+- Docs: [Audit logs overview](https://www.evlog.dev/use-cases/audit/overview). Source at [`apps/docs/content/5.use-cases/4.audit/`](../../../../apps/docs/content/5.use-cases/4.audit/)
 - Source: [`packages/evlog/src/audit.ts`](../../../../packages/evlog/src/audit.ts)
 - Tests: [`packages/evlog/test/core/audit.test.ts`](../../../../packages/evlog/test/core/audit.test.ts)

@@ -177,8 +177,8 @@ Look for: client errors that don't have corresponding server errors (network iss
 
 ## Important notes
 
-- Each line is a **complete, self-contained event**. Unlike traditional logs, you don't need to correlate multiple lines — one line has all the context for one request.
+- Each line is a **complete, self-contained event**. Unlike traditional logs, you don't need to correlate multiple lines. One line has all the context for one request.
 - The `error.data.why` and `error.data.fix` fields are evlog-specific structured error fields. When present, they provide the most actionable information.
 - Duration values are strings with units (e.g. `"706ms"`). Parse the numeric part for comparisons.
 - Events with `"source":"client"` originated from browser-side logging and were sent to the server via the HTTP drain endpoint.
-- Log files are `.gitignore`'d automatically — they exist only on the local machine or server where the app runs.
+- Log files are `.gitignore`'d automatically. They exist only on the local machine or server where the app runs.
