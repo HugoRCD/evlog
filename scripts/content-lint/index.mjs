@@ -21,7 +21,7 @@
  * half: what no threshold reached on this page, which the reviewer owes.
  */
 
-import { existsSync, readFileSync, statSync } from 'node:fs'
+import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { parseMarkdown } from './lib/mdc.mjs'
@@ -32,6 +32,7 @@ import { SURFACES, corpusFiles, surfaceOf } from './lib/surfaces.mjs'
 import { modelChecks } from './lib/model-checks.mjs'
 import { extract } from './lib/extract.mjs'
 import { fetchPublic } from './lib/net.mjs'
+import { applyFixes, isSafeFix, loadRedirects } from './lib/fix.mjs'
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../..')
 const CONTENT_ROOT = resolve(REPO_ROOT, 'apps/docs/content')
@@ -45,6 +46,8 @@ const argv = process.argv.slice(2)
 const options = {
   json: argv.includes('--json'),
   stdin: argv.includes('--stdin'),
+  fix: argv.includes('--fix'),
+  dryRun: argv.includes('--dry-run'),
   top: numberFlag('--top', { min: 1, integer: true }),
   minScore: numberFlag('--min-score', { min: 0, max: 100 }),
   surface: surfaceFlag('--surface'),
@@ -57,10 +60,14 @@ if (options.url !== null && options.stdin) fail('--url and --stdin read differen
 if (options.url !== null && !/^https?:\/\//i.test(options.url)) {
   fail('--url takes an http or https address.')
 }
+if (options.fix && (options.url !== null || options.stdin)) fail('--fix writes files, so it takes paths.')
+// A corpus-wide rewrite is a maintainer's decision, not a default.
+if (options.fix && options.targets.length === 0) fail('--fix needs the files to fix. It never sweeps the corpus on its own.')
 
 const REDIRECTS_FILE = resolve(REPO_ROOT, 'apps/docs/config/redirects.ts')
 const api = loadApiSurface(REPO_ROOT)
 const routes = loadRoutes(CONTENT_ROOT, REDIRECTS_FILE)
+const redirects = loadRedirects(REDIRECTS_FILE)
 
 // A docs page links by route, a skill links by path. Only the second can be
 // resolved on disk, and resolving a route there would report every link.
@@ -106,15 +113,20 @@ const files = loose || options.targets.length > 0
 
 if (files.length === 0 && loose === null) fail('no markdown files matched')
 
-const scanned = [...files.map(scan), ...(loose ? [loose] : [])]
-
 // The baseline is the corpus, never the selection: a single-page run has to
 // return the same verdict it would inside a full sweep. Reuse the scan already
 // done only when the selection *is* the corpus, by identity. A count would let
 // a repeated path or an unrelated directory of the right size redefine the
-// house rhythm, which is the one number a page cannot argue with.
-const selectionIsCorpus = isSameSet(files, corpus)
-const baseline = buildBaseline(selectionIsCorpus ? files.map((_file, index) => scanned[index]) : corpus.map(file => scan(file)))
+// house rhythm, which is the one number a page cannot argue with. Built at most
+// once, since --fix needs it before the reported scan happens.
+let corpusRates = null
+const corpusBaseline = () => (corpusRates ??= buildBaseline(corpus.map(file => scan(file))))
+
+const fixes = options.fix ? files.map(fixFile) : []
+
+const scanned = [...files.map(scan), ...(loose ? [loose] : [])]
+
+const baseline = corpusRates ?? (isSameSet(files, corpus) ? buildBaseline(scanned) : corpusBaseline())
 const pages = scanned
   .map(page => ({ ...page, ...evaluate(page, baseline) }))
   .map(page => ({ ...page, modelChecks: modelChecks(page) }))
@@ -124,7 +136,9 @@ const pages = scanned
 const selected = options.top ? pages.slice(0, options.top) : pages
 
 if (options.json) {
-  process.stdout.write(`${JSON.stringify({ baseline, pages: selected }, null, 2)}\n`)
+  process.stdout.write(`${JSON.stringify({ baseline, fixed: fixes, pages: selected }, null, 2)}\n`)
+} else if (options.fix) {
+  process.stdout.write(renderFixes(fixes))
 } else if (selected.length === 1) {
   process.stdout.write(renderPage(selected[0], baseline))
 } else {
@@ -135,6 +149,34 @@ const worst = pages.at(0)
 if (options.minScore !== null && worst && worst.score < options.minScore) {
   process.stderr.write(`content-lint: ${worst.path} scored ${worst.score}, below --min-score ${options.minScore}\n`)
   process.exit(1)
+}
+
+/**
+ * Apply the derivable fixes to one file, then prove they helped.
+ *
+ * The proof is the point. A rewrite that trades one finding for another, or
+ * lowers the score on its way to removing a dash, is reverted and reported as
+ * unfixed. That is what makes this safe to run before a reviewer ever sees the
+ * file, and it costs one extra scan.
+ *
+ * @param {string} file Absolute path.
+ */
+function fixFile(file) {
+  const path = relative(REPO_ROOT, file)
+  const before = readFileSync(file, 'utf8')
+  const { source, applied } = applyFixes(before, { redirects })
+
+  if (applied.length === 0) return { path, applied: [], written: false }
+
+  const rate = text => evaluate({ path, surface: surfaceOf(path), ...scanSource(text) }, corpusBaseline())
+  const was = rate(before)
+  const now = rate(source)
+  const verdict = isSafeFix(was, now)
+
+  if (!verdict.safe) return { path, applied: [], written: false, reverted: verdict.why }
+
+  if (!options.dryRun) writeFileSync(file, source)
+  return { path, applied, written: !options.dryRun, score: { before: was.score, after: now.score } }
 }
 
 /**
@@ -217,6 +259,34 @@ function isSameSet(a, b) {
 function fail(message) {
   process.stderr.write(`content-lint: ${message}\n`)
   process.exit(2)
+}
+
+/**
+ * @param {object[]} results
+ * @returns {string}
+ */
+function renderFixes(results) {
+  const changed = results.filter(result => result.applied.length > 0)
+  const reverted = results.filter(result => result.reverted)
+  const lines = [
+    `content-lint --fix · ${results.length} file${results.length === 1 ? '' : 's'} · ${changed.length} changed${options.dryRun ? ' (dry run, nothing written)' : ''}`,
+    '',
+  ]
+
+  for (const result of changed) {
+    lines.push(`  ${result.path}  ${result.score.before} → ${result.score.after}`)
+    for (const entry of result.applied) {
+      lines.push(`    [${entry.id}] ${result.path}:${entry.line}`)
+      lines.push(`      - ${entry.before}`)
+      lines.push(`      + ${entry.after}`)
+    }
+  }
+
+  for (const result of reverted) lines.push(`  ${result.path} reverted: ${result.reverted}`)
+
+  if (changed.length === 0 && reverted.length === 0) lines.push('  nothing derivable to fix')
+  lines.push('', '  What is left needs a reader. Run without --fix for the findings.', '')
+  return lines.join('\n')
 }
 
 /**
