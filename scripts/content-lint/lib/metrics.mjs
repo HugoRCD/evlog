@@ -318,7 +318,7 @@ function phraseHits(doc) {
   // Retired entry points live in backticks, where the prose only sees a
   // placeholder. Scan the token, but carry the sentence around it: a page
   // documenting a deprecation names the retired path on purpose.
-  const surrounding = new Map(prose.map(span => [span.line, span.text]))
+  const surrounding = new Map([...doc.tableRows, ...prose].map(span => [span.line, span.text]))
   const symbols = doc.inlineCode.map(item => ({
     text: item.token,
     line: item.line,

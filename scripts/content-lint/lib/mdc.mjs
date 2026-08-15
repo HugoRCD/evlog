@@ -27,6 +27,7 @@ const TABLE_ROW = /^\s*\|.*\|\s*$/
  * @property {{ name: string, line: number }[]} components
  * @property {{ text: string, href: string, line: number }[]} links
  * @property {{ token: string, line: number }[]} inlineCode
+ * @property {{ text: string, line: number }[]} tableRows Row text, for context only.
  * @property {number} tables Table rows, header separators included.
  */
 
@@ -47,6 +48,7 @@ export function parseMarkdown(source) {
     components: [],
     links: [],
     inlineCode: [],
+    tableRows: [],
     tables: 0,
   }
 
@@ -124,10 +126,16 @@ export function parseMarkdown(source) {
       flushList()
       doc.components.push({ name: open[2], line: lineNumber })
       componentStack.push(open[2])
-      // A prop block opens on the line right after the component.
+      // A prop block opens on the line right after the component. Its values
+      // are configuration and never prose, but `to:` and `href:` are the links
+      // a card group uses to reach every page in a section.
       if (lines[index + 1]?.trim() === '---') {
         index += 2
-        while (index < lines.length && lines[index].trim() !== '---') index += 1
+        while (index < lines.length && lines[index].trim() !== '---') {
+          const route = /^\s*(?:to|href|link):\s*['"]?([^'"\s]+)['"]?\s*$/.exec(lines[index])
+          if (route) doc.links.push({ text: '', href: route[1], line: index + 1 })
+          index += 1
+        }
       }
       continue
     }
@@ -155,6 +163,10 @@ export function parseMarkdown(source) {
       flushParagraph()
       flushList()
       doc.tables += 1
+      // A table cell is not prose, but a link inside one is still a link: the
+      // framework and adapter indexes point at every page from a table. The
+      // row text is kept so a symbol found here still has a sentence around it.
+      doc.tableRows.push({ text: cleanInline(line, lineNumber, doc), line: lineNumber })
       continue
     }
 

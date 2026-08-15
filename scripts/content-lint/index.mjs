@@ -30,6 +30,7 @@ import { checkDrift, loadApiSurface, loadRoutes, walk } from './lib/drift.mjs'
 import { buildBaseline, evaluate } from './lib/score.mjs'
 import { SURFACES, corpusFiles, surfaceOf } from './lib/surfaces.mjs'
 import { modelChecks } from './lib/model-checks.mjs'
+import { corpusFindings } from './lib/reach.mjs'
 import { extract } from './lib/extract.mjs'
 import { fetchPublic } from './lib/net.mjs'
 import { applyFixes, isSafeFix, loadRedirects } from './lib/fix.mjs'
@@ -89,7 +90,7 @@ const scan = (file) => {
  */
 function scanSource(source, file) {
   const doc = parseMarkdown(source)
-  return { metrics: measure(doc), drift: checkDrift(doc, api, routes, file) }
+  return { frontmatter: doc.frontmatter, links: doc.links, metrics: measure(doc), drift: checkDrift(doc, api, routes, file) }
 }
 
 // Ad-hoc input is scanned against the corpus baseline but belongs to no file,
@@ -135,8 +136,19 @@ if (options.fix && fixes.length === 0 && files.length > 0) {
 const scanned = [...files.map(scan), ...(loose ? [loose] : [])]
 
 const baseline = corpusRates ?? (isSameSet(files, corpus) ? buildBaseline(scanned) : corpusBaseline())
+// Reach and description length only exist against the whole corpus, so they
+// are decided here and folded into each page's findings.
+const corpus_ = corpus.length === scanned.length ? scanned : corpus.map(file => scan(file))
+const reach = corpusFindings(corpus_)
+
 const pages = scanned
   .map(page => ({ ...page, ...evaluate(page, baseline) }))
+  .map((page) => {
+    const extra = reach.get(page.path) ?? []
+    if (extra.length === 0) return page
+    const findings = [...page.findings, ...extra].sort((a, b) => a.line - b.line)
+    return { ...page, findings, score: Math.max(0, page.score - extra.length * 5) }
+  })
   .map(page => ({ ...page, modelChecks: modelChecks(page) }))
   .filter(page => options.surface === null || page.surface === options.surface)
   .sort((a, b) => a.score - b.score || a.path.localeCompare(b.path))
