@@ -9,12 +9,12 @@ name: evi evals
 #   - a PR that changes the agent itself or an eval — the 12 `fast` evals.
 #     Automatic, because the PR author is often Evi: an agent opening a PR on
 #     its own behaviour cannot be trusted to remember a label.
-#   - a push to main touching the same paths — the full 20. One trend point per
+#   - a push to main touching the same paths — the full 23. One trend point per
 #     behaviour change that shipped, which is what makes cost and latency
 #     comparable over time.
-#   - a weekly cron — the full 20, to catch drift that lands without a commit
+#   - a weekly cron — the full 23, to catch drift that lands without a commit
 #     (a provider silently updating the model behind the id).
-#   - workflow_dispatch with a model — the full 20 against a candidate, to
+#   - workflow_dispatch with a model — the full 23 against a candidate, to
 #     compare cost, latency and pass rate before swapping agent.ts.
 #
 # The guards on the automatic path, in order of how much they save:

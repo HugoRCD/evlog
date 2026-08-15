@@ -1,0 +1,71 @@
+/**
+ * Building the content-lint invocation for a single ad-hoc scan.
+ *
+ * The scanner is the deterministic half of a review and it lives in the
+ * repository, not here: one implementation, one set of thresholds, whether a
+ * person runs it or the reviewer does. This only decides the command.
+ *
+ * Prose never reaches the shell. A passage is written to a file and redirected
+ * in, so a draft containing quotes, backticks, or a heredoc delimiter is scanned
+ * rather than executed.
+ */
+
+/** The template clone; every session inherits it with dependencies installed. */
+const REPO_DIR = '/workspace/repo'
+
+/** Where a passage is staged before it is redirected into the scanner. */
+export const PASSAGE_FILE = '/tmp/content-scan.md'
+
+export type ScanSurface = 'docs' | 'reference' | 'landing' | 'blog' | 'readme' | 'skill' | 'agents'
+
+export interface ScanInput {
+  path?: string
+  text?: string
+  url?: string
+  as?: ScanSurface
+}
+
+/**
+ * Single-quote a value for `sh`, closing and reopening around any quote it
+ * contains. A path or a URL is model-supplied and reaches a shell.
+ */
+export function shellQuote(value: string): string {
+  return `'${value.replaceAll('\'', `'\\''`)}'`
+}
+
+/**
+ * A repository path, or the reason it is not one. The scanner refuses anything
+ * outside the checkout on its own, but a path built here reaches a shell first,
+ * and a clear refusal beats an exit code the model has to interpret.
+ */
+export function repoPathError(path: string): string | null {
+  if (path.startsWith('/')) return 'Pass a repo-relative path, not an absolute one.'
+  if (path.split('/').includes('..')) return 'Pass a path inside the repository.'
+  if (!path.endsWith('.md')) return 'Only markdown files are scanned.'
+  return null
+}
+
+/**
+ * The command that scans one input, and whether a passage has to be staged
+ * first. Exactly one of `path`, `text`, and `url` is expected; the caller
+ * rejects anything else before reaching here.
+ */
+export function scanCommand(input: ScanInput): { command: string, passage?: string } {
+  const scanner = `cd ${REPO_DIR} && node scripts/content-lint/index.mjs`
+  const as = `--as ${shellQuote(input.as ?? 'docs')}`
+
+  if (input.path !== undefined) {
+    // A file in the checkout takes its surface from where it lives, so `--as`
+    // would be a way to ask for the wrong thresholds.
+    return { command: `${scanner} ${shellQuote(input.path)} --json` }
+  }
+
+  if (input.url !== undefined) {
+    return { command: `${scanner} --url ${shellQuote(input.url)} ${as} --json` }
+  }
+
+  return {
+    command: `${scanner} --stdin ${as} --json < ${PASSAGE_FILE}`,
+    passage: input.text,
+  }
+}
