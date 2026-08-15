@@ -41,16 +41,22 @@ export function routeOf(path) {
  * A page nobody links to in prose is a page the docs never suggest. The nav can
  * still reach it, so this is not a broken link: it is `D-08` unmet, and the
  * voice's own promise that the docs point at the next move rather than waiting
- * to be searched.
+ * to be searched. Section indexes are exempt, and a page linking to itself
+ * suggests nothing.
  *
  * @param {{ path: string, links?: { href: string }[], frontmatter?: Record<string, string> }[]} pages
  * @returns {Map<string, { id: string, severity: 'standard', line: number, message: string }[]>}
  */
 export function corpusFindings(pages) {
-  const linked = new Set()
+  // Keyed by destination, valued by the pages that point there. A page linking
+  // to its own route does not suggest itself to anyone.
+  const linked = new Map()
   for (const page of pages) {
     for (const link of page.links ?? []) {
-      if (link.href?.startsWith('/')) linked.add(link.href.split(/[#?]/)[0].replace(/\/$/, ''))
+      if (!link.href?.startsWith('/')) continue
+      const destination = link.href.split(/[#?]/)[0].replace(/\/$/, '')
+      if (!linked.has(destination)) linked.set(destination, new Set())
+      linked.get(destination).add(page.path)
     }
   }
 
@@ -85,7 +91,11 @@ export function corpusFindings(pages) {
       }
     }
 
-    if (route !== null && route !== '/' && !linked.has(route)) {
+    // A section index is reached through the navigation by design, so nothing
+    // in prose is expected to point at it.
+    const isIndex = /\/(?:\d+\.)?(index|overview)\.md$/.test(page.path)
+    const suggestedBy = [...(linked.get(route) ?? [])].filter(source => source !== page.path)
+    if (route !== null && route !== '/' && !isIndex && suggestedBy.length === 0) {
       add(page.path, {
         id: 'D-11',
         severity: 'standard',

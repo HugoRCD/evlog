@@ -45,6 +45,26 @@ describe('corpusFindings', () => {
     expect(corpusFindings(linked).get('apps/docs/content/2.learn/a.md')).toBeUndefined()
   })
 
+  it('does not let a page suggest itself', () => {
+    // The link is real and points at this page's own route, which tells no
+    // reader anywhere else that the page exists.
+    const pages = [page('apps/docs/content/2.learn/a.md', fine, ['/learn/a']), page('apps/docs/content/2.learn/b.md', fine)]
+
+    expect(corpusFindings(pages).get('apps/docs/content/2.learn/a.md')?.[0].id).toBe('D-11')
+  })
+
+  it('exempts a section index, numbered prefix included', () => {
+    const pages = [
+      page('apps/docs/content/2.learn/0.overview.md', fine),
+      page('apps/docs/content/4.integrate/index.md', fine),
+      page('apps/docs/content/2.learn/a.md', fine, ['/learn', '/integrate']),
+    ]
+    const found = corpusFindings(pages)
+
+    expect(found.get('apps/docs/content/2.learn/0.overview.md')).toBeUndefined()
+    expect(found.get('apps/docs/content/4.integrate/index.md')).toBeUndefined()
+  })
+
   it('counts a link that lives in a card prop or a table cell', () => {
     // `links` is what the parser harvested, wherever it found it.
     const pages = [page('apps/docs/content/2.learn/a.md', fine), page('apps/docs/content/2.learn/index.md', fine, ['/learn/a#section'])]

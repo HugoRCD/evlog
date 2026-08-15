@@ -80,4 +80,4 @@ Why: this is the only class of docs defect that silently converts a correct read
 
 Rule: at least one other page links to this one in prose, a table, or a card. The navigation is not a substitute: it lists what exists, it does not tell a reader when they need it.
 Why: `voice.md` promises that the docs suggest the next move rather than waiting to be searched. A page nothing points at is a page that only answers a search someone already knew how to run.
-Note: the scanner reads links from prose, from table cells, and from `to:` / `href:` props in MDC components, so a card group counts. Section indexes reached only by the nav are the honest exception, and they are the ones this rule keeps flagging.
+Note: the scanner reads links from prose, from table cells, and from `to:` / `href:` props in MDC components, so a card group counts. A section index is exempt, since the navigation is how it is meant to be reached, and a page linking to its own route does not count as being suggested.
