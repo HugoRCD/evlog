@@ -9,6 +9,7 @@
  *   node scripts/content-lint <file> --json                one page, machine-readable
  *   node scripts/content-lint --surface skill --top 5      one surface only
  *   node scripts/content-lint --min-score 70               exit 1 below the bar
+ *   node scripts/content-lint --since origin/main          exit 1 if a changed file got worse
  *   node scripts/content-lint --url https://…              a page that is not in the repo
  *   cat draft.md | node scripts/content-lint --stdin       prose that is not a file yet
  *
@@ -21,6 +22,7 @@
  * half: what no threshold reached on this page, which the reviewer owes.
  */
 
+import { execFileSync } from 'node:child_process'
 import { existsSync, readFileSync, statSync, writeFileSync } from 'node:fs'
 import { dirname, join, relative, resolve } from 'node:path'
 import { fileURLToPath } from 'node:url'
@@ -31,6 +33,7 @@ import { buildBaseline, evaluate } from './lib/score.mjs'
 import { SURFACES, corpusFiles, surfaceOf } from './lib/surfaces.mjs'
 import { modelChecks } from './lib/model-checks.mjs'
 import { corpusFindings } from './lib/reach.mjs'
+import { compare, render } from './lib/ratchet.mjs'
 import { extract } from './lib/extract.mjs'
 import { fetchPublic } from './lib/net.mjs'
 import { applyFixes, isSafeFix, loadRedirects } from './lib/fix.mjs'
@@ -51,6 +54,7 @@ const options = {
   dryRun: argv.includes('--dry-run'),
   top: numberFlag('--top', { min: 1, integer: true }),
   minScore: numberFlag('--min-score', { min: 0, max: 100 }),
+  since: stringFlag('--since'),
   surface: surfaceFlag('--surface'),
   url: stringFlag('--url'),
   as: surfaceFlag('--as') ?? 'docs',
@@ -102,7 +106,9 @@ const loose = options.url
     ? { path: '<stdin>', surface: options.as, ...scanSource(await readStdin()) }
     : null
 
-const corpus = corpusFiles(REPO_ROOT).map(file => join(REPO_ROOT, file))
+const corpusRelative = corpusFiles(REPO_ROOT)
+const corpusPaths = new Set(corpusRelative)
+const corpus = corpusRelative.map(file => join(REPO_ROOT, file))
 
 const files = loose || options.targets.length > 0
   ? options.targets.flatMap((target) => {
@@ -154,6 +160,39 @@ const pages = scanned
   .sort((a, b) => a.score - b.score || a.path.localeCompare(b.path))
 
 const selected = options.top ? pages.slice(0, options.top) : pages
+
+if (options.since !== null) {
+  const base = options.since
+  const changed = execFileSync('git', ['diff', '--name-only', `${base}...HEAD`], { encoding: 'utf8' })
+    .split('\n')
+    .map(line => line.trim())
+    .filter(line => corpusPaths.has(line))
+
+  const results = changed.map((path) => {
+    const now = pages.find(page => page.path === path)
+      ?? { ...evaluate({ path, surface: surfaceOf(path), ...scanSource(readFileSync(join(REPO_ROOT, path), 'utf8')) }, baseline), path }
+
+    let previous = null
+    try {
+      const source = execFileSync('git', ['show', `${base}:${path}`], { encoding: 'utf8', maxBuffer: 32 * 1024 * 1024 })
+      previous = { ...evaluate({ path, surface: surfaceOf(path), ...scanSource(source) }, baseline), path }
+    } catch {
+      previous = null
+    }
+
+    // The score carries the corpus penalty too, so it is recomputed from what
+    // is left rather than reused.
+    const own = (scored) => {
+      const findings = scored.findings.filter(finding => finding.corpus !== true)
+      const penalty = findings.reduce((total, finding) => total + (finding.severity === 'critical' ? 15 : 5), 0)
+      return { ...scored, findings, score: Math.max(0, 100 - penalty) }
+    }
+    return compare(previous === null ? null : own(previous), own(now))
+  })
+
+  process.stdout.write(render(results))
+  process.exit(results.some(result => result.verdict === 'worse') ? 1 : 0)
+}
 
 if (options.json) {
   process.stdout.write(`${JSON.stringify({ baseline, fixed: fixes, pages: selected }, null, 2)}\n`)
@@ -425,5 +464,5 @@ function surfaceFlag(name) {
  */
 function isFlagValue(arg) {
   const at = argv.indexOf(arg)
-  return at > 0 && ['--top', '--min-score', '--surface', '--url', '--as'].includes(argv[at - 1])
+  return at > 0 && ['--top', '--min-score', '--surface', '--url', '--as', '--since'].includes(argv[at - 1])
 }

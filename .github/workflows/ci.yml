@@ -89,6 +89,14 @@ jobs:
       - name: Test content-lint
         run: pnpm run content:lint:test
 
+      # A ratchet, not a floor: every file this pull request touched has to score
+      # at least as well as the same file on the base branch, and introduce no
+      # finding id it did not already carry. A fixed bar would fail a new page
+      # written at 85 while a page sitting at 60 since last year sails through.
+      - name: Content did not regress
+        if: github.event_name == 'pull_request'
+        run: pnpm run content:lint -- --since origin/${{ github.base_ref }}
+
       # The coverage step bypasses turbo, so it inherits no dist/ from the
       # affected graph — on a docs-only change nothing is affected and the
       # dist-dependent tests (auto-import types, api-surface) would run

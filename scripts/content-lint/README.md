@@ -79,6 +79,20 @@ Alongside the findings, every scan returns `modelChecks`: the questions no thres
 
 The pass carries them through to `content_review` untouched, and the reviewer answers every one in its report.
 
+## Keeping it from sliding back
+
+```bash
+pnpm content:lint --since origin/main
+```
+
+Scores every corpus file the branch changed against the same file on the base, and exits 1 when one comes back worse. Worse means a lower score, or a finding id that appears more often than it did: trading a dash for a hollow superlative costs the same and is not progress.
+
+It is a ratchet rather than a floor on purpose. A fixed `--min-score` fails a new page written at 85 while a page that has sat at 60 since last year passes untouched, so the bar punishes whoever writes next instead of whoever wrote last.
+
+Corpus-level findings are left out of the comparison. A page cannot answer `D-11` on its own: another page has to link to it.
+
+The Test job runs this on every pull request.
+
 ## Calibration
 
 `fixtures/generated.md` is saturated on purpose and `fixtures/written.md` carries the lawful twins. `fixtures.test.mjs` fails when the distance between their scores closes, in either direction. A tell that cannot separate those two files is measuring nothing, and the same pair backs the content evals in `apps/evi/evals/content/`.
