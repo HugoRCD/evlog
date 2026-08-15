@@ -31,7 +31,7 @@ A rule reaches `lib/fix.mjs` only when the corrected text follows from the rule 
 | `T-15` | `evlog/shared` → `evlog/toolkit`, `evlog/browser` → `evlog/http` | a page documenting the deprecation, which is skipped |
 | `U-15` | `sink` → `drain`, `error registry` → `error catalog` | `child logger`, which does not slot into the same sentence |
 | `U-16` | a link with a redirect behind it | a link with no destination |
-| `U-14` | `A — B — C` → `A, B, C` | the single elaborating dash, which wants a comma here and a colon there |
+| `U-14` | nothing | every dash. A dashed span is sometimes an appositive and sometimes a list, and commas wreck the second kind |
 
 After writing, each file is re-scanned. If the score dropped or a new finding id appeared, the file is reverted and reported as unfixed — that check is the whole argument for running this before a reviewer sees the file. `--fix` refuses to run without explicit paths: a corpus-wide rewrite is a maintainer's decision.
 

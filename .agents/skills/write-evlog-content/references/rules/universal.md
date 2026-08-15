@@ -132,6 +132,8 @@ Why: this is a maintainer decision about how evlog sounds, and it is the punctua
 4. **Nothing**, when the dash was joining two things that did not need joining. Cutting is a valid fix and the only one that cannot introduce a new tell.
 
 **Never a semicolon.** It is not in this register, it reads as a writer who could not choose between a comma and a period, and swapping one unusual mark for another leaves the sentence exactly as stiff as it was. A replacement that a reader would notice is not a fix.
+
+**No codemod touches this rule**, and the reason is worth keeping. Replacing a dashed pair with commas was tried across this corpus: 25 of 38 replacements turned a parenthetical list into a sentence whose subject was followed by four bare nouns. "It finds every entry point, API handlers, pages that fetch, middleware, checks each one" is not a fix, and the scanner cannot tell that span from an appositive. Which mark belongs here is a reading, so every dash arrives as a finding.
 Note: the corpus predates the rule, so most pages still carry them. A content pass removes the ones on the pages it touches and does not open a PR just to sweep them.
 
 ---

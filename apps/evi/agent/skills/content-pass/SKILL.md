@@ -47,7 +47,7 @@ Slugify the group: `.agents/skills/create-adapter` becomes `skills-create-adapte
 node scripts/content-lint/index.mjs <each target> --fix
 ```
 
-This rewrites only what follows from the rule rather than from taste: a retired entry point, a term with one replacement, a link with a redirect behind it, a parenthetical pair of dashes. It re-scans each file afterwards and reverts anything that scored worse or introduced a new id, so a reverted file is a bug to report, not a file to retry.
+This rewrites only what follows from the rule rather than from taste: a retired entry point, a term with one replacement, a link with a redirect behind it. Dashes are not mechanical and stay findings for the reviewer. It re-scans each file afterwards and reverts anything that scored worse or introduced a new id, so a reverted file is a bug to report, not a file to retry.
 
 Commit it on its own before anything else runs:
 
@@ -137,7 +137,7 @@ Report to the thread: what group, how many files, the PR link. Two lines maximum
 
 Run this when `eligible` is 0. It needs an observation, not an opinion: name the gap you found and where you found it, or drop it.
 
-**Whatever file you end up editing, run `--fix` on it first.** A page you are already opening does not have "pre-existing" findings, it has findings, and the mechanical ones cost one command. Leaving an em dash on a page you just edited, and writing that it was out of scope, is the pass explaining why it did less than the tool it was given.
+**Whatever file you end up editing, run `--fix` on it first.** A page you are already opening does not have "pre-existing" findings, it has findings, and the mechanical ones cost one command. Leaving a wrong term on a page you just edited, and writing that it was out of scope, is the pass explaining why it did less than the tool it was given.
 
 Look, in this order, and stop at the first thing that holds:
 

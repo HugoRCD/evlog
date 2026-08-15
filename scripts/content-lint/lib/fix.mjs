@@ -2,10 +2,12 @@
  * The fixes with a derivable answer.
  *
  * A rule belongs here only when the corrected text follows from the rule
- * itself, never from taste. `evlog/shared` has exactly one replacement.
- * `sink` has exactly one. A single elaborating em dash does not: it wants a
- * comma here and a colon there, and picking wrong makes a comma splice, so it
- * stays a finding for someone who can read the sentence.
+ * itself, never from taste. `evlog/shared` has exactly one replacement. `sink`
+ * has exactly one. Punctuation never does, which is why `U-14` is absent: a
+ * dashed span is sometimes an appositive and sometimes a list, and swapping the
+ * dashes for commas turns the second kind into a sentence whose subject is
+ * followed by four nouns. Measured over this corpus, that was 25 replacements
+ * out of 38. Dashes stay a finding for someone who can read the sentence.
  *
  * Everything works on raw text, line by line, because formatting has to survive
  * exactly and a round trip through `parseMarkdown` would not preserve it. Code
@@ -38,12 +40,6 @@ const TERMS = [
   { from: 'error registry', to: 'error catalog' },
   { from: 'error registries', to: 'error catalogs' },
 ]
-
-/**
- * A parenthetical wrapped in dashes, which becomes a pair of commas without
- * touching the clause structure (`U-14`). The single dash is not here.
- */
-const PAIRED_DASH = /(\S) [—–] ([^—–]+?) [—–] (?=\S)/g
 
 /**
  * Old path to new, from the docs redirect table. A dead link with a redirect
@@ -204,12 +200,6 @@ function prose(segment, redirects, ids) {
   if (relinked !== text) {
     ids.add('U-16')
     text = relinked
-  }
-
-  const undashed = text.replace(PAIRED_DASH, '$1, $2, ')
-  if (undashed !== text) {
-    ids.add('U-14')
-    text = undashed
   }
 
   // A sentence naming another logger is allowed to use that logger's words.

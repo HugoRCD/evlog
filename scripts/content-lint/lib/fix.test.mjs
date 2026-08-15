@@ -42,15 +42,14 @@ describe('U-15 terminology', () => {
 })
 
 describe('U-14 dashes', () => {
-  it('replaces a parenthetical pair with commas', () => {
-    expect(fix('The drain batches — then retries with backoff — before it gives up.').source)
-      .toBe('The drain batches, then retries with backoff, before it gives up.')
-  })
+  it('leaves every dash to someone who can read the sentence', () => {
+    // A dashed span is sometimes an appositive and sometimes a list. Commas fix
+    // the first and wreck the second, and the second was the majority here.
+    const appositive = 'The drain batches — then retries with backoff — before it gives up.'
+    const list = 'It finds every entry point — handlers, pages, middleware — and scores each one.'
+    const single = 'evlog is built for the day-zero choice — pick it once.'
 
-  it('leaves a single dash for someone who can read the sentence', () => {
-    const source = 'evlog is built for the day-zero choice — pick it once.'
-
-    expect(fix(source).source).toBe(source)
+    for (const source of [appositive, list, single]) expect(fix(source).source).toBe(source)
   })
 })
 
