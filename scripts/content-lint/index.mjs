@@ -94,7 +94,7 @@ const scan = (file) => {
  */
 function scanSource(source, file) {
   const doc = parseMarkdown(source)
-  return { frontmatter: doc.frontmatter, links: doc.links, metrics: measure(doc), drift: checkDrift(doc, api, routes, file) }
+  return { frontmatter: doc.frontmatter, links: doc.links, headings: doc.headings, metrics: measure(doc), drift: checkDrift(doc, api, routes, file) }
 }
 
 // Ad-hoc input is scanned against the corpus baseline but belongs to no file,
