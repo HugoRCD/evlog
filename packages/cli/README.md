@@ -44,7 +44,7 @@ pnpm evlog doctor
 | --- | --- |
 | `evlog init` | Interactive setup: install, register the framework integration, wire a drain |
 | `evlog init --yes` | Non-interactive — defaults for everything (also implied by `--json`, no TTY, or `CI`) |
-| `evlog init --drain <id>` | Development sink: `fs` (default) or `none` |
+| `evlog init --drain <id>` | Development drain: `fs` (default) or `none` |
 | `evlog init --prod-drain <a,b>` | `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx` — several fan out |
 | `evlog init --extras <a,b>` | `enrichers`, `pipeline`, `sampling`, `error-catalog`, `audit-catalog`, `ai`, `better-auth`, `vite` |
 | `evlog init --apps <a,b>` | Workspace packages to set up, from a monorepo root |

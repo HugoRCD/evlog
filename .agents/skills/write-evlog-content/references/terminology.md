@@ -6,9 +6,9 @@ Rule id: `U-15`. The scanner raises a candidate from `scripts/content-lint/lib/c
 
 | evlog says | Not | Why |
 | --- | --- | --- |
-| **drain** | sink, transport, exporter | A drain is where events leave the process. `transport` is pino's word, `exporter` is OpenTelemetry's, and both carry the other tool's model with them. |
+| **drain** | drain, transport, exporter | A drain is where events leave the process. `transport` is pino's word, `exporter` is OpenTelemetry's, and both carry the other tool's model with them. |
 | **enricher** | enrichment plugin, context provider, middleware | An enricher adds fields to an event before it is emitted. Calling it middleware puts it in the request chain, which is where it is not. |
-| **error catalog** | error registry, error map, error dictionary | `defineErrorCatalog` is the API. Anything else is a term the reader cannot grep for. |
+| **error catalog** | error catalog, error map, error dictionary | `defineErrorCatalog` is the API. Anything else is a term the reader cannot grep for. |
 | **`log.fork()`** | child logger, sub-logger | pino's `child()` inherits bindings. `fork()` branches accumulated context and can be discarded. The distinction is the feature. |
 | **wide event** | wide log, fat event, structured log | One event per unit of work, with every field the work touched. `structured log` is the category, not this. |
 | **pipeline** | chain, middleware stack | `createDrainPipeline` composes drains. |
@@ -19,7 +19,7 @@ Rule id: `U-15`. The scanner raises a candidate from `scripts/content-lint/lib/c
 
 A sentence describing another tool uses that tool's vocabulary, and has to. "pino writes through a transport that runs in a worker thread" is correct and the scanner drops it: the check skips any sentence naming an alternative.
 
-What survives is a sentence about evlog wearing another tool's word. "Register the sink" is the finding, whatever page it lands on.
+What survives is a sentence about evlog wearing another tool's word. "Register the drain" is the finding, whatever page it lands on.
 
 ## When the word is genuinely missing
 
