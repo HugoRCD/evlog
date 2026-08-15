@@ -24,9 +24,10 @@ export default defineNuxtConfig({
   // Docus defaults to allowing everything. Keep non-content routes (the MCP
   // JSON-RPC endpoint, the Studio CMS editor) out of the crawl — they 405/302
   // on a GET and only add noise to Search Console Coverage.
+  // Top-level `disallow` merges into Docus's `*` group; declaring our own group
+  // would append a second `User-agent: *` block instead of extending theirs.
   robots: {
-    groups: [{ userAgent: '*', allow: '/', disallow: ['/mcp', '/_studio'] }],
-    sitemap: '/sitemap.xml',
+    disallow: ['/mcp', '/_studio'],
   },
 
   modules: [
