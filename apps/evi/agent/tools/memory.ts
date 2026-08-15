@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { memoryAvailable } from '../lib/memory/config'
@@ -59,9 +60,11 @@ export default defineDynamic({
             supersedes: z.string().uuid().optional()
               .describe('The id of a memory this one corrects. The old one stops being used and stays readable as history.'),
           }),
-          async execute(input) {
+          async execute(input, toolCtx) {
+            const log = useLogger(toolCtx)
             const target = writableTarget(auth, input.about, session.personId)
             if (target === null) {
+              log.set({ memory: { refused: 'not_writable' } })
               return { success: false as const, error: 'This session cannot write memories.' }
             }
             try {
@@ -74,10 +77,12 @@ export default defineDynamic({
                 source: { ...source },
                 createdBy: auth?.principalId ?? 'unknown',
               })
+              log.set({ memory: { saved: input.about } })
               return { success: true as const, id: record.id, about: input.about }
             }
             catch (error) {
               if (error instanceof MemoryRejected) {
+                log.set({ memory: { refused: error.reason } })
                 return { success: false as const, reason: error.reason, error: error.message }
               }
               throw error
@@ -91,8 +96,11 @@ export default defineDynamic({
             query: z.string().trim().min(2).describe('Words to match against remembered facts.'),
             limit: z.number().int().min(1).max(25).default(DEFAULT_SEARCH_LIMIT),
           }),
-          async execute(input) {
+          async execute(input, toolCtx) {
             const records = await session.store.search(session.targets, input.query, input.limit)
+            // A search that keeps coming back empty is the signal that the core
+            // block is not carrying what the turn actually needs.
+            useLogger(toolCtx).set({ memory: { searched: true, hits: records.length } })
             return {
               success: true as const,
               memories: records.map(record => ({
