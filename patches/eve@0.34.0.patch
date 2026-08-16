@@ -1,28 +1,41 @@
 diff --git a/dist/src/public/channels/photon/inboundContent.js b/dist/src/public/channels/photon/inboundContent.js
-index d9d9f1da..412b4597 100644
+index d9d9f1da..b8be215b 100644
 --- a/dist/src/public/channels/photon/inboundContent.js
 +++ b/dist/src/public/channels/photon/inboundContent.js
-@@ -1 +1,42 @@
+@@ -1 +1,55 @@
 -import{messageToUserContent}from"#public/channels/chat-sdk/index.js";function photonInboundContent(e){let t=messageToUserContent(e);return typeof t==`string`?t.trim().length>0?t:void 0:t.length>0?t:void 0}export{photonInboundContent};
 \ No newline at end of file
 +import{messageToUserContent}from"#public/channels/chat-sdk/index.js";
 +
-+// Patched: the Photon adapter maps inbound attachments to bare metadata, but
-+// the spectrum message on `message.raw` keeps the parsed content nodes, whose
-+// `read()` downloads the bytes by GUID through the authenticated client. Read
-+// inbound images here, before the message enters the durable session, and
-+// deliver them as file parts alongside the text.
-+function collectAttachmentNodes(node, out) {
++// Patched: the Photon adapter maps inbound attachments to bare metadata. On
++// the connected (pump) path the parsed spectrum message on `message.raw`
++// still carries content nodes with an authenticated `read()`; on the webhook
++// path `raw` is the delivery JSON, which never has one, so the message is
++// re-resolved through the adapter's spectrum client to obtain readable
++// nodes. Images are read here, before the message enters the durable
++// session, and delivered as file parts alongside the text.
++function collectReadableAttachmentNodes(node, out) {
 +  if (node === null || typeof node !== "object") return out;
 +  if (node.type === "attachment" && typeof node.read === "function") out.push(node);
-+  else if (node.type === "reply" && node.content) collectAttachmentNodes(node.content, out);
-+  else if (node.type === "group" && Array.isArray(node.items)) for (const item of node.items) collectAttachmentNodes(item.content, out);
++  else if (node.type === "reply" && node.content) collectReadableAttachmentNodes(node.content, out);
++  else if (node.type === "group" && Array.isArray(node.items)) for (const item of node.items) collectReadableAttachmentNodes(item.content, out);
 +  return out;
 +}
 +
-+async function readInboundImageParts(message) {
++async function readInboundImageParts(message, adapter) {
++  const announced = (message.attachments ?? []).some((attachment) => attachment.mimeType?.startsWith("image/"));
++  if (!announced) return [];
++  let nodes = collectReadableAttachmentNodes(message.raw?.content, []);
++  if (nodes.length === 0 && adapter) {
++    try {
++      const resolved = await adapter.fetchMessage(message.threadId, message.id);
++      nodes = collectReadableAttachmentNodes(resolved?.raw?.content, []);
++    } catch {
++      return [];
++    }
++  }
 +  const parts = [];
-+  for (const node of collectAttachmentNodes(message.raw?.content, [])) {
++  for (const node of nodes) {
 +    if (typeof node.mimeType !== "string" || !node.mimeType.startsWith("image/")) continue;
 +    try {
 +      parts.push({ data: await node.read(), filename: node.name, mediaType: node.mimeType, type: "file" });
@@ -33,9 +46,9 @@ index d9d9f1da..412b4597 100644
 +  return parts;
 +}
 +
-+async function photonInboundContent(message) {
++async function photonInboundContent(message, adapter) {
 +  const text = messageToUserContent(message);
-+  const images = await readInboundImageParts(message);
++  const images = await readInboundImageParts(message, adapter);
 +  if (images.length === 0) {
 +    if (typeof text === "string") return text.trim().length > 0 ? text : void 0;
 +    return text.length > 0 ? text : void 0;
@@ -48,11 +61,11 @@ index d9d9f1da..412b4597 100644
 +
 +export{photonInboundContent};
 diff --git a/dist/src/public/channels/photon/photonIMessageChannel.js b/dist/src/public/channels/photon/photonIMessageChannel.js
-index 24249a4f..66066926 100644
+index 24249a4f..cb821e0c 100644
 --- a/dist/src/public/channels/photon/photonIMessageChannel.js
 +++ b/dist/src/public/channels/photon/photonIMessageChannel.js
 @@ -1 +1 @@
 -import{vercelOidc}from"#public/channels/auth.js";import{chatSdkChannel}from"#public/channels/chat-sdk/index.js";import{createMemoryState}from"#compiled/@chat-adapter/state-memory/index.js";import{createiMessageAdapter}from"#compiled/@photon-ai/chat-adapter-imessage/index.js";import{photonInboundContent}from"#public/channels/photon/inboundContent.js";function photonIMessageChannel(i){let a=i.webhookSecret??process.env.IMESSAGE_WEBHOOK_SECRET,o=chatSdkChannel({adapters:{imessage:createiMessageAdapter({credentials:i.credentials,...i.webhookVerifier?{webhookVerifier:i.webhookVerifier}:a?{webhookSecret:a}:{webhookVerifier:vercelOidc()}})},concurrency:`concurrent`,events:i.events,routes:{imessage:i.route??`/eve/v1/photon`},state:createMemoryState(),streaming:!1,turnPolicy:i.turnPolicy,userName:i.userName??`eve`}),s=i.onMessage??defaultOnMessage;return o.bot.onDirectMessage(async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.bot.onNewMessage(/[\s\S]*/,async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.channel}async function defaultOnMessage(){return{auth:null}}async function dispatchMessage(e,t,n,r){let a=await t({thread:n},r);if(a===null)return;await markReadBestEffort(e.bot.getAdapter(`imessage`),n,r);let o=photonInboundContent(r);o!==void 0&&await e.send({context:[...a.context??[]],message:o},{auth:a.auth,thread:n})}async function markReadBestEffort(e,t,n){try{await e.markRead(t.id,n.id)}catch{}}export{photonIMessageChannel};
 \ No newline at end of file
-+import{vercelOidc}from"#public/channels/auth.js";import{chatSdkChannel}from"#public/channels/chat-sdk/index.js";import{createMemoryState}from"#compiled/@chat-adapter/state-memory/index.js";import{createiMessageAdapter}from"#compiled/@photon-ai/chat-adapter-imessage/index.js";import{photonInboundContent}from"#public/channels/photon/inboundContent.js";function photonIMessageChannel(i){let a=i.webhookSecret??process.env.IMESSAGE_WEBHOOK_SECRET,o=chatSdkChannel({adapters:{imessage:createiMessageAdapter({credentials:i.credentials,...i.webhookVerifier?{webhookVerifier:i.webhookVerifier}:a?{webhookSecret:a}:{webhookVerifier:vercelOidc()}})},concurrency:`concurrent`,events:i.events,routes:{imessage:i.route??`/eve/v1/photon`},state:createMemoryState(),streaming:!1,turnPolicy:i.turnPolicy,userName:i.userName??`eve`}),s=i.onMessage??defaultOnMessage;return o.bot.onDirectMessage(async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.bot.onNewMessage(/[\s\S]*/,async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.channel}async function defaultOnMessage(){return{auth:null}}async function dispatchMessage(e,t,n,r){let a=await t({thread:n},r);if(a===null)return;await markReadBestEffort(e.bot.getAdapter(`imessage`),n,r);let o=await photonInboundContent(r);o!==void 0&&await e.send({context:[...a.context??[]],message:o},{auth:a.auth,thread:n})}async function markReadBestEffort(e,t,n){try{await e.markRead(t.id,n.id)}catch{}}export{photonIMessageChannel};
++import{vercelOidc}from"#public/channels/auth.js";import{chatSdkChannel}from"#public/channels/chat-sdk/index.js";import{createMemoryState}from"#compiled/@chat-adapter/state-memory/index.js";import{createiMessageAdapter}from"#compiled/@photon-ai/chat-adapter-imessage/index.js";import{photonInboundContent}from"#public/channels/photon/inboundContent.js";function photonIMessageChannel(i){let a=i.webhookSecret??process.env.IMESSAGE_WEBHOOK_SECRET,o=chatSdkChannel({adapters:{imessage:createiMessageAdapter({credentials:i.credentials,...i.webhookVerifier?{webhookVerifier:i.webhookVerifier}:a?{webhookSecret:a}:{webhookVerifier:vercelOidc()}})},concurrency:`concurrent`,events:i.events,routes:{imessage:i.route??`/eve/v1/photon`},state:createMemoryState(),streaming:!1,turnPolicy:i.turnPolicy,userName:i.userName??`eve`}),s=i.onMessage??defaultOnMessage;return o.bot.onDirectMessage(async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.bot.onNewMessage(/[\s\S]*/,async(e,t)=>{await dispatchMessage(o,s,e,t)}),o.channel}async function defaultOnMessage(){return{auth:null}}async function dispatchMessage(e,t,n,r){let a=await t({thread:n},r);if(a===null)return;await markReadBestEffort(e.bot.getAdapter(`imessage`),n,r);let o=await photonInboundContent(r,e.bot.getAdapter(`imessage`));o!==void 0&&await e.send({context:[...a.context??[]],message:o},{auth:a.auth,thread:n})}async function markReadBestEffort(e,t,n){try{await e.markRead(t.id,n.id)}catch{}}export{photonIMessageChannel};
 \ No newline at end of file

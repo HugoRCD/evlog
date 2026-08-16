@@ -23,12 +23,15 @@ empty. Sandbox file tools reject repo-relative paths.
 **`disableTool()` is static.** There is no per-session way to remove a built-in,
 so a tool that is useless on one channel still occupies context there.
 
-**iMessage attachments only survive through `message.raw`.** The Photon
-adapter's chat mapping keeps name/mimeType/size and throws away the spectrum
-content nodes' authenticated `read()` handles, and eve's `messageToUserContent`
-only reads `attachment.url`, which Photon never has. `patches/eve@0.34.0.patch`
-reads inbound images from `message.raw.content` before the message enters the
-durable session. On an eve upgrade the patch must be re-applied or retired.
+**iMessage attachments need a second spectrum round-trip on the webhook path.**
+The Photon adapter's chat mapping keeps name/mimeType/size, and eve's
+`messageToUserContent` only reads `attachment.url`, which Photon never has. On
+the connected (pump) path the parsed content nodes with their authenticated
+`read()` survive on `message.raw.content`; on the webhook path `raw` is the
+delivery JSON, which never carries them, so `patches/eve@0.34.0.patch` calls
+`adapter.fetchMessage()` to re-resolve the message through the spectrum client
+and reads the images from the resolved nodes. On an eve upgrade the patch must
+be re-applied or retired.
 
 **Reasoning levels are per-model.** `GET /v1/models` exposes `reasoning_options`;
 DeepSeek V4 Flash advertises only `high` and `xhigh`. Setting `low` or `medium`
@@ -51,8 +54,10 @@ eve's bundler transform registers a dynamic tool's `execute` as a durable step
 function only when the function sits inline in the resolver body. A tool map
 built by a factory (`return myTools()`) type-checks and works on a fresh
 session, then fails on any resumed session with `references step function
-"..." which is not registered`. Every `agent/tools/*.ts` dynamic file
-therefore defines its tools inline in a single `turn.started` resolver.
+"..." which is not registered`. An implicit arrow return (`() => ({ ... })`)
+defeats the transform the same way; the resolver needs a block body with an
+explicit `return`. Every `agent/tools/*.ts` dynamic file therefore defines
+its tools inline in a single block-bodied `turn.started` resolver.
 
 ## Schedules
 
