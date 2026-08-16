@@ -4,8 +4,8 @@ import { MAINTAINER_PHONE } from '../lib/trust'
 
 export default defineSchedule({
   // Vercel evaluates cron in UTC: 0 5 is 06:00 London in summer (BST) and
-  // drifts to 05:00 in winter (GMT).
-  cron: '0 5 * * *',
+  // drifts to 05:00 in winter (GMT). Weekdays only - no weekend digest.
+  cron: '0 5 * * 1-5',
   // eslint-disable-next-line require-await
   async run({ to, waitUntil, appAuth }) {
     if (MAINTAINER_PHONE === undefined) {
