@@ -1,4 +1,9 @@
+import { existsSync } from 'node:fs'
 import { defineConfig } from 'drizzle-kit'
+
+// drizzle-kit runs outside eve, which is what loads `.env.local` for every
+// other command, so without this `db:migrate` reports an empty url.
+if (existsSync('.env.local')) process.loadEnvFile('.env.local')
 
 function databaseUrl(): string {
   for (const name of ['DATABASE_URL', 'POSTGRES_URL', 'POSTGRESQL_URL']) {

@@ -13,7 +13,8 @@ export const MAINTAINER_GITHUB_ID = process.env.MAINTAINER_GITHUB_ID
 /** Hugo's GitHub login, used to assign escalated issues to him. Public handle, not a credential. */
 export const MAINTAINER_GITHUB_LOGIN = 'hugorcd'
 
-const MAINTAINER_PRINCIPALS = new Set(
+/** Exported for memory identity seeding, which needs the members, not the answer. */
+export const MAINTAINER_PRINCIPALS: ReadonlySet<string> = new Set(
   [
     MAINTAINER_GITHUB_ID && `github:${MAINTAINER_GITHUB_ID}`,
     process.env.MAINTAINER_LINEAR_ID && `linear:${process.env.MAINTAINER_LINEAR_ID}`,
