@@ -3,10 +3,11 @@ import photon from '../channels/photon'
 import { MAINTAINER_PHONE } from '../lib/trust'
 
 export default defineSchedule({
-  // Daily, 06:00 UTC: after the digest (05:00) and before upstream-sync
-  // (07:00), cost-watchdog (Mon 08:00) and self-review (Wed 08:00), so the five
-  // scheduled turns never contend for the thread. Vercel evaluates cron in UTC.
-  cron: '0 6 * * *',
+  // Tuesday and Friday, 06:00 UTC: after the digest (05:00) and before
+  // upstream-sync (07:00), cost-watchdog (Mon 08:00) and self-review
+  // (Wed 08:00), so the scheduled turns never contend for the thread.
+  // Vercel evaluates cron in UTC.
+  cron: '0 6 * * 2,5',
   // eslint-disable-next-line require-await
   async run({ to, waitUntil, appAuth }) {
     if (MAINTAINER_PHONE === undefined) {
