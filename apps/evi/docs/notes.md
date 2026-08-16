@@ -23,6 +23,13 @@ empty. Sandbox file tools reject repo-relative paths.
 **`disableTool()` is static.** There is no per-session way to remove a built-in,
 so a tool that is useless on one channel still occupies context there.
 
+**iMessage attachments only survive through `message.raw`.** The Photon
+adapter's chat mapping keeps name/mimeType/size and throws away the spectrum
+content nodes' authenticated `read()` handles, and eve's `messageToUserContent`
+only reads `attachment.url`, which Photon never has. `patches/eve@0.34.0.patch`
+reads inbound images from `message.raw.content` before the message enters the
+durable session. On an eve upgrade the patch must be re-applied or retired.
+
 **Reasoning levels are per-model.** `GET /v1/models` exposes `reasoning_options`;
 DeepSeek V4 Flash advertises only `high` and `xhigh`. Setting `low` or `medium`
 produced erratic, non-monotonic reasoning volume rather than an error.
