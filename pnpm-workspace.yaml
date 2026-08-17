@@ -38,6 +38,11 @@ overrides:
   # a stale v2, breaking Nuxt's `legacyPlugins` import at build time.
   '@unhead/vue': ^3.2.1
 
+# Delivers inbound iMessage image attachments as file parts; see
+# apps/evi/docs/vision.md for the upstream gap this covers.
+patchedDependencies:
+  eve@0.38.3: patches/eve@0.38.3.patch
+
 minimumReleaseAge: 2880
 
 minimumReleaseAgeExclude:
@@ -63,4 +68,3 @@ minimumReleaseAgeExclude:
   - nitro
   - rolldown
   - workflow
-

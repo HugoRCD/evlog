@@ -50,7 +50,7 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
       keepPercent: z.number(),
     }),
   },
-  handler: ({ requestsPerMonth, linesPerRequest, provider, perGb, perMillionIndexed, keepPercent }) => {
+  handler: async ({ requestsPerMonth, linesPerRequest, provider, perGb, perMillionIndexed, keepPercent }) => {
     const preset = LOG_COST_PROVIDERS.find(p => p.id === provider)
     if (provider && !preset) {
       throw createError({ statusCode: 400, message: `Unknown provider "${provider}". Known: ${PROVIDER_IDS.join(', ')}.` })
@@ -67,6 +67,15 @@ Pass a provider id to start from its published list rate, or pass perGb and perM
       perGb: gbRate,
       perMillionIndexed: indexedRate,
       keepRatio: keepPercent / 100,
+    })
+
+    await captureServerEvent('mcp_tool_called', {
+      tool: 'estimate-log-cost',
+      provider: provider ?? null,
+      requests_per_month: requestsPerMonth,
+      lines_per_request: linesPerRequest,
+      keep_percent: keepPercent,
+      saved_percent: Math.round(estimate.savedRatio * 100),
     })
 
     return {

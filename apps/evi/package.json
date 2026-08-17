@@ -9,6 +9,7 @@
   },
   "scripts": {
     "build": "eve build",
+    "vercel-build": "turbo run build --filter=evlog && drizzle-kit migrate && eve build",
     "dev": "eve dev",
     "eval": "EVE_RUN_MODE=eval eve eval",
     "start": "eve start",
