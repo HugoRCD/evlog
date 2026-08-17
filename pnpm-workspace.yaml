@@ -41,7 +41,7 @@ overrides:
 # Delivers inbound iMessage image attachments as file parts; see
 # apps/evi/docs/vision.md for the upstream gap this covers.
 patchedDependencies:
-  eve@0.34.0: patches/eve@0.34.0.patch
+  eve@0.38.3: patches/eve@0.38.3.patch
 
 minimumReleaseAge: 2880
 
@@ -68,4 +68,3 @@ minimumReleaseAgeExclude:
   - nitro
   - rolldown
   - workflow
-
