@@ -21,7 +21,7 @@ export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) =>
       isAutonomous(ctx.session.auth.current)
-        ? defineInstructions({ markdown: FIRST_RESPONDER })
+        ? defineInstructions({ content: FIRST_RESPONDER })
         : null,
   },
 })

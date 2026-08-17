@@ -37,7 +37,7 @@ export default defineDynamic({
   events: {
     'turn.started': (_event, ctx) =>
       defineInstructions({
-        markdown:
+        content:
           `${channelName(ctx.channel.kind) === 'github' ? CHECKED_OUT : NO_THREAD_CHECKOUT}\n\n${LINEAR_ISSUE_BRANCHES}`,
       }),
   },
