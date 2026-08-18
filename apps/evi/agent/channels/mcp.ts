@@ -1,82 +1,42 @@
-import { randomUUID } from 'node:crypto'
-import { defineChannel, GET, POST } from 'eve/channels'
-import { finalMessageFromStream, handleMcpRequest, mcpSessionAuth, verifyMcpBearer } from '../lib/mcp'
+import { createHash, timingSafeEqual } from 'node:crypto'
+import type { SessionAuthContext } from 'eve/context'
+import { mcpChannel } from 'eve/channels/mcp'
+
+/** The principal MCP bearer sessions run under; trusted as the maintainer when the token is configured. */
+export const MCP_PRINCIPAL = 'mcp:hugo'
 
 /**
- * Exposes Evi over the Model Context Protocol at POST /eve/v1/mcp, for
- * external harnesses (Raycast AI, Claude Code, Cursor). One `evi` tool
- * forwards the message into a real Evi session under the `mcp:hugo`
- * principal, which agent/lib/trust.ts trusts as the maintainer only while
- * EVI_MCP_TOKEN is configured. Protocol handling lives in agent/lib/mcp.ts.
- *
- * The mcp-session-id issued on initialize keys the eve continuation address,
- * so one Raycast chat maps to one Evi conversation.
+ * The `EVI_MCP_TOKEN` bearer is the only way in, deliberately: single-user
+ * surface, no OAuth authorization server. eve has no stock static-bearer
+ * strategy, so this AuthFn is ours: constant-time comparison via digests (so
+ * neither token length nor prefix leaks through timing), nobody admitted
+ * while the token is unconfigured. The minted `mcp:hugo` principal is what
+ * agent/lib/trust.ts trusts as the maintainer, and eve binds invocation
+ * ownership to it.
  */
-
-// A shipping flow (checks, push, PR) runs for minutes; let the synchronous tool call wait.
-export const maxDuration = 800
-
-function unauthorized(): Response {
-  return new Response(null, {
-    status: 401,
-    headers: { 'www-authenticate': 'Bearer realm="evi-mcp"' },
-  })
+export function mcpBearerAuth(request: Request): SessionAuthContext | null {
+  const expected = process.env.EVI_MCP_TOKEN?.trim()
+  const authorization = request.headers.get('authorization')
+  if (!expected || !authorization?.startsWith('Bearer ')) return null
+  const presented = authorization.slice('Bearer '.length).trim()
+  if (presented.length === 0) return null
+  const a = createHash('sha256').update(presented).digest()
+  const b = createHash('sha256').update(expected).digest()
+  if (!timingSafeEqual(a, b)) return null
+  return {
+    attributes: {},
+    authenticator: 'mcp-bearer',
+    principalId: MCP_PRINCIPAL,
+    principalType: 'user',
+  }
 }
 
-function parseError(): Response {
-  return Response.json(
-    { jsonrpc: '2.0', id: null, error: { code: -32700, message: 'Parse error' } },
-    { status: 200, headers: { 'cache-control': 'no-store' } },
-  )
-}
-
-export default defineChannel({
-  cors: {
-    methods: ['GET', 'POST'],
-    allowHeaders: ['authorization', 'content-type', 'mcp-protocol-version', 'mcp-session-id'],
-  },
-  routes: [
-    // Absolute path: custom-channel routes are not auto-prefixed, and only
-    // /eve/v1/* is the eve surface in production.
-    // Streamable HTTP: no server-initiated streams are offered, so GET is a
-    // spec-compliant 405 instead of an SSE channel.
-    GET('/eve/v1/mcp', async () => new Response(null, { status: 405, headers: { allow: 'POST' } })),
-    POST('/eve/v1/mcp', async (req, { from }) => {
-      if (!verifyMcpBearer(req.headers.get('authorization'), process.env.EVI_MCP_TOKEN?.trim())) {
-        return unauthorized()
-      }
-
-      let body: unknown
-      try {
-        body = await req.json()
-      }
-      catch {
-        return parseError()
-      }
-
-      const mcpSessionId = req.headers.get('mcp-session-id')?.trim() || randomUUID()
-      const result = await handleMcpRequest(body, async (message) => {
-        const session = await from(`mcp:${mcpSessionId}`).send(message, {
-          auth: mcpSessionAuth(),
-        })
-        return await finalMessageFromStream(await session.getEventStream())
-      })
-
-      const headers: Record<string, string> = {
-        'cache-control': 'no-store',
-        'mcp-session-id': mcpSessionId,
-      }
-      if (result.body === null) return new Response(null, { status: result.status, headers })
-      // Streamable HTTP lets the server answer POSTs as JSON or as an SSE
-      // frame; clients built against SSE-framing servers (Linear's among
-      // them) expect the frame when their Accept says so.
-      if (req.headers.get('accept')?.includes('text/event-stream')) {
-        return new Response(`event: message\ndata: ${JSON.stringify(result.body)}\n\n`, {
-          status: result.status,
-          headers: { ...headers, 'content-type': 'text/event-stream' },
-        })
-      }
-      return Response.json(result.body, { status: result.status, headers })
-    }),
-  ],
+/**
+ * Exposes Evi over the Model Context Protocol at /eve/v1/mcp, for external
+ * harnesses (Raycast AI, Claude Code, Cursor), through eve's durable
+ * invocation tools: `agent_start`, `agent_get`, `agent_update`,
+ * `agent_cancel`. Each start runs a task-mode session under `mcp:hugo`.
+ */
+export default mcpChannel({
+  auth: mcpBearerAuth,
 })

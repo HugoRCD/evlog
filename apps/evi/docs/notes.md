@@ -155,14 +155,18 @@ for both local and eval traffic while the spend tags separate them. Both now rea
 ## MCP channel
 
 External harnesses (Raycast AI, Claude Code, Cursor) reach Evi at
-`POST /eve/v1/mcp` with `Authorization: Bearer $EVI_MCP_TOKEN`: a single `evi`
-tool that runs a real session under the `mcp:hugo` principal, trusted as the
-maintainer only while the token env is set. The `mcp-session-id` returned on
-`initialize` keys the conversation, so one Raycast chat is one Evi session.
-Setup: generate a token (`openssl rand -hex 32`), set `EVI_MCP_TOKEN` on the
-project, add an HTTP MCP server in the client pointing at the production URL
-with the Authorization header. Rotate by changing the env var. There is no
-OAuth AS on purpose: single-user surface, a static bearer is the right size.
+`/eve/v1/mcp` with `Authorization: Bearer $EVI_MCP_TOKEN`, served by eve's
+native MCP channel (`mcpChannel`). Clients get the durable invocation tools —
+`agent_start`, `agent_get`, `agent_update`, `agent_cancel`: start returns an
+invocation id immediately, the harness polls `agent_get`, and human-input
+requests surface as `input_required` instead of a hanging HTTP call. Each
+`agent_start` is one task-mode session owned by the `mcp:hugo` principal,
+trusted as the maintainer only while the token env is set; there is no
+cross-call conversation, so a request must carry its own context. Setup:
+generate a token (`openssl rand -hex 32`), set `EVI_MCP_TOKEN` on the project,
+add an HTTP MCP server in the client pointing at the production URL with the
+Authorization header. Rotate by changing the env var. There is no OAuth AS on
+purpose: single-user surface, a static bearer is the right size.
 
 ## Open
 
