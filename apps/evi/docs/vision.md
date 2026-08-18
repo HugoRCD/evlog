@@ -3,13 +3,21 @@
 How Evi sees images. The base model (`EVI_MODEL`, DeepSeek V4 Flash) is
 text-only, so vision is not a model swap: the dynamic model resolver in
 `agent/agent.ts` re-evaluates at every step and selects the vision fallback
-(`EVI_VISION_MODEL`, Qwen 3.7 Flash) while the session history carries image
-parts. Detection lives in `agent/lib/model.ts` (`hasVisualParts`). When
-compaction drops the image payloads, the session returns to the base model on
-its own. Sessions that never see an image never pay for one.
+(`EVI_VISION_MODEL`, Qwen 3.7 Flash) while the *current turn* carries image
+parts — an inbound attachment, or a screenshot a tool returned during the
+turn. Selection lives in `agent/lib/model.ts` (`modelForMessages`,
+`modelForStep`). Sessions that never see an image never pay for one.
 
-The fallback must be a model that can run the whole session, tools included,
-not just caption a picture: while an image sits in history, every step runs on
+The next turn returns to the base model: `modelForStep` wraps it in a
+middleware that replaces earlier turns' visual payloads with text stubs, since
+the base model rejects raw image parts in history. An image is therefore
+readable only during the turn that delivered it; the stub tells the model to
+ask for it again. This also stops a single screenshot from re-billing its
+base64 payload on every later call, and from holding a long-lived thread on
+the fallback model for days.
+
+The fallback must be a model that can run a whole turn, tools included, not
+just caption a picture: while an image sits in the turn, every step runs on
 it. Qwen 3.7 Flash is vision-native, agentic, and at or below the base model's
 rate card.
 
