@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-// Guards patches/eve@0.38.3.patch: the workflow runtime must tolerate ULID
+// Guards the eve patch in patches/: the workflow runtime must tolerate ULID
 // event ids, because the production World does not allocate slot-numbered ids
 // yet. The chunk filename is version-specific on purpose — an eve upgrade
 // breaks this import, which is the cue to re-check whether the patch is still
