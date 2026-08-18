@@ -46,5 +46,5 @@ watched path changed but the behaviour did not.
 Swapping the model goes through `EVI_MODEL`, not an edit to `agent.ts`: run the
 workflow manually against the candidate, compare cost, latency and pass rate in
 PostHog (`evi_eval_run`, broken down by `model`), then commit the swap.
-`EVI_VISION_MODEL` swaps the vision fallback the same way; sessions run it only
-while image parts sit in history (`docs/vision.md`).
+`EVI_VISION_MODEL` swaps the vision fallback the same way; it runs only for
+the turn that carries image parts (`docs/vision.md`).
