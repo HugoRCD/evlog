@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { MCP_PRINCIPAL, mcpBearerAuth } from './mcp'
+import { MCP_PRINCIPAL, mcpBearerAuth } from '../channels/mcp'
 
 function request(authorization?: string): Request {
   return new Request('https://evi.example/eve/v1/mcp', {
