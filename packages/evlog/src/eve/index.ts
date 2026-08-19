@@ -873,7 +873,7 @@ function flushAi(state: TurnState): void {
   if (!ai.provider) {
     const modelId = sessionRuntimes().get(state.sessionId)?.model
     if (modelId) {
-      const slashIndex = modelId.indexOf("/")
+      const slashIndex = modelId.indexOf('/')
       if (slashIndex !== -1) {
         ai.provider = modelId.slice(0, slashIndex)
       }
