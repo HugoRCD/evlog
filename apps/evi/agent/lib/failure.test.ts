@@ -9,8 +9,9 @@ describe('flattenInline', () => {
     expect(long.endsWith('…')).toBe(true)
   })
 
-  it('stringifies non-string values', () => {
+  it('stringifies non-string values, including ones JSON cannot represent', () => {
     expect(flattenInline({ branch: 'main' })).toBe('{"branch":"main"}')
+    expect(flattenInline(undefined)).toBe('undefined')
   })
 })
 

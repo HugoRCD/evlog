@@ -62,8 +62,7 @@ async function escalate(state: GitHubChannelState): Promise<void> {
   if (state.issueNumber === null) return
   try {
     await escalateFailedTriage(state.issueNumber)
-  }
-  catch (error) {
+  } catch (error) {
     // Never let the escalation turn a triage failure into a failure loop.
     console.error('[evi:github] failed to escalate a failed triage', error)
   }

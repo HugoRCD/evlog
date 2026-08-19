@@ -5,7 +5,8 @@ interface FailureEvent {
 
 /** One line of the value, truncated so an error dump never floods a thread. */
 export function flattenInline(value: unknown, max = 160): string {
-  const text = typeof value === 'string' ? value : JSON.stringify(value)
+  // JSON.stringify returns undefined for undefined and functions.
+  const text = typeof value === 'string' ? value : (JSON.stringify(value) ?? String(value))
   const flat = text.replace(/\s+/g, ' ').trim()
   return flat.length <= max ? flat : `${flat.slice(0, max - 1).trimEnd()}…`
 }

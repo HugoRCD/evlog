@@ -14,7 +14,7 @@ export const SCHEDULED_TASK_EPILOGUE
  */
 export function maintainerRun(channel: ChatSdkChannel, task: string): ScheduleRunHandler {
   return ({ to, waitUntil, appAuth }) => {
-    if (MAINTAINER_PHONE === undefined) {
+    if (!MAINTAINER_PHONE) {
       throw new Error('MAINTAINER_PHONE is required for scheduled runs.')
     }
     waitUntil(

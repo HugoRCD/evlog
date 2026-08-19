@@ -47,10 +47,11 @@ describe('maintainerRun', () => {
     expect(waitUntil).toHaveBeenCalledTimes(1)
   })
 
-  it('throws when no maintainer phone is configured', async () => {
-    const { maintainerRun } = await loadSchedule(undefined)
-    const { args } = scheduleArgs()
-
-    expect(() => maintainerRun(channel, 'anything')(args)).toThrow('MAINTAINER_PHONE')
+  it('throws when the maintainer phone is missing or empty', async () => {
+    for (const phone of [undefined, '']) {
+      const { maintainerRun } = await loadSchedule(phone)
+      const { args } = scheduleArgs()
+      expect(() => maintainerRun(channel, 'anything')(args)).toThrow('MAINTAINER_PHONE')
+    }
   })
 })

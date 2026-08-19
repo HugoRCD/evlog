@@ -44,16 +44,19 @@ export function defaultReportTags(): string[] {
   return tags.length ? tags : fallback
 }
 
+/** The dedicated Evi key that scopes historical, pre-tagging spend. */
 export function reportApiKeyName(): string | undefined {
   return process.env.AI_GATEWAY_REPORT_API_KEY_NAME?.trim() || undefined
 }
 
+/** The caller-supplied part of a spend-report request. */
 export interface ReportQueryInput {
   groupBy?: string
   tags?: string[]
   tagsMatch?: 'any' | 'all'
 }
 
+/** The resolved Custom Reporting query, one of two scoping modes. */
 export interface ReportQuery {
   groupBy: string
   tags: string[] | undefined

@@ -12,8 +12,8 @@ export function adminGatedAuth<T>(grant: (ctx: SessionContext) => T) {
     if (!canAccessAdminTools(ctx.session.auth.current)) {
       return {
         principalType: 'app' as const,
-        async getToken(): Promise<never> {
-          throw new Error('This tool is not available in the current session.')
+        getToken(): Promise<never> {
+          return Promise.reject(new Error('This tool is not available in the current session.'))
         },
       }
     }

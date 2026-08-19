@@ -47,8 +47,7 @@ export default defineDynamic({
                 sha: String(head.stdout).trim(),
                 repository: 'HugoRCD/evlog',
               }
-            }
-            finally {
+            } finally {
               // Drop the brokered credential; the channel checkout re-brokers its own when it needs to fetch.
               await sandbox.setNetworkPolicy('allow-all')
             }

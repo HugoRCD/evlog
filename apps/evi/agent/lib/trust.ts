@@ -6,8 +6,7 @@ import { environment } from './environment'
  * repo carries no personal identifiers. A missing variable removes that
  * channel from the trusted set, so its writes fall back to asking.
  */
-export const MAINTAINER_PHONE = process.env.MAINTAINER_PHONE
-export const MAINTAINER_GITHUB_ID = process.env.MAINTAINER_GITHUB_ID
+export const { MAINTAINER_PHONE, MAINTAINER_GITHUB_ID } = process.env
 /** Hugo's GitHub login, used to assign escalated issues to him. Public handle, not a credential. */
 export const MAINTAINER_GITHUB_LOGIN = 'hugorcd'
 
@@ -24,12 +23,11 @@ export const MAINTAINER_PRINCIPALS: ReadonlySet<string> = new Set(
 )
 
 function decodeJwtClaims(token: string): Record<string, unknown> | null {
-  const payload = token.split('.')[1]
+  const [, payload] = token.split('.')
   if (payload === undefined) return null
   try {
     return JSON.parse(Buffer.from(payload, 'base64url').toString()) as Record<string, unknown>
-  }
-  catch {
+  } catch {
     return null
   }
 }

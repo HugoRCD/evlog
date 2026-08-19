@@ -102,10 +102,14 @@ export async function uploadSandboxImage(
   if (sniffImageContentType(bytes) !== contentType) {
     return { error: `The content of "${path}" does not match its extension; only real image files are uploaded.` }
   }
-  const blob = await putImage(screenshotKey(path), Buffer.from(bytes), {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType,
-  })
-  return { url: blob.url, bytes: bytes.byteLength }
+  try {
+    const blob = await putImage(screenshotKey(path), Buffer.from(bytes), {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType,
+    })
+    return { url: blob.url, bytes: bytes.byteLength }
+  } catch (error) {
+    return { error: `The upload of "${path}" failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
 }
