@@ -1,4 +1,5 @@
 import { getVercelOidcToken } from '@vercel/oidc'
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { canAccessAdminTools } from '../lib/trust'
@@ -19,9 +20,11 @@ export default defineDynamic({
             if (!canAccessAdminTools(toolCtx.session.auth.current)) {
               return { success: false as const, error: 'Remote cache access is not available in this session.' }
             }
+            const log = useLogger(toolCtx)
             const teamSlug = process.env.TURBO_TEAM
             const teamId = process.env.VERCEL_TEAM_ID
             if (!teamSlug || !teamId) {
+              log.set({ turbo: { remoteCache: false, reason: 'not_configured' } })
               return { success: false as const, error: 'TURBO_TEAM and VERCEL_TEAM_ID must be configured for remote caching.' }
             }
             // Fetched per call: the env token is minted at boot and expires on a warm instance.
@@ -29,19 +32,23 @@ export default defineDynamic({
             try {
               oidc = await getVercelOidcToken()
             } catch (error) {
+              log.set({ turbo: { remoteCache: false, reason: 'no_oidc_token' } })
               return { success: false as const, error: `No Vercel OIDC token available: ${error instanceof Error ? error.message : String(error)}` }
             }
             let token: string
             try {
               token = await exchangeTurboToken(oidc, teamSlug)
             } catch {
+              log.set({ turbo: { remoteCache: false, reason: 'exchange_failed' } })
               return { success: false as const, error: 'Turborepo token exchange failed; remote caching is unavailable for this run.' }
             }
             const sandbox = await toolCtx.getSandbox()
             const write = await sandbox.run({ command: turboConfigCommand(token, teamId, teamSlug) })
             if (write.exitCode !== 0) {
+              log.set({ turbo: { remoteCache: false, reason: 'config_write_failed' } })
               return { success: false as const, error: `Writing the turbo config failed: ${runOutput(write)}` }
             }
+            log.set({ turbo: { remoteCache: true } })
             return {
               success: true as const,
               team: teamSlug,

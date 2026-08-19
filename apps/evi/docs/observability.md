@@ -14,6 +14,21 @@ called and whether each succeeded, how much of the context was cache-served, and
 which surface it came from. Every cost claim in this project was measured from
 these events rather than estimated.
 
+Tool executes enrich the same event with their outcome, in the pattern
+`tools/memory.ts` set: one namespace per domain, holding counts, reason codes,
+and identifiers Evi authored — never raw error strings, tool payloads, or
+untrusted URLs, so the metadata-only PostHog policy holds. The namespaces:
+`git.{branch,pushed,sha,reason}`,
+`capture.{published,viewport,target,beforeHost,afterHost,reason}`,
+`blob.{uploaded,bytes}`, `turbo.{remoteCache,reason}`,
+`gateway.report.{mode,groupBy,matchedRows}`,
+`content.{scanned,candidates,eligible,targets,group,surface}`,
+`image.{host,fetched,bytes,mediaType}`, and
+`memory.{saved,refused,searched,hits}`. A content pass that held everything or
+a push that was refused is chartable from the turn event alone. Tool executes
+are the one place `useLogger()` is contractually bound (see the caller gap
+below), which is why hooks, schedules, and the subagents stay uninstrumented.
+
 `environment` comes from `agent/lib/environment.ts`, the same function that
 builds the gateway spend tags. That is deliberate: a run that bills as `eval`
 also logs as `eval`, so the two views line up. Before, wide events reported

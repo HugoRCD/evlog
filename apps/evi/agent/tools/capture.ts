@@ -1,4 +1,5 @@
 import { runAgentBrowser, type EveToolContext } from '@agent-browser/eve/sandbox'
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { missingBlobTokenError, uploadSandboxImage } from '../lib/blob'
@@ -72,12 +73,19 @@ export default defineDynamic({
             if (!canAccessAdminTools(toolCtx.session.auth.current)) {
               return { success: false as const, error: 'Captures are not available in this session.' }
             }
+            const log = useLogger(toolCtx)
             for (const url of [input.beforeUrl, input.afterUrl]) {
               const refusal = validateCaptureUrl(url)
-              if (refusal) return { success: false as const, error: refusal }
+              if (refusal) {
+                log.set({ capture: { published: false, reason: 'origin_refused' } })
+                return { success: false as const, error: refusal }
+              }
             }
             const missingToken = missingBlobTokenError()
-            if (missingToken) return { success: false as const, error: missingToken }
+            if (missingToken) {
+              log.set({ capture: { published: false, reason: 'missing_token' } })
+              return { success: false as const, error: missingToken }
+            }
             const viewport = input.viewport ?? 'desktop'
             const target: CaptureTarget | null = input.selector || input.text
               ? { selector: input.selector, text: input.text }
@@ -87,9 +95,24 @@ export default defineDynamic({
             const before = await captureFrame(toolCtx, { side: 'before', url: input.beforeUrl, target, viewport })
             const after = await captureFrame(toolCtx, { side: 'after', url: input.afterUrl, target, viewport })
             const beforeUpload = await uploadSandboxImage(sandbox, before.path)
-            if ('error' in beforeUpload) return { success: false as const, error: beforeUpload.error }
+            if ('error' in beforeUpload) {
+              log.set({ capture: { published: false, reason: 'upload_failed' } })
+              return { success: false as const, error: beforeUpload.error }
+            }
             const afterUpload = await uploadSandboxImage(sandbox, after.path)
-            if ('error' in afterUpload) return { success: false as const, error: afterUpload.error }
+            if ('error' in afterUpload) {
+              log.set({ capture: { published: false, reason: 'upload_failed' } })
+              return { success: false as const, error: afterUpload.error }
+            }
+            log.set({
+              capture: {
+                published: true,
+                viewport,
+                target: after.how ?? 'viewport',
+                beforeHost: new URL(input.beforeUrl).hostname,
+                afterHost: new URL(input.afterUrl).hostname,
+              },
+            })
             // Only the composed block is returned: handing back the bare image URLs
             // invites a hand-assembled table that drops the attestation receipt.
             return {

@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog/eve'
 import { defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { parseLintReport } from '../lib/content/scan'
@@ -43,6 +44,17 @@ export default defineTool({
       pages: report.pages as LintPage[],
       recentlyTouched: touchedPaths(String(log.stdout)),
       limit: input.limit,
+    })
+
+    useLogger(toolCtx).set({
+      content: {
+        scanned: report.pages.length,
+        candidates: selection.candidates,
+        eligible: selection.eligible,
+        targets: selection.targets.length,
+        ...(selection.group ? { group: selection.group } : {}),
+        ...(input.surface ? { surface: input.surface } : {}),
+      },
     })
 
     return {

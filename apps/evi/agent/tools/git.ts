@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { githubCredentials } from '../lib/github/credentials'
@@ -28,8 +29,12 @@ export default defineDynamic({
             if (!isMaintainer(toolCtx.session.auth.current) && !isScheduleAppAuth(toolCtx.session.auth.current)) {
               return { success: false as const, error: 'Only maintainer and schedule-app sessions may push.' }
             }
+            const log = useLogger(toolCtx)
             const refusal = validatePushBranch(input.branch)
-            if (refusal) return { success: false as const, error: refusal }
+            if (refusal) {
+              log.set({ git: { branch: input.branch, pushed: false, reason: 'refused' } })
+              return { success: false as const, error: refusal }
+            }
             const sandbox = await toolCtx.getSandbox()
             const token = await mintInstallationToken(githubCredentials)
             await sandbox.setNetworkPolicy(pushBrokerPolicy(token))
@@ -38,13 +43,16 @@ export default defineDynamic({
                 command: `git -C ${REPO_DIR} push ${PUSH_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
               })
               if (push.exitCode !== 0) {
+                log.set({ git: { branch: input.branch, pushed: false, reason: `exit_${push.exitCode}` } })
                 return { success: false as const, error: `git push exited ${push.exitCode}: ${runOutput(push)}` }
               }
               const head = await sandbox.run({ command: `git -C ${REPO_DIR} rev-parse '${input.branch}'` })
+              const sha = String(head.stdout).trim()
+              log.set({ git: { branch: input.branch, pushed: true, sha } })
               return {
                 success: true as const,
                 branch: input.branch,
-                sha: String(head.stdout).trim(),
+                sha,
                 repository: 'HugoRCD/evlog',
               }
             } finally {
