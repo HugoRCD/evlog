@@ -175,6 +175,12 @@ interface TurnAccumulator {
   pausedForInput: boolean
   stepStartedAt?: number
   costMap?: Record<string, ModelCost>
+  /**
+   * The resolved provider (deployment) that served the model call.
+   * Populated at turn end from the session model slug, or set directly
+   * when eve reports the provider per-step.
+   */
+  lastProvider?: string
   costModel?: string
   /** Cumulative input tokens of the most recent completed model step, the baseline for per-tool attribution. */
   lastStepInputTokens?: number
@@ -303,6 +309,7 @@ function buildAiField(state: TurnAccumulator): AIEventData {
     steps: state.steps,
   }
   if (state.costModel) data.model = state.costModel
+  if (state.lastProvider) data.provider = state.lastProvider
   if (state.cacheReadTokens > 0) data.cacheReadTokens = state.cacheReadTokens
   if (state.cacheWriteTokens > 0) data.cacheWriteTokens = state.cacheWriteTokens
   if (state.finishReason) data.finishReason = state.finishReason
@@ -862,6 +869,15 @@ function flushAi(state: TurnState): void {
   if (!ai.model) {
     const model = sessionRuntimes().get(state.sessionId)?.model
     if (model) ai.model = model
+  }
+  if (!ai.provider) {
+    const modelId = sessionRuntimes().get(state.sessionId)?.model
+    if (modelId) {
+      const slashIndex = modelId.indexOf('/')
+      if (slashIndex !== -1) {
+        ai.provider = modelId.slice(0, slashIndex)
+      }
+    }
   }
   state.logger.set({ ai })
 }
