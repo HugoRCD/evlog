@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest'
-import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from './blob'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType, uploadSandboxImage } from './blob'
 
 describe('imageContentType', () => {
   it('maps image extensions case-insensitively', () => {
@@ -25,8 +25,22 @@ describe('screenshotKey', () => {
 describe('sniffImageContentType', () => {
   it('recognizes each supported format by its signature and trailer', () => {
     expect(sniffImageContentType(new Uint8Array([
-      0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,
-      0x49, 0x45, 0x4E, 0x44, 0xAE, 0x42, 0x60, 0x82,
+      0x89,
+      0x50,
+      0x4E,
+      0x47,
+      0x0D,
+      0x0A,
+      0x1A,
+      0x0A,
+      0x49,
+      0x45,
+      0x4E,
+      0x44,
+      0xAE,
+      0x42,
+      0x60,
+      0x82,
     ]))).toBe('image/png')
     expect(sniffImageContentType(new Uint8Array([0xFF, 0xD8, 0xFF, 0xE0, 0x00, 0xFF, 0xD9]))).toBe('image/jpeg')
     expect(sniffImageContentType(new Uint8Array([0x47, 0x49, 0x46, 0x38, 0x39, 0x61, 0x3B]))).toBe('image/gif')
@@ -60,5 +74,71 @@ describe('sniffImageContentType', () => {
 describe('MAX_IMAGE_BYTES', () => {
   it('caps uploads at 8 MB', () => {
     expect(MAX_IMAGE_BYTES).toBe(8 * 1024 * 1024)
+  })
+})
+
+describe('uploadSandboxImage', () => {
+  const png = new Uint8Array([
+    0x89,
+    0x50,
+    0x4E,
+    0x47,
+    0x0D,
+    0x0A,
+    0x1A,
+    0x0A,
+    0x49,
+    0x45,
+    0x4E,
+    0x44,
+    0xAE,
+    0x42,
+    0x60,
+    0x82,
+  ])
+
+  function sandboxWith(bytes: Uint8Array | null) {
+    return { readBinaryFile: vi.fn().mockResolvedValue(bytes) }
+  }
+
+  afterEach(() => {
+    vi.unstubAllEnvs()
+  })
+
+  it('uploads a validated image and returns its public URL', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'tok')
+    const put = vi.fn().mockResolvedValue({ url: 'https://blob.example/after-x.png' })
+    const result = await uploadSandboxImage(sandboxWith(png), '/workspace/screenshots/after.png', put)
+    expect(result).toEqual({ url: 'https://blob.example/after-x.png', bytes: png.byteLength })
+    expect(put).toHaveBeenCalledWith('evi/screenshots/after.png', Buffer.from(png), {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType: 'image/png',
+    })
+  })
+
+  it('refuses before reading anything when the token or extension is wrong', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'tok')
+    const sandbox = sandboxWith(png)
+    expect(await uploadSandboxImage(sandbox, '/workspace/repo/package.json')).toMatchObject({ error: expect.stringContaining('not a supported image') })
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', '')
+    expect(await uploadSandboxImage(sandbox, 'after.png')).toMatchObject({ error: expect.stringContaining('BLOB_READ_WRITE_TOKEN') })
+    expect(sandbox.readBinaryFile).not.toHaveBeenCalled()
+  })
+
+  it('refuses a missing file and bytes that do not match the extension', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'tok')
+    const put = vi.fn()
+    expect(await uploadSandboxImage(sandboxWith(null), 'after.png', put)).toMatchObject({ error: expect.stringContaining('No file') })
+    expect(await uploadSandboxImage(sandboxWith(new TextEncoder().encode('SECRET')), 'after.png', put))
+      .toMatchObject({ error: expect.stringContaining('does not match its extension') })
+    expect(put).not.toHaveBeenCalled()
+  })
+
+  it('reports a rejected upload instead of throwing', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'tok')
+    const put = vi.fn().mockRejectedValue(new Error('store unavailable'))
+    expect(await uploadSandboxImage(sandboxWith(png), 'after.png', put))
+      .toMatchObject({ error: expect.stringContaining('store unavailable') })
   })
 })

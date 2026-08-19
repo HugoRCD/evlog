@@ -3,14 +3,12 @@ import { z } from 'zod'
 import { githubCredentials } from '../lib/github/credentials'
 import { mintInstallationToken, pushBrokerPolicy, validatePushBranch } from '../lib/github/push'
 import { isMaintainer, isScheduleAppAuth } from '../lib/trust'
-
-/** The template clone with dependencies installed; sessions branch, verify, and push from here. */
-const REPO_DIR = '/workspace/repo'
+import { REPO_DIR, runOutput } from '../lib/workspace'
 
 /**
  * Pushes go to this URL literally, never through the `origin` remote: remote
- * config inside the sandbox (`pushurl`, `pushDefault`, per-branch remotes) is
- * model-writable and must not be able to redirect the brokered credential.
+ * config inside the sandbox is model-writable and must not be able to
+ * redirect the brokered credential.
  */
 const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
 
@@ -40,10 +38,7 @@ export default defineDynamic({
                 command: `git -C ${REPO_DIR} push ${PUSH_URL} 'refs/heads/${input.branch}:refs/heads/${input.branch}'`,
               })
               if (push.exitCode !== 0) {
-                return {
-                  success: false as const,
-                  error: `git push exited ${push.exitCode}: ${String(push.stderr || push.stdout).trim()}`,
-                }
+                return { success: false as const, error: `git push exited ${push.exitCode}: ${runOutput(push)}` }
               }
               const head = await sandbox.run({ command: `git -C ${REPO_DIR} rev-parse '${input.branch}'` })
               return {
@@ -52,8 +47,7 @@ export default defineDynamic({
                 sha: String(head.stdout).trim(),
                 repository: 'HugoRCD/evlog',
               }
-            }
-            finally {
+            } finally {
               // Drop the brokered credential; the channel checkout re-brokers its own when it needs to fetch.
               await sandbox.setNetworkPolicy('allow-all')
             }

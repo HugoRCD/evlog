@@ -4,10 +4,8 @@ import { schema } from '../../db/schema'
 
 /**
  * Connection string for the current environment, or null when no database is
- * configured. Accepts the Vercel Marketplace Postgres names (Neon sets
- * `POSTGRES_URL`, some integrations `POSTGRESQL_URL`) alongside the plain
- * `DATABASE_URL`, mirroring how the telemetry app reads its store (its
- * `.env.example` documents the same three).
+ * configured. Accepts the Vercel Marketplace Postgres names alongside the
+ * plain `DATABASE_URL`, mirroring how the telemetry app reads its store.
  */
 export function databaseUrl(): string | null {
   for (const name of ['DATABASE_URL', 'POSTGRES_URL', 'POSTGRESQL_URL']) {
@@ -17,11 +15,7 @@ export function databaseUrl(): string | null {
   return null
 }
 
-/**
- * True when a connection string is present. Features that need persistence
- * gate on this first and degrade cleanly (return an unavailable error) when
- * it is false, so local runs without the DB keep working.
- */
+/** Features that need persistence gate on this and degrade cleanly, so local runs without the DB keep working. */
 export function isDbConfigured(): boolean {
   return databaseUrl() !== null
 }

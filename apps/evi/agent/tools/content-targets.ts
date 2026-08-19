@@ -1,10 +1,9 @@
 import { defineTool } from 'eve/tools'
 import { z } from 'zod'
+import { parseLintReport } from '../lib/content/scan'
 import type { LintPage } from '../lib/content/selection'
 import { cooldownCommand, selectTargets, touchedPaths } from '../lib/content/selection'
-
-/** The template clone; every session inherits it with dependencies installed. */
-const REPO_DIR = '/workspace/repo'
+import { REPO_DIR, runOutput } from '../lib/workspace'
 
 const DEFAULT_COOLDOWN_DAYS = 14
 
@@ -28,26 +27,20 @@ export default defineTool({
       command: `cd ${REPO_DIR} && node scripts/content-lint/index.mjs --json${surface}`,
     })
     if (scan.exitCode !== 0) {
-      return { success: false as const, error: `content-lint exited ${scan.exitCode}: ${String(scan.stderr || scan.stdout).trim()}` }
+      return { success: false as const, error: `content-lint exited ${scan.exitCode}: ${runOutput(scan)}` }
     }
-
-    let report: { baseline: unknown, pages: LintPage[] }
-    try {
-      report = JSON.parse(String(scan.stdout)) as { baseline: unknown, pages: LintPage[] }
-    } catch {
-      return { success: false as const, error: 'content-lint returned output that is not JSON.' }
-    }
-    if (!Array.isArray(report.pages)) {
-      return { success: false as const, error: 'content-lint returned no pages array.' }
+    const report = parseLintReport(scan.stdout)
+    if (report === null) {
+      return { success: false as const, error: 'content-lint returned no JSON pages array.' }
     }
 
     const log = await sandbox.run({ command: cooldownCommand(REPO_DIR, cooldownDays) })
     if (log.exitCode !== 0) {
-      return { success: false as const, error: `git log exited ${log.exitCode}: ${String(log.stderr || log.stdout).trim()}` }
+      return { success: false as const, error: `git log exited ${log.exitCode}: ${runOutput(log)}` }
     }
 
     const selection = selectTargets({
-      pages: report.pages,
+      pages: report.pages as LintPage[],
       recentlyTouched: touchedPaths(String(log.stdout)),
       limit: input.limit,
     })
@@ -57,7 +50,6 @@ export default defineTool({
       baseline: report.baseline,
       scanned: report.pages.length,
       cooldownDays,
-      // Reported so a pass can say what it saw instead of characterising it.
       // `eligible` is the only number that decides whether the rewrite half
       // has work: zero means empty, anything else means targets exist.
       candidates: selection.candidates,

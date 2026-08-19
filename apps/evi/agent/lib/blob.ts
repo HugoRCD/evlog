@@ -1,3 +1,5 @@
+import { put } from '@vercel/blob'
+
 const CONTENT_TYPES: Record<string, string> = {
   gif: 'image/gif',
   jpeg: 'image/jpeg',
@@ -18,10 +20,8 @@ export function imageContentType(path: string): string | null {
  * Content type from the file's magic bytes and structural end marker, or null
  * when the bytes are not a plausible complete image. Uploads are public the
  * instant they exist, so the extension alone must never decide that arbitrary
- * sandbox data is an image; requiring the format's trailer also rejects a
- * signature prefixed to arbitrary data and payload appended after a real
- * image. Deliberately not a full decode: captures come from Evi's own CLI in
- * her own sandbox, and a decoder dependency is not worth that residual risk.
+ * sandbox data is an image; requiring the trailer too rejects data smuggled
+ * around a real signature. Deliberately not a full decode.
  */
 export function sniffImageContentType(bytes: Uint8Array): string | null {
   if (
@@ -56,4 +56,60 @@ function riffSize(bytes: Uint8Array): number {
 export function screenshotKey(path: string): string {
   const basename = path.slice(path.lastIndexOf('/') + 1)
   return `evi/screenshots/${basename}`
+}
+
+interface SandboxFiles {
+  readBinaryFile(input: { path: string }): PromiseLike<Uint8Array | null>
+}
+
+type PutImage = (
+  key: string,
+  body: Buffer,
+  options: { access: 'public', addRandomSuffix: boolean, contentType: string },
+) => Promise<{ url: string }>
+
+/** Refusal when the store token is missing; callers may check it before doing expensive work. */
+export function missingBlobTokenError(): string | null {
+  if (process.env.BLOB_READ_WRITE_TOKEN) return null
+  return 'BLOB_READ_WRITE_TOKEN is not configured. Locally, run `vercel env pull` in apps/evi.'
+}
+
+/**
+ * Validate a sandbox image and upload it to the public Blob store: extension,
+ * size, and magic bytes all have to agree before anything publishes. Returns
+ * the public URL, or the reason the file was refused.
+ */
+export async function uploadSandboxImage(
+  sandbox: SandboxFiles,
+  path: string,
+  putImage: PutImage = put,
+): Promise<{ url: string, bytes: number } | { error: string }> {
+  const contentType = imageContentType(path)
+  if (!contentType) {
+    return { error: `"${path}" is not a supported image (png/jpg/webp/gif).` }
+  }
+  const missingToken = missingBlobTokenError()
+  if (missingToken) {
+    return { error: missingToken }
+  }
+  const bytes = await sandbox.readBinaryFile({ path })
+  if (bytes === null) {
+    return { error: `No file at "${path}".` }
+  }
+  if (bytes.byteLength > MAX_IMAGE_BYTES) {
+    return { error: `Image is ${bytes.byteLength} bytes; the limit is ${MAX_IMAGE_BYTES}.` }
+  }
+  if (sniffImageContentType(bytes) !== contentType) {
+    return { error: `The content of "${path}" does not match its extension; only real image files are uploaded.` }
+  }
+  try {
+    const blob = await putImage(screenshotKey(path), Buffer.from(bytes), {
+      access: 'public',
+      addRandomSuffix: true,
+      contentType,
+    })
+    return { url: blob.url, bytes: bytes.byteLength }
+  } catch (error) {
+    return { error: `The upload of "${path}" failed: ${error instanceof Error ? error.message : String(error)}` }
+  }
 }

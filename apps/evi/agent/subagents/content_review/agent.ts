@@ -6,7 +6,7 @@ export default defineAgent({
   /** This model honors only `high` and `xhigh`; judging a candidate against its twin is the hardest call in the pass. */
   reasoning: 'xhigh',
   modelOptions: {
-    providerOptions: { gateway: { ...gatewayRouting, tags: sessionTags('content') } },
+    providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags('content') } },
   },
   description:
     'Review one evlog content file (a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md) against the write-evlog-content skill and the content-lint candidates. '

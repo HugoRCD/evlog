@@ -1,12 +1,9 @@
 import { shellQuote } from './scan'
 
 /**
- * Which pages the next content pass works on.
- *
- * State is derived, never stored: the scanner recomputes every score and git
- * says what was touched. A ledger would drift the first time a pass died
- * mid-run or a branch was dropped, and it would claim progress the repository
- * cannot show.
+ * Which pages the next content pass works on. State is derived, never stored:
+ * the scanner recomputes every score and git says what was touched, so a
+ * dead pass or a dropped branch cannot leave a ledger claiming progress.
  */
 
 export interface LintFinding {
@@ -89,12 +86,9 @@ function modeOf(page: LintPage, criticals: number): Target['mode'] {
 }
 
 /**
- * Rank the scanned corpus and take the pages this pass should open.
- *
- * Ordering puts critical findings first and low scores second, so a broken
- * import outranks a page that merely reads uniform. Pages touched inside the
- * cooldown are held: rewriting the same page two days running is churn, and
- * the second rewrite has no new evidence behind it.
+ * Rank the scanned corpus and take the pages this pass should open: critical
+ * findings first, low scores second, and pages touched inside the cooldown
+ * held — rewriting the same page two days running is churn.
  */
 export function selectTargets(input: {
   pages: LintPage[]
@@ -141,12 +135,10 @@ export function selectTargets(input: {
 }
 
 /**
- * The log that says which files are resting.
- *
- * `--min-parents=1` is load-bearing. In a shallow clone the boundary commit has
- * no recorded parent, so `--name-only` diffs it against nothing and lists every
- * file in the repository. Without the flag the cooldown holds the whole corpus
- * and the rewrite half is empty on every run.
+ * The log that says which files are resting. `--min-parents=1` is
+ * load-bearing: in a shallow clone the boundary commit has no recorded
+ * parent, so without it `--name-only` lists every file in the repository and
+ * the cooldown holds the whole corpus.
  */
 export function cooldownCommand(repoDir: string, days: number): string {
   return `git -C ${shellQuote(repoDir)} log --since='${days} days ago' --min-parents=1 --name-only --pretty=format:`
