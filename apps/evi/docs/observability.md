@@ -16,7 +16,7 @@ these events rather than estimated.
 
 Tool executes enrich the same event with their outcome, in the pattern
 `tools/memory.ts` set: one namespace per domain, holding counts, reason codes,
-and identifiers Evi authored — never raw error strings, tool payloads, or
+and identifiers Evi authored. Never raw error strings, tool payloads, or
 untrusted URLs, so the metadata-only PostHog policy holds. The namespaces:
 `git.{branch,pushed,sha,reason}`,
 `capture.{published,viewport,target,beforeHost,afterHost,reason}`,
