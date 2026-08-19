@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import type { LabMenuAction } from './LabMenu.vue'
 import { DEFAULT_SETTINGS, FRAME_RATES, HINTS, OUTPUT_PRESETS, RANGES, SPEEDS, VIEWPORTS, frameCountFor, outputDuration } from '~/utils/lab/settings'
-import type { AsciiSet, LabSettings, RangedKey, StylizeMode } from '~/utils/lab/settings'
+import type { AsciiSet, LabSettings, RangedKey, ShotSettingKey, ShotSettings, StylizeMode } from '~/utils/lab/settings'
 import { ASCII_MIN_CELL } from '~/utils/lab/ascii'
 import type { LabMode } from '~/utils/lab/storage'
 import type { Layer } from '~/utils/lab/layers'
@@ -26,6 +26,9 @@ const props = defineProps<{
   layers: Layer[]
   selectedLayerId: string | null
   selectedLayer: Layer | null
+  /** Effective visual settings for the selected clip, or the timeline defaults. */
+  shotSettings: LabSettings
+  shotCustomized: boolean
   /** Length the selected clip's animation declares, when it declares one. */
   sequenceMs?: number
   canUndo: boolean
@@ -56,6 +59,8 @@ const emit = defineEmits<{
   resetEverything: []
   cancel: []
   updateLayer: [id: string, patch: Partial<Layer>]
+  updateShotSetting: [key: ShotSettingKey, value: ShotSettings[ShotSettingKey]]
+  resetShot: []
   removeLayer: []
   duplicateLayer: []
 }>()
@@ -63,6 +68,17 @@ const emit = defineEmits<{
 const settings = defineModel<LabSettings>('settings', { required: true })
 const picking = defineModel<boolean>('picking', { required: true })
 const camera = defineModel<LayerEffect[]>('camera', { required: true })
+
+const shot = new Proxy({} as LabSettings, {
+  get(_target, key) {
+    return typeof key === 'symbol' ? undefined : props.shotSettings[key as keyof LabSettings]
+  },
+  set(_target, key, value) {
+    if (typeof key === 'symbol') return false
+    emit('updateShotSetting', key as ShotSettingKey, value as ShotSettings[ShotSettingKey])
+    return true
+  },
+})
 
 /**
  * Bind a control to the shared range table, plus the value it resets to.
@@ -239,7 +255,7 @@ const segmentSeconds = computed(() => (settings.value.timelineLength / 1000).toF
  * a broken slider.
  */
 const hasDepth = computed(() =>
-  Math.abs(settings.value.pitch) > 0.5 || Math.abs(settings.value.yaw) > 0.5,
+  Math.abs(shot.pitch) > 0.5 || Math.abs(shot.yaw) > 0.5,
 )
 
 /**
@@ -247,11 +263,11 @@ const hasDepth = computed(() =>
  * it is zero. Said outright rather than by disabling them — a control that has
  * gone grey never explains what would bring it back.
  */
-const hasSpread = computed(() => settings.value.aberration > 0)
+const hasSpread = computed(() => shot.aberration > 0)
 
 /** Letters need more room than dots do — see `ASCII_MIN_CELL`. */
 const minCell = computed(() =>
-  settings.value.stylize === 'ascii' ? ASCII_MIN_CELL : RANGES.stylizeScale.min,
+  shot.stylize === 'ascii' ? ASCII_MIN_CELL : RANGES.stylizeScale.min,
 )
 
 /**
@@ -261,9 +277,9 @@ const minCell = computed(() =>
  * disagreeing; moving the value is the honest half of enforcing a minimum.
  */
 function setScreen(mode: StylizeMode) {
-  settings.value.stylize = mode
+  shot.stylize = mode
   if (mode === 'ascii') {
-    settings.value.stylizeScale = Math.max(ASCII_MIN_CELL, settings.value.stylizeScale)
+    shot.stylizeScale = Math.max(ASCII_MIN_CELL, shot.stylizeScale)
   }
 }
 
@@ -522,6 +538,30 @@ const CONTAINERS = [
         </div>
       </LabSection>
 
+      <div v-if="mode === 'video'" class="mx-3 mt-3 border border-primary-500/30 bg-primary-500/5 px-2.5 py-2 @min-[280px]:mx-4">
+        <div class="flex items-center justify-between gap-2">
+          <span class="truncate font-pixel text-[10px] uppercase tracking-[0.14em] text-primary">
+            {{ selectedLayer ? `Clip shot · ${selectedLayer.name}` : 'Timeline shot' }}
+          </span>
+          <button
+            v-if="selectedLayer && shotCustomized"
+            type="button"
+            class="shrink-0 font-mono text-[9px] text-dimmed hover:text-primary"
+            @click="emit('resetShot')"
+          >
+            use timeline
+          </button>
+        </div>
+        <p class="mt-1 font-mono text-[9px] leading-relaxed text-dimmed">
+          <template v-if="selectedLayer">
+            Changes below belong to this clip. Controls you have not changed still follow the timeline shot.
+          </template>
+          <template v-else>
+            The default look for the timeline. Clips with their own shot keep their overrides.
+          </template>
+        </p>
+      </div>
+
       <LabSection title="Camera">
         <!--
           Framing lives with the framing controls. This sat in the stage section
@@ -537,13 +577,13 @@ const CONTAINERS = [
           reset the framing
         </button>
 
-        <LabNumber v-model="settings.pitch" label="Pitch" v-bind="range('pitch')" />
-        <LabNumber v-model="settings.yaw" label="Yaw" v-bind="range('yaw')" />
-        <LabNumber v-model="settings.roll" label="Roll" v-bind="range('roll')" />
-        <LabNumber v-model="settings.zoom" label="Zoom" v-bind="range('zoom')" />
-        <LabNumber v-model="settings.fov" label="Field of view" v-bind="range('fov')" />
-        <LabNumber v-model="settings.panX" label="Pan X" v-bind="range('panX')" />
-        <LabNumber v-model="settings.panY" label="Pan Y" v-bind="range('panY')" />
+        <LabNumber v-model="shot.pitch" label="Pitch" v-bind="range('pitch')" />
+        <LabNumber v-model="shot.yaw" label="Yaw" v-bind="range('yaw')" />
+        <LabNumber v-model="shot.roll" label="Roll" v-bind="range('roll')" />
+        <LabNumber v-model="shot.zoom" label="Zoom" v-bind="range('zoom')" />
+        <LabNumber v-model="shot.fov" label="Field of view" v-bind="range('fov')" />
+        <LabNumber v-model="shot.panX" label="Pan X" v-bind="range('panX')" />
+        <LabNumber v-model="shot.panY" label="Pan Y" v-bind="range('panY')" />
 
         <!--
           Moves on the shot rather than on a layer: dolly travels, slide pans,
@@ -562,7 +602,7 @@ const CONTAINERS = [
       <LabSection title="Focus">
         <div class="flex items-center gap-1">
           <div class="min-w-0 flex-1">
-            <LabNumber v-model="settings.focus" label="Focal plane" v-bind="range('focus')" />
+            <LabNumber v-model="shot.focus" label="Focal plane" v-bind="range('focus')" />
           </div>
           <button
             type="button"
@@ -577,20 +617,20 @@ const CONTAINERS = [
             <UIcon name="i-lucide-crosshair" class="block size-3" />
           </button>
         </div>
-        <LabNumber v-model="settings.focusRange" label="Sharp band" v-bind="range('focusRange')" />
-        <LabNumber v-model="settings.aperture" label="Bokeh strength" v-bind="range('aperture')" />
-        <LabNumber v-model="settings.blurRadius" label="Max blur" v-bind="range('blurRadius')" />
+        <LabNumber v-model="shot.focusRange" label="Sharp band" v-bind="range('focusRange')" />
+        <LabNumber v-model="shot.aperture" label="Bokeh strength" v-bind="range('aperture')" />
+        <LabNumber v-model="shot.blurRadius" label="Max blur" v-bind="range('blurRadius')" />
 
         <!--
           The shape of the aperture, which is what separates a photographed
           highlight from a blur. Only offered once there is blur to shape: at
           aperture zero these two set the geometry of something with no radius.
         -->
-        <template v-if="settings.aperture > 0">
-          <LabNumber v-model="settings.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
-          <LabNumber v-model="settings.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
-          <LabNumber v-model="settings.bokehSwirl" label="Swirl" v-bind="range('bokehSwirl')" />
-          <LabNumber v-model="settings.bokehSqueeze" label="Anamorphic bokeh" v-bind="range('bokehSqueeze')" />
+        <template v-if="shot.aperture > 0">
+          <LabNumber v-model="shot.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
+          <LabNumber v-model="shot.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
+          <LabNumber v-model="shot.bokehSwirl" label="Swirl" v-bind="range('bokehSwirl')" />
+          <LabNumber v-model="shot.bokehSqueeze" label="Anamorphic bokeh" v-bind="range('bokehSqueeze')" />
         </template>
 
         <!--
@@ -598,10 +638,10 @@ const CONTAINERS = [
           it moves where the sharpness is rather than what the blur looks like.
           Its direction only appears once there is a lean to point.
         -->
-        <LabNumber v-model="settings.focusTilt" label="Plane tilt" v-bind="range('focusTilt')" />
+        <LabNumber v-model="shot.focusTilt" label="Plane tilt" v-bind="range('focusTilt')" />
         <LabNumber
-          v-if="Math.abs(settings.focusTilt) > 0.002"
-          v-model="settings.focusTiltAngle"
+          v-if="Math.abs(shot.focusTilt) > 0.002"
+          v-model="shot.focusTiltAngle"
           label="Tilt axis"
           v-bind="range('focusTiltAngle')"
         />
@@ -618,32 +658,32 @@ const CONTAINERS = [
         the four things under the glow are the four ways a lens spills it.
       -->
       <LabSection title="Light">
-        <LabNumber v-model="settings.emission" label="Source brightness" v-bind="range('emission')" />
-        <LabNumber v-model="settings.bloomIntensity" label="Glow" v-bind="range('bloomIntensity')" />
-        <LabNumber v-model="settings.bloomThreshold" label="Threshold" v-bind="range('bloomThreshold')" />
-        <LabNumber v-model="settings.bloomRadius" label="Spread" v-bind="range('bloomRadius')" />
+        <LabNumber v-model="shot.emission" label="Source brightness" v-bind="range('emission')" />
+        <LabNumber v-model="shot.bloomIntensity" label="Glow" v-bind="range('bloomIntensity')" />
+        <LabNumber v-model="shot.bloomThreshold" label="Threshold" v-bind="range('bloomThreshold')" />
+        <LabNumber v-model="shot.bloomRadius" label="Spread" v-bind="range('bloomRadius')" />
         <!--
           These three ride the same thresholded mip chain the glow does, so they
           belong with it: dragging any of them with the glow at zero would appear
           to do nothing, and there would be nothing on screen to say why.
         -->
-        <LabNumber v-model="settings.bleed" label="Halation" v-bind="range('bleed')" />
-        <LabNumber v-model="settings.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
-        <LabNumber v-model="settings.ghosts" label="Ghosts" v-bind="range('ghosts')" />
-        <LabNumber v-model="settings.diffusion" label="Diffusion" v-bind="range('diffusion')" />
-        <LabNumber v-model="settings.starIntensity" label="Star" v-bind="range('starIntensity')" />
+        <LabNumber v-model="shot.bleed" label="Halation" v-bind="range('bleed')" />
+        <LabNumber v-model="shot.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
+        <LabNumber v-model="shot.ghosts" label="Ghosts" v-bind="range('ghosts')" />
+        <LabNumber v-model="shot.diffusion" label="Diffusion" v-bind="range('diffusion')" />
+        <LabNumber v-model="shot.starIntensity" label="Star" v-bind="range('starIntensity')" />
 
         <!--
           The star's shape, only once there is one. Three numbers that decide
           nothing are three ways to doubt the panel describes the frame.
         -->
-        <template v-if="settings.starIntensity > 0">
-          <LabNumber v-model="settings.starPoints" label="Points" v-bind="range('starPoints')" />
-          <LabNumber v-model="settings.starLength" label="Reach" v-bind="range('starLength')" />
-          <LabNumber v-model="settings.starAngle" label="Star angle" v-bind="range('starAngle')" />
+        <template v-if="shot.starIntensity > 0">
+          <LabNumber v-model="shot.starPoints" label="Points" v-bind="range('starPoints')" />
+          <LabNumber v-model="shot.starLength" label="Reach" v-bind="range('starLength')" />
+          <LabNumber v-model="shot.starAngle" label="Star angle" v-bind="range('starAngle')" />
         </template>
 
-        <p v-if="settings.bloomIntensity <= 0" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
+        <p v-if="shot.bloomIntensity <= 0" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Everything below the glow is spilled light, so it needs some glow to
           spill. Raise it above zero.
         </p>
@@ -657,12 +697,12 @@ const CONTAINERS = [
         it read as a colour adjustment rather than as a lens.
       -->
       <LabSection title="Lens">
-        <LabNumber v-model="settings.distortion" label="Bulge" v-bind="range('distortion')" />
-        <LabNumber v-model="settings.aberration" label="Colour spread" v-bind="range('aberration')" />
-        <LabNumber v-model="settings.dispersion" label="Dispersion" v-bind="range('dispersion')" />
-        <LabNumber v-model="settings.lensNoise" label="Scatter" v-bind="range('lensNoise')" />
-        <LabNumber v-model="settings.radialBlur" label="Zoom blur" v-bind="range('radialBlur')" />
-        <LabNumber v-model="settings.spinBlur" label="Spin blur" v-bind="range('spinBlur')" />
+        <LabNumber v-model="shot.distortion" label="Bulge" v-bind="range('distortion')" />
+        <LabNumber v-model="shot.aberration" label="Colour spread" v-bind="range('aberration')" />
+        <LabNumber v-model="shot.dispersion" label="Dispersion" v-bind="range('dispersion')" />
+        <LabNumber v-model="shot.lensNoise" label="Scatter" v-bind="range('lensNoise')" />
+        <LabNumber v-model="shot.radialBlur" label="Zoom blur" v-bind="range('radialBlur')" />
+        <LabNumber v-model="shot.spinBlur" label="Spin blur" v-bind="range('spinBlur')" />
 
         <p v-if="!hasSpread" class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           Dispersion and scatter both act on the colour spread, so they do
@@ -671,13 +711,13 @@ const CONTAINERS = [
       </LabSection>
 
       <LabSection title="Grade">
-        <LabNumber v-model="settings.exposure" label="Exposure" v-bind="range('exposure')" />
-        <LabNumber v-model="settings.contrast" label="Contrast" v-bind="range('contrast')" />
-        <LabNumber v-model="settings.saturation" label="Saturation" v-bind="range('saturation')" />
-        <LabNumber v-model="settings.attenuation" label="Distance falloff" v-bind="range('attenuation')" />
-        <LabNumber v-model="settings.vignette" label="Vignette" v-bind="range('vignette')" />
-        <LabNumber v-model="settings.grain" label="Grain" v-bind="range('grain')" />
-        <LabToggle v-model="settings.tonemap" label="Filmic tonemap" />
+        <LabNumber v-model="shot.exposure" label="Exposure" v-bind="range('exposure')" />
+        <LabNumber v-model="shot.contrast" label="Contrast" v-bind="range('contrast')" />
+        <LabNumber v-model="shot.saturation" label="Saturation" v-bind="range('saturation')" />
+        <LabNumber v-model="shot.attenuation" label="Distance falloff" v-bind="range('attenuation')" />
+        <LabNumber v-model="shot.vignette" label="Vignette" v-bind="range('vignette')" />
+        <LabNumber v-model="shot.grain" label="Grain" v-bind="range('grain')" />
+        <LabToggle v-model="shot.tonemap" label="Filmic tonemap" />
 
         <!--
           No alpha here, and on the two duotone stops below. All three are read
@@ -685,20 +725,20 @@ const CONTAINERS = [
           frame is not a thing that can be see-through anyway.
         -->
         <div class="mt-2">
-          <LabColour v-model="settings.background" label="Background" :alpha="false" />
+          <LabColour v-model="shot.background" label="Background" :alpha="false" />
         </div>
 
         <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
           Duotone
         </div>
-        <LabNumber v-model="settings.duotone" label="Amount" v-bind="range('duotone')" />
+        <LabNumber v-model="shot.duotone" label="Amount" v-bind="range('duotone')" />
         <!--
           Only offered once there is something to colour. Two swatches above a
           control set to zero are two decisions nobody has been asked to make.
         -->
-        <div v-if="settings.duotone > 0" class="mt-2 flex flex-col gap-2">
-          <LabColour v-model="settings.duotoneShadow" label="Shadow" :alpha="false" />
-          <LabColour v-model="settings.duotoneHighlight" label="Highlight" :alpha="false" />
+        <div v-if="shot.duotone > 0" class="mt-2 flex flex-col gap-2">
+          <LabColour v-model="shot.duotoneShadow" label="Shadow" :alpha="false" />
+          <LabColour v-model="shot.duotoneHighlight" label="Highlight" :alpha="false" />
         </div>
 
       </LabSection>
@@ -715,46 +755,46 @@ const CONTAINERS = [
           label="Screen"
           hint="Redraws the finished frame on a grid. One at a time — two screens fighting over the same cell is mush."
           :options="STYLIZE_OPTIONS"
-          :model-value="settings.stylize"
+          :model-value="shot.stylize"
           cards
           @update:model-value="setScreen(String($event) as StylizeMode)"
         />
 
-        <template v-if="settings.stylize !== 'none'">
+        <template v-if="shot.stylize !== 'none'">
           <LabNumber
-            v-model="settings.stylizeScale"
+            v-model="shot.stylizeScale"
             label="Cell size"
             v-bind="{ ...range('stylizeScale'), min: minCell }"
           />
           <LabNumber
-            v-if="settings.stylize === 'dither' || settings.stylize === 'posterize'"
-            v-model="settings.stylizeLevels"
+            v-if="shot.stylize === 'dither' || shot.stylize === 'posterize'"
+            v-model="shot.stylizeLevels"
             label="Levels"
             v-bind="range('stylizeLevels')"
           />
           <LabNumber
-            v-if="settings.stylize === 'halftone'"
-            v-model="settings.stylizeAngle"
+            v-if="shot.stylize === 'halftone'"
+            v-model="shot.stylizeAngle"
             label="Screen angle"
             v-bind="range('stylizeAngle')"
           />
-          <LabNumber v-model="settings.stylizeColour" label="Keep colour" v-bind="range('stylizeColour')" />
-          <LabNumber v-model="settings.stylizeMask" label="Confine to" v-bind="range('stylizeMask')" />
+          <LabNumber v-model="shot.stylizeColour" label="Keep colour" v-bind="range('stylizeColour')" />
+          <LabNumber v-model="shot.stylizeMask" label="Confine to" v-bind="range('stylizeMask')" />
 
           <p class="mt-1 font-mono text-[10px] leading-relaxed text-dimmed/70">
-            {{ settings.stylizeMask > 0.02
+            {{ shot.stylizeMask > 0.02
               ? 'Only the highlights are screened; the rest stays as photographed.'
-              : settings.stylizeMask < -0.02
+              : shot.stylizeMask < -0.02
                 ? 'Only the shadows are screened.'
                 : 'The whole frame is screened.' }}
           </p>
 
           <LabChoice
-            v-if="settings.stylize === 'ascii'"
+            v-if="shot.stylize === 'ascii'"
             label="Glyphs"
             :options="ASCII_OPTIONS"
-            :model-value="settings.asciiSet"
-            @update:model-value="settings.asciiSet = String($event) as AsciiSet"
+            :model-value="shot.asciiSet"
+            @update:model-value="shot.asciiSet = String($event) as AsciiSet"
           />
         </template>
       </LabSection>

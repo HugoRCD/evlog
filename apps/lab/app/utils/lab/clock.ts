@@ -177,11 +177,15 @@ export function createClock(): Clock {
       }
       try {
         const start = (animation as Animation & { __labStart?: number }).__labStart
+        const target = (animation.effect as KeyframeEffect | null)?.target
+        const speed = target instanceof Element
+          ? Number(target.closest<HTMLElement>('[data-stage-speed]')?.dataset.stageSpeed ?? 1)
+          : 1
         if (start === undefined) {
           Object.assign(animation, { __labStart: virtualTime })
           animation.currentTime = 0
         } else {
-          animation.currentTime = virtualTime - start
+          animation.currentTime = (virtualTime - start) * speed
         }
       } catch {
         // Same — a detached animation throws on assignment.
