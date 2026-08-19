@@ -292,6 +292,66 @@ export const DEFAULT_SETTINGS: LabSettings = {
   asciiSet: 'ascii',
 }
 
+/** Visual settings that a timeline clip can override for its own span. */
+export const SHOT_SETTING_KEYS = [
+  'pitch',
+  'yaw',
+  'roll',
+  'zoom',
+  'fov',
+  'panX',
+  'panY',
+  'focus',
+  'focusRange',
+  'aperture',
+  'blurRadius',
+  'bokehBlades',
+  'bokehCatEye',
+  'bokehSwirl',
+  'bokehSqueeze',
+  'focusTilt',
+  'focusTiltAngle',
+  'emission',
+  'bloomIntensity',
+  'bloomThreshold',
+  'bloomRadius',
+  'bleed',
+  'streaks',
+  'ghosts',
+  'diffusion',
+  'starIntensity',
+  'starPoints',
+  'starAngle',
+  'starLength',
+  'distortion',
+  'aberration',
+  'dispersion',
+  'lensNoise',
+  'radialBlur',
+  'spinBlur',
+  'exposure',
+  'contrast',
+  'saturation',
+  'attenuation',
+  'vignette',
+  'grain',
+  'tonemap',
+  'background',
+  'duotone',
+  'duotoneShadow',
+  'duotoneHighlight',
+  'stylize',
+  'stylizeScale',
+  'stylizeLevels',
+  'stylizeColour',
+  'stylizeAngle',
+  'stylizeMask',
+  'asciiSet',
+] as const satisfies readonly (keyof LabSettings)[]
+
+export type ShotSettingKey = typeof SHOT_SETTING_KEYS[number]
+export type ShotSettings = Pick<LabSettings, ShotSettingKey>
+
 /** Bounds and step for every numeric control, driving both the UI and URL clamping. */
 /**
  * One line per control that cannot be understood from its name.
@@ -547,6 +607,31 @@ export function settingsFromQuery(query: Record<string, unknown>): LabSettings {
       if (Number.isFinite(parsed)) Object.assign(settings, { [key]: clampRanged(key, parsed) })
     }
   }
+  return settings
+}
+
+/** Coerce the sparse visual settings stored on a clip. */
+export function sanitizeShotSettings(value: unknown): Partial<ShotSettings> {
+  if (!value || typeof value !== 'object') return {}
+  const record = value as Record<string, unknown>
+  const settings: Partial<ShotSettings> = {}
+
+  for (const key of SHOT_SETTING_KEYS) {
+    const raw = record[key]
+    if (raw === undefined || raw === null || Array.isArray(raw)) continue
+
+    if ((STRING_KEYS as readonly string[]).includes(key)) {
+      if (typeof raw !== 'string') continue
+      const allowed = ENUM_KEYS[key]
+      if (allowed && !allowed.includes(raw)) continue
+      Object.assign(settings, { [key]: raw })
+    } else if ((BOOLEAN_KEYS as readonly string[]).includes(key)) {
+      if (typeof raw === 'boolean') Object.assign(settings, { [key]: raw })
+    } else if (typeof raw === 'number' && Number.isFinite(raw)) {
+      Object.assign(settings, { [key]: clampRanged(key, raw) })
+    }
+  }
+
   return settings
 }
 
