@@ -28,7 +28,10 @@ export default defineSandbox({
   async bootstrap({ use }) {
     const sandbox = await use()
     await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
-    await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install && pnpm run dev:prepare' })
+    // Frozen: a cold install in a fresh clone otherwise re-resolves the whole
+    // graph, and any <48h transitive release then fails the template build on
+    // the repo's own minimumReleaseAge policy. The lockfile is what CI tested.
+    await sandbox.run({ command: 'cd repo && corepack enable && corepack prepare --activate && pnpm install --frozen-lockfile && pnpm run dev:prepare' })
     // Prime the turbo cache on deployed builds only: locally this is minutes
     // of CPU on every template rebuild.
     if (process.env.VERCEL) {
