@@ -1,29 +1,18 @@
 import { defaultBackend, defineSandbox } from 'eve/sandbox'
 
 /**
- * The workspace the content subagents share.
- *
- * A declared subagent inherits nothing from the root, sandbox included, and
- * eve prewarms one template per subagent at build time. Re-exporting the root
- * definition therefore built the root's template three times: clone, install,
- * the full lint, typecheck, and test run, Chromium, and the before-after CLI,
- * once for the root and once per content subagent. That tripled the deploy and
- * was the slowest way to find out that any of them can fail.
- *
- * These two read pages and write pages. They run no checks, drive no browser,
- * and capture nothing, so the template stops at a checkout. There is not even
- * an install: `scripts/content-lint` imports node builtins and its own files,
- * nothing else, and the pass runs its verification in the root session after
- * the rewrite comes back. A checkout with no `node_modules` is also a checkout
- * with nothing to go stale when `onSession` moves it to the current `main`.
+ * The workspace the content subagents share. eve prewarms one template per
+ * subagent at build time, so re-exporting the root sandbox would build its
+ * full template (install, checks, Chromium) once per subagent. These two only
+ * read and write pages, and `scripts/content-lint` imports nothing beyond
+ * node builtins, so the template stops at a bare checkout — no install.
  */
 export default defineSandbox({
   backend: defaultBackend({
     vercel: {
       resources: { vcpus: 2 },
-      // One day is the platform floor: Vercel rejects anything between 0 and
-      // 86400000 ms. It also matches the pass's cadence, so a snapshot lives
-      // exactly as long as the gap between two runs.
+      // One day is the platform floor (Vercel rejects anything shorter) and
+      // matches the pass's cadence.
       snapshotExpiration: 24 * 60 * 60 * 1000,
     },
   }),

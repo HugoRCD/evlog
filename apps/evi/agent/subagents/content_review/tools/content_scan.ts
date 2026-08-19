@@ -1,15 +1,15 @@
 import { defineTool } from 'eve/tools'
 import { z } from 'zod'
-import { PASSAGE_FILE, repoPathError, scanCommand } from '../../../lib/content/scan'
+import { parseLintReport, PASSAGE_FILE, repoPathError, scanCommand } from '../../../lib/content/scan'
+import { runOutput } from '../../../lib/workspace'
 
 /** A passage larger than this is a file, and a file has a path. */
 const MAX_PASSAGE_CHARS = 200_000
 
 /**
- * Read-only, and the reviewer's own: the pass hands it the candidates for the
- * file it was given, but a reviewer that can only see a fixed list reviews only
- * that list. This is what lets it scan a passage it is unsure about, a page the
- * pass did not pick, or the source a claim points at.
+ * Read-only, and the reviewer's own: a reviewer that can only see a fixed
+ * list reviews only that list. This is what lets it scan a passage it is
+ * unsure about, a page the pass did not pick, or the source a claim points at.
  */
 export default defineTool({
   description: 'Scan prose for the deterministic half of a content review. Pass `path` (a file in the checkout), `text` (a passage), or `url` (a page outside the repository, fetched and reduced to its main content). '
@@ -43,15 +43,10 @@ export default defineTool({
     const result = await sandbox.run({ command })
 
     if (result.exitCode !== 0) {
-      return { success: false as const, error: `content-lint exited ${result.exitCode}: ${String(result.stderr || result.stdout).trim()}` }
+      return { success: false as const, error: `content-lint exited ${result.exitCode}: ${runOutput(result)}` }
     }
 
-    const report = parseReport(result.stdout)
-    if (report === null) {
-      return { success: false as const, error: 'content-lint returned output that is not JSON.' }
-    }
-
-    const page = report.pages.at(0)
+    const page = parseLintReport(result.stdout)?.pages.at(0)
     if (page === undefined) {
       return { success: false as const, error: 'content-lint returned no page.' }
     }
@@ -59,16 +54,3 @@ export default defineTool({
     return { success: true as const, page }
   },
 })
-
-/**
- * @param {unknown} stdout
- * @returns {{ pages: unknown[] } | null}
- */
-function parseReport(stdout: unknown): { pages: unknown[] } | null {
-  try {
-    const parsed = JSON.parse(String(stdout)) as { pages?: unknown }
-    return Array.isArray(parsed.pages) ? { pages: parsed.pages } : null
-  } catch {
-    return null
-  }
-}

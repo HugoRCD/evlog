@@ -2,7 +2,7 @@ import { defaultGitHubAuth, githubChannel } from 'eve/channels/github'
 import type { GitHubChannelState } from 'eve/channels/github'
 import { githubCredentials } from '../lib/github/credentials'
 import { escalateFailedTriage, isAutonomousTriageState } from '../lib/github/escalate'
-import { failureComment } from '../lib/github/failure'
+import { failureComment } from '../lib/failure'
 import { AUTONOMOUS_GITHUB_PRINCIPAL, isAutonomous, MAINTAINER_GITHUB_ID } from '../lib/trust'
 
 const botName = 'evlogai'

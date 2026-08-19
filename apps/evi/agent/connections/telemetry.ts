@@ -1,7 +1,6 @@
 import { getVercelOidcToken } from '@vercel/oidc'
 import { defineMcpClientConnection } from 'eve/connections'
-import type { SessionContext } from 'eve/context'
-import { canAccessAdminTools } from '../lib/trust'
+import { adminGatedAuth } from '../lib/connect'
 
 /** Production evlog telemetry, mirrored from the dashboard's own MCP endpoint. */
 const TELEMETRY_MCP_URL = 'https://telemetry.evlog.cloud/mcp'
@@ -13,35 +12,6 @@ const ALLOWED_TOOLS: string[] = [
   'telemetry-run',
 ]
 
-/**
- * Read-only production telemetry, gated to maintainer and app-principal
- * sessions (the same set as the Vercel connection). A blocked caller gets a
- * terminal error instead of a silent authorization challenge.
- *
- * The bearer token is the deployment's own Vercel OIDC token (the same one
- * the turbo remote-cache tool sends), which the telemetry app verifies
- * against Vercel's JWKS. Locally there is no OIDC token, and the dashboard's
- * soft auth accepts a blank token when `ANALYTICS_PASSWORD` is unset, so a
- * password-less local dashboard still works.
- */
-function telemetryAuth() {
-  return (ctx: SessionContext) => {
-    if (!canAccessAdminTools(ctx.session.auth.current)) {
-      return {
-        principalType: 'app' as const,
-        async getToken(): Promise<never> {
-          throw new Error('This tool is not available in the current session.')
-        },
-      }
-    }
-    return {
-      // Fetched per call: the env var is only minted at boot and expires
-      // within the hour on a warm instance, which the telemetry app rejects.
-      getToken: async () => ({ token: await getVercelOidcToken() }),
-    }
-  }
-}
-
 const TELEMETRY_INSTRUCTIONS = [
   '**Telemetry MCP connection (telemetry__*, admin only): read-only production evlog CLI telemetry, use judiciously.**',
   '',
@@ -52,9 +22,16 @@ const TELEMETRY_INSTRUCTIONS = [
   '- Data is real production usage; the dashboard serves generated sample data only when no real events exist yet. Prefer `range: \'7d\'` for stable signals; the stats tool compares against the preceding window itself.',
 ].join(String.fromCharCode(10))
 
+/**
+ * The bearer is the deployment's own Vercel OIDC token, verified by the
+ * telemetry app against Vercel's JWKS (docs/notes.md). Fetched per call: the
+ * env token is minted at boot and expires within the hour on a warm instance.
+ */
 export default defineMcpClientConnection({
   url: TELEMETRY_MCP_URL,
   description: TELEMETRY_INSTRUCTIONS,
   tools: { allow: ALLOWED_TOOLS },
-  auth: telemetryAuth(),
+  auth: adminGatedAuth(() => ({
+    getToken: async () => ({ token: await getVercelOidcToken() }),
+  })),
 })

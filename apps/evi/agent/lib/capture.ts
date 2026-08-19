@@ -48,18 +48,12 @@ export interface CaptureTarget {
 }
 
 /**
- * JavaScript that locates the element to frame and marks it.
- *
- * The selector is tried first. When it matches nothing, or when only `text`
- * was given, the visible copy is searched instead and the match is widened to
- * its nearest sectioning ancestor. A change is usually authored as prose, so
- * the text the author just wrote is a locator they already hold, and it works
- * on a page whose components carry no hook.
- *
- * The element is stamped with {@link CAPTURE_MARK} rather than returned, so
- * the scroll that follows can use agent-browser's own `scrollintoview`, which
- * handles scroll containers and sticky headers that a hand-rolled
- * `window.scrollTo` gets wrong.
+ * JavaScript that locates the element to frame and marks it. The selector is
+ * tried first; otherwise the visible copy is searched and widened to its
+ * nearest sectioning ancestor. The element is stamped with
+ * {@link CAPTURE_MARK} rather than returned, so the scroll that follows can
+ * use agent-browser's own `scrollintoview` (which handles scroll containers
+ * and sticky headers a hand-rolled `window.scrollTo` gets wrong).
  */
 export function resolveTargetExpression(target: CaptureTarget): string {
   const selector = JSON.stringify(target.selector ?? '')

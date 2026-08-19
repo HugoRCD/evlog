@@ -1,17 +1,12 @@
-/**
- * Building the content-lint invocation for a single ad-hoc scan.
- *
- * The scanner is the deterministic half of a review and it lives in the
- * repository, not here: one implementation, one set of thresholds, whether a
- * person runs it or the reviewer does. This only decides the command.
- *
- * Prose never reaches the shell. A passage is written to a file and redirected
- * in, so a draft containing quotes, backticks, or a heredoc delimiter is scanned
- * rather than executed.
- */
+import { REPO_DIR } from '../workspace'
 
-/** The template clone; every session inherits it with dependencies installed. */
-const REPO_DIR = '/workspace/repo'
+/**
+ * The content-lint invocation for a single ad-hoc scan. The scanner itself
+ * lives in the repository: one implementation, one set of thresholds, whether
+ * a person runs it or the reviewer does. Prose never reaches the shell: a
+ * passage is staged in a file and redirected in, so a draft containing quotes
+ * or a heredoc delimiter is scanned rather than executed.
+ */
 
 /** Where a passage is staged before it is redirected into the scanner. */
 export const PASSAGE_FILE = '/tmp/content-scan.md'
@@ -67,5 +62,15 @@ export function scanCommand(input: ScanInput): { command: string, passage?: stri
   return {
     command: `${scanner} --stdin ${as} --json < ${PASSAGE_FILE}`,
     passage: input.text,
+  }
+}
+
+/** The scanner's `--json` report, or null when stdout is not its JSON. */
+export function parseLintReport(stdout: unknown): { baseline: unknown, pages: unknown[] } | null {
+  try {
+    const parsed = JSON.parse(String(stdout)) as { baseline?: unknown, pages?: unknown }
+    return Array.isArray(parsed.pages) ? { baseline: parsed.baseline, pages: parsed.pages } : null
+  } catch {
+    return null
   }
 }

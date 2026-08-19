@@ -1,14 +1,7 @@
 import { connectPhotonCredentials } from '@vercel/connect/eve'
 import { photonIMessageChannel } from 'eve/channels/photon'
+import { failureLine, flattenInline } from '../lib/failure'
 import { MAINTAINER_PHONE } from '../lib/trust'
-
-const MAX_VALUE_LENGTH = 160
-
-function formatValue(value: unknown) {
-  const text = typeof value === 'string' ? value : JSON.stringify(value)
-  const flat = text.replace(/\s+/g, ' ').trim()
-  return flat.length > MAX_VALUE_LENGTH ? `${flat.slice(0, MAX_VALUE_LENGTH)}…` : flat
-}
 
 export default photonIMessageChannel({
   credentials: connectPhotonCredentials('photon/evi'),
@@ -36,7 +29,7 @@ export default photonIMessageChannel({
           if (request.kind === 'tool-approval') {
             for (const [key, value] of Object.entries(request.action.input)) {
               if (value === null || value === '' || (Array.isArray(value) && value.length === 0)) continue
-              lines.push(`${key}: ${formatValue(value)}`)
+              lines.push(`${key}: ${flattenInline(value)}`)
             }
           }
 
@@ -55,17 +48,11 @@ export default photonIMessageChannel({
     // A terminal failure is always reported in the thread; a failed turn never ends silent.
     async 'turn.failed'(event, channel) {
       if (!channel.thread) return
-      await channel.thread.post(failureText('That turn failed', 'Send the message again to retry.', event))
+      await channel.thread.post(failureLine('That turn failed', 'Send the message again to retry.', event))
     },
     async 'session.failed'(event, channel) {
       if (!channel.thread) return
-      await channel.thread.post(failureText('This session could not recover', 'Send a new message to start over.', event))
+      await channel.thread.post(failureLine('This session could not recover', 'Send a new message to start over.', event))
     },
   },
 })
-
-function failureText(lead: string, guidance: string, event: { code?: string, message?: string }) {
-  const hint = event.message ? ` (${formatValue(event.message)})` : ''
-  const code = event.code ? ` [${event.code}]` : ''
-  return `${lead}${hint}${code}. ${guidance}`
-}

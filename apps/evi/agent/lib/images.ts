@@ -41,9 +41,8 @@ export interface FetchedImage {
 
 /**
  * Downloads an image and validates the bytes are a complete raster image
- * (png/jpg/webp/gif, same sniff as the blob uploads); the server's
- * content-type header is never trusted. Failures return a message naming
- * what went wrong, so the model can report it instead of guessing.
+ * (same sniff as the blob uploads); the server's content-type header is never
+ * trusted. Failures return a message the model can report instead of guessing.
  */
 export async function fetchImage(
   url: URL,

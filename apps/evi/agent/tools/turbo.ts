@@ -3,6 +3,7 @@ import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { canAccessAdminTools } from '../lib/trust'
 import { exchangeTurboToken, turboConfigCommand } from '../lib/turbo'
+import { runOutput } from '../lib/workspace'
 
 // The token only touches the remote cache, but never unattended: autonomous
 // turns don't see this tool. Keep executes inline in the resolver (docs/notes.md).
@@ -32,16 +33,16 @@ export default defineDynamic({
               return { success: false as const, error: `No Vercel OIDC token available: ${error instanceof Error ? error.message : String(error)}` }
             }
             let token: string
-        try {
-          token = await exchangeTurboToken(oidc, teamSlug)
-        }
-        catch {
-          return { success: false as const, error: 'Turborepo token exchange failed; remote caching is unavailable for this run.' }
-        }
+            try {
+              token = await exchangeTurboToken(oidc, teamSlug)
+            }
+            catch {
+              return { success: false as const, error: 'Turborepo token exchange failed; remote caching is unavailable for this run.' }
+            }
             const sandbox = await toolCtx.getSandbox()
             const write = await sandbox.run({ command: turboConfigCommand(token, teamId, teamSlug) })
             if (write.exitCode !== 0) {
-              return { success: false as const, error: `Writing the turbo config failed: ${String(write.stderr || write.stdout).trim()}` }
+              return { success: false as const, error: `Writing the turbo config failed: ${runOutput(write)}` }
             }
             return {
               success: true as const,

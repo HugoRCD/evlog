@@ -1,9 +1,7 @@
 import { runAgentBrowser, type EveToolContext } from '@agent-browser/eve/sandbox'
-import { put } from '@vercel/blob'
 import { defineDynamic, defineTool } from 'eve/tools'
-import type { SandboxSession } from 'eve/sandbox'
 import { z } from 'zod'
-import { imageContentType, MAX_IMAGE_BYTES, screenshotKey, sniffImageContentType } from '../lib/blob'
+import { missingBlobTokenError, uploadSandboxImage } from '../lib/blob'
 import { CAPTURE_MARK, CAPTURE_SETTLE_MS, CAPTURE_VIEWPORTS, captureMarkdown, describeTarget, readTargetProbe, resolveTargetExpression, sensitiveCaptureReason, unresolvedTargetMessage, validateCaptureUrl, type CaptureTarget, type CaptureViewport } from '../lib/capture'
 import { canAccessAdminTools } from '../lib/trust'
 
@@ -37,22 +35,6 @@ async function captureFrame(
   return { path, how: probe.how }
 }
 
-async function hostFrame(sandbox: SandboxSession, path: string): Promise<string> {
-  const bytes = await sandbox.readBinaryFile({ path })
-  if (bytes === null) throw new Error(`The capture at "${path}" was not written.`)
-  if (bytes.byteLength > MAX_IMAGE_BYTES) throw new Error(`Capture is ${bytes.byteLength} bytes; the limit is ${MAX_IMAGE_BYTES}.`)
-  const contentType = sniffImageContentType(bytes)
-  if (contentType === null || contentType !== imageContentType(path)) {
-    throw new Error(`The capture at "${path}" is not a valid image.`)
-  }
-  const blob = await put(screenshotKey(path), Buffer.from(bytes), {
-    access: 'public',
-    addRandomSuffix: true,
-    contentType,
-  })
-  return blob.url
-}
-
 // Frames publish to public URLs the moment the tool runs: autonomous turns
 // never see it. Keep executes inline in the resolver (docs/notes.md).
 export default defineDynamic({
@@ -70,9 +52,9 @@ export default defineDynamic({
             viewport: z.enum(['desktop', 'mobile', 'tablet']).optional().describe('Defaults to desktop (1280×800)'),
             caption: z.string().trim().min(1).max(200).describe('One line naming the surface and viewport, e.g. "Landing hero, desktop viewport."'),
           }),
-          // Skill-level "review sensitive surfaces first" is not an enforceable
-          // control; a capture of a surface that can show real user data parks on
-          // an approval card before anything publishes.
+          // A capture of a surface that can show real user data parks on an
+          // approval card before anything publishes; the skill's "review
+          // sensitive surfaces first" is not an enforceable control.
           approval(approvalCtx) {
             for (const raw of [approvalCtx.toolInput?.beforeUrl, approvalCtx.toolInput?.afterUrl]) {
               if (typeof raw !== 'string') continue
@@ -94,9 +76,8 @@ export default defineDynamic({
               const refusal = validateCaptureUrl(url)
               if (refusal) return { success: false as const, error: refusal }
             }
-            if (!process.env.BLOB_READ_WRITE_TOKEN) {
-              return { success: false as const, error: 'BLOB_READ_WRITE_TOKEN is not configured. Locally, run `vercel env pull` in apps/evi.' }
-            }
+            const missingToken = missingBlobTokenError()
+            if (missingToken) return { success: false as const, error: missingToken }
             const viewport = input.viewport ?? 'desktop'
             const target: CaptureTarget | null = input.selector || input.text
               ? { selector: input.selector, text: input.text }
@@ -105,9 +86,10 @@ export default defineDynamic({
             await sandbox.run({ command: `mkdir -p ${SCREENSHOT_DIR}` })
             const before = await captureFrame(toolCtx, { side: 'before', url: input.beforeUrl, target, viewport })
             const after = await captureFrame(toolCtx, { side: 'after', url: input.afterUrl, target, viewport })
-            const beforeImageUrl = await hostFrame(sandbox, before.path)
-            const afterImageUrl = await hostFrame(sandbox, after.path)
-            const capturedAt = new Date().toISOString()
+            const beforeUpload = await uploadSandboxImage(sandbox, before.path)
+            if ('error' in beforeUpload) return { success: false as const, error: beforeUpload.error }
+            const afterUpload = await uploadSandboxImage(sandbox, after.path)
+            if ('error' in afterUpload) return { success: false as const, error: afterUpload.error }
             // Only the composed block is returned: handing back the bare image URLs
             // invites a hand-assembled table that drops the attestation receipt.
             return {
@@ -115,12 +97,12 @@ export default defineDynamic({
               markdown: captureMarkdown({
                 beforeUrl: input.beforeUrl,
                 afterUrl: input.afterUrl,
-                beforeImageUrl,
-                afterImageUrl,
+                beforeImageUrl: beforeUpload.url,
+                afterImageUrl: afterUpload.url,
                 caption: input.caption,
                 frame: target === null ? 'full viewport' : describeTarget(target, after.how),
                 viewport,
-                capturedAt,
+                capturedAt: new Date().toISOString(),
               }),
             }
           },

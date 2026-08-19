@@ -6,10 +6,8 @@ import { canAccessAdminTools } from '../lib/trust'
 
 // Available in every session: screenshots in community bug reports are the
 // main reason this tool exists. Only the Linear host needs a credential, and
-// only admin sessions get it. Keep executes inline in the resolver, in a
-// block-bodied handler: eve's bundler transform only registers step functions
-// it finds in a resolver body, and an implicit arrow return defeats it
-// (docs/notes.md).
+// only admin sessions get it. Keep executes inline in a block-bodied
+// resolver (docs/notes.md).
 export default defineDynamic({
   events: {
     'turn.started': () => {

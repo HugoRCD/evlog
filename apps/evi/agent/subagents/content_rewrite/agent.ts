@@ -6,7 +6,7 @@ export default defineAgent({
   /** This model honors only `high` and `xhigh`. */
   reasoning: 'high',
   modelOptions: {
-    providerOptions: { gateway: { ...gatewayRouting, tags: sessionTags('content') } },
+    providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags('content') } },
   },
   description:
     'Apply a content review to one evlog page. Takes the review findings and edits only what they name, in the evlog voice, preserving MDC structure, frontmatter, and every link target. '

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { PASSAGE_FILE, scanCommand, shellQuote } from './scan'
+import { PASSAGE_FILE, parseLintReport, scanCommand, shellQuote } from './scan'
 
 describe('shellQuote', () => {
   it('survives the characters that end an argument', () => {
@@ -30,5 +30,14 @@ describe('scanCommand', () => {
     expect(passage).toBe('It\'s `powerful` $(and) \'quoted\'.')
     expect(command).toContain(`--stdin --as 'docs' --json < ${PASSAGE_FILE}`)
     expect(command).not.toContain('powerful')
+  })
+})
+
+describe('parseLintReport', () => {
+  it('accepts the scanner JSON and rejects anything else', () => {
+    expect(parseLintReport('{"baseline": {"p50": 1}, "pages": [{"path": "a.md"}]}'))
+      .toEqual({ baseline: { p50: 1 }, pages: [{ path: 'a.md' }] })
+    expect(parseLintReport('{"pages": "not-a-list"}')).toBeNull()
+    expect(parseLintReport('warming up...')).toBeNull()
   })
 })

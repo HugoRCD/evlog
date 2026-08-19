@@ -3,11 +3,11 @@ import type { SessionContext } from 'eve/context'
 import { canAccessAdminTools } from './trust'
 
 /**
- * App-scoped Connect auth for admin-gated MCP connections: maintainer and
- * schedule sessions get the connector's token; anyone else gets a terminal
- * error instead of a silent authorization challenge.
+ * Admin gate for a connection's auth: maintainer and schedule sessions get
+ * the granted credential; anyone else gets a terminal error instead of a
+ * silent authorization challenge.
  */
-export function adminOnlyAppConnection(connector: string) {
+export function adminGatedAuth<T>(grant: (ctx: SessionContext) => T) {
   return (ctx: SessionContext) => {
     if (!canAccessAdminTools(ctx.session.auth.current)) {
       return {
@@ -17,6 +17,11 @@ export function adminOnlyAppConnection(connector: string) {
         },
       }
     }
-    return connect({ connector, principalType: 'app', autoProvision: false })
+    return grant(ctx)
   }
+}
+
+/** App-scoped Connect auth for admin-gated MCP connections. */
+export function adminOnlyAppConnection(connector: string) {
+  return adminGatedAuth(() => connect({ connector, principalType: 'app', autoProvision: false }))
 }
