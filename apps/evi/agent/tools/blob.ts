@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { uploadSandboxImage } from '../lib/blob'
@@ -19,8 +20,13 @@ export default defineDynamic({
             if (!canAccessAdminTools(toolCtx.session.auth.current)) {
               return { success: false as const, error: 'Image upload is not available in this session.' }
             }
+            const log = useLogger(toolCtx)
             const uploaded = await uploadSandboxImage(await toolCtx.getSandbox(), input.path)
-            if ('error' in uploaded) return { success: false as const, error: uploaded.error }
+            if ('error' in uploaded) {
+              log.set({ blob: { uploaded: false } })
+              return { success: false as const, error: uploaded.error }
+            }
+            log.set({ blob: { uploaded: true, bytes: uploaded.bytes } })
             return { success: true as const, ...uploaded }
           },
         }),

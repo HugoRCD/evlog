@@ -1,4 +1,5 @@
 import { getToken } from '@vercel/connect'
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool, toolOutput, toolOutputPart } from 'eve/tools'
 import { z } from 'zod'
 import { classifyImageUrl, fetchImage } from '../lib/images'
@@ -27,8 +28,13 @@ export default defineDynamic({
               }
               authorization = `Bearer ${await getToken('linear/evi', { subject: { type: 'app' } })}`
             }
+            const log = useLogger(toolCtx)
             const fetched = await fetchImage(classified.url, { authorization })
-            if ('error' in fetched) return { success: false as const, error: fetched.error }
+            if ('error' in fetched) {
+              log.set({ image: { host: classified.host, fetched: false } })
+              return { success: false as const, error: fetched.error }
+            }
+            log.set({ image: { host: classified.host, fetched: true, bytes: fetched.bytes, mediaType: fetched.mediaType } })
             return { success: true as const, url: input.url, ...fetched }
           },
           toModelOutput(output) {

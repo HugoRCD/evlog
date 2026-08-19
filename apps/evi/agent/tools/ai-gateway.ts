@@ -1,3 +1,4 @@
+import { useLogger } from 'evlog/eve'
 import { defineDynamic, defineTool } from 'eve/tools'
 import { z } from 'zod'
 import { defaultReportTag, reportQuery, scopedReport } from '../lib/gateway'
@@ -80,7 +81,17 @@ export default defineDynamic({
               tags: query.tags?.join(','),
               tags_match: query.tagsMatch,
             })
-            return scopedReport(payload, query)
+            const report = scopedReport(payload, query)
+            useLogger(toolCtx).set({
+              gateway: {
+                report: {
+                  mode: report.scope.mode,
+                  groupBy: query.groupBy,
+                  matchedRows: report.scope.matchedRows,
+                },
+              },
+            })
+            return report
           },
         }),
         ai_gateway__generation: defineTool({

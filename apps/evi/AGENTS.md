@@ -18,9 +18,11 @@ with a colocated test).
 
 ## What reaches PostHog
 
-Metadata only: tokens, cost, latency, model, tool names. Prompts, responses,
-and tool payloads stay in the agent: turns carry third-party GitHub and Linear
-content. Turning that off rules out LLM-judge evaluations in PostHog, which is
+Metadata only: tokens, cost, latency, model, tool names, and per-tool outcome
+fields (counts, reason codes, and identifiers Evi authored; the namespaces are
+listed in `docs/observability.md`). Prompts, responses, and tool payloads stay
+in the agent: turns carry third-party GitHub and Linear content. A new outcome
+field follows the same rule: never a raw error string or an untrusted URL. Turning that off rules out LLM-judge evaluations in PostHog, which is
 a deliberate trade.
 
 ## Evals cost real money
