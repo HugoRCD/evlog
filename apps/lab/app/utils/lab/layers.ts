@@ -498,7 +498,7 @@ function sanitizeLayerShot(value: unknown): LayerShot | undefined {
   if (!value || typeof value !== 'object') return undefined
   const record = value as Record<string, unknown>
   const settings = sanitizeShotSettings(record.settings)
-  const hasCamera = record.camera !== undefined
+  const hasCamera = Array.isArray(record.camera)
   if (!Object.keys(settings).length && !hasCamera) return undefined
 
   return {

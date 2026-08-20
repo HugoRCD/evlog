@@ -18,7 +18,7 @@
  */
 
 import { effectRampMs } from '~/utils/lab/effects'
-import { canJoin, layerEnd, layerSpeed } from '~/utils/lab/layers'
+import { canChangeLayerSpeed, canJoin, layerEnd, layerSpeed } from '~/utils/lab/layers'
 import type { Layer } from '~/utils/lab/layers'
 
 const props = defineProps<{
@@ -817,8 +817,8 @@ const seconds = (ms: number) => `${(ms / 1000).toFixed(2)}s`
                   name="i-lucide-sparkles"
                   class="ml-auto size-2.5 shrink-0 opacity-60"
                 />
-                <span v-if="layer.kind === 'video' && layer.speed && layer.speed !== 1" class="shrink-0 tabular-nums opacity-60">
-                  {{ layer.speed }}×
+                <span v-if="canChangeLayerSpeed(layer) && layerSpeed(layer) !== 1" class="shrink-0 tabular-nums opacity-60">
+                  {{ Number(layerSpeed(layer).toFixed(2)) }}×
                 </span>
                 <!-- Only once the clip is wide enough that a number reads as a
                      number rather than as noise crowding the name. -->
