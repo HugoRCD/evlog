@@ -38,11 +38,9 @@ overrides:
   # a stale v2, breaking Nuxt's `legacyPlugins` import at build time.
   '@unhead/vue': ^3.2.1
 
-# Two upstream gaps: inbound iMessage image attachments delivered as file
-# parts (apps/evi/docs/vision.md), and the workflow runtime tolerating ULID
-# event ids from Worlds that do not allocate slots yet.
+# iMessage image vision support and workflow runtime event-id slot tolerance.
 patchedDependencies:
-  eve@0.39.0: patches/eve@0.39.0.patch
+  eve@0.40.0: patches/eve@0.40.0.patch
 
 minimumReleaseAge: 2880
 
@@ -66,6 +64,7 @@ minimumReleaseAgeExclude:
   - tsdown@0.22.8
   - "@rolldown/*"
   - "@workflow/*"
+  - "@oxc-project/*"
   - experimental-ai-sdk-code-mode
   - nitro
   - rolldown
