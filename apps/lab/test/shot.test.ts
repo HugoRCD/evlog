@@ -78,6 +78,19 @@ describe('clip shots', () => {
     expect(layer?.shot?.settings).toEqual({ zoom: 4, tonemap: false })
   })
 
+  it('ignores malformed persisted camera overrides', () => {
+    const camera = [{ kind: 'dolly' as const, at: 'in' as const, duration: 400, easing: 'out' as const, amount: 1 }]
+    const [layer] = sanitizeLayers([
+      {
+        ...video(),
+        shot: { settings: { exposure: 1.4 }, camera: 'invalid' },
+      },
+    ])
+
+    expect(layer?.shot).toEqual({ settings: { exposure: 1.4 } })
+    expect(resolveTimelineShot(DEFAULT_SETTINGS, camera, [layer!], 500).camera).toBe(camera)
+  })
+
   it('returns one setting to timeline inheritance without dropping other overrides', () => {
     const camera = [{ kind: 'dolly' as const, at: 'in' as const, duration: 400, easing: 'out' as const, amount: 1 }]
     const layer = {
