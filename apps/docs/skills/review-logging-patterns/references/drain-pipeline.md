@@ -56,9 +56,10 @@ const pipeline = createDrainPipeline<DrainContext>({
 2. When `buffer.length >= batch.size`, the batch is flushed immediately
 3. If the batch isn't full, a timer starts; after `intervalMs`, whatever is buffered gets flushed
 4. On flush, the drain function receives `T[]` (always an array)
-5. If the drain throws, the batch is retried with the configured backoff
-6. After `maxAttempts` failures, `onDropped` is called and the batch is discarded
-7. If the buffer exceeds `maxBufferSize`, the oldest event is dropped and `onDropped` is called
+5. Adapter drains built with `defineDrain` / `defineHttpDrain` are unwrapped to their throwing `raw` variant, which skips the adapter's internal HTTP retries: the pipeline is the single retry owner
+6. If the drain throws, the batch is retried with the configured backoff
+7. After `maxAttempts` failures, `onDropped` is called and the batch is discarded (logged when no `onDropped` is configured)
+8. If the buffer exceeds `maxBufferSize`, the oldest event is dropped and `onDropped` is called
 
 ## Backoff Strategies
 
@@ -73,10 +74,15 @@ const pipeline = createDrainPipeline<DrainContext>({
 ```typescript
 const drain = pipeline(myDrainFn)
 
-drain(ctx)          // Push a single event (synchronous, non-blocking)
-await drain.flush() // Force-flush all buffered events
-drain.pending       // Number of events currently buffered (readonly)
+drain(ctx)            // Push a single event (synchronous, non-blocking)
+await drain.flush()   // Force-flush all buffered events
+await drain.settled() // Resolves once everything buffered is delivered or dropped, without forcing a flush
+drain.pending         // Number of events currently buffered (readonly)
 ```
+
+## Serverless
+
+`drain(ctx)` returns after buffering, so delivery must outlive the response. When the pipeline is passed as the `drain` option of a framework integration, the shared middleware registers `drain.settled()` with the runtime's `waitUntil` (Next `after()`, Workers `ctx.waitUntil`) automatically: the instance stays alive until the batch ships, delayed by at most `batch.intervalMs`. Nitro's `evlog:drain` hook path can't do this for you; on Cloudflare register `drain.settled()` with the execution context's `waitUntil` where the hook is wired.
 
 ## Common Patterns
 
@@ -152,7 +158,9 @@ nitroApp.hooks.hook('close', () => drain.flush())
 ## Review Checklist
 
 - [ ] Pipeline wraps the adapter for production use
-- [ ] `drain.flush()` called on server `close` hook
+- [ ] `drain.flush()` called on server `close` hook (long-lived servers)
+- [ ] On serverless, the pipeline is passed as the integration's `drain` option (settled() registration is automatic); Nitro-on-Cloudflare wires `drain.settled()` into `waitUntil` manually
 - [ ] `onDropped` callback logs or reports dropped events
+- [ ] Retries are owned by one layer: no explicit `retries` on the adapter config when the pipeline wraps it
 - [ ] Batch size and interval are appropriate for the traffic volume
 - [ ] `maxBufferSize` is set to prevent memory leaks under load
