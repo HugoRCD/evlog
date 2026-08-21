@@ -1,5 +1,5 @@
 import { AsyncLocalStorage } from 'node:async_hooks'
-import { beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Elysia } from 'elysia'
 import { initLogger } from '../../src/logger'
 import {
@@ -52,6 +52,18 @@ async function request(app: { handle: (req: Request) => Promise<Response> }, pat
 }
 
 describe('asyncStorageScope', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals()
+  })
+
+  it('does not probe enterWith on Bun (#496)', () => {
+    vi.stubGlobal('Bun', {})
+    const enterWith = vi.fn()
+
+    expect(supportsAsyncLocalStorageEnterWith({ enterWith })).toBe(true)
+    expect(enterWith).not.toHaveBeenCalled()
+  })
+
   it('detects native enterWith support', () => {
     expect(supportsAsyncLocalStorageEnterWith(new AsyncLocalStorage<string>())).toBe(true)
   })
