@@ -112,9 +112,14 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
     let timer: ReturnType<typeof setTimeout> | null = null
     let activeFlush: Promise<void> | null = null
     let settleWaiters: Array<() => void> = []
+    let activeFlushCalls = 0
+
+    function isIdle(): boolean {
+      return buffer.length === 0 && !activeFlush && activeFlushCalls === 0
+    }
 
     function notifySettled(): void {
-      if (buffer.length > 0 || activeFlush || settleWaiters.length === 0) return
+      if (!isIdle() || settleWaiters.length === 0) return
       const waiters = settleWaiters
       settleWaiters = []
       for (const resolve of waiters) resolve()
@@ -211,23 +216,29 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
 
     async function flush(): Promise<void> {
       clearTimer()
-      if (activeFlush) {
-        await activeFlush
-      }
-      // Snapshot the buffer length to avoid infinite loop if push() is called during flush
-      const snapshot = buffer.length
-      if (snapshot > 0) {
-        const toFlush = buffer.splice(0, snapshot)
-        while (toFlush.length > 0) {
-          const batch = toFlush.splice(0, batchSize)
-          await sendWithRetry(batch)
+      // Counted so settled() stays pending while a spliced batch is in flight.
+      activeFlushCalls++
+      try {
+        if (activeFlush) {
+          await activeFlush
         }
+        // Snapshot the buffer length to avoid infinite loop if push() is called during flush
+        const snapshot = buffer.length
+        if (snapshot > 0) {
+          const toFlush = buffer.splice(0, snapshot)
+          while (toFlush.length > 0) {
+            const batch = toFlush.splice(0, batchSize)
+            await sendWithRetry(batch)
+          }
+        }
+      } finally {
+        activeFlushCalls--
+        notifySettled()
       }
-      notifySettled()
     }
 
     function settled(): Promise<void> {
-      if (buffer.length === 0 && !activeFlush) return Promise.resolve()
+      if (isIdle()) return Promise.resolve()
       return new Promise<void>((resolve) => {
         settleWaiters.push(resolve)
       })

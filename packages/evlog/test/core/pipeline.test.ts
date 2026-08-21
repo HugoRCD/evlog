@@ -507,6 +507,31 @@ describe('createDrainPipeline', () => {
       expect(drain).toHaveBeenCalledTimes(2)
     })
 
+    it('stays pending while an explicit flush() delivery is in flight', async () => {
+      let resolveDrain!: () => void
+      const drain = vi.fn(() => new Promise<void>((resolve) => {
+        resolveDrain = resolve
+      }))
+      const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 60000 } })(drain)
+
+      hook(createTestContext(1))
+      const flushPromise = hook.flush()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(drain).toHaveBeenCalledTimes(1)
+
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(resolved).toBe(false)
+
+      resolveDrain()
+      await flushPromise
+      await vi.advanceTimersByTimeAsync(0)
+      expect(resolved).toBe(true)
+    })
+
     it('resolves via flush()', async () => {
       const drain = vi.fn().mockResolvedValue(undefined)
       const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 60000 } })(drain)
