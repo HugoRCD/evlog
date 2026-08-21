@@ -56,7 +56,7 @@ const pipeline = createDrainPipeline<DrainContext>({
 2. When `buffer.length >= batch.size`, the batch is flushed immediately
 3. If the batch isn't full, a timer starts; after `intervalMs`, whatever is buffered gets flushed
 4. On flush, the drain function receives `T[]` (always an array)
-5. Adapter drains built with `defineDrain` / `defineHttpDrain` are unwrapped to their throwing `raw` variant, which skips the adapter's internal HTTP retries: the pipeline is the single retry owner
+5. Adapter drains built with `defineDrain` / `defineHttpDrain` are unwrapped to their throwing `raw` variant, which defaults to one HTTP attempt per pipeline attempt: the pipeline owns retries, unless `retries` is explicitly configured on the adapter, which then still applies inside each pipeline attempt
 6. If the drain throws, the batch is retried with the configured backoff
 7. After `maxAttempts` failures, `onDropped` is called and the batch is discarded (logged when no `onDropped` is configured)
 8. If the buffer exceeds `maxBufferSize`, the oldest event is dropped and `onDropped` is called
