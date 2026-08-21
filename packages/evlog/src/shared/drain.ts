@@ -12,6 +12,30 @@ export interface DrainOptions<TConfig> {
   /** Return `null` to skip draining (e.g. missing API key in dev). */
   resolve: () => TConfig | null | Promise<TConfig | null>
   send: (events: WideEvent[], config: TConfig) => Promise<void>
+  /**
+   * Variant of `send` used by {@link DrainFn.raw}. Defaults to `send`. HTTP
+   * drains use it to skip internal retries when the caller owns retrying.
+   */
+  rawSend?: (events: WideEvent[], config: TConfig) => Promise<void>
+}
+
+/**
+ * Drain callback returned by {@link defineDrain} / {@link defineHttpDrain}.
+ *
+ * Calling it delivers the events and swallows failures (logged with the drain
+ * name), so a failing drain never breaks the request pipeline. `raw` is the
+ * throwing variant for callers that own failure handling themselves.
+ */
+export interface DrainFn {
+  (ctx: DrainContext | DrainContext[]): Promise<void>
+  /**
+   * Deliver the events and reject on failure. Skips the drain's internal
+   * retries unless retries are explicitly configured, so a wrapping layer
+   * owns them. `createDrainPipeline` picks this up automatically: its `retry`
+   * and `onDropped` options observe real failures instead of the swallowing
+   * wrapper.
+   */
+  raw: (ctx: DrainContext | DrainContext[]) => Promise<void>
 }
 
 /**
@@ -29,20 +53,26 @@ export interface DrainOptions<TConfig> {
  * }
  * ```
  */
-export function defineDrain<TConfig>(options: DrainOptions<TConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
-  return async (ctx: DrainContext | DrainContext[]) => {
+export function defineDrain<TConfig>(options: DrainOptions<TConfig>): DrainFn {
+  async function deliver(ctx: DrainContext | DrainContext[], send: DrainOptions<TConfig>['send']): Promise<void> {
     const contexts = Array.isArray(ctx) ? ctx : [ctx]
     if (contexts.length === 0) return
 
     const config = await options.resolve()
     if (!config) return
 
+    await send(contexts.map(c => c.event), config)
+  }
+
+  const drain = (async (ctx: DrainContext | DrainContext[]) => {
     try {
-      await options.send(contexts.map(c => c.event), config)
+      await deliver(ctx, options.send)
     } catch (error) {
       console.error(`[evlog/${options.name}] Failed to send events:`, error)
     }
-  }
+  }) as DrainFn
+  drain.raw = ctx => deliver(ctx, options.rawSend ?? options.send)
+  return drain
 }
 
 export interface HttpDrainRequest {
@@ -135,11 +165,9 @@ export async function sendEncodedDrainRequest(
  * }
  * ```
  */
-export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): (ctx: DrainContext | DrainContext[]) => Promise<void> {
-  return defineDrain<TConfig>({
-    name: options.name,
-    resolve: options.resolve,
-    send: async (events, config) => {
+export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): DrainFn {
+  function buildSend(fallbackRetries?: number) {
+    return async (events: WideEvent[], config: TConfig): Promise<void> => {
       if (events.length === 0) return
       const request = options.encode(events, config)
       if (!request) return
@@ -149,7 +177,7 @@ export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): (c
         ?? DEFAULT_HTTP_TIMEOUT
       const retries = options.resolveRetries?.(config)
         ?? (config as { retries?: number }).retries
-        ?? options.retries
+        ?? fallbackRetries
       await httpPost({
         url: request.url,
         headers: request.headers,
@@ -159,6 +187,14 @@ export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): (c
         label: options.label ?? options.name,
         source: options.name,
       })
-    },
+    }
+  }
+  return defineDrain<TConfig>({
+    name: options.name,
+    resolve: options.resolve,
+    send: buildSend(options.retries),
+    // Raw callers (the pipeline) own retries: single attempt unless the
+    // config sets retries explicitly.
+    rawSend: buildSend(0),
   })
 }
