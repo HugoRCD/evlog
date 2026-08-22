@@ -18,8 +18,8 @@ the fallback model for days.
 
 The fallback must be a model that can run a whole turn, tools included, not
 just caption a picture: while an image sits in the turn, every step runs on
-it. Qwen 3.7 Flash is vision-native, agentic, and at or below the base model's
-rate card.
+it. Qwen 3.7 Flash is vision-native, agentic, and in the same price band as
+the base model.
 
 ## Per channel
 
