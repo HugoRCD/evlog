@@ -162,7 +162,7 @@ describe('{name} adapter', () => {
 - **Auth headers**: Match the service (`X-API-Key`, HTTP Basic, `X-ClickHouse-User`, …).
 - **Body format**: Wrapper objects (PostHog `{ api_key, batch }`), raw arrays (Axiom), NDJSON (ClickHouse). Assert the real structure, not just "is an array".
 - **Deprecated aliases**: If the adapter supports one (`token` → `apiKey`), add a test that the alias still resolves and that the canonical name wins when both are set.
-- **Error swallowing**: The drain itself never throws. That contract lives in `defineHttpDrain` and is covered by `test/toolkit/toolkit.test.ts`; don't re-test it per adapter. Only direct helpers surface errors.
+- **Error swallowing**: The drain itself never throws; its `raw` variant rejects and single-attempts so the pipeline can own retries. Both contracts live in `defineHttpDrain` and are covered by `test/toolkit/toolkit.test.ts`; don't re-test them per adapter. Only direct helpers surface errors.
 - **Service-specific helpers**: Every exported helper (`buildLokiPayload`, `toClickHouseRow`, severity mappers…) gets its own `describe` with edge cases (empty input, malformed timestamps, cardinality guards).
 
 ## Beyond unit tests
