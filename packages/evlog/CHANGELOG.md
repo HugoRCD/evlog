@@ -1,5 +1,13 @@
 # evlog
 
+## 2.27.0
+
+### Minor Changes
+
+- [#622](https://github.com/HugoRCD/evlog/pull/622) [`1704339`](https://github.com/HugoRCD/evlog/commit/17043394e7bcf8c1603ffb44f0f4952a5be77a31) Thanks [@evlogai](https://github.com/apps/evlogai)! - The `evlog/eve` wide event now records which AI provider (deployment) served each turn. The `ai.model` field continues to carry the gateway slug (e.g. `deepseek/deepseek-v4-flash`), while the new `ai.provider` field reports the resolved provider (e.g. `deepseek`), extracted from the model id eve reports on `session.started`. Cost-per-provider analysis no longer requires cross-referencing the rate card against the model catalogue.
+
+- [#580](https://github.com/HugoRCD/evlog/pull/580) [`c40e0fd`](https://github.com/HugoRCD/evlog/commit/c40e0fd5a60ab094b28bd98aa8ff3b5120784d7f) Thanks [@evlogai](https://github.com/apps/evlogai)! - The `evlog/eve` integration now records how much context each tool result added. `ai.tools[]` gains an `inputTokens` field per tool, measured as the input-token delta between the step that called the tool and the step that consumed its result, so the tool that dominates a turn's context shows up without a manual before/after diff. Parallel tool results in one step share the delta evenly; a result whose delta crosses a compaction or context reset is left unset rather than mis-attributed.
+
 ## 2.26.0
 
 ### Minor Changes
