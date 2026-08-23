@@ -1,5 +1,17 @@
 # evlog
 
+## 2.27.0
+
+### Minor Changes
+
+- [#622](https://github.com/HugoRCD/evlog/pull/622) [`1704339`](https://github.com/HugoRCD/evlog/commit/17043394e7bcf8c1603ffb44f0f4952a5be77a31) Thanks [@evlogai](https://github.com/apps/evlogai)! - The `evlog/eve` wide event now records which AI provider (deployment) served each turn. The `ai.model` field continues to carry the gateway slug (e.g. `deepseek/deepseek-v4-flash`), while the new `ai.provider` field reports the resolved provider (e.g. `deepseek`), extracted from the model id eve reports on `session.started`. Cost-per-provider analysis no longer requires cross-referencing the rate card against the model catalogue.
+
+- [#627](https://github.com/HugoRCD/evlog/pull/627) [`72093df`](https://github.com/HugoRCD/evlog/commit/72093df2e658bf307312feaf57cecaf0c2cad19f) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Wrapping an adapter drain in `createDrainPipeline` now behaves as documented. Adapter drains swallow delivery failures so they never break a request, which silently disabled the pipeline's `retry` and `onDropped` and stacked the adapter's internal HTTP retries on top of the pipeline's. Drains built with `defineDrain` / `defineHttpDrain` now expose a throwing `raw` variant that performs a single attempt unless retries are explicitly configured, and the pipeline picks it up automatically: `retry` and `onDropped` observe real failures, and one layer owns retrying. A batch dropped with no `onDropped` configured is logged instead of vanishing.
+
+  On serverless runtimes the pipeline no longer strands buffered events. It exposes `settled()`, which resolves once everything buffered so far has been delivered or dropped, and the shared middleware registers it with the runtime's `waitUntil` (Next's `after()`, Workers' `ctx.waitUntil`) so the instance is not frozen while a batch sits in the buffer.
+
+- [#580](https://github.com/HugoRCD/evlog/pull/580) [`c40e0fd`](https://github.com/HugoRCD/evlog/commit/c40e0fd5a60ab094b28bd98aa8ff3b5120784d7f) Thanks [@evlogai](https://github.com/apps/evlogai)! - The `evlog/eve` integration now records how much context each tool result added. `ai.tools[]` gains an `inputTokens` field per tool, measured as the input-token delta between the step that called the tool and the step that consumed its result, so the tool that dominates a turn's context shows up without a manual before/after diff. Parallel tool results in one step share the delta evenly; a result whose delta crosses a compaction or context reset is left unset rather than mis-attributed.
+
 ## 2.26.0
 
 ### Minor Changes
