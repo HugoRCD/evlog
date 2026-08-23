@@ -211,6 +211,14 @@ export async function runEnrichAndDrain(
     const drainPromise = Promise.all(tasks)
     if (options.waitUntil) {
       extendDeferredDrain(drainPromise, options.waitUntil)
+      // A pipeline drain buffers and returns immediately; extend the runtime's
+      // lifetime until the buffered batch is delivered, not just until push().
+      if (hasUserDrain) {
+        const { settled } = drain as { settled?: () => Promise<void> }
+        if (typeof settled === 'function') {
+          extendDeferredDrain(settled(), options.waitUntil)
+        }
+      }
       return
     }
     await drainPromise

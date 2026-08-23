@@ -137,6 +137,7 @@ export async function sendBatchTo{Name}(events: WideEvent[], config: {Name}Confi
 - Skipping silently when `resolve()` returns `null`
 - Transport via `httpPost` (`../shared/http`): timeout (default 5000ms), retries (default 2), evlog identity headers (`User-Agent: evlog/x.y.z`, `X-Evlog-Source`)
 - Error logging (`[evlog/{name}] Failed to send events:`) that never throws into the request pipeline
+- A `raw` variant on the returned drain that rejects on failure and performs a single attempt (unless `retries` is set on the config). `createDrainPipeline` uses it so its retry/`onDropped` own failures; never swallow errors inside `encode` or a custom `send`
 
 ## Customization Notes
 

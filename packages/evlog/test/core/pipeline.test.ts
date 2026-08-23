@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DrainContext } from '../../src/types'
 import { createDrainPipeline } from '../../src/pipeline'
+import { defineDrain } from '../../src/shared/drain'
 import { defined } from '../helpers/defined'
 
 function getBatchArg(call: unknown[]): DrainContext[] {
@@ -388,6 +389,164 @@ describe('createDrainPipeline', () => {
 
     it('throws on NaN batch.size', () => {
       expect(() => createDrainPipeline({ batch: { size: NaN } })).toThrow('batch.size must be a positive finite number')
+    })
+  })
+
+  describe('adapter raw composition', () => {
+    it('uses drain.raw so retries and onDropped observe adapter failures', async () => {
+      const send = vi.fn().mockRejectedValue(new Error('ingest down'))
+      const adapter = defineDrain<{ ok: boolean }>({
+        name: 'unit-test',
+        resolve: () => ({ ok: true }),
+        send,
+      })
+      const onDropped = vi.fn()
+      const hook = createDrainPipeline<DrainContext>({
+        batch: { size: 1, intervalMs: 60000 },
+        retry: { maxAttempts: 2, initialDelayMs: 10 },
+        onDropped,
+      })(adapter)
+
+      hook(createTestContext(1))
+      await vi.runAllTimersAsync()
+
+      expect(send).toHaveBeenCalledTimes(2)
+      expect(onDropped).toHaveBeenCalledTimes(1)
+      const [batch, error] = defined(onDropped.mock.calls[0], 'onDropped call')
+      expect(batch).toHaveLength(1)
+      expect((error as Error).message).toContain('ingest down')
+    })
+
+    it('delivers through drain.raw on success', async () => {
+      const send = vi.fn().mockResolvedValue(undefined)
+      const adapter = defineDrain<{ ok: boolean }>({
+        name: 'unit-test',
+        resolve: () => ({ ok: true }),
+        send,
+      })
+      const hook = createDrainPipeline<DrainContext>({ batch: { size: 2, intervalMs: 60000 } })(adapter)
+
+      hook(createTestContext(1))
+      hook(createTestContext(2))
+      await vi.runAllTimersAsync()
+
+      expect(send).toHaveBeenCalledTimes(1)
+      const [events] = defined(send.mock.calls[0], 'send call')
+      expect(events).toHaveLength(2)
+    })
+
+    it('logs dropped batches when no onDropped is provided', async () => {
+      const errorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
+      const drain = vi.fn().mockRejectedValue(new Error('boom'))
+      const hook = createDrainPipeline<DrainContext>({
+        batch: { size: 1, intervalMs: 60000 },
+        retry: { maxAttempts: 1 },
+      })(drain)
+
+      hook(createTestContext(1))
+      await vi.runAllTimersAsync()
+
+      expect(errorSpy).toHaveBeenCalledWith(
+        expect.stringContaining('[evlog/pipeline] Dropped 1 event(s) after 1 attempt(s)'),
+        expect.any(Error),
+      )
+      errorSpy.mockRestore()
+    })
+  })
+
+  describe('settled()', () => {
+    it('resolves immediately when nothing is buffered', async () => {
+      const drain = vi.fn().mockResolvedValue(undefined)
+      const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 5000 } })(drain)
+
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(resolved).toBe(true)
+      expect(drain).not.toHaveBeenCalled()
+    })
+
+    it('resolves once the interval flush delivers buffered events', async () => {
+      const drain = vi.fn().mockResolvedValue(undefined)
+      const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 5000 } })(drain)
+
+      hook(createTestContext(1))
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+
+      await vi.advanceTimersByTimeAsync(4999)
+      expect(resolved).toBe(false)
+      expect(drain).not.toHaveBeenCalled()
+
+      await vi.advanceTimersByTimeAsync(1)
+      expect(resolved).toBe(true)
+      expect(drain).toHaveBeenCalledTimes(1)
+    })
+
+    it('resolves after a failing batch is dropped', async () => {
+      const drain = vi.fn().mockRejectedValue(new Error('boom'))
+      const hook = createDrainPipeline({
+        batch: { size: 1, intervalMs: 60000 },
+        retry: { maxAttempts: 2, initialDelayMs: 10 },
+        onDropped: vi.fn(),
+      })(drain)
+
+      hook(createTestContext(1))
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+
+      await vi.runAllTimersAsync()
+      expect(resolved).toBe(true)
+      expect(drain).toHaveBeenCalledTimes(2)
+    })
+
+    it('stays pending while an explicit flush() delivery is in flight', async () => {
+      let resolveDrain!: () => void
+      const drain = vi.fn(() => new Promise<void>((resolve) => {
+        resolveDrain = resolve
+      }))
+      const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 60000 } })(drain)
+
+      hook(createTestContext(1))
+      const flushPromise = hook.flush()
+      await vi.advanceTimersByTimeAsync(0)
+      expect(drain).toHaveBeenCalledTimes(1)
+
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+      await vi.advanceTimersByTimeAsync(0)
+      expect(resolved).toBe(false)
+
+      resolveDrain()
+      await flushPromise
+      await vi.advanceTimersByTimeAsync(0)
+      expect(resolved).toBe(true)
+    })
+
+    it('resolves via flush()', async () => {
+      const drain = vi.fn().mockResolvedValue(undefined)
+      const hook = createDrainPipeline({ batch: { size: 10, intervalMs: 60000 } })(drain)
+
+      hook(createTestContext(1))
+      let resolved = false
+      void hook.settled().then(() => {
+        resolved = true
+      })
+
+      await hook.flush()
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(resolved).toBe(true)
+      expect(drain).toHaveBeenCalledTimes(1)
     })
   })
 })

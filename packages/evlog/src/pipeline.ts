@@ -25,6 +25,12 @@ export interface PipelineDrainFn<T> {
   (ctx: T): void
   /** Flush all buffered events. Call on server shutdown. */
   flush: () => Promise<void>
+  /**
+   * Resolves once everything buffered so far has been delivered or dropped,
+   * without forcing an early flush. Serverless integrations register it with
+   * `waitUntil` so the runtime is not frozen while events sit in the buffer.
+   */
+  settled: () => Promise<void>
   readonly pending: number
 }
 
@@ -32,6 +38,12 @@ export interface PipelineDrainFn<T> {
  * Create a drain pipeline that batches events, retries on failure, and manages buffer overflow.
  *
  * Returns a higher-order function: pass your drain adapter to get a hook-compatible function.
+ *
+ * Adapter drains built with `defineDrain` / `defineHttpDrain` are unwrapped to
+ * their throwing `raw` variant, so `retry` and `onDropped` observe delivery
+ * failures and the pipeline owns retries alone. On serverless runtimes,
+ * register `settled()` with `waitUntil` (the framework integrations do this
+ * automatically) so buffered events are delivered before the instance freezes.
  *
  * @example
  * ```ts
@@ -89,9 +101,29 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
   }
 
   return (drain: (batch: T[]) => void | Promise<void>): PipelineDrainFn<T> => {
+    // Drains built with defineDrain/defineHttpDrain swallow failures so they
+    // never break a request. Their `raw` variant rejects instead — use it so
+    // retry and onDropped observe real failures and own them alone.
+    const rawDrain = (drain as { raw?: unknown }).raw
+    const send = typeof rawDrain === 'function'
+      ? rawDrain as (batch: T[]) => void | Promise<void>
+      : drain
     const buffer: T[] = []
     let timer: ReturnType<typeof setTimeout> | null = null
     let activeFlush: Promise<void> | null = null
+    let settleWaiters: Array<() => void> = []
+    let activeFlushCalls = 0
+
+    function isIdle(): boolean {
+      return buffer.length === 0 && !activeFlush && activeFlushCalls === 0
+    }
+
+    function notifySettled(): void {
+      if (!isIdle() || settleWaiters.length === 0) return
+      const waiters = settleWaiters
+      settleWaiters = []
+      for (const resolve of waiters) resolve()
+    }
 
     function clearTimer(): void {
       if (timer !== null) {
@@ -130,7 +162,7 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
       let lastError: Error | undefined
       for (let attempt = 1; attempt <= maxAttempts; attempt++) {
         try {
-          await drain(batch)
+          await send(batch)
           return
         } catch (error) {
           lastError = error instanceof Error ? error : new Error(String(error))
@@ -139,7 +171,11 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
           }
         }
       }
-      onDropped?.(batch, lastError)
+      if (onDropped) {
+        onDropped(batch, lastError)
+      } else {
+        console.error(`[evlog/pipeline] Dropped ${batch.length} event(s) after ${maxAttempts} attempt(s):`, lastError)
+      }
     }
 
     async function drainBuffer(): Promise<void> {
@@ -157,6 +193,8 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
           startFlush()
         } else if (buffer.length > 0) {
           scheduleFlush()
+        } else {
+          notifySettled()
         }
       })
     }
@@ -178,22 +216,37 @@ export function createDrainPipeline<T = unknown>(options?: DrainPipelineOptions<
 
     async function flush(): Promise<void> {
       clearTimer()
-      if (activeFlush) {
-        await activeFlush
-      }
-      // Snapshot the buffer length to avoid infinite loop if push() is called during flush
-      const snapshot = buffer.length
-      if (snapshot > 0) {
-        const toFlush = buffer.splice(0, snapshot)
-        while (toFlush.length > 0) {
-          const batch = toFlush.splice(0, batchSize)
-          await sendWithRetry(batch)
+      // Counted so settled() stays pending while a spliced batch is in flight.
+      activeFlushCalls++
+      try {
+        if (activeFlush) {
+          await activeFlush
         }
+        // Snapshot the buffer length to avoid infinite loop if push() is called during flush
+        const snapshot = buffer.length
+        if (snapshot > 0) {
+          const toFlush = buffer.splice(0, snapshot)
+          while (toFlush.length > 0) {
+            const batch = toFlush.splice(0, batchSize)
+            await sendWithRetry(batch)
+          }
+        }
+      } finally {
+        activeFlushCalls--
+        notifySettled()
       }
+    }
+
+    function settled(): Promise<void> {
+      if (isIdle()) return Promise.resolve()
+      return new Promise<void>((resolve) => {
+        settleWaiters.push(resolve)
+      })
     }
 
     const hookFn = push as PipelineDrainFn<T>
     hookFn.flush = flush
+    hookFn.settled = settled
     Object.defineProperty(hookFn, 'pending', {
       get: () => buffer.length,
       enumerable: true,

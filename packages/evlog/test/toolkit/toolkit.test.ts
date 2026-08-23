@@ -517,6 +517,38 @@ describe('defineHttpDrain', () => {
     await expect(drain(drainCtx())).resolves.toBeUndefined()
     expect(console.error).toHaveBeenCalled()
   })
+
+  it('raw rejects on HTTP failure with a single attempt', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('boom', { status: 500 }))))
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'k' }),
+      encode: () => ({ url: 'https://x.test', headers: {}, body: '{}' }),
+    })
+    await expect(drain.raw(drainCtx())).rejects.toThrow('unit-test API error: 500')
+    expect(fetch).toHaveBeenCalledTimes(1)
+  })
+
+  it('raw honors explicitly configured retries', async () => {
+    vi.stubGlobal('fetch', vi.fn(() => Promise.resolve(new Response('boom', { status: 500 }))))
+    const drain = defineHttpDrain<{ apiKey: string; retries?: number }>({
+      name: 'unit-test',
+      resolve: () => ({ apiKey: 'k', retries: 1 }),
+      encode: () => ({ url: 'https://x.test', headers: {}, body: '{}' }),
+    })
+    await expect(drain.raw(drainCtx())).rejects.toThrow()
+    expect(fetch).toHaveBeenCalledTimes(2)
+  })
+
+  it('raw skips when resolve returns null', async () => {
+    const drain = defineHttpDrain<{ apiKey: string }>({
+      name: 'unit-test',
+      resolve: () => null,
+      encode: () => ({ url: 'https://x.test', headers: {}, body: '{}' }),
+    })
+    await expect(drain.raw(drainCtx())).resolves.toBeUndefined()
+    expect(fetch).not.toHaveBeenCalled()
+  })
 })
 
 describe('defineEvlog / toLoggerConfig / toMiddlewareOptions', () => {
