@@ -37,7 +37,7 @@ const cyan = text => paint('36', text)
 /* ── the apps ───────────────────────────────────────────────────────────── */
 
 /**
- * Three of the four come from the `map` test fixtures rather than being written
+ * All but one come from the `map` test fixtures rather than being written
  * again here: they are already realistic apps with deliberately uneven
  * instrumentation, which is exactly what makes a `map` report worth reading.
  * Nitro has no fixture, so it is generated.
@@ -47,6 +47,7 @@ const APPS = [
   { name: 'next', fixture: 'next-app-router', augment: augmentNextApp },
   { name: 'tanstack', fixture: 'tanstack-basic' },
   { name: 'nitro', generate: generateNitroApp },
+  { name: 'hono', fixture: 'hono-basic' },
 ]
 
 /**
@@ -414,7 +415,7 @@ check('init never overwrites, never silently drops a destination', (dir) => {
   expect(readFileSync(join(dir, 'lib/evlog.ts'), 'utf8') === '// pre-existing\n', 'lib/evlog.ts was modified')
   expect(readFileSync(join(dir, 'server/plugins/evlog-drain.ts'), 'utf8') === '// pre-existing\n', 'the drain plugin was modified')
 
-  const landed = payload.written.some(file => /evlog-drain-|lib\/evlog/.test(file.file))
+  const landed = payload.written.some(file => /evlog-drain-|lib\/evlog|(^|\/)evlog\.ts$/.test(file.file))
     || payload.manual.some(step => /destination|factory/i.test(step.title))
   expect(landed, 'Axiom was asked for and went nowhere')
 })

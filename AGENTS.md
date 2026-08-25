@@ -15,6 +15,7 @@ pnpm run typecheck                 # type-check all packages
 pnpm run docs                      # start docs site
 pnpm run telemetry                 # start the telemetry dashboard (apps/telemetry)
 pnpm telemetry:cli <command>       # run this repo's CLI into that local dashboard (--cwd to target an app)
+pnpm cli:sandbox                   # disposable per-framework apps under .sandbox/ to test the CLI by hand (--reset restores them, --smoke runs the feature matrix)
 pnpm content:lint [path]           # rank the written corpus by content findings (see scripts/content-lint/README.md)
 pnpm content:lint:test             # the scanner's own tests, including its two calibration fixtures
 ```
