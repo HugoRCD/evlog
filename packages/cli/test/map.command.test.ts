@@ -196,6 +196,17 @@ describe('formatMapReport', () => {
     expect(out).toContain('app.get(\'/health\', async (c) => {')
   })
 
+  it('suggests app.on for a hono method that has no shorthand', async () => {
+    const cwd = join(FIXTURES, 'hono-basic')
+    const ctx = fakeContext(cwd)
+    const result = await runMap(ctx, undefined, { noWrite: true })
+    const health = result.scan.map.routes.find(route => route.path === '/health')!
+    const out = formatMapInspect(ctx, result.scan, { ...health, method: 'PURGE' })
+
+    expect(out).toContain('app.on(\'PURGE\', \'/health\', async (c) => {')
+    expect(out).not.toContain('app.purge(')
+  })
+
   it('names the audit action after the route it suggests it for', async () => {
     const { ctx, result } = await nuxt()
     const out = formatMapReport(ctx, result, { entry: '/api/payments/stripe' })
