@@ -1,6 +1,5 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
-import { cliErrors } from '../errors'
 import type { Framework } from '../map/types'
 import { findDestination, findEnricher, findSamplingPreset } from './catalog'
 import type { DrainId, EnricherId, ExtraId, SamplingProfile } from './catalog'
@@ -48,11 +47,11 @@ export interface WiringPlan {
 /**
  * Frameworks `init` can wire — the ones with a `frameworkPlan` case.
  *
- * `map` scans more (hono has an adapter but no wiring plan yet): every init
- * surface (flag parsing, prompt, workspace targets, telemetry) reads this list
- * so a map-only framework is refused cleanly instead of reaching the planner.
+ * `map` adapters can land ahead of init wiring: every init surface (flag
+ * parsing, prompt, workspace targets, telemetry) reads this list so a map-only
+ * framework is refused cleanly instead of reaching the planner.
  */
-export const INIT_FRAMEWORKS = ['nuxt', 'nitro', 'next', 'tanstack-start'] as const satisfies readonly Framework[]
+export const INIT_FRAMEWORKS = ['nuxt', 'nitro', 'next', 'tanstack-start', 'hono'] as const satisfies readonly Framework[]
 
 export function isInitFramework(framework: Framework): boolean {
   return (INIT_FRAMEWORKS as readonly Framework[]).includes(framework)
@@ -553,8 +552,12 @@ export const { register, onRequestError } = defineNodeInstrumentation({
 `
 }
 
-/** The pieces of a Next.js `lib/evlog.ts` — shared by the create and patch paths. */
-interface NextFactoryParts {
+/**
+ * The pieces of a generated evlog config file — shared by Next's `lib/evlog.ts`
+ * (create and patch paths) and Hono's `src/evlog.ts`, which are both plain
+ * TypeScript rather than a framework config.
+ */
+interface FactoryParts {
   imports: string[]
   /** Statements that go above `createEvlog`. */
   preamble: string
@@ -562,7 +565,7 @@ interface NextFactoryParts {
   options: string[]
 }
 
-function nextFactoryParts(input: WiringInput): NextFactoryParts {
+function factoryParts(input: WiringInput): FactoryParts {
   const dev = input.devDrain === 'none' ? null : findDestination(input.devDrain) ?? null
   const prod = input.prodDrains.map(id => findDestination(id)).filter(Boolean) as NonNullable<ReturnType<typeof findDestination>>[]
   const batched = input.extras.includes('pipeline') && prod.length > 0
@@ -593,7 +596,7 @@ function nextFactoryParts(input: WiringInput): NextFactoryParts {
   const wrap = (factory: string) => batched ? `pipeline(${factory})` : factory
   const options: string[] = []
 
-  // Next has no `import.meta.dev`, so the split is on NODE_ENV.
+  // Neither Next nor Hono has `import.meta.dev`, so the split is on NODE_ENV.
   if (dev && prod.length > 0) {
     blocks.push(`const drains = process.env.NODE_ENV === 'production'\n  ? [${prod.map(d => wrap(d.factory!)).join(', ')}]\n  : [${dev.factory}]`)
     options.push('  drain: async ctx => void await Promise.all(drains.map(drain => drain(ctx))),')
@@ -620,7 +623,7 @@ function nextFactoryParts(input: WiringInput): NextFactoryParts {
 }
 
 function nextLibTemplate(input: WiringInput): string {
-  const { imports, preamble, options } = nextFactoryParts(input)
+  const { imports, preamble, options } = factoryParts(input)
   const all = [`import { createEvlog } from 'evlog/next'`, ...imports]
 
   return `${all.join('\n')}
@@ -638,7 +641,7 @@ ${options.join('\n')}${options.length > 0 ? '\n' : ''}})
  * barrel or a computed config gets the snippet to paste instead.
  */
 function patchNextLib(plan: WiringPlan, input: WiringInput, path: string, relativePath: string): void {
-  const { imports, preamble, options } = nextFactoryParts(input)
+  const { imports, preamble, options } = factoryParts(input)
   if (options.length === 0) {
     plan.already.push(`${relativePath} already exists`)
     return
@@ -794,6 +797,9 @@ function catalogDir(input: WiringInput): string {
     return useSrc ? join('src', 'lib') : 'lib'
   }
   if (input.framework === 'tanstack-start') return join('src', 'lib')
+  if (input.framework === 'hono') {
+    return existsSync(join(input.root, 'src')) ? join('src', 'lib') : 'lib'
+  }
   return join('server', 'utils')
 }
 
@@ -907,6 +913,49 @@ export const GET = withEvlog(async () => {
   return plan
 }
 
+/* ── hono ───────────────────────────────────────────────────────────────── */
+
+function honoEvlogTemplate(input: WiringInput): string {
+  const { imports, preamble, options } = factoryParts(input)
+  /* Hono splits the surface: sampling belongs to `initLogger`, drains and
+     enrichers are middleware options. */
+  const sampling = options.filter(option => option.trimStart().startsWith('sampling:'))
+  const middleware = options.filter(option => !sampling.includes(option))
+  const head = [`import { initLogger } from 'evlog'`, `import { evlog } from 'evlog/hono'`, ...imports]
+
+  return `${head.join('\n')}
+
+initLogger({
+  env: { service: '${input.service}' },
+${sampling.join('\n')}${sampling.length > 0 ? '\n' : ''}})
+${preamble}
+/** Register once, before your routes: \`app.use(evlogMiddleware)\`. */
+export const evlogMiddleware = evlog(${middleware.length > 0 ? `{\n${middleware.join('\n')}\n}` : ''})
+`
+}
+
+function planHono(input: WiringInput): WiringPlan {
+  const plan: WiringPlan = { actions: [], manual: [], already: [] }
+  const useSrc = existsSync(join(input.root, 'src'))
+  const relativePath = useSrc ? join('src', 'evlog.ts') : 'evlog.ts'
+  addFile(plan, input, relativePath, honoEvlogTemplate(input))
+
+  const entry = useSrc ? join('src', 'index.ts') : 'index.ts'
+  plan.manual.push({
+    title: 'Register the middleware on your app',
+    file: entry,
+    snippet: `import { Hono } from 'hono'
+import type { EvlogVariables } from 'evlog/hono'
+import { evlogMiddleware } from './evlog'
+
+const app = new Hono<EvlogVariables>()
+app.use(evlogMiddleware)`,
+    reason: `${entry} is your application file, and splicing a middleware into it is guesswork`,
+  })
+
+  return plan
+}
+
 /** Build the file plan for a framework. Pure: reads the project, writes nothing. */
 export function planWiring(input: WiringInput): WiringPlan {
   // Applied once here rather than in each planner, where one would be forgotten.
@@ -919,9 +968,7 @@ function frameworkPlan(input: WiringInput): WiringPlan {
     case 'nitro':
     case 'tanstack-start': return planNitro(input)
     case 'next': return planNext(input)
-    /* map-only framework — the INIT_FRAMEWORKS guard refuses it before any
-       prompt; thrown here too so the planner can never return undefined. */
-    case 'hono': throw cliErrors.INIT_FRAMEWORK_UNSUPPORTED({ framework: input.framework })
+    case 'hono': return planHono(input)
   }
   /* A new Framework member fails to compile here until init decides on a plan. */
   return input.framework satisfies never

@@ -602,26 +602,81 @@ describe('sampling tiers', () => {
   })
 })
 
-describe('runInit — map-only frameworks', () => {
-  it('refuses a hono project cleanly instead of reaching the planner', async () => {
+describe('planWiring — hono', () => {
+  it('creates src/evlog.ts with the configured middleware and asks for the app.use line', async () => {
+    const root = await project({
+      'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
+      'src/index.ts': 'import { Hono } from \'hono\'\nconst app = new Hono()\nexport default app\n',
+    })
+
+    const plan = planWiring({ root, framework: 'hono', service: 'api', ...wiring(), nitroMajor: 3 })
+    const file = plan.actions.find(action => action.relative === join('src', 'evlog.ts'))!
+
+    expect(file.contents).toContain(`import { evlog } from 'evlog/hono'`)
+    expect(file.contents).toContain(`initLogger({\n  env: { service: 'api' },\n})`)
+    expect(file.contents).toContain('export const evlogMiddleware = evlog(')
+    expect(file.contents).toContain('createFsDrain')
+    expect(plan.manual.map(step => step.title)).toContain('Register the middleware on your app')
+    expect(plan.manual[0]?.snippet).toContain('app.use(evlogMiddleware)')
+  })
+
+  it('puts sampling in initLogger and drains on the middleware', async () => {
+    const root = await project({
+      'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
+      'src/index.ts': 'export {}\n',
+    })
+
+    const plan = planWiring({
+      root,
+      framework: 'hono',
+      service: 'api',
+      ...wiring({ prodDrains: ['axiom'], extras: ['sampling'], sampling: 'medium' }),
+      nitroMajor: 3,
+    })
+    const file = plan.actions.find(action => action.relative === join('src', 'evlog.ts'))!
+    const [initBlock] = file.contents.split('export const evlogMiddleware')
+
+    expect(initBlock).toContain('sampling:')
+    expect(file.contents.split('evlogMiddleware = evlog(')[1]).toContain('drain:')
+    expect(file.contents).toContain('createAxiomDrain')
+  })
+
+  it('falls back to the package root when there is no src directory', async () => {
+    const root = await project({
+      'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
+      'index.ts': 'export {}\n',
+    })
+
+    const plan = planWiring({ root, framework: 'hono', service: 'api', ...wiring(), nitroMajor: 3 })
+
+    expect(plan.actions.map(action => action.relative)).toContain('evlog.ts')
+    expect(plan.manual[0]?.file).toBe('index.ts')
+  })
+
+  it('reports an existing evlog.ts instead of overwriting it', async () => {
+    const root = await project({
+      'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
+      'src/evlog.ts': 'export const evlogMiddleware = null\n',
+    })
+
+    const plan = planWiring({ root, framework: 'hono', service: 'api', ...wiring(), nitroMajor: 3 })
+
+    expect(plan.actions.map(action => action.relative)).not.toContain(join('src', 'evlog.ts'))
+    expect(plan.already.some(line => line.includes('evlog.ts'))).toBe(true)
+  })
+})
+
+describe('runInit — hono', () => {
+  it('wires a hono project end to end', async () => {
     const cwd = await project({
       'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
       'src/index.ts': 'import { Hono } from \'hono\'\nconst app = new Hono()\nexport default app\n',
     })
 
-    await expect(runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true }))
-      .rejects.toThrow(/init cannot wire hono yet/)
-  })
+    const result = await runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true })
 
-  it('throws from the planner backstop instead of returning undefined', () => {
-    const plan = () => planWiring({
-      root: '/tmp/nowhere',
-      framework: 'hono',
-      service: 'shop',
-      ...wiring(),
-      nitroMajor: 3,
-    })
-
-    expect(plan).toThrow(/init cannot wire hono yet/)
+    expect(result.answers.framework).toBe('hono')
+    expect(result.written.map(action => action.relative)).toContain(join('src', 'evlog.ts'))
+    expect(await readFile(join(cwd, 'src', 'evlog.ts'), 'utf8')).toContain('export const evlogMiddleware')
   })
 })
