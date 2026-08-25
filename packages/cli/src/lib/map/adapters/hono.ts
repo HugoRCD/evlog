@@ -21,6 +21,11 @@ const ROUTE_METHODS: ReadonlyMap<string, string | null> = new Map([
   ['all', null],
 ])
 
+/** Verbs with an `app.<verb>()` shorthand — anything else registers via `app.on()`. */
+export const HONO_SHORTHAND_VERBS: ReadonlySet<string> = new Set(
+  [...ROUTE_METHODS.values()].filter((verb): verb is string => verb !== null),
+)
+
 /**
  * Source roots to scan for `app.get('/path', …)`-style registrations.
  *
