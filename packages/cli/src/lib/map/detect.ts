@@ -62,6 +62,10 @@ export function detectFramework(project: ProjectInfo, override?: Framework): Det
     matches.push({ framework: 'tanstack-start', specificity: 10, reason: '@tanstack/react-start dependency' })
   }
 
+  if (hasDep(pkg, ['hono'])) {
+    matches.push({ framework: 'hono', specificity: 10, reason: 'hono dependency' })
+  }
+
   if (matches.length === 0) {
     const isBareWorkspaceRoot = project.kind !== 'single' && project.packageDir === project.root
     if (isBareWorkspaceRoot) {

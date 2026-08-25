@@ -215,3 +215,73 @@ describe('tanstack-start adapter', () => {
     expect(routes.map(route => route.method).sort()).toEqual(['GET', 'POST'])
   })
 })
+
+describe('hono adapter', () => {
+  it('reads method and path off app.get / app.post registrations', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.post(\'/checkout\', (c) => c.json({ ok: true }))',
+        'app.get(\'/health\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`).sort()).toEqual([
+      'GET /health',
+      'POST /checkout',
+    ])
+  })
+
+  it('still finds routes when the app is not named app', async () => {
+    const root = await project({
+      'src/api.ts': [
+        'import { Hono } from \'hono\'',
+        'const api = new Hono()',
+        'api.put(\'/orders/:id\', (c) => c.json({ ok: true }))',
+        'export default api',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['PUT /orders/:id'])
+  })
+
+  it('does not treat c.get(\'log\') as a route', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.get(\'/health\', (c) => {',
+        '  const log = c.get(\'log\')',
+        '  log.set({ route: \'health\' })',
+        '  return c.json({ ok: true })',
+        '})',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
+  it('reads app.on(\'GET\', \'/path\', …) registrations', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.on(\'GET\', \'/status\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /status'])
+  })
+})

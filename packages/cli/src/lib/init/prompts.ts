@@ -66,6 +66,7 @@ const FRAMEWORK_LABELS: Record<Framework, string> = {
   'nitro': 'Nitro',
   'next': 'Next.js',
   'tanstack-start': 'TanStack Start',
+  'hono': 'Hono',
 }
 
 export interface PromptContext {
