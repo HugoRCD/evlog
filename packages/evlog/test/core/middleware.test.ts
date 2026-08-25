@@ -1,9 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import type { DrainContext } from '../../src/types'
 import { initLogger } from '../../src/logger'
+import { createDrainPipeline } from '../../src/pipeline'
 import { globallyRedacted } from '../../src/redact'
 import { createMiddlewareLogger } from '../../src/shared/middleware'
 import { defined } from '../helpers/defined'
 import { createPipelineSpies, waitForDrainCalls } from '../helpers/framework'
+import { withFakeTimers } from '../helpers/timers'
 
 describe('createMiddlewareLogger', () => {
   beforeEach(() => {
@@ -459,6 +462,38 @@ describe('createMiddlewareLogger', () => {
       await scheduled
       expect(drain).toHaveBeenCalledOnce()
       expect(drainSettled).toBe(true)
+    })
+
+    it('registers pipeline settled() with waitUntil so buffered batches are delivered', async () => {
+      await withFakeTimers(async () => {
+        const send = vi.fn().mockResolvedValue(undefined)
+        const drain = createDrainPipeline<DrainContext>({ batch: { size: 10, intervalMs: 1000 } })(send)
+        const waitUntil = vi.fn()
+
+        const { finish } = createMiddlewareLogger({
+          method: 'GET',
+          path: '/api/test',
+          drain,
+          waitUntil,
+        })
+
+        await finish({ status: 200 })
+
+        expect(waitUntil).toHaveBeenCalledTimes(2)
+        const [settledPromise] = defined(waitUntil.mock.calls[1], 'settled registration')
+        let delivered = false
+        void (settledPromise as Promise<void>).then(() => {
+          delivered = true
+        })
+
+        await vi.advanceTimersByTimeAsync(0)
+        expect(delivered).toBe(false)
+        expect(send).not.toHaveBeenCalled()
+
+        await vi.advanceTimersByTimeAsync(1000)
+        expect(delivered).toBe(true)
+        expect(send).toHaveBeenCalledTimes(1)
+      })
     })
 
     it('still awaits enrich before registering waitUntil drain', async () => {

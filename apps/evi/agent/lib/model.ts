@@ -2,7 +2,7 @@ import type { LanguageModel, LanguageModelMiddleware, ModelMessage } from 'ai'
 import { gateway, wrapLanguageModel } from 'ai'
 
 /** `EVI_MODEL` overrides the model, to run the eval suite on a candidate. */
-export const MODEL = process.env.EVI_MODEL || 'deepseek/deepseek-v4-flash'
+export const MODEL = process.env.EVI_MODEL || 'deepseek/deepseek-v4-flash-0731'
 
 /**
  * Vision fallback for turns carrying image parts, since the base model is
