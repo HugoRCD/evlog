@@ -270,6 +270,25 @@ describe('hono adapter', () => {
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
   })
 
+  it('does not treat HTTP client calls as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'import axios from \'axios\'',
+        'const app = new Hono()',
+        'app.get(\'/proxy\', async (c) => {',
+        '  const res = await axios.get(\'/users\', { headers: {} })',
+        '  return c.json(res.data)',
+        '})',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /proxy'])
+  })
+
   it('reads app.on(\'GET\', \'/path\', …) registrations', async () => {
     const root = await project({
       'src/index.ts': [

@@ -65,6 +65,23 @@ function isRoutePath(path: string): boolean {
   return path.startsWith('/') || path === '*'
 }
 
+/** Function-like node types that can be Hono route handlers. */
+const HANDLER_TYPES = new Set([
+  'ArrowFunctionExpression',
+  'FunctionExpression',
+  'Identifier',
+])
+
+/**
+ * Whether the node looks like a route handler (function) rather than an options
+ * object. This tells `app.get('/users', handler)` apart from HTTP client calls
+ * like `axios.get('/users', { headers })`.
+ */
+function looksLikeHandler(node: Node | undefined): boolean {
+  if (!node) return false
+  return HANDLER_TYPES.has(node.type)
+}
+
 /**
  * Find every `*.get('/path', handler)` / `*.post(…)` call in a parsed file.
  *
@@ -100,9 +117,10 @@ function findHonoRoutes(parsed: ParseResult): FoundRoute[] {
 
     if (!ROUTE_METHODS.has(name)) return
     const path = stringLiteral(call.arguments[0])
-    /* Path + at least one handler: `c.get('log')` has neither a `/…` path nor a
-       second argument, so both checks drop it without caring what `c` is named. */
-    if (!path || !isRoutePath(path) || call.arguments.length < 2) return
+    /* Path + handler function: `c.get('log')` has neither a `/…` path nor a
+       second argument, and `axios.get('/users', { headers })` passes an object
+       rather than a function, so both are filtered without tracking bindings. */
+    if (!path || !isRoutePath(path) || !looksLikeHandler(call.arguments[1])) return
 
     const loc = nodeLoc(node, parsed.lines)
     found.push({

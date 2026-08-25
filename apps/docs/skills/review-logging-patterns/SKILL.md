@@ -56,7 +56,7 @@ npm install evlog
 
 ## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start, Hono)
 
-`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On the four supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
+`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On the five supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
 ### 1. Setup: `evlog init`
 
