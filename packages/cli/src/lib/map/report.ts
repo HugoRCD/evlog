@@ -743,7 +743,15 @@ function suggestedShape(route: RouteEntry, framework: Framework, project: Projec
         indent(1, '} },'),
         '})',
       ]
+    case 'hono':
+      return [
+        `app.${(route.method ?? 'all').toLowerCase()}('${route.path}', async (c) => {`,
+        ...body.map(line => indent(1, line)),
+        '})',
+      ]
   }
+  /* A new Framework member fails to compile here until it has a shape. */
+  return framework satisfies never
 }
 
 /**

@@ -81,7 +81,7 @@ export async function scan(input: ScanContext): Promise<ScanResult> {
   const ctx: ScanContext = { ...input, parse: input.parse ?? createParseCache() }
   const adapter = getAdapter(ctx.framework)
   const capabilities: FrameworkCapabilities = {
-    requestLogger: adapter.requestLogger,
+    requestLogger: adapter.resolveRequestLogger?.(ctx) ?? adapter.requestLogger,
     evlogAutoImports: adapter.evlogAutoImports ?? [],
   }
 

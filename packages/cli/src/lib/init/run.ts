@@ -6,12 +6,13 @@ import { planAgents } from '../agents/plan'
 import { findInstalledSkills, runSkills, skillsCommand } from '../agents/skills'
 import type { CliDebug } from '../debug'
 import { createNoopCliDebug } from '../debug'
+import { cliErrors } from '../errors'
 import { detectFramework } from '../map/detect'
 import type { Framework } from '../map/types'
 import { resolveEvlog, resolveProject } from '../project'
 import type { PackageJson, ProjectInfo } from '../project'
 import type { DrainId, EnricherId, ExtraId, OfferContext, SamplingProfile } from './catalog'
-import { planWiring } from './frameworks'
+import { isInitFramework, planWiring } from './frameworks'
 import type { FileAction, ManualStep } from './frameworks'
 import { readProject } from './insight'
 import type { ProjectInsight } from './insight'
@@ -156,6 +157,12 @@ export async function runInit(
     () => detectFramework(project, options.framework),
     r => ({ framework: r.framework }),
   )
+
+  /* `map` scans more frameworks than `init` can wire: refuse the map-only ones
+     here, before any prompt, instead of crashing in the planner. */
+  if (!isInitFramework(detection.framework)) {
+    throw cliErrors.INIT_FRAMEWORK_UNSUPPORTED({ framework: detection.framework })
+  }
 
   const resolved = await log.step(
     'resolveEvlog',
@@ -451,5 +458,6 @@ export function frameworkDocs(framework: Framework): string {
     case 'nitro': return '/integrate/frameworks/nitro'
     case 'next': return '/integrate/frameworks/nextjs'
     case 'tanstack-start': return '/integrate/frameworks/tanstack-start'
+    case 'hono': return '/integrate/frameworks/hono'
   }
 }

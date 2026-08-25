@@ -34,6 +34,11 @@ const SOURCE_GLOBS = [
   '*.{ts,tsx,js,jsx}',
 ] as const
 
+/** Every file the adapter reads — the globs overlap, so deduplicate. */
+function sourceFiles(root: string): string[] {
+  return [...new Set(globSync([...SOURCE_GLOBS], { cwd: root, absolute: true }))]
+}
+
 interface FoundRoute {
   method: string | null
   path: string
@@ -52,6 +57,20 @@ function stringLiteral(node: Node | undefined): string | null {
     return (node as { value: string }).value
   }
   return null
+}
+
+/**
+ * The same, accepting `app.on`'s array spelling: `'GET'` and `['GET', 'POST']`
+ * both come back as a list, anything else as an empty one.
+ */
+function stringLiterals(node: Node | undefined): string[] {
+  if (!node) return []
+  if (node.type === 'ArrayExpression') {
+    const { elements } = node as { elements: (Node | null)[] }
+    return elements.map(element => stringLiteral(element ?? undefined)).filter((value): value is string => value !== null)
+  }
+  const single = stringLiteral(node)
+  return single === null ? [] : [single]
 }
 
 /**
@@ -88,8 +107,9 @@ function looksLikeHandler(node: Node | undefined): boolean {
  * The receiver name does not matter (`app`, `api`, `routes`): Hono sub-apps are
  * registered the same way. Two cheap shape checks keep `c.get('log')` out:
  * the first argument must look like a path, and there must be a handler after it.
- * `app.on('GET', '/path', …)` is the one spelling where the method is an
- * argument rather than the callee.
+ * `app.on(…)` is the one spelling where the method is an argument rather than
+ * the callee, and it takes arrays on both sides: `app.on(['PUT', 'DELETE'],
+ * ['/a', '/b'], …)` registers every combination.
  */
 function findHonoRoutes(parsed: ParseResult): FoundRoute[] {
   const found: FoundRoute[] = []
@@ -107,11 +127,15 @@ function findHonoRoutes(parsed: ParseResult): FoundRoute[] {
     const { name } = property
 
     if (name === 'on') {
-      const method = stringLiteral(call.arguments[0])?.toUpperCase() ?? null
-      const path = stringLiteral(call.arguments[1])
-      if (!path || !method || !isRoutePath(path) || call.arguments.length < 3) return
+      const methods = stringLiterals(call.arguments[0]).map(method => method.toUpperCase())
+      const paths = stringLiterals(call.arguments[1]).filter(isRoutePath)
+      if (methods.length === 0 || paths.length === 0 || call.arguments.length < 3) return
       const loc = nodeLoc(node, parsed.lines)
-      found.push({ method, path, line: loc?.line ?? 1 })
+      for (const method of methods) {
+        for (const path of paths) {
+          found.push({ method, path, line: loc?.line ?? 1 })
+        }
+      }
       return
     }
 
@@ -148,27 +172,71 @@ function extractFromFile(file: string, root: string, parse: ParseFn): RawRouteEn
   }))
 }
 
+/** Local names bound to `evlog` from `evlog/hono`, alias included. */
+function evlogMiddlewareNames(parsed: ParseResult): Set<string> {
+  const names = new Set<string>()
+  walkAst(parsed.program, (node) => {
+    if (node.type !== 'ImportDeclaration') return
+    const declaration = node as {
+      source: { value: string }
+      specifiers: Array<{ type: string, imported?: { name?: string }, local?: { name: string } }>
+    }
+    if (declaration.source.value !== 'evlog/hono') return
+    for (const specifier of declaration.specifiers) {
+      if (specifier.imported?.name === 'evlog' && specifier.local) names.add(specifier.local.name)
+    }
+  })
+  return names
+}
+
+/** Whether the file registers evlog's middleware: `app.use(evlog())`. */
+function registersEvlogMiddleware(parsed: ParseResult): boolean {
+  const names = evlogMiddlewareNames(parsed)
+  if (names.size === 0) return false
+
+  let found = false
+  walkAst(parsed.program, (node) => {
+    if (found || node.type !== 'CallExpression') return
+    const call = node as { callee: Node, arguments: Node[] }
+    if (call.callee.type !== 'MemberExpression') return
+    const { property, computed } = call.callee as { property: Node, computed?: boolean }
+    if (computed || property.type !== 'Identifier' || property.name !== 'use') return
+    found = call.arguments.some((argument) => {
+      if (argument.type !== 'CallExpression') return false
+      const { callee } = argument as { callee: Node }
+      return callee.type === 'Identifier' && names.has((callee as unknown as { name: string }).name)
+    })
+  })
+  return found
+}
+
 /**
  * Hono: scan source for `app.get/post/…('/path', …)` registrations.
  *
- * No auto-imports — `useLogger` / `c.get('log')` come from `evlog/hono`. The
- * middleware emits a per-request event once `app.use(evlog())` is registered, so
- * a bare handler is still a thin event (ambient), not a fully dark one.
+ * No auto-imports — `useLogger` / `c.get('log')` come from `evlog/hono`. Unlike
+ * Nuxt or Nitro, the per-request event only exists once the app itself calls
+ * `app.use(evlog())`, so the ambient/explicit capability is resolved per
+ * project: ambient when the middleware is registered somewhere in the scanned
+ * sources, explicit (nothing is emitted at all) when it is not.
  */
 export const honoAdapter: FrameworkAdapter = {
   framework: 'hono',
-  requestLogger: 'ambient',
+  requestLogger: 'explicit',
+  resolveRequestLogger(ctx: ScanContext): 'ambient' | 'explicit' {
+    const parse = ctx.parse ?? parseFile
+    for (const file of sourceFiles(ctx.projectRoot)) {
+      const parsed = parse(file)
+      if (parsed && registersEvlogMiddleware(parsed)) return 'ambient'
+    }
+    return 'explicit'
+  },
   // eslint-disable-next-line require-await -- satisfies the async FrameworkAdapter contract
   async extractRoutes(ctx: ScanContext): Promise<RawRouteEntry[]> {
-    const root = ctx.projectRoot
     const parse = ctx.parse ?? parseFile
     const routes: RawRouteEntry[] = []
-    const seen = new Set<string>()
 
-    for (const file of globSync([...SOURCE_GLOBS], { cwd: root, absolute: true })) {
-      if (seen.has(file)) continue
-      seen.add(file)
-      routes.push(...extractFromFile(file, root, parse))
+    for (const file of sourceFiles(ctx.projectRoot)) {
+      routes.push(...extractFromFile(file, ctx.projectRoot, parse))
     }
 
     return routes

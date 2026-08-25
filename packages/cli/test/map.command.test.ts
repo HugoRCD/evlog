@@ -186,6 +186,16 @@ describe('formatMapReport', () => {
     expect(out).toContain('useLogger(event)')
   })
 
+  it('suggests a hono handler shape for a hono route', async () => {
+    const cwd = join(FIXTURES, 'hono-basic')
+    const ctx = fakeContext(cwd)
+    const result = await runMap(ctx, undefined, { noWrite: true })
+    const out = formatMapReport(ctx, result, { entry: '/health' })
+
+    expect(out).toContain('SUGGESTED SHAPE')
+    expect(out).toContain('app.get(\'/health\', async (c) => {')
+  })
+
   it('names the audit action after the route it suggests it for', async () => {
     const { ctx, result } = await nuxt()
     const out = formatMapReport(ctx, result, { entry: '/api/payments/stripe' })

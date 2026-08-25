@@ -85,6 +85,15 @@ export const cliErrors = defineErrorCatalog('cli', {
     link: 'https://evlog.dev/cli/init',
     tags: ['init'],
   },
+  INIT_FRAMEWORK_UNSUPPORTED: {
+    status: 400,
+    message: ({ framework }: { framework: string }) =>
+      `evlog init cannot wire ${framework} yet`,
+    why: 'The framework has a map adapter, but init has no wiring plan for it',
+    fix: 'Wire evlog by hand following the framework guide, then run evlog map to score coverage',
+    link: 'https://evlog.dev/integrate/frameworks/overview',
+    tags: ['init'],
+  },
   INIT_INVALID_ENRICHER: {
     status: 400,
     message: ({ value, known }: { value: string, known: string }) =>

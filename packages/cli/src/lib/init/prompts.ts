@@ -28,6 +28,7 @@ import {
   SAMPLING_PRESETS,
 } from './catalog'
 import type { DrainId, EnricherId, ExtraGroup, ExtraId, OfferContext, SamplingProfile } from './catalog'
+import { INIT_FRAMEWORKS } from './frameworks'
 import type { FileAction, ManualStep } from './frameworks'
 
 /** Every answer `init` needs, however it was obtained. */
@@ -97,7 +98,8 @@ export async function askAnswers(input: PromptContext): Promise<InitAnswers> {
   const framework = input.uncertain
     ? required(await select<Framework>({
       message: 'Which framework is this?',
-      options: (Object.keys(FRAMEWORK_LABELS) as Framework[]).map(id => ({
+      /* Only the frameworks init can wire — map-only ones would crash the planner. */
+      options: INIT_FRAMEWORKS.map(id => ({
         value: id,
         label: FRAMEWORK_LABELS[id],
       })),

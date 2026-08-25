@@ -142,6 +142,12 @@ export interface FrameworkAdapter {
    * means nothing is emitted until the code opts in.
    */
   requestLogger: 'ambient' | 'explicit'
+  /**
+   * Per-project override for `requestLogger`, for frameworks where ambient
+   * emission depends on app code (Hono's `app.use(evlog())`) rather than a
+   * module the framework loads on its own.
+   */
+  resolveRequestLogger?: (ctx: ScanContext) => 'ambient' | 'explicit'
 }
 
 export type Grade = 'excellent' | 'good' | 'needs-work' | 'at-risk'
