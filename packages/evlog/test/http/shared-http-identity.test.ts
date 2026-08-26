@@ -4,6 +4,7 @@ import { sendBatchToDatadog } from '../../src/adapters/datadog'
 import { sendBatchToOTLP } from '../../src/adapters/otlp'
 import { EVLOG_USER_AGENT, EVLOG_VERSION, httpPost, withEvlogIdentityHeaders } from '../../src/shared/http'
 import type { WideEvent } from '../../src/types'
+import { withFakeTimers } from '../helpers/timers'
 
 const event: WideEvent = {
   timestamp: '2024-01-01T12:00:00.000Z',
@@ -88,6 +89,43 @@ describe('shared/http evlog identity', () => {
       const headers = options.headers as Record<string, string>
       expect(headers['User-Agent']).toBe(EVLOG_USER_AGENT)
       expect(headers['X-Evlog-Source']).toBe('test')
+    })
+  })
+
+  describe('httpPost retries and response inspection', () => {
+    it('retries 429 responses with backoff', async () => {
+      await withFakeTimers(async () => {
+        fetchSpy
+          .mockResolvedValueOnce(new Response('rate limit exceeded', { status: 429 }))
+          .mockResolvedValueOnce(new Response(null, { status: 200 }))
+
+        const promise = httpPost({
+          url: 'https://example.com/ingest',
+          headers: {},
+          body: '[]',
+          timeout: 5000,
+          label: 'test',
+        })
+        await vi.advanceTimersByTimeAsync(200)
+        await promise
+
+        expect(fetchSpy).toHaveBeenCalledTimes(2)
+      })
+    })
+
+    it('calls onResponse with the successful response', async () => {
+      const onResponse = vi.fn()
+
+      await httpPost({
+        url: 'https://example.com/ingest',
+        headers: {},
+        body: '[]',
+        timeout: 5000,
+        label: 'test',
+        onResponse,
+      })
+
+      expect(onResponse).toHaveBeenCalledTimes(1)
     })
   })
 })

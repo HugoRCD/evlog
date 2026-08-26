@@ -34,7 +34,7 @@ describe('axiom adapter', () => {
 
       expect(fetchSpy).toHaveBeenCalledTimes(1)
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('https://api.axiom.co/v1/datasets/my-dataset/ingest')
+      expect(url).toBe('https://api.axiom.co/v1/datasets/my-dataset/ingest?timestamp-field=timestamp')
     })
 
     it('uses custom base URL when provided', async () => {
@@ -47,7 +47,7 @@ describe('axiom adapter', () => {
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('https://custom.axiom.co/v1/datasets/my-dataset/ingest')
+      expect(url).toBe('https://custom.axiom.co/v1/datasets/my-dataset/ingest?timestamp-field=timestamp')
     })
 
     it('uses edgeUrl for edge ingest endpoint', async () => {
@@ -60,7 +60,7 @@ describe('axiom adapter', () => {
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my-dataset')
+      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my-dataset?timestamp-field=timestamp')
     })
 
     it('uses edgeUrl as-is when custom path is provided', async () => {
@@ -73,7 +73,7 @@ describe('axiom adapter', () => {
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('http://localhost:3400/custom/ingest')
+      expect(url).toBe('http://localhost:3400/custom/ingest?timestamp-field=timestamp')
     })
 
     it('URL encodes dataset name', async () => {
@@ -85,7 +85,7 @@ describe('axiom adapter', () => {
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('https://api.axiom.co/v1/datasets/my%20dataset%2Ftest/ingest')
+      expect(url).toBe('https://api.axiom.co/v1/datasets/my%20dataset%2Ftest/ingest?timestamp-field=timestamp')
     })
 
     it('URL encodes dataset name for edge ingest endpoint', async () => {
@@ -98,7 +98,7 @@ describe('axiom adapter', () => {
       })
 
       const [url] = fetchSpy.mock.calls[0] as [string, RequestInit]
-      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my%20dataset%2Ftest')
+      expect(url).toBe('https://eu-central-1.aws.edge.axiom.co/v1/ingest/my%20dataset%2Ftest?timestamp-field=timestamp')
     })
 
     it('sets correct Authorization header', async () => {
@@ -181,6 +181,33 @@ describe('axiom adapter', () => {
         dataset: 'my-dataset',
         apiKey: 'test-token',
       })).rejects.toThrow('Axiom API error: 400 Bad Request')
+    })
+
+    it('warns when Axiom reports partial ingest failures', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({ ingested: 1, failed: 1, failures: [{ error: 'invalid timestamp' }] }), { status: 200 }),
+      )
+
+      await sendToAxiom(createTestEvent(), { dataset: 'my-dataset', apiKey: 'test-token' })
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('1 event(s) failed to ingest'))
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('invalid timestamp'))
+    })
+
+    it('warns on schema messages from Axiom', async () => {
+      const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
+      fetchSpy.mockResolvedValueOnce(
+        new Response(JSON.stringify({
+          ingested: 1,
+          failed: 0,
+          messages: [{ priority: 'warn', code: 'schema_rules_drop:debug', msg: 'field "debug" dropped: not in declared schema' }],
+        }), { status: 200 }),
+      )
+
+      await sendToAxiom(createTestEvent(), { dataset: 'my-dataset', apiKey: 'test-token' })
+
+      expect(warnSpy).toHaveBeenCalledWith(expect.stringContaining('field "debug" dropped'))
     })
   })
 
