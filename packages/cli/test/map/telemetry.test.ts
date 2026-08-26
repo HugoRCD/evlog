@@ -144,6 +144,7 @@ describe('map telemetry', () => {
        framework or grade band would go missing from the numbers rather than
        break loudly. */
     expect(MAP_TELEMETRY_FIELDS.mapFramework).toContain('tanstack-start')
+    expect(MAP_TELEMETRY_FIELDS.mapFramework).toContain('hono')
     expect(MAP_TELEMETRY_FIELDS.mapGrade).toContain('at-risk')
   })
 

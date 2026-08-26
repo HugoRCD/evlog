@@ -2,7 +2,7 @@ import type { ParseFn } from './parse'
 import type { ProjectFacts } from './project-facts'
 
 /** Frameworks the `map` command can scan (adapter selection key). */
-export type Framework = 'nuxt' | 'nitro' | 'next' | 'tanstack-start'
+export type Framework = 'nuxt' | 'nitro' | 'next' | 'tanstack-start' | 'hono'
 
 /** Route shape as detected on disk, before observability checks run. */
 export type RouteKind = 'api' | 'page' | 'middleware' | 'server-action' | 'cron' | 'websocket'
@@ -142,6 +142,12 @@ export interface FrameworkAdapter {
    * means nothing is emitted until the code opts in.
    */
   requestLogger: 'ambient' | 'explicit'
+  /**
+   * Per-project override for `requestLogger`, for frameworks where ambient
+   * emission depends on app code (Hono's `app.use(evlog())`) rather than a
+   * module the framework loads on its own.
+   */
+  resolveRequestLogger?: (ctx: ScanContext) => 'ambient' | 'explicit'
 }
 
 export type Grade = 'excellent' | 'good' | 'needs-work' | 'at-risk'

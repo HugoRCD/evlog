@@ -300,6 +300,25 @@ function hasContextLoggerPath(chain: readonly string[]): boolean {
   )
 }
 
+/**
+ * Hono's `c.get('log')` (and the same shape on any context object).
+ *
+ * Not a member path: the key is a call argument. Taken at face value like
+ * `context.log` — there is no import to check, and missing it would score
+ * every idiomatic Hono handler as a dark event.
+ */
+function isContextGetLog(node: Node): boolean {
+  if (node.type !== 'CallExpression') return false
+  const call = node as { callee: Node, arguments: Node[] }
+  if (call.callee.type !== 'MemberExpression') return false
+  const member = call.callee as { property: Node, computed?: boolean }
+  if (member.computed || member.property.type !== 'Identifier' || member.property.name !== 'get') {
+    return false
+  }
+  const [key] = call.arguments
+  return key?.type === 'Literal' && (key as { value: unknown }).value === 'log'
+}
+
 /** Member names of `node`, root first — `['context', 'log']` for `req.context.log`. */
 function memberPath(node: Node): string[] {
   const path: string[] = []
@@ -567,6 +586,13 @@ export function buildFileFacts(
               factory: described.member,
               line: lines.lineAt((init as unknown as { start: number }).start),
             })
+          }
+          /* `const log = c.get('log')` — Hono's documented accessor. */
+          if (isContextGetLog(init)) {
+            const line = lines.lineAt((init as unknown as { start: number }).start)
+            for (const name of patternNames(declarator.id)) {
+              contextLoggers.push({ binding: name, line })
+            }
           }
         }
 

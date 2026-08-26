@@ -111,5 +111,6 @@ export function frameworkLabel(framework: Framework): string {
     case 'nitro': return 'Nitro'
     case 'next': return 'Next.js'
     case 'tanstack-start': return 'TanStack Start'
+    case 'hono': return 'Hono'
   }
 }

@@ -24,6 +24,7 @@ const ACCESSOR: Record<Framework, string> = {
   'nitro': '`useLogger(event)` from `evlog/nitro` inside a route handler',
   'next': '`useLogger()` from your `lib/evlog.ts` inside a route handler',
   'tanstack-start': '`req.context.log` inside a server route',
+  'hono': '`c.get(\'log\')` or `useLogger()` from `evlog/hono` inside a route handler',
 }
 
 const DEFAULT_ACCESSOR = '`useLogger()` inside a request handler'

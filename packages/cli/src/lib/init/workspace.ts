@@ -4,6 +4,7 @@ import { globSync } from 'tinyglobby'
 import { detectFramework } from '../map/detect'
 import type { Framework } from '../map/types'
 import type { PackageJson, ProjectInfo } from '../project'
+import { isInitFramework } from './frameworks'
 
 /** A workspace package `init` could set up. */
 export interface WorkspaceApp {
@@ -24,7 +25,8 @@ export function isWorkspaceRoot(project: ProjectInfo): boolean {
  * Find the apps in a workspace that `init` knows how to wire.
  *
  * Packages with no detectable framework are left out — a shared `utils`
- * package has no entry points to instrument.
+ * package has no entry points to instrument. So are map-only frameworks,
+ * which init has no wiring plan for.
  */
 export function findWorkspaceApps(project: ProjectInfo): WorkspaceApp[] {
   const patterns = workspaceGlobs(project)
@@ -59,6 +61,7 @@ export function findWorkspaceApps(project: ProjectInfo): WorkspaceApp[] {
 
     try {
       const { framework } = detectFramework(candidate)
+      if (!isInitFramework(framework)) continue
       apps.push({
         name: packageJson.name ?? relative(project.root, dir),
         dir,

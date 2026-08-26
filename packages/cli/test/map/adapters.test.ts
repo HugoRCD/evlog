@@ -20,14 +20,23 @@ async function project(files: Record<string, string>): Promise<string> {
 }
 
 function routesOf(framework: Framework, root: string): Promise<RawRouteEntry[]> {
-  const ctx: ScanContext = {
+  return getAdapter(framework).extractRoutes(scanContext(framework, root))
+}
+
+/** The capability `scan` would use: the per-project override, else the static one. */
+function requestLoggerOf(framework: Framework, root: string): 'ambient' | 'explicit' {
+  const adapter = getAdapter(framework)
+  return adapter.resolveRequestLogger?.(scanContext(framework, root)) ?? adapter.requestLogger
+}
+
+function scanContext(framework: Framework, root: string): ScanContext {
+  return {
     projectRoot: root,
     framework,
     projectName: 'temp',
     hasEvlog: true,
     verbose: false,
   }
-  return getAdapter(framework).extractRoutes(ctx)
 }
 
 afterEach(async () => {
@@ -213,5 +222,157 @@ describe('tanstack-start adapter', () => {
     const routes = await routesOf('tanstack-start', root)
 
     expect(routes.map(route => route.method).sort()).toEqual(['GET', 'POST'])
+  })
+})
+
+describe('hono adapter', () => {
+  it('reads method and path off app.get / app.post registrations', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.post(\'/checkout\', (c) => c.json({ ok: true }))',
+        'app.get(\'/health\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`).sort()).toEqual([
+      'GET /health',
+      'POST /checkout',
+    ])
+  })
+
+  it('still finds routes when the app is not named app', async () => {
+    const root = await project({
+      'src/api.ts': [
+        'import { Hono } from \'hono\'',
+        'const api = new Hono()',
+        'api.put(\'/orders/:id\', (c) => c.json({ ok: true }))',
+        'export default api',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['PUT /orders/:id'])
+  })
+
+  it('does not treat c.get(\'log\') as a route', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.get(\'/health\', (c) => {',
+        '  const log = c.get(\'log\')',
+        '  log.set({ route: \'health\' })',
+        '  return c.json({ ok: true })',
+        '})',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
+  it('does not treat HTTP client calls as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'import axios from \'axios\'',
+        'const app = new Hono()',
+        'app.get(\'/proxy\', async (c) => {',
+        '  const res = await axios.get(\'/users\', { headers: {} })',
+        '  return c.json(res.data)',
+        '})',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /proxy'])
+  })
+
+  it('reads app.on(\'GET\', \'/path\', …) registrations', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.on(\'GET\', \'/status\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /status'])
+  })
+
+  it('expands app.on array methods and paths into one route per combination', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.on([\'PUT\', \'DELETE\'], \'/posts/:id\', (c) => c.json({ ok: true }))',
+        'app.on(\'GET\', [\'/hello\', \'/ja/hello\'], (c) => c.text(\'hi\'))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('hono', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`).sort()).toEqual([
+      'DELETE /posts/:id',
+      'GET /hello',
+      'GET /ja/hello',
+      'PUT /posts/:id',
+    ])
+  })
+
+  it('resolves the request logger to ambient once app.use(evlog()) is registered', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'import { evlog } from \'evlog/hono\'',
+        'const app = new Hono()',
+        'app.use(evlog())',
+        'app.get(\'/health\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    expect(requestLoggerOf('hono', root)).toBe('ambient')
+  })
+
+  it('resolves the request logger to explicit when the middleware is never registered', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'const app = new Hono()',
+        'app.get(\'/health\', (c) => c.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    expect(requestLoggerOf('hono', root)).toBe('explicit')
+  })
+
+  it('does not credit an evlog() call that is not evlog/hono\'s middleware', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Hono } from \'hono\'',
+        'import { evlog } from \'./local-helper\'',
+        'const app = new Hono()',
+        'app.use(evlog())',
+        'export default app',
+      ].join('\n'),
+    })
+
+    expect(requestLoggerOf('hono', root)).toBe('explicit')
   })
 })

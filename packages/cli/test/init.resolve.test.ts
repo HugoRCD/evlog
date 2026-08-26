@@ -54,7 +54,7 @@ describe('parseExtrasArg', () => {
 describe('resolveAnswers', () => {
   /* No scan ran, so evidence-gated offers are unavailable — which is exactly
      what a caller passing flags against an unreadable project gets. */
-  const offers = (prodDrains: DrainId[], framework: 'nuxt' | 'nitro' | 'next' | 'tanstack-start') => ({
+  const offers = (prodDrains: DrainId[], framework: 'nuxt' | 'nitro' | 'next' | 'tanstack-start' | 'hono') => ({
     framework,
     prodDrains,
     facts: null,

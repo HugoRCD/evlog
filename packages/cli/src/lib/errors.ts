@@ -63,7 +63,7 @@ export const cliErrors = defineErrorCatalog('cli', {
   },
   MAP_FRAMEWORK_NOT_DETECTED: {
     status: 400,
-    message: 'Could not detect a supported framework (nuxt, nitro, next, tanstack-start)',
+    message: 'Could not detect a supported framework (nuxt, nitro, next, tanstack-start, hono)',
     why: 'No matching dependency or config file was found in this project',
     fix: 'Use --framework <name> to override detection',
     tags: ['map', 'project'],
@@ -72,8 +72,8 @@ export const cliErrors = defineErrorCatalog('cli', {
     status: 400,
     message: ({ value }: { value: string }) =>
       `Unknown --framework "${value}"`,
-    why: 'map only ships adapters for nuxt, nitro, next, and tanstack-start',
-    fix: 'Pass one of: nuxt, nitro, next, tanstack-start',
+    why: 'map only ships adapters for nuxt, nitro, next, tanstack-start, and hono',
+    fix: 'Pass one of: nuxt, nitro, next, tanstack-start, hono',
     tags: ['map'],
   },
   INIT_INVALID_FRAMEWORK: {
@@ -83,6 +83,15 @@ export const cliErrors = defineErrorCatalog('cli', {
     why: 'init only knows how to wire nuxt, nitro, next, and tanstack-start',
     fix: 'Pass one of: nuxt, nitro, next, tanstack-start — or omit it and let detection decide',
     link: 'https://evlog.dev/cli/init',
+    tags: ['init'],
+  },
+  INIT_FRAMEWORK_UNSUPPORTED: {
+    status: 400,
+    message: ({ framework }: { framework: string }) =>
+      `evlog init cannot wire ${framework} yet`,
+    why: 'The framework has a map adapter, but init has no wiring plan for it',
+    fix: 'Wire evlog by hand following the framework guide, then run evlog map to score coverage',
+    link: 'https://evlog.dev/integrate/frameworks/overview',
     tags: ['init'],
   },
   INIT_INVALID_ENRICHER: {

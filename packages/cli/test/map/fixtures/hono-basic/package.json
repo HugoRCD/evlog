@@ -1,0 +1,9 @@
+{
+  "name": "hono-basic-fixture",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "evlog": "workspace:*",
+    "hono": "^4.0.0"
+  }
+}

@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs'
 import { join, relative } from 'node:path'
+import { cliErrors } from '../errors'
 import type { Framework } from '../map/types'
 import { findDestination, findEnricher, findSamplingPreset } from './catalog'
 import type { DrainId, EnricherId, ExtraId, SamplingProfile } from './catalog'
@@ -42,6 +43,19 @@ export interface WiringPlan {
   manual: ManualStep[]
   /** Wiring that is already in place — printed so the run is never silent. */
   already: string[]
+}
+
+/**
+ * Frameworks `init` can wire — the ones with a `frameworkPlan` case.
+ *
+ * `map` scans more (hono has an adapter but no wiring plan yet): every init
+ * surface (flag parsing, prompt, workspace targets, telemetry) reads this list
+ * so a map-only framework is refused cleanly instead of reaching the planner.
+ */
+export const INIT_FRAMEWORKS = ['nuxt', 'nitro', 'next', 'tanstack-start'] as const satisfies readonly Framework[]
+
+export function isInitFramework(framework: Framework): boolean {
+  return (INIT_FRAMEWORKS as readonly Framework[]).includes(framework)
 }
 
 export interface WiringInput {
@@ -905,5 +919,10 @@ function frameworkPlan(input: WiringInput): WiringPlan {
     case 'nitro':
     case 'tanstack-start': return planNitro(input)
     case 'next': return planNext(input)
+    /* map-only framework — the INIT_FRAMEWORKS guard refuses it before any
+       prompt; thrown here too so the planner can never return undefined. */
+    case 'hono': throw cliErrors.INIT_FRAMEWORK_UNSUPPORTED({ framework: input.framework })
   }
+  /* A new Framework member fails to compile here until init decides on a plan. */
+  return input.framework satisfies never
 }

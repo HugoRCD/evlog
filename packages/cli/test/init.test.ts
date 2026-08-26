@@ -601,3 +601,27 @@ describe('sampling tiers', () => {
     expect(config.contents).not.toContain('sampling:')
   })
 })
+
+describe('runInit — map-only frameworks', () => {
+  it('refuses a hono project cleanly instead of reaching the planner', async () => {
+    const cwd = await project({
+      'package.json': '{"name":"shop","dependencies":{"hono":"^4.0.0"}}',
+      'src/index.ts': 'import { Hono } from \'hono\'\nconst app = new Hono()\nexport default app\n',
+    })
+
+    await expect(runInit(fakeContext(cwd), undefined, { agentGuide: false, install: false, yes: true }))
+      .rejects.toThrow(/init cannot wire hono yet/)
+  })
+
+  it('throws from the planner backstop instead of returning undefined', () => {
+    const plan = () => planWiring({
+      root: '/tmp/nowhere',
+      framework: 'hono',
+      service: 'shop',
+      ...wiring(),
+      nitroMajor: 3,
+    })
+
+    expect(plan).toThrow(/init cannot wire hono yet/)
+  })
+})

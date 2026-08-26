@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Hono, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start; `evlog map` also scans Hono. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
@@ -54,9 +54,9 @@ Docs: https://www.evlog.dev/use-cases/audit/overview
 npm install evlog
 ```
 
-## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start)
+## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start, Hono)
 
-`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On the four supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
+`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On Nuxt, Nitro, Next.js, and TanStack Start it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). On Hono, `map` and the CI gate work, but `init` has no wiring plan yet: set evlog up with the manual Hono section below, then score with `map`. If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
 ### 1. Setup: `evlog init`
 

@@ -68,6 +68,12 @@ describe('detect', () => {
     const result = detectFramework(project)
     expect(result.framework).toBe('tanstack-start')
   })
+
+  it('detects hono in fixture', async () => {
+    const project = await resolveProject(join(FIXTURES, 'hono-basic'))
+    const result = detectFramework(project)
+    expect(result.framework).toBe('hono')
+  })
 })
 
 describe('nuxt extraction', () => {
@@ -127,6 +133,20 @@ describe('tanstack extraction', () => {
   })
 })
 
+describe('hono extraction', () => {
+  it('extracts all routes from hono-basic fixture', async () => {
+    const root = join(FIXTURES, 'hono-basic')
+    const adapter = getAdapter('hono')
+    const routes = await adapter.extractRoutes(await ctx(root, 'hono'))
+
+    const paths = routes.map(r => `${r.method ?? '*'} ${r.path} (${r.kind})`).sort()
+    expect(paths).toEqual([
+      'GET /health (api)',
+      'POST /checkout (api)',
+    ])
+  })
+})
+
 describe('full scan snapshots', () => {
   it('nuxt-basic map snapshot', async () => {
     const root = join(FIXTURES, 'nuxt-basic')
@@ -143,6 +163,12 @@ describe('full scan snapshots', () => {
   it('tanstack-basic map snapshot', async () => {
     const root = join(FIXTURES, 'tanstack-basic')
     const result = await scan(await ctx(root, 'tanstack-start'))
+    expect(mapForSnapshot(result.map)).toMatchSnapshot()
+  })
+
+  it('hono-basic map snapshot', async () => {
+    const root = join(FIXTURES, 'hono-basic')
+    const result = await scan(await ctx(root, 'hono'))
     expect(mapForSnapshot(result.map)).toMatchSnapshot()
   })
 })
@@ -177,5 +203,27 @@ describe('checks', () => {
   it('flags plain throw new Error', () => {
     const plain = result.map.routes.find(r => r.path === '/api/plain-error')
     expect(plain?.checks['structured-errors']?.status).toBe('fail')
+  })
+})
+
+describe('hono checks', () => {
+  let result: ScanResult
+
+  beforeAll(async () => {
+    result = await scan(await ctx(join(FIXTURES, 'hono-basic'), 'hono'))
+  })
+
+  it('passes the instrumented checkout route that uses c.get(\'log\')', () => {
+    const checkout = result.map.routes.find(r => r.path === '/checkout')
+    expect(checkout?.checks['wide-event']?.status).toBe('pass')
+    expect(checkout?.checks['context']?.status).toBe('pass')
+    expect(checkout?.checks['audit']?.status).toBe('pass')
+    expect(checkout?.score).toBe(100)
+  })
+
+  it('flags the dark health route', () => {
+    const health = result.map.routes.find(r => r.path === '/health')
+    expect(health?.checks['wide-event']?.status).toBe('fail')
+    expect(health?.checks['context']?.status).toBe('fail')
   })
 })

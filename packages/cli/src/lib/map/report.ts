@@ -2,6 +2,7 @@ import type { CliContext } from '../../core/context'
 import { gradientRule, HEADER_GRADIENT_WIDTH } from '../../core/brand'
 import { DOCS_URL, createStyle } from '../../core/output'
 import type { Style, StyleCode } from '../../core/output'
+import { HONO_SHORTHAND_VERBS } from './adapters/hono'
 import type { BaselineComparison } from './baseline'
 import { hasRegressed } from './baseline'
 import { countSuppressed } from './directives'
@@ -743,7 +744,16 @@ function suggestedShape(route: RouteEntry, framework: Framework, project: Projec
         indent(1, '} },'),
         '})',
       ]
+    case 'hono': {
+      /* `app.on('PURGE', …)` routes have no `app.purge()` shorthand to suggest. */
+      const open = route.method === null || HONO_SHORTHAND_VERBS.has(route.method)
+        ? `app.${(route.method ?? 'all').toLowerCase()}('${route.path}', async (c) => {`
+        : `app.on('${route.method}', '${route.path}', async (c) => {`
+      return [open, ...body.map(line => indent(1, line)), '})']
+    }
   }
+  /* A new Framework member fails to compile here until it has a shape. */
+  return framework satisfies never
 }
 
 /**
