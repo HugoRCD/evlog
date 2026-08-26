@@ -1,5 +1,18 @@
 # @evlog/cli
 
+## 0.6.0
+
+### Minor Changes
+
+- [#630](https://github.com/HugoRCD/evlog/pull/630) [`f1c37d0`](https://github.com/HugoRCD/evlog/commit/f1c37d0765e5352e6c2ee4383698e7e4ad607a10) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `evlog init` wires Hono projects. It creates `src/evlog.ts` with `initLogger` and a configured `evlog()` middleware export: drains and enrichers land in the middleware options, sampling in `initLogger`. Registering the middleware stays yours, so init prints the `app.use(evlogMiddleware)` line to paste. Hono joins the framework prompt, `--framework hono`, and init telemetry.
+
+- [#629](https://github.com/HugoRCD/evlog/pull/629) [`0a8793b`](https://github.com/HugoRCD/evlog/commit/0a8793b2ddc0cac0ed3ade95280c51974d781131) Thanks [@cavalluccijohann](https://github.com/cavalluccijohann)! - Add Hono support to `evlog map`. The scanner detects Hono projects and extracts routes from `app.get('/path', handler)` registrations, including `app.on()` with array methods or paths. The facts layer recognizes `c.get('log')` as a logger binding, so Hono handlers using the idiomatic accessor score correctly, and the report distinguishes an app that registered `app.use(evlog())` (thin ambient events) from one that never did (dark). `evlog map <file>` suggests the handler shape in Hono's own idiom, and `evlog agents` documents the accessor in its AGENTS.md block.
+
+### Patch Changes
+
+- Updated dependencies [[`f030d01`](https://github.com/HugoRCD/evlog/commit/f030d01a6423c3cb7843e33cb8b95d9bbc4b9c12)]:
+  - evlog@2.27.1
+
 ## 0.5.3
 
 ### Patch Changes
