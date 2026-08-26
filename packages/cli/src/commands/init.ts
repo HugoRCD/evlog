@@ -48,7 +48,7 @@ export default defineEvlogCommand('init', {
   skipHeader: (ctx, args) => args.json !== true && args.yes !== true && canPrompt(ctx),
   args: {
     cwd: { type: 'string', description: 'Project directory (default: current)' },
-    framework: { type: 'string', description: 'Override framework detection (nuxt, nitro, next, tanstack-start)' },
+    framework: { type: 'string', description: 'Override framework detection (nuxt, nitro, next, tanstack-start, hono)' },
     service: { type: 'string', description: 'Service name on every wide event (default: package name)' },
     drain: { type: 'string', description: 'Development sink: fs (default) or none' },
     prodDrain: { type: 'string', description: 'Production destinations, comma-separated: axiom, otlp, posthog, sentry, better-stack, datadog, hyperdx' },

@@ -1,6 +1,6 @@
 ---
 name: review-logging-patterns
-description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, and TanStack Start; `evlog map` also scans Hono. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
+description: Review code for logging patterns and suggest evlog adoption. Optionally use @evlog/cli (`evlog init` to wire evlog, `evlog agents` to write the conventions into AGENTS.md, `evlog map` to score entry-point coverage, `--baseline` to gate regressions in CI) on Nuxt, Nitro, Next.js, TanStack Start, and Hono. Guides setup on those plus SvelteKit, React Router, NestJS, Express, Fastify, Elysia, oRPC, Cloudflare Workers, AWS Lambda, Astro, and standalone TypeScript. Detects console.log spam, unstructured errors, and missing context. Covers wide events, structured errors, drain adapters (Axiom, OTLP, HyperDX, PostHog, Sentry, Better Stack, Datadog, Loki, ClickHouse, NuxtHub, Memory), sampling, enrichers, and AI SDK integration.
 license: MIT
 metadata:
   author: HugoRCD
@@ -56,7 +56,7 @@ npm install evlog
 
 ## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start, Hono)
 
-`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On Nuxt, Nitro, Next.js, and TanStack Start it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). On Hono, `map` and the CI gate work, but `init` has no wiring plan yet: set evlog up with the manual Hono section below, then score with `map`. If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
+`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On the five supported frameworks it covers the whole loop: **wire evlog in** (`init`), **score coverage** (`map`), **lock the score in CI** (`--min-score`, `--baseline`). If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
 ### 1. Setup: `evlog init`
 
@@ -75,7 +75,7 @@ npx @evlog/cli init --yes \
   --sampling medium
 ```
 
-Useful flags: `--framework` (override detection: `nuxt`, `nitro`, `next`, `tanstack-start`), `--prodDrain` (comma-separated: `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx`), `--extras` (`enrichers`, `pipeline`, `sampling`, `vite`, `error-catalog`, `audit-catalog`, `ai`, `better-auth`), `--enrichers`, `--sampling` (traffic tier: `all`, `low`, `medium`, `high`, `very-high`), `--apps` (monorepo: which workspace packages), `--no-install`. Review the `--dry-run` output with the user before applying. Docs: https://www.evlog.dev/cli/init
+Useful flags: `--framework` (override detection: `nuxt`, `nitro`, `next`, `tanstack-start`, `hono`), `--prodDrain` (comma-separated: `axiom`, `otlp`, `posthog`, `sentry`, `better-stack`, `datadog`, `hyperdx`), `--extras` (`enrichers`, `pipeline`, `sampling`, `vite`, `error-catalog`, `audit-catalog`, `ai`, `better-auth`), `--enrichers`, `--sampling` (traffic tier: `all`, `low`, `medium`, `high`, `very-high`), `--apps` (monorepo: which workspace packages), `--no-install`. Review the `--dry-run` output with the user before applying. Docs: https://www.evlog.dev/cli/init
 
 ### 2. Score: `evlog map`
 
