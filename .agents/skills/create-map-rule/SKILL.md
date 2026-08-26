@@ -132,7 +132,7 @@ pnpm --filter @evlog/cli run typecheck   # catches REGISTRY/CheckId drift
 pnpm --filter @evlog/cli run test
 ```
 
-Then sanity-check on a real project: `pnpm cli map --no-write` from an example app.
+Then sanity-check on a real project: `pnpm cli:sandbox` builds disposable, unevenly-instrumented apps under `.sandbox/` (one per supported framework, each a git repo), and prints the commands to run against them. `pnpm cli:sandbox --reset` rolls an app back to pristine after an `init` or `map` run; `--smoke` drives the whole non-interactive feature matrix and reports what broke.
 
 ---
 
@@ -150,6 +150,7 @@ Teaching `evlog map` a new framework is a different, heavier change: the adapter
 | 6 | `packages/cli/src/lib/init/` | Decide whether `evlog init` gains the framework too (separate scope of work — flag it explicitly in the PR if not) |
 | 7 | `apps/docs/content/3.cli/2.map.md` + `0.overview.md` | Update the supported-frameworks statements |
 | 8 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Update every "Nuxt, Nitro, Next.js, and TanStack Start" list (frontmatter description + CLI section) — same in `references/code-review.md` and `apps/docs/skills/build-audit-logs/SKILL.md` (Pass 2) and `analyze-logs/SKILL.md` (init suggestion) |
-| 9 | `.changeset/{framework}-map-adapter.md` | Changeset for `"@evlog/cli": minor` |
+| 9 | `scripts/cli-sandbox.mjs` | Add the framework to `APPS` (reuse the map fixture) so `pnpm cli:sandbox` covers it and `--smoke` exercises every CLI command against it |
+| 10 | `.changeset/{framework}-map-adapter.md` | Changeset for `"@evlog/cli": minor` |
 
 Reference implementations: `adapters/nuxt.ts` (shared Nuxt/Nitro), `adapters/next.ts`, `adapters/tanstack-start.ts`.
