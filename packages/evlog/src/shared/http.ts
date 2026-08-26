@@ -1,6 +1,7 @@
 /**
  * Minimal HTTP transport for drain adapters: abort-based timeouts, exponential
- * backoff on `5xx` / network errors, response bodies truncated in error messages.
+ * backoff on `5xx` / `429` / network errors, response bodies truncated in error
+ * messages.
  *
  * Identifies every outgoing request as coming from evlog via:
  * - `User-Agent: evlog/<version>` (Node / server runtimes only — browsers strip this)
@@ -26,7 +27,8 @@ export interface HttpPostOptions {
   /** Prefix used in error messages. */
   label: string
   /**
-   * Retries network errors, aborts, and `5xx` responses with exponential backoff.
+   * Retries network errors, aborts, and `5xx` / `429` responses with
+   * exponential backoff.
    * @default 2
    */
   retries?: number
@@ -42,6 +44,12 @@ export interface HttpPostOptions {
    * (`axiom`, `datadog`, ...) or `client` for browser-originated drains.
    */
   source?: string
+  /**
+   * Inspect a successful response before the request resolves. Lets an adapter
+   * surface partial failures a 2xx can still carry (e.g. Axiom's `failed` and
+   * `messages` fields).
+   */
+  onResponse?: (response: Response) => void | Promise<void>
 }
 
 function hasHeader(headers: Record<string, string>, target: string): boolean {
@@ -78,7 +86,10 @@ function isRetryable(error: unknown): boolean {
   if (error instanceof TypeError) return true
   if (error instanceof Error) {
     const match = error.message.match(/API error: (\d+)/)
-    if (match) return Number.parseInt(match[1]) >= 500
+    if (match) {
+      const status = Number.parseInt(match[1])
+      return status >= 500 || status === 429
+    }
   }
   return false
 }
@@ -87,7 +98,7 @@ function isRetryable(error: unknown): boolean {
  * POST a body with timeout + retry. Throws label-prefixed errors with a
  * truncated response body. Safe to call from any drain `send()`.
  */
-export async function httpPost({ url, headers, body, timeout, label, retries = 2, userAgent, source }: HttpPostOptions): Promise<void> {
+export async function httpPost({ url, headers, body, timeout, label, retries = 2, userAgent, source, onResponse }: HttpPostOptions): Promise<void> {
   const normalizedRetries = Number.isFinite(retries) && retries >= 0 ? Math.floor(retries) : 2
   const finalHeaders = withEvlogIdentityHeaders(headers, { userAgent, source })
 
@@ -111,6 +122,7 @@ export async function httpPost({ url, headers, body, timeout, label, retries = 2
         throw new Error(`${label} API error: ${response.status} ${response.statusText} - ${safeText}`)
       }
 
+      await onResponse?.(response)
       clearTimeout(timeoutId)
       return
     } catch (error) {

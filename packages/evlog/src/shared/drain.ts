@@ -105,6 +105,11 @@ export interface HttpDrainOptions<TConfig> {
   resolveTimeout?: (config: TConfig) => number | undefined
   /** Read the retry count off the resolved config (falls back to `retries`). */
   resolveRetries?: (config: TConfig) => number | undefined
+  /**
+   * Inspect a successful response (e.g. to surface partial failures a 2xx can
+   * still carry). Forwarded to {@link httpPost}.
+   */
+  onResponse?: (response: Response) => void | Promise<void>
 }
 
 const DEFAULT_HTTP_TIMEOUT = 5000
@@ -129,7 +134,13 @@ const DEFAULT_HTTP_TIMEOUT = 5000
  */
 export async function sendEncodedDrainRequest(
   request: HttpDrainRequest,
-  options: { label: string; source: string; timeout?: number; retries?: number },
+  options: {
+    label: string
+    source: string
+    timeout?: number
+    retries?: number
+    onResponse?: (response: Response) => void | Promise<void>
+  },
 ): Promise<void> {
   await httpPost({
     url: request.url,
@@ -139,6 +150,7 @@ export async function sendEncodedDrainRequest(
     retries: options.retries,
     label: options.label,
     source: options.source,
+    onResponse: options.onResponse,
   })
 }
 
@@ -186,6 +198,7 @@ export function defineHttpDrain<TConfig>(options: HttpDrainOptions<TConfig>): Dr
         retries,
         label: options.label ?? options.name,
         source: options.name,
+        onResponse: options.onResponse,
       })
     }
   }

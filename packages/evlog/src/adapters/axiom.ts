@@ -111,6 +111,7 @@ export function createAxiomDrain(overrides?: Partial<AxiomConfig>) {
     },
     label: 'Axiom',
     encode: encodeAxiomRequest,
+    onResponse: logIngestWarnings,
   })
 }
 
@@ -147,7 +148,36 @@ export async function sendBatchToAxiom(events: WideEvent[], config: AxiomConfig)
     source: 'axiom',
     timeout: config.timeout,
     retries: config.retries,
+    onResponse: logIngestWarnings,
   })
+}
+
+interface AxiomIngestResponse {
+  failed?: number
+  failures?: Array<{ error?: string }>
+  messages?: Array<{ msg?: string }>
+}
+
+/**
+ * Log Axiom's ingest warnings: partial failures and schema messages (e.g.
+ * locked-schema field drops) that a 2xx response can still carry.
+ */
+async function logIngestWarnings(response: Response): Promise<void> {
+  const text = await response.text().catch(() => '')
+  if (!text) return
+  let body: AxiomIngestResponse
+  try {
+    body = JSON.parse(text) as AxiomIngestResponse
+  } catch {
+    return
+  }
+  if (body.failed && body.failed > 0) {
+    const details = body.failures?.map(failure => failure.error).filter(Boolean).join('; ')
+    console.warn(`[evlog/axiom] ${body.failed} event(s) failed to ingest${details ? `: ${details}` : ''}`)
+  }
+  for (const message of body.messages ?? []) {
+    if (message.msg) console.warn(`[evlog/axiom] ${message.msg}`)
+  }
 }
 
 function resolveIngestUrl(config: AxiomConfig): string {
@@ -155,20 +185,23 @@ function resolveIngestUrl(config: AxiomConfig): string {
 
   if (!config.edgeUrl) {
     const baseUrl = config.baseUrl ?? 'https://api.axiom.co'
-    return `${baseUrl}/v1/datasets/${encodedDataset}/ingest`
+    const url = new URL(`${baseUrl}/v1/datasets/${encodedDataset}/ingest`)
+    url.searchParams.set('timestamp-field', 'timestamp')
+    return url.toString()
   }
 
   try {
     const parsed = new URL(config.edgeUrl)
     if (parsed.pathname === '' || parsed.pathname === '/') {
       parsed.pathname = `/v1/ingest/${encodedDataset}`
-      return parsed.toString()
+    } else {
+      parsed.pathname = parsed.pathname.replace(/\/+$/, '')
     }
-    parsed.pathname = parsed.pathname.replace(/\/+$/, '')
+    parsed.searchParams.set('timestamp-field', 'timestamp')
     return parsed.toString()
   } catch {
     console.warn(`[evlog/axiom] edgeUrl "${config.edgeUrl}" is not a valid URL, falling back to string concatenation.`)
     const trimmed = config.edgeUrl.replace(/\/+$/, '')
-    return `${trimmed}/v1/ingest/${encodedDataset}`
+    return `${trimmed}/v1/ingest/${encodedDataset}?timestamp-field=timestamp`
   }
 }
