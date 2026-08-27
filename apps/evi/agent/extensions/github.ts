@@ -1,5 +1,5 @@
 import githubExtension from '@github-tools/eve-extension'
-import type { ApprovalContext, ApprovalStatus } from 'eve/tools'
+import type { ApprovalContext, ApprovalStatus } from 'eve/tools/approval'
 import { GITHUB_CONNECTOR } from '../lib/github/credentials'
 import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
 import { isAutonomous, isScheduleAppAuth, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
@@ -121,7 +121,7 @@ export default githubExtension({
     removeAssignees: policy,
     addLabels: autonomousWrite,
     removeLabel: policy,
-    createLabel: (ctx) => createLabelPolicy(ctx.session.auth.current, ctx.toolInput),
+    createLabel: (ctx: ApprovalContext) => createLabelPolicy(ctx.session.auth.current, ctx.toolInput),
     updateLabel: policy,
   },
 })

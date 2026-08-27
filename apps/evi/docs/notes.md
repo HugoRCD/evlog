@@ -28,7 +28,7 @@ The Photon adapter's chat mapping keeps name/mimeType/size, and eve's
 `messageToUserContent` only reads `attachment.url`, which Photon never has. On
 the connected (pump) path the parsed content nodes with their authenticated
 `read()` survive on `message.raw.content`; on the webhook path `raw` is the
-delivery JSON, which never carries them, so `patches/eve@0.34.0.patch` calls
+delivery JSON, which never carries them, so `patches/eve@0.46.1.patch` calls
 `adapter.fetchMessage()` to re-resolve the message through the spectrum client
 and reads the images from the resolved nodes. On an eve upgrade the patch must
 be re-applied or retired.

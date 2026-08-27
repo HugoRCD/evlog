@@ -1,5 +1,5 @@
 import type { SessionAuthContext } from 'eve/context'
-import type { ApprovalStatus } from 'eve/tools'
+import type { ApprovalStatus } from 'eve/tools/approval'
 import { isAutonomous, isMaintainer } from '../trust'
 
 const LABEL_NAME_MAX = 50
