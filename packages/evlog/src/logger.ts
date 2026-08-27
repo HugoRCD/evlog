@@ -751,7 +751,8 @@ const _log: Log = {
 export { _log as log }
 
 const noopAudit = Object.assign(() => {}, { deny: () => {} }) as AuditMethod
-const noopLogger: AuditableLogger = {
+/** @internal Accepts every call and emits nothing; reused wherever logging must not fail the caller. */
+export const noopLogger: AuditableLogger = {
   set() {},
   setLevel() {},
   error() {},
