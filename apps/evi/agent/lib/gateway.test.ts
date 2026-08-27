@@ -27,6 +27,17 @@ describe('gatewayRouting', () => {
     const { gatewayRouting } = await loadGateway({})
     expect(gatewayRouting('schedule').sort).toBe('cost')
   })
+
+  it('pins scheduled runs to the vetted provider order, keeping the pool as fallback', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting('schedule').order).toEqual(['fireworks', 'alibaba'])
+  })
+
+  it('leaves interactive surfaces without a provider pin', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting('channel:photon')).not.toHaveProperty('order')
+    expect(gatewayRouting()).not.toHaveProperty('order')
+  })
 })
 
 describe('sessionTags', () => {
