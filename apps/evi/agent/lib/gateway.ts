@@ -7,13 +7,23 @@ function isBatch(kind?: string): boolean {
 }
 
 /**
+ * Deployments vetted for the base model, tried first on scheduled runs. The
+ * cost sort alone may pick any pool member, including deployments that serve
+ * the model without native tool-call parsing (raw DSML leaks into the text)
+ * or answer with an empty stream; unlisted providers remain as fallback.
+ */
+const SCHEDULE_PROVIDER_ORDER = ['fireworks', 'alibaba']
+
+/**
  * Routing shared by every gateway call: schedules sort on cost, every
  * interactive surface sorts on time to first token.
  */
 export function gatewayRouting(kind?: string) {
+  const batch = isBatch(kind)
   return {
     caching: 'auto',
-    sort: isBatch(kind) ? 'cost' : 'ttft',
+    sort: batch ? 'cost' : 'ttft',
+    ...(batch ? { order: SCHEDULE_PROVIDER_ORDER } : {}),
     zeroDataRetention: true,
   } as const
 }
