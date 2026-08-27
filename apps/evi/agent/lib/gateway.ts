@@ -1,29 +1,19 @@
 import { channelName } from './channel'
 import { environment } from './environment'
 
-/** Scheduled runs answer to nobody in real time; every other surface has someone waiting. */
-function isBatch(kind?: string): boolean {
-  return channelName(kind) === 'schedule'
-}
-
 /**
- * Deployments vetted for the base model, tried first on scheduled runs. The
- * cost sort alone may pick any pool member, including deployments that serve
- * the model without native tool-call parsing (raw DSML leaks into the text)
- * or answer with an empty stream; unlisted providers remain as fallback.
+ * Deployments vetted for the base model, preferred over the rest of the pool:
+ * routing alone can pick one that returns the model's tool calls as plain text
+ * instead of parsing them. Unlisted providers stay available as fallback.
  */
-const SCHEDULE_PROVIDER_ORDER = ['fireworks', 'alibaba']
+const PROVIDER_ORDER = ['fireworks', 'alibaba']
 
-/**
- * Routing shared by every gateway call: schedules sort on cost, every
- * interactive surface sorts on time to first token.
- */
-export function gatewayRouting(kind?: string) {
-  const batch = isBatch(kind)
+/** Routing shared by every gateway call. */
+export function gatewayRouting() {
   return {
     caching: 'auto',
-    sort: batch ? 'cost' : 'ttft',
-    ...(batch ? { order: SCHEDULE_PROVIDER_ORDER } : {}),
+    order: PROVIDER_ORDER,
+    sort: 'ttft',
     zeroDataRetention: true,
   } as const
 }

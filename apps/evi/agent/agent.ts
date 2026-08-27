@@ -8,7 +8,7 @@ interface ModelContext { channel: { kind?: string }, messages: readonly ModelMes
 function modelOptions(kind?: string) {
   return {
     providerOptions: {
-      gateway: { ...gatewayRouting(kind), tags: sessionTags(kind) },
+      gateway: { ...gatewayRouting(), tags: sessionTags(kind) },
     },
   }
 }

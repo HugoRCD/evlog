@@ -16,27 +16,14 @@ describe('gatewayRouting', () => {
     expect(gatewayRouting().zeroDataRetention).toBe(true)
   })
 
-  it('sorts an interactive surface on time to first token', async () => {
+  it('sorts on time to first token', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('channel:photon').sort).toBe('ttft')
-    expect(gatewayRouting('http').sort).toBe('ttft')
     expect(gatewayRouting().sort).toBe('ttft')
   })
 
-  it('leaves scheduled runs on the cheapest deployment', async () => {
+  it('prefers the vetted providers', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('schedule').sort).toBe('cost')
-  })
-
-  it('pins scheduled runs to the vetted provider order, keeping the pool as fallback', async () => {
-    const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('schedule').order).toEqual(['fireworks', 'alibaba'])
-  })
-
-  it('leaves interactive surfaces without a provider pin', async () => {
-    const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('channel:photon')).not.toHaveProperty('order')
-    expect(gatewayRouting()).not.toHaveProperty('order')
+    expect(gatewayRouting().order).toEqual(['fireworks', 'alibaba'])
   })
 })
 
