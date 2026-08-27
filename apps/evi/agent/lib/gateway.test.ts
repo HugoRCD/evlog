@@ -16,14 +16,21 @@ describe('gatewayRouting', () => {
     expect(gatewayRouting().zeroDataRetention).toBe(true)
   })
 
-  it('sorts on time to first token', async () => {
+  it('sorts a surface with someone waiting on time to first token', async () => {
     const { gatewayRouting } = await loadGateway({})
     expect(gatewayRouting().sort).toBe('ttft')
+    expect(gatewayRouting(false).sort).toBe('ttft')
   })
 
-  it('prefers the vetted providers', async () => {
+  it('sorts an unattended run on cost', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting().order).toEqual(['fireworks', 'alibaba'])
+    expect(gatewayRouting(true).sort).toBe('cost')
+  })
+
+  it('prefers the vetted providers whichever way it sorts', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting(false).order).toEqual(['fireworks', 'alibaba'])
+    expect(gatewayRouting(true).order).toEqual(['fireworks', 'alibaba'])
   })
 })
 

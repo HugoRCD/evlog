@@ -8,12 +8,17 @@ import { environment } from './environment'
  */
 const PROVIDER_ORDER = ['fireworks', 'alibaba']
 
-/** Routing shared by every gateway call. */
-export function gatewayRouting() {
+/**
+ * Routing shared by every gateway call. Schedule turns answer to nobody in
+ * real time, so they sort on cost; every other surface has someone waiting and
+ * sorts on time to first token. The sort only orders the pool past
+ * `PROVIDER_ORDER`, so the cheapest deployment never displaces a vetted one.
+ */
+export function gatewayRouting(unattended = false) {
   return {
     caching: 'auto',
     order: PROVIDER_ORDER,
-    sort: 'ttft',
+    sort: unattended ? 'cost' : 'ttft',
     zeroDataRetention: true,
   } as const
 }
