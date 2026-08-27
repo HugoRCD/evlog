@@ -85,6 +85,14 @@ $0.20/$0.40 deployment while cheaper 1M-context ones served the same model. A
 grounded turn went from $0.084 to $0.006. Sorting keeps following the price as
 deployments and promos move.
 
+**`zeroDataRetention` is what prunes the pool, and it prunes the cheap end.**
+On GLM 5.3 Flash the two deployments at half the going rate keep data, so ZDR
+drops them and the floor Evi can reach is the next tier up. `only: ['<provider>']`
+with ZDR set answers per provider: an ineligible one fails with a ZDR error
+rather than routing elsewhere. A hand-written `order` cannot fix this — a
+provider it names that ZDR has dropped is skipped silently, which reads as
+vetted while doing nothing.
+
 **`GET /v1/models` returns the real rate card**, including `input_cache_read`.
 Reconstructing an observed turn from it matched eve's reported `costUsd` to four
 decimals, which is how the overspend was found.
