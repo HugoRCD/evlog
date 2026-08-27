@@ -40,6 +40,18 @@ function toolContext(turnId = TURN_ID) {
   }
 }
 
+/**
+ * The turn's logger is gone. `useLogger` degrades to a detached logger and
+ * warns instead of throwing, so instrumentation can never fail its caller.
+ */
+function expectDetachedLogger(ctx?: ReturnType<typeof toolContext>): void {
+  const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+  const log = ctx === undefined ? useLogger() : useLogger(ctx)
+  expect(warn).toHaveBeenCalledWith(expect.stringContaining('found no logger'))
+  expect(log.emit()).toBeNull()
+  warn.mockRestore()
+}
+
 async function runTurn(
   hook: ReturnType<typeof defineEvlogHook>,
   options: {
@@ -546,7 +558,7 @@ describe('evlog/eve', () => {
 
     await runTurn(hook, { cancel: true })
 
-    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+    expectDetachedLogger(toolContext())
 
     await runTurn(hook, { turnId: TURN_ID_1 })
     await waitForDrainCalls(spies.drain, 2)
@@ -575,7 +587,7 @@ describe('evlog/eve', () => {
     expect(event?.eve).toMatchObject({
       failure: { code: 'SESSION_ERROR', message: 'session exploded' },
     })
-    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+    expectDetachedLogger(toolContext())
   })
 
   it('drops session context once the session completes', async () => {
@@ -594,7 +606,7 @@ describe('evlog/eve', () => {
     await waitForDrainCalls(spies.drain)
     const openTurn = findEventViaDrain(spies.drain, e => e.path?.includes(TURN_ID))
     expect(openTurn?.status).toBe(200)
-    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+    expectDetachedLogger(toolContext())
 
     hook.events!['turn.started']!({
       type: 'turn.started',
@@ -1257,8 +1269,39 @@ describe('evlog/eve', () => {
     expect(event?.business).toEqual({ tenant: 'active-turn' })
   })
 
-  it('useLogger throws outside an active turn', () => {
-    expect(() => useLogger()).toThrow(/outside an evlog eve turn/)
+  it('useLogger degrades to a detached logger outside an active turn', () => {
+    expectDetachedLogger()
+  })
+
+  it('degrades instead of throwing when the turn resumed in another process', () => {
+    const spies = createPipelineSpies()
+    const hook = defineEvlogHook({ drain: spies.drain })
+
+    hook.events!['turn.started']!({
+      type: 'turn.started',
+      data: { sequence: 0, turnId: TURN_ID },
+    }, hookContext())
+
+    // A resume elsewhere leaves the turn live with its process-local state gone.
+    resetEvlogEveForTests()
+    initLogger({ env: { service: 'eve-test' } })
+
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const log = useLogger(toolContext())
+    expect(() => log.set({ customer: { slug: 'acme' } })).not.toThrow()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('resumed in another process'))
+    warn.mockRestore()
+  })
+
+  it('warns once per turn while a resumed turn keeps calling useLogger', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+
+    useLogger(toolContext())
+    useLogger(toolContext())
+    useLogger(toolContext())
+
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
   })
 
   it('carries business context across turns in the same session', async () => {
@@ -1768,7 +1811,7 @@ describe('evlog/eve', () => {
 
     await runTurn(hook)
 
-    expect(() => useLogger(toolContext())).toThrow(/could not find a logger/)
+    expectDetachedLogger(toolContext())
   })
 
   it('evicts oldest sessions when maxSessions is exceeded', async () => {
