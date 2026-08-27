@@ -1,9 +1,9 @@
 import { defineAgent } from 'eve'
 import { gatewayRouting, sessionTags } from '../../lib/gateway'
+import { MODEL } from '../../lib/model'
 
 export default defineAgent({
-  model: 'deepseek/deepseek-v4-flash-0731',
-  /** This model honors only `high` and `xhigh`. */
+  model: MODEL,
   reasoning: 'high',
   modelOptions: {
     providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags('content') } },

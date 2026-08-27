@@ -2,22 +2,16 @@ import { channelName } from './channel'
 import { environment } from './environment'
 
 /**
- * Deployments vetted for the base model, preferred over the rest of the pool:
- * routing alone can pick one that returns the model's tool calls as plain text
- * instead of parsing them. Unlisted providers stay available as fallback.
- */
-const PROVIDER_ORDER = ['fireworks', 'alibaba']
-
-/**
  * Routing shared by every gateway call. Schedule turns answer to nobody in
  * real time, so they sort on cost; every other surface has someone waiting and
- * sorts on time to first token. The sort only orders the pool past
- * `PROVIDER_ORDER`, so the cheapest deployment never displaces a vetted one.
+ * sorts on time to first token. `zeroDataRetention` prunes the pool before the
+ * sort sees it — on this model it drops the cheapest deployments, which keep
+ * data — and the sort picks from the rest. Naming providers by hand pins that
+ * choice to a list that rots as deployments, prices and health move.
  */
 export function gatewayRouting(unattended = false) {
   return {
     caching: 'auto',
-    order: PROVIDER_ORDER,
     sort: unattended ? 'cost' : 'ttft',
     zeroDataRetention: true,
   } as const

@@ -47,6 +47,12 @@ watched path changed but the behaviour did not.
 
 Swapping the model goes through `EVI_MODEL`, not an edit to `agent.ts`: run the
 workflow manually against the candidate, compare cost, latency and pass rate in
-PostHog (`evi_eval_run`, broken down by `model`), then commit the swap.
-`EVI_VISION_MODEL` swaps the vision fallback the same way; it runs only for
-the turn that carries image parts (`docs/vision.md`).
+PostHog (`evi_eval_run`, broken down by `model`), then commit the swap. The
+base model takes image parts natively (`docs/vision.md`), so a candidate that
+cannot read an image is not a drop-in.
+
+Routing to a deployment is the gateway's job, not the app's: `gatewayRouting`
+sends a sort and `zeroDataRetention`, and names no provider. A candidate's
+advertised price is not what Evi pays, because ZDR drops the deployments that
+keep data and those are routinely the cheap ones — read the real floor from a
+call's `provider_metadata.gateway`, not from the model's page.

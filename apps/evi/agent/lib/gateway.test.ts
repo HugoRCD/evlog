@@ -27,10 +27,9 @@ describe('gatewayRouting', () => {
     expect(gatewayRouting(true).sort).toBe('cost')
   })
 
-  it('prefers the vetted providers whichever way it sorts', async () => {
+  it('names no provider, so the sort is what picks the deployment', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting(false).order).toEqual(['fireworks', 'alibaba'])
-    expect(gatewayRouting(true).order).toEqual(['fireworks', 'alibaba'])
+    expect(gatewayRouting()).not.toHaveProperty('order')
   })
 })
 
