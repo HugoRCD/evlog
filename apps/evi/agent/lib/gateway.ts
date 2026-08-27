@@ -1,29 +1,24 @@
 import { channelName } from './channel'
 import { environment } from './environment'
 
-/** Scheduled runs answer to nobody in real time; every other surface has someone waiting. */
-function isBatch(kind?: string): boolean {
-  return channelName(kind) === 'schedule'
-}
+/**
+ * Deployments vetted for the base model, preferred over the rest of the pool:
+ * routing alone can pick one that returns the model's tool calls as plain text
+ * instead of parsing them. Unlisted providers stay available as fallback.
+ */
+const PROVIDER_ORDER = ['fireworks', 'alibaba']
 
 /**
- * Deployments vetted for the base model, tried first on scheduled runs. The
- * cost sort alone may pick any pool member, including deployments that serve
- * the model without native tool-call parsing (raw DSML leaks into the text)
- * or answer with an empty stream; unlisted providers remain as fallback.
+ * Routing shared by every gateway call. Schedule turns answer to nobody in
+ * real time, so they sort on cost; every other surface has someone waiting and
+ * sorts on time to first token. The sort only orders the pool past
+ * `PROVIDER_ORDER`, so the cheapest deployment never displaces a vetted one.
  */
-const SCHEDULE_PROVIDER_ORDER = ['fireworks', 'alibaba']
-
-/**
- * Routing shared by every gateway call: schedules sort on cost, every
- * interactive surface sorts on time to first token.
- */
-export function gatewayRouting(kind?: string) {
-  const batch = isBatch(kind)
+export function gatewayRouting(unattended = false) {
   return {
     caching: 'auto',
-    sort: batch ? 'cost' : 'ttft',
-    ...(batch ? { order: SCHEDULE_PROVIDER_ORDER } : {}),
+    order: PROVIDER_ORDER,
+    sort: unattended ? 'cost' : 'ttft',
     zeroDataRetention: true,
   } as const
 }

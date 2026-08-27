@@ -1,20 +1,34 @@
 import type { ModelMessage } from 'ai'
+import type { SessionAuthContext } from 'eve/context'
 import { defineAgent, defineDynamic } from 'eve'
 import { gatewayRouting, sessionTags } from './lib/gateway'
 import { modelForMessages, modelForStep } from './lib/model'
+import { isScheduleAppAuth } from './lib/trust'
 
-interface ModelContext { channel: { kind?: string }, messages: readonly ModelMessage[] }
+interface ModelContext {
+  channel: { kind?: string }
+  messages: readonly ModelMessage[]
+  session: { auth: { current: SessionAuthContext | null } }
+}
 
-function modelOptions(kind?: string) {
+/**
+ * Schedules deliver through the maintainer's channel, so `channel.kind` names
+ * that channel and never `schedule`: the app principal on the turn is what
+ * separates a scheduled run from a message the maintainer just sent.
+ */
+function modelOptions(ctx: ModelContext) {
   return {
     providerOptions: {
-      gateway: { ...gatewayRouting(kind), tags: sessionTags(kind) },
+      gateway: {
+        ...gatewayRouting(isScheduleAppAuth(ctx.session.auth.current)),
+        tags: sessionTags(ctx.channel.kind),
+      },
     },
   }
 }
 
 function selectModel(_event: unknown, ctx: ModelContext) {
-  return { model: modelForMessages(ctx.messages), modelOptions: modelOptions(ctx.channel.kind) }
+  return { model: modelForMessages(ctx.messages), modelOptions: modelOptions(ctx) }
 }
 
 export default defineAgent({
@@ -29,7 +43,7 @@ export default defineAgent({
       'turn.started': selectModel,
       'step.started': (_event: unknown, ctx: ModelContext) => ({
         model: modelForStep(ctx.messages),
-        modelOptions: modelOptions(ctx.channel.kind),
+        modelOptions: modelOptions(ctx),
       }),
     },
   }),
