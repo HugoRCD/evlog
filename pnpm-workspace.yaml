@@ -38,9 +38,10 @@ overrides:
   # a stale v2, breaking Nuxt's `legacyPlugins` import at build time.
   '@unhead/vue': ^3.2.1
 
-# iMessage image vision support and workflow runtime event-id slot tolerance.
+# Delivers inbound iMessage image attachments as file parts; see
+# apps/evi/docs/vision.md for the upstream gap this covers.
 patchedDependencies:
-  eve@0.40.0: patches/eve@0.40.0.patch
+  eve@0.46.1: patches/eve@0.46.1.patch
 
 minimumReleaseAge: 2880
 
