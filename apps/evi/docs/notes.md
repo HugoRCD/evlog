@@ -119,7 +119,7 @@ its labels and recent comments in one call.
 
 **Connector types are not interchangeable.** The Linear channel is type `Linear`
 (managed agent app plus webhooks); the Linear MCP is type `OAuth`. `eve add
-linear` provisions one of each — it is one command, not one connector.
+linear` provisions one of each: it is one command, not one connector.
 
 **App-scoped auth fails silently when the connector cannot mint an app token.**
 Because app-scoped is non-interactive, eve never emits a challenge:
@@ -127,16 +127,21 @@ Because app-scoped is non-interactive, eve never emits a challenge:
 anyone can approve, on every turn. User-scoped at least fails loudly with
 `principal_required`.
 
-**A misconfigured OAuth connection does not degrade, it breaks the whole run.**
-On EVL-213, the Linear MCP connection took every GitHub tool down with it: five
-calls, all `Cannot read properties of undefined (reading 'toLowerCase')`, thrown
-from `isProvisionableConnectorUid` in
-`@vercel/connect/dist/eve/provision-oauth-connector.js`. Local evals never saw it
-because `provisionEveOAuthConnector` returns early without an OIDC token; in
-production it runs. The connection is removed until Connect can mint the token —
-assuming the agent simply answers without that connection is wrong.
+**The whole-run crash from a misconfigured OAuth connection is fixed in
+`@vercel/connect` 2.0.0.** On EVL-213, the Linear MCP connection took every
+GitHub tool down with it: five calls, all `Cannot read properties of undefined
+(reading 'toLowerCase')`, thrown from `isProvisionableConnectorUid` in
+`@vercel/connect/dist/eve/provision-oauth-connector.js`. That was the eager
+provisioning path: 0.8.x ran `provisionEveOAuthConnector` before every token
+call unless `autoProvision: false`. 2.0.0 makes provisioning opt-in and
+failure-driven (`autoProvision: true`, and only after a missing-connector or
+unlinked-project error), and Evi never opts in, so the crash cannot trigger.
+The operational truth survives: a connector that cannot mint an app token still
+fails for the tools that need it, so remove the connection until Connect can
+mint the token; assuming the agent simply answers without that connection is
+wrong.
 
-**`vercel connect token` from the CLI proves nothing about app-scoped auth** — it
+**`vercel connect token` from the CLI proves nothing about app-scoped auth**: it
 resolves through your own Vercel identity, the user-scoped path.
 
 ## Telemetry
