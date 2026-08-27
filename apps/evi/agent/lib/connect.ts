@@ -23,5 +23,5 @@ export function adminGatedAuth<T>(grant: (ctx: SessionContext) => T) {
 
 /** App-scoped Connect auth for admin-gated MCP connections. */
 export function adminOnlyAppConnection(connector: string) {
-  return adminGatedAuth(() => connect({ connector, principalType: 'app', autoProvision: false }))
+  return adminGatedAuth(() => connect({ connector, principalType: 'app' }))
 }

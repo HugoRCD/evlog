@@ -21,9 +21,8 @@ export function maintainerRun(channel: ChatSdkChannel, task: string): ScheduleRu
       to(channel, { adapterName: 'imessage', threadId: `imessage:any;-;${MAINTAINER_PHONE}` })
         .send(`${task} ${SCHEDULED_TASK_EPILOGUE}`, { auth: appAuth })
         .then(
-          // A send has vanished without an error before (accepted with a 2xx
-          // by a stale deployment, no turn, no log); record both outcomes so
-          // the cron invocation always tells whether the handoff happened.
+          // A send resolves once the session accepts it, not once the turn
+          // runs, so the cron invocation records the handoff either way.
           (session) => console.log(`[schedule] send accepted, session ${session.id}`),
           (error) => {
             console.error('[schedule] send failed', error)
