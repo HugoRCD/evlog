@@ -2,7 +2,7 @@
   "name": "@evlog/cli",
   "version": "0.6.0",
   "description": "The official command line for evlog",
-  "author": "HugoRCD <contact@hrcd.fr>",
+  "author": "HugoRCD <contact@evlog.dev>",
   "homepage": "https://evlog.dev",
   "repository": {
     "type": "git",
