@@ -9,6 +9,21 @@ export default defineAppConfig({
     titleTemplate: '%s - evlog',
     title: 'evlog',
     description: 'Wide events and structured errors for TypeScript. One log per request, full context, errors that explain why and how to fix.',
+    // Answers "what is this site?" as a linked JSON-LD graph on the landing.
+    // `sameAs` is the part that matters: it reconciles the site, the repository
+    // and the package as one entity rather than three unrelated sources.
+    schema: {
+      type: 'SoftwareApplication',
+      applicationCategory: 'DeveloperApplication',
+      operatingSystem: 'Node.js, Bun, Deno, Cloudflare Workers, all major browsers',
+      price: 0,
+      priceCurrency: 'USD',
+      sameAs: [
+        'https://github.com/hugorcd/evlog',
+        'https://www.npmjs.com/package/evlog',
+        'https://x.com/hugorcd',
+      ],
+    },
   },
   assistant: {
     icons: {

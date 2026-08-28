@@ -13,7 +13,13 @@ Nuxt UI ships the components this site renders inside markdown. Use them as the 
 
 ## Structured data
 
-JSON-LD carries the facts that are **not** already in the page text: the license, the price, the application category. Never restate the page's own prose in it. Copy is crawlable where it is written, so a second copy in a `.vue` file buys nothing and drifts. That rules out `FAQPage`, which is why the landing has none: Google restricted FAQ rich results to authoritative government and health sites in 2023, and the answers are already in the served HTML.
+JSON-LD carries the facts that are **not** already in the page text: the license, the price, the application category. Never restate the page's own prose in it. Copy is crawlable where it is written, so a second copy in a `.vue` file buys nothing and drifts.
+
+**The identity is configuration.** `seo.schema` in `app.config.ts` says what the site *is*; Docus emits it from `useSeo` as one linked graph, alongside `WebSite` on the landing and `Article` + `BreadcrumbList` on every docs page. A product node written by hand competes with that graph instead of extending it. What the config cannot express (the license, the author) goes in a node reusing the same `@id`, so it merges into the identity rather than declaring a second product.
+
+`app/pages/index.vue` replaces the Docus landing template, so it calls `useSeo({ type: 'website' })` itself. Drop that call and the site silently loses its identity graph, its canonical, and its OG tags.
+
+The landing's `FAQPage` is read back from the accordion the page renders, never written by hand. It buys no rich result, since Google restricted those to government and health sites in 2023, and it stays for the answer engines that do read it.
 
 ## Interactive doc components
 

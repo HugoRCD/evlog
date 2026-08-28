@@ -60,6 +60,7 @@ minimumReleaseAgeExclude:
   - '@github-tools/*'
   - 'eve'
   # Other
+  - docus@5.13.0
   - '@databuddy/nuxt'
   - '@changesets/cli@2.31.1'
   - eve
