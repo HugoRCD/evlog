@@ -5,9 +5,9 @@
  * rather than restated, so a schema that disagrees with the page is not a thing
  * that can happen.
  *
- * This is the only shape the site adds. Docus already emits `Article` and
- * `BreadcrumbList` on every docs page from its own `useSeo`, and the landing
- * carries `SoftwareApplication` inline.
+ * Docus already emits `Article` and `BreadcrumbList` on every docs page from its
+ * own `useSeo`, and the landing's `WebSite` / `SoftwareApplication` graph comes
+ * from `seo.schema` in `app.config.ts`.
  */
 
 /** A minimark node: `[tag, props, ...children]`, or a bare string for text. */

@@ -22,7 +22,7 @@
     "@vercel/speed-insights": "^2.0.0",
     "@vueuse/core": "^14.3.0",
     "better-sqlite3": "^12.11.1",
-    "docus": "^5.12.3",
+    "docus": "^5.13.0",
     "motion-v": "^2.3.0",
     "nostics": "^1.2.0",
     "nuxt": "^4.4.4",
