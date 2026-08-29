@@ -45,7 +45,7 @@ feat({framework}): add {Framework} middleware integration
 | 8 | `apps/docs/content/1.start/3.installation.md` | Add card in "Choose Your Framework" |
 | 9 | `apps/docs/content/0.landing.md` | Add framework code snippet slot |
 | 10 | `apps/docs/app/components/features/FeatureFrameworks.vue` | Add framework tab |
-| 11 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Add framework setup section + update frontmatter description |
+| 11 | `skills/review-logging-patterns/SKILL.md` | Add framework setup section + update frontmatter description |
 | 12 | `packages/evlog/README.md` | Add framework section + row in the Framework Support table |
 | 13 | `examples/{framework}/` | Create example app with test UI (auto-discovered by `pnpm example {framework}` — no root script needed) |
 | 14 | `.changeset/{framework}-integration.md` | Create changeset (`minor`) |
@@ -287,7 +287,7 @@ Icons use Simple Icons format: `i-simple-icons-{name}`.
 
 ## Step 9: Update the Public Skill
 
-In `apps/docs/skills/review-logging-patterns/SKILL.md` (published on evlog.dev):
+In `skills/review-logging-patterns/SKILL.md` (published on evlog.dev):
 
 1. Add `### {Framework}` in the **"Framework Setup"** section, in the same order as the docs
 2. Include: import + `initLogger` + middleware setup; native logger access; a `useLogger()` snippet, or the accessor that replaces it when the integration has no ALS; full pipeline example (`drain`, `enrich`, `keep`)

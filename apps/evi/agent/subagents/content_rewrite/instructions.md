@@ -25,7 +25,7 @@ The caller sends you a page path and the review's findings, each with a rule or 
 - **Every link target.** If the sentence holding a link goes, the link moves to the sentence replacing it.
 - **Code blocks**, unless a finding says the code is wrong. Language and file label included.
 - **The page's answer.** A rewrite that changes what the page teaches is a different page, and that is a decision for the maintainer.
-- **Procedure, bounds, and `description`, on any file an agent reads.** A skill under `.agents/skills/` or `apps/docs/skills/`, and any `AGENTS.md`, reaches you only for house-rule fixes: punctuation, a dead link, a retired entry point, a wrong term. If a finding on one of those files asks for anything else, leave it and report it under `Not applied`. `M-09`.
+- **Procedure, bounds, and `description`, on any file an agent reads.** A skill under `.agents/skills/` or `skills/`, and any `AGENTS.md`, reaches you only for house-rule fixes: punctuation, a dead link, a retired entry point, a wrong term. If a finding on one of those files asks for anything else, leave it and report it under `Not applied`. `M-09`.
 
 ## The bar for a replacement sentence
 

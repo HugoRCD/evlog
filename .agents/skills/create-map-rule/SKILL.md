@@ -43,7 +43,7 @@ Current requirements: `wide-event` (40), `audit` (25), `structured-errors` (20),
 | 4 | `packages/cli/test/map/rules.test.ts` | Add cases (the file has an ESLint-`RuleTester`-style `Case` harness — `runRuleSet` exercises one rule in isolation) |
 | 5 | `apps/docs/content/3.cli/3.rules.md` | Add a row to the Requirements or Opportunities table + a `### {title}` section |
 | 6 | `apps/docs/content/3.cli/4.scoring.md` | Requirements only: reflect the new weight in the scoring explanation |
-| 7 | `apps/docs/skills/review-logging-patterns/references/code-review.md` | Add a row to the matching rules table |
+| 7 | `skills/review-logging-patterns/references/code-review.md` | Add a row to the matching rules table |
 | 8 | `.changeset/{id}-map-rule.md` | Changeset for `"@evlog/cli": minor` |
 
 **Important**: Do NOT consider the task complete until all applicable touchpoints have been addressed.
@@ -118,7 +118,7 @@ Read `apps/docs/AGENTS.md` before touching anything under `apps/docs/`. Then in 
 
 ## Step 7: Published Skill
 
-`apps/docs/skills/review-logging-patterns/references/code-review.md` mirrors the rules tables (requirements + opportunities) and maps each rule to a skill section. Add the row and, if the rule promotes a feature the skill documents elsewhere, link the section.
+`skills/review-logging-patterns/references/code-review.md` mirrors the rules tables (requirements + opportunities) and maps each rule to a skill section. Add the row and, if the rule promotes a feature the skill documents elsewhere, link the section.
 
 ## Step 8: Changeset
 
@@ -149,7 +149,7 @@ Teaching `evlog map` a new framework is a different, heavier change: the adapter
 | 5 | `packages/cli/test/map/adapters.test.ts` + `detect.test.ts` + `fixtures/` | Route extraction + detection tests against a fixture tree |
 | 6 | `packages/cli/src/lib/init/` | Decide whether `evlog init` gains the framework too (separate scope of work — flag it explicitly in the PR if not) |
 | 7 | `apps/docs/content/3.cli/2.map.md` + `0.overview.md` | Update the supported-frameworks statements |
-| 8 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Update every "Nuxt, Nitro, Next.js, and TanStack Start" list (frontmatter description + CLI section) — same in `references/code-review.md` and `apps/docs/skills/build-audit-logs/SKILL.md` (Pass 2) and `analyze-logs/SKILL.md` (init suggestion) |
+| 8 | `skills/review-logging-patterns/SKILL.md` | Update every "Nuxt, Nitro, Next.js, and TanStack Start" list (frontmatter description + CLI section) — same in `references/code-review.md` and `skills/build-audit-logs/SKILL.md` (Pass 2) and `analyze-logs/SKILL.md` (init suggestion) |
 | 9 | `scripts/cli-sandbox.mjs` | Add the framework to `APPS` (reuse the map fixture) so `pnpm cli:sandbox` covers it and `--smoke` exercises every CLI command against it |
 | 10 | `.changeset/{framework}-map-adapter.md` | Changeset for `"@evlog/cli": minor` |
 

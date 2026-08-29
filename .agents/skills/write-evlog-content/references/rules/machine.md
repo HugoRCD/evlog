@@ -1,6 +1,6 @@
 # Rules for the surfaces an agent reads
 
-Applies to `.agents/skills/`, `apps/docs/skills/`, and every `AGENTS.md`. Read `universal.md` first: the house rules hold here too, punctuation included.
+Applies to `.agents/skills/`, `skills/`, and every `AGENTS.md`. Read `universal.md` first: the house rules hold here too, punctuation included.
 
 What changes is who is reading. A docs page is read by someone who can tell that a sentence is vague and go look elsewhere. A skill is read by a model that will act on it, at the altitude the file sets, without the option of doubting it. So the failure modes invert: rhythm stops mattering, and precision, ordering, and scope start deciding outcomes.
 

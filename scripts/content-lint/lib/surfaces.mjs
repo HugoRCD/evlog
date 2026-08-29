@@ -34,7 +34,7 @@ const PROFILES = {
 export const SURFACES = Object.keys(PROFILES)
 
 /** Trees scanned whole. */
-const TREES = ['apps/docs/content', 'apps/docs/skills', '.agents/skills']
+const TREES = ['apps/docs/content', 'skills', '.agents/skills']
 
 /**
  * The doctrine's own reference files quote the prose they ban, worked pair by
@@ -55,7 +55,7 @@ export function surfaceOf(path) {
     return /\/(7\.reference|4\.integrate)\//.test(normalized) ? 'reference' : 'docs'
   }
   if (normalized.endsWith('AGENTS.md')) return 'agents'
-  if (normalized.startsWith('.agents/skills/') || normalized.startsWith('apps/docs/skills/')) return 'skill'
+  if (normalized.startsWith('.agents/skills/') || normalized.startsWith('skills/')) return 'skill'
   if (normalized === 'README.md' || /^(packages|apps)\/[^/]+\/README\.md$/.test(normalized)) return 'readme'
   return 'docs'
 }

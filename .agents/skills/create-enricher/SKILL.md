@@ -23,7 +23,7 @@ Enrichers live in the core package surface (`evlog/enrichers`), so use the `core
 | 2 | Same file — `createDefaultEnrichers()` | Decide whether the enricher belongs in the default composition (see below) |
 | 3 | `packages/evlog/test/toolkit/enrichers.test.ts` | Add tests (one `describe` block per enricher) |
 | 4 | `apps/docs/content/5.use-cases/5.enrichers.md` | Add a section for the enricher + update the import list and, if applicable, the "All built-in enrichers" default composition text |
-| 5 | `apps/docs/skills/review-logging-patterns/SKILL.md` | Add the enricher to the `Built-in:` line in the Enrichers section |
+| 5 | `skills/review-logging-patterns/SKILL.md` | Add the enricher to the `Built-in:` line in the Enrichers section |
 | 6 | `packages/evlog/README.md` | Add the enricher to the Built-in Enrichers section (root `README.md` is a symlink to it) |
 | 7 | `.changeset/{name}-enricher.md` | Create changeset (`minor`) |
 
@@ -119,7 +119,7 @@ Custom-enricher authoring docs live separately at `apps/docs/content/6.extend/5.
 
 ## Step 4: Update the Public Skill
 
-In `apps/docs/skills/review-logging-patterns/SKILL.md` (published on evlog.dev), find the **Enrichers** section and add the new enricher to the `Built-in:` line.
+In `skills/review-logging-patterns/SKILL.md` (published on evlog.dev), find the **Enrichers** section and add the new enricher to the `Built-in:` line.
 
 ## Step 5: Update README
 

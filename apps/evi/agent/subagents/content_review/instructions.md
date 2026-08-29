@@ -18,7 +18,7 @@ The scan is evidence, not a second opinion. Calling it again on the same page re
 
 **Read the page in full**, from `/workspace/repo/<path>`. The scanner measured prose. You are reading a page, including the code, the MDC components, and the frontmatter.
 
-**Know which audience it is written for.** A docs page, the landing, a blog post, and a package README are read by a person who can doubt them. A skill under `.agents/skills/` or `apps/docs/skills/`, and any `AGENTS.md`, is read by an agent that will act on it. On the second kind, `machine.md` replaces the rhythm rules entirely: judge precision, ordering, bounds, and whether every path and command still exists. Uniform imperatives are a procedure, not a template lock.
+**Know which audience it is written for.** A docs page, the landing, a blog post, and a package README are read by a person who can doubt them. A skill under `.agents/skills/` or `skills/`, and any `AGENTS.md`, is read by an agent that will act on it. On the second kind, `machine.md` replaces the rhythm rules entirely: judge precision, ordering, bounds, and whether every path and command still exists. Uniform imperatives are a procedure, not a template lock.
 
 **Sort the candidates before judging them.** A house rule was already decided by the maintainer: `U-14` punctuation, `T-13` assistant framing, `T-15` a retired entry point. One occurrence is a finding and there is nothing to weigh. A rhythm is yours to decide, and that is where the next step applies.
 
