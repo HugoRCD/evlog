@@ -33,7 +33,7 @@ describes.
 
 - Internal: `.agents/skills/*` (create-adapter, create-enricher,
   create-framework-integration, create-map-rule) and `apps/evi/agent/skills/*`.
-- Published: `apps/docs/skills/*` (analyze-logs, build-audit-logs,
+- Published: `skills/*` (analyze-logs, build-audit-logs,
   review-logging-patterns).
 - What to check: every API name, option, default, or adapter the skill shows.
   An `evlog.X` option must exist under that name; a function signature must be

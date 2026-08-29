@@ -14,7 +14,7 @@ describe('surfaceOf', () => {
 
   it('tells the surfaces an agent reads from the ones a person reads', () => {
     expect(surfaceOf('.agents/skills/create-adapter/SKILL.md')).toBe('skill')
-    expect(surfaceOf('apps/docs/skills/analyze-logs/SKILL.md')).toBe('skill')
+    expect(surfaceOf('skills/analyze-logs/SKILL.md')).toBe('skill')
     expect(surfaceOf('AGENTS.md')).toBe('agents')
     expect(surfaceOf('apps/docs/AGENTS.md')).toBe('agents')
     expect(surfaceOf('packages/evlog/README.md')).toBe('readme')

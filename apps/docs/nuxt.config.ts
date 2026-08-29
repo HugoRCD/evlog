@@ -6,6 +6,16 @@ const contentCommitDates = readContentCommitDates(import.meta.dirname)
 export default defineNuxtConfig({
   extends: ['docus'],
 
+  docus: {
+    skills: {
+      // The published skills live at the repo root (`skills/`) so a bare
+      // `npx skills add hugorcd/evlog` discovers them: the installer only scans
+      // conventional root-level directories. Docus defaults to `skills/` inside
+      // the app, so point it back at the shared source of truth.
+      dir: '../../skills',
+    },
+  },
+
   experimental: {
     appManifest: true,
     emitRouteChunkError: 'automatic-immediate',
