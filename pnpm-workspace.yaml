@@ -43,7 +43,7 @@ overrides:
 # Delivers inbound iMessage image attachments as file parts; see
 # apps/evi/docs/vision.md for the upstream gap this covers.
 patchedDependencies:
-  eve@0.46.1: patches/eve@0.46.1.patch
+  eve@0.47.3: patches/eve@0.47.3.patch
 
 minimumReleaseAge: 2880
 
