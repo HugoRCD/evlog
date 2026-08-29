@@ -1,6 +1,8 @@
 ---
 name: create-evlog-framework-integration
 description: Create a new evlog framework integration to add automatic wide-event logging to an HTTP framework. Use when adding middleware/plugin support for a framework (e.g., Koa, H3 standalone, Deno Fresh, etc.) to the evlog package. Covers source code, build config, package exports, tests, example app, and all documentation.
+metadata:
+  internal: true
 ---
 
 # Create evlog Framework Integration

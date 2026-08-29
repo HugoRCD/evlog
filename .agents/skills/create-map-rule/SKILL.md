@@ -1,6 +1,8 @@
 ---
 name: create-evlog-map-rule
 description: Add a new rule or a new framework adapter to `evlog map` in @evlog/cli. Use when adding a coverage check (requirement or opportunity) that scores entry points, or when extending the map scanner to a new framework. Covers rule source, registry, types, tests, docs, and the published skill.
+metadata:
+  internal: true
 ---
 
 # Create an `evlog map` Rule (or Framework Adapter)

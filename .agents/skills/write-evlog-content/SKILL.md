@@ -1,6 +1,8 @@
 ---
 name: write-evlog-content
 description: "Write, review, and rewrite any evlog content: a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset. Load before drafting or editing prose in apps/docs/content, before writing a blog post, before touching a SKILL.md or an AGENTS.md, and whenever content is reviewed for voice, accuracy, or AI-generated slop. Carries the evlog voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell."
+metadata:
+  internal: true
 ---
 
 # Writing evlog content

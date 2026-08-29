@@ -1,6 +1,8 @@
 ---
 name: create-evlog-adapter
 description: Create a new built-in evlog adapter to send wide events to an external observability platform. Use when adding a new drain adapter (e.g., for Elasticsearch, Honeycomb, SigNoz, etc.) to the evlog package. Covers source code, build config, package exports, tests, e2e, and all documentation.
+metadata:
+  internal: true
 ---
 
 # Create evlog Adapter
