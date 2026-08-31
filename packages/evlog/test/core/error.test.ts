@@ -516,6 +516,45 @@ describe('parseError', () => {
       expect(parseError({ data: { statusCode: 500, message: 'Boom' } }).data).toBeUndefined()
     })
 
+    it('reads every field from the error when the payload mimics a response body', () => {
+      const error = createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined',
+        data: {
+          statusCode: 'upstream-500',
+          statusMessage: 'payload-message',
+          data: { value: 1 },
+        },
+      })
+
+      const parsed = parseError(error)
+
+      expect(parsed.message).toBe('Payment failed')
+      expect(parsed.status).toBe(402)
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ statusCode: 'upstream-500', data: { value: 1 } })
+    })
+
+    it('reads the payload an h3 error holds directly', () => {
+      const h3Error = { message: 'Boom', statusCode: 402, data: { orderId: 'ord_1', why: 'Card declined' } }
+
+      const parsed = parseError(h3Error)
+
+      expect(parsed.message).toBe('Boom')
+      expect(parsed.status).toBe(402)
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toEqual({ orderId: 'ord_1', why: 'Card declined' })
+    })
+
+    it('reads a flat body that carries the guidance at the top level', () => {
+      const parsed = parseError({ data: { message: 'Payment failed', why: 'Card declined', orderId: 'ord_1' } })
+
+      expect(parsed.message).toBe('Payment failed')
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ orderId: 'ord_1' })
+    })
+
     it('reads a payload whose keys collide with the response body shape', () => {
       const statusCode = createError({ message: 'x', data: { statusCode: 'upstream-500' } })
       expect(parseError(statusCode).data).toEqual({ statusCode: 'upstream-500' })

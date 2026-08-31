@@ -69,7 +69,7 @@ Caused by: StripeCardError: card_declined
 
 ### JSON Output (Production)
 
-`EvlogError.toJSON()`, which every framework serializer returns:
+`EvlogError.toJSON()`, returned as-is by the Next.js handler:
 
 ```json
 {
@@ -90,7 +90,7 @@ Caused by: StripeCardError: card_declined
 }
 ```
 
-`why`, `fix`, and `link` are nested under `data`, not at the top level, and neither `internal` nor `stack` is ever included.
+The Nitro, Nuxt, and SvelteKit handlers return a Nitro-shaped body instead, with `url`, `statusCode`, `statusText`, and `error: true` around the same `message`, `status`, and `data`. Every serializer agrees on the part clients read: `why`, `fix`, and `link` sit under `data`, not at the top level, and neither `internal` nor `stack` is ever included. On the client, `parseError()` flattens both shapes.
 
 ## Field Guidelines
 
