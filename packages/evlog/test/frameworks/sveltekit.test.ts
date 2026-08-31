@@ -120,6 +120,7 @@ describe('evlog/sveltekit', () => {
         why: 'Card declined by issuer',
         fix: 'Try a different card',
         link: 'https://docs.example.com/payments',
+        data: { orderId: 'ord_1' },
       })
     })
 
@@ -133,6 +134,7 @@ describe('evlog/sveltekit', () => {
     expect(body.data.why).toBe('Card declined by issuer')
     expect(body.data.fix).toBe('Try a different card')
     expect(body.data.link).toBe('https://docs.example.com/payments')
+    expect(body.data.orderId).toBe('ord_1')
   })
 
   it('logs EvlogError before returning structured response', async () => {
@@ -174,6 +176,7 @@ describe('evlog/sveltekit', () => {
       status: 402,
       why: 'Card declined',
       fix: 'Try another card',
+      data: { orderId: 'ord_1' },
     })
 
     // Simulate SvelteKit's resolve: calls handleError, then returns 500
@@ -194,6 +197,7 @@ describe('evlog/sveltekit', () => {
     expect(body.status).toBe(402)
     expect(body.data.why).toBe('Card declined')
     expect(body.data.fix).toBe('Try another card')
+    expect(body.data.orderId).toBe('ord_1')
   })
 
   it('skips routes not matching include patterns', async () => {

@@ -231,22 +231,63 @@ export function suppressNitroDevOverlay(error: Error): void {
 }
 
 /**
+ * Whether an error's own message and `data` are unsafe to return to the client.
+ *
+ * Mirrors Nitro: an error the developer shaped into an HTTP response is theirs
+ * to expose, an error that merely escaped a handler is not. h3 flags the latter
+ * as `unhandled`/`fatal`; errors carrying no status at all are treated the same
+ * way, since Nitro v3 derives `unhandled` from the error not being an HTTPError.
+ *
+ * @internal
+ */
+export function isSensitiveNitroError(error: Error): boolean {
+  const err = error as Error & {
+    unhandled?: boolean
+    fatal?: boolean
+    status?: unknown
+    statusCode?: unknown
+  }
+  if (err.unhandled || err.fatal) return true
+  return err.status === undefined && err.statusCode === undefined
+}
+
+/** @internal */
+export interface PlainNitroErrorBodyOptions {
+  /** Nitro's dev handler never sanitizes — it returns the message and `data` as thrown. */
+  isDev?: boolean
+  /**
+   * Whether to withhold the error's message and `data`. Defaults to
+   * {@link isSensitiveNitroError}; pass it explicitly when the flags it reads
+   * have already been cleared (see `suppressNitroDevOverlay`).
+   */
+  sensitive?: boolean
+}
+
+/**
  * Build Nitro-compatible JSON for non-EvlogError throws.
- * Sanitizes 5xx messages in production.
+ *
+ * Preserves `data` from `createError({ data })` the way Nitro's own handler
+ * does, and withholds the message and `data` of sensitive errors in production.
  */
 export function buildPlainNitroErrorBody(
   error: Error,
   url: string,
-  isDev = process.env.NODE_ENV === 'development',
+  options: PlainNitroErrorBodyOptions = {},
 ): Record<string, unknown> {
+  const {
+    isDev = process.env.NODE_ENV === 'development',
+    sensitive = isSensitiveNitroError(error),
+  } = options
+  const hide = sensitive && !isDev
+
   const status = extractErrorStatus(error)
   const shortStatus = (error as { statusText?: string }).statusText
     ?? (error as { statusMessage?: string }).statusMessage
   const rawMessage = error.message || shortStatus || 'Internal Server Error'
-  const sanitize = (text: string) =>
-    isDev ? text : (status >= 500 ? 'Internal Server Error' : text)
+  const sanitize = (text: string) => hide ? 'Internal Server Error' : text
   const message = sanitize(rawMessage)
   const statusMessage = sanitize(shortStatus ?? rawMessage)
+  const { data } = error as { data?: unknown }
 
   return {
     url,
@@ -256,6 +297,7 @@ export function buildPlainNitroErrorBody(
     statusMessage,
     message,
     error: true,
+    ...(!hide && data !== undefined && { data }),
   }
 }
 

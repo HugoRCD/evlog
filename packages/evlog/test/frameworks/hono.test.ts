@@ -1,6 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { Hono } from 'hono'
 import { initLogger } from '../../src/logger'
+import { createError } from '../../src/error'
+import { parseError } from '../../src/runtime/utils/parseError'
 import { evlog, useLogger, type EvlogVariables } from '../../src/hono/index'
 import {
   assertDrainCalledWith,
@@ -96,6 +98,34 @@ describe('evlog/hono', () => {
     await waitForDrainCalls(drain)
 
     assertHttpEventEmitted(drain, { path: '/api/fail', status: 500 })
+  })
+
+  it('carries the createError data payload through onError', async () => {
+    const { drain } = createPipelineSpies()
+    const app = new Hono<EvlogVariables>()
+    app.use(evlog({ drain }))
+    app.get('/api/checkout', () => {
+      throw createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined by issuer',
+        data: { orderId: 'ord_1', retryable: true },
+      })
+    })
+    app.onError((error, c) => {
+      const parsed = parseError(error)
+      return c.json({ message: parsed.message, ...parsed.data }, 402)
+    })
+
+    const response = await app.request('/api/checkout')
+    await waitForDrainCalls(drain)
+
+    expect(await response.json()).toEqual({
+      message: 'Payment failed',
+      why: 'Card declined by issuer',
+      orderId: 'ord_1',
+      retryable: true,
+    })
   })
 
   it('logs error context set manually by route handler', async () => {

@@ -12,6 +12,18 @@ function pickCode(value: unknown): string | undefined {
   return undefined
 }
 
+function pickRecord(value: unknown): Record<string, unknown> | undefined {
+  return value && typeof value === 'object' && !Array.isArray(value)
+    ? value as Record<string, unknown>
+    : undefined
+}
+
+/** An HTTP error body nests the payload under `data`; an error object is the payload. */
+function isErrorEnvelope(value: Record<string, unknown> | undefined): boolean {
+  if (!value) return false
+  return 'statusCode' in value || 'statusMessage' in value || 'statusText' in value || value.error === true
+}
+
 export function parseError(error: unknown): ParsedError {
   if (error && typeof error === 'object' && 'data' in error) {
     const { data, message: fetchMessage, statusCode: fetchStatusCode, status: fetchStatus } = error as FetchError & { status?: number }
@@ -29,6 +41,7 @@ export function parseError(error: unknown): ParsedError {
       why: evlogData?.why,
       fix: evlogData?.fix,
       link: evlogData?.link,
+      data: isErrorEnvelope(pickRecord(data)) ? pickRecord(data?.data) : pickRecord(data),
       raw: error,
     }
   }

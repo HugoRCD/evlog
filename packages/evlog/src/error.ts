@@ -1,8 +1,11 @@
-import type { ErrorOptions } from './types'
+import type { ErrorOptions, EvlogErrorData } from './types'
 import { colors, isServer } from './utils'
 
 /** Non-enumerable storage so `JSON.stringify(error)` never exposes internal context */
 const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
+
+/** Non-enumerable storage; the payload reaches the wire through the `data` getter */
+const evlogErrorDataKey = Symbol.for('evlog.error.data')
 
 /**
  * Prototype brand read by {@link EvlogError.isEvlogError}. `instanceof` compares
@@ -78,6 +81,15 @@ export class EvlogError extends Error {
       })
     }
 
+    if (opts.data !== undefined) {
+      Object.defineProperty(this, evlogErrorDataKey, {
+        value: opts.data,
+        enumerable: false,
+        writable: false,
+        configurable: true,
+      })
+    }
+
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, EvlogError)
@@ -99,12 +111,20 @@ export class EvlogError extends Error {
     return this.message
   }
 
-  /** Structured data for serialization */
-  get data(): { code?: string, why?: string, fix?: string, link?: string } | undefined {
-    if (this.code || this.why || this.fix || this.link) {
-      return { code: this.code, why: this.why, fix: this.fix, link: this.link }
+  /**
+   * Structured data for serialization: the guidance fields, merged over the
+   * payload passed as `createError({ data })`.
+   */
+  get data(): EvlogErrorData | undefined {
+    const extra = (this as EvlogError & { [evlogErrorDataKey]?: Record<string, unknown> })[evlogErrorDataKey]
+    if (!extra && !this.code && !this.why && !this.fix && !this.link) return undefined
+    return {
+      ...extra,
+      ...(this.code !== undefined && { code: this.code }),
+      ...(this.why !== undefined && { why: this.why }),
+      ...(this.fix !== undefined && { fix: this.fix }),
+      ...(this.link !== undefined && { link: this.link }),
     }
-    return undefined
   }
 
   override toString(): string {
