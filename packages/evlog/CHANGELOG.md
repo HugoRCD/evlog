@@ -1,5 +1,21 @@
 # evlog
 
+## 2.28.0
+
+### Minor Changes
+
+- [#643](https://github.com/HugoRCD/evlog/pull/643) [`ada6408`](https://github.com/HugoRCD/evlog/commit/ada6408caa7271f7f4a2595dc7f56dd934367052) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `createError({ data })` returns an extra payload to the client, merged into the response body's `data` object next to `code`, `why`, `fix`, and `link`. Those four win on a key collision, and anything the client must never see still goes in `internal`. Read it client-side with `parseError(err).data`.
+
+  The Nitro and Nuxt error handler no longer drops `data` from errors thrown with h3's `createError`. It now follows Nitro's own rule for what it withholds: the message and `data` of an unhandled error are hidden in production, while a deliberate `createError({ status: 500, message })` keeps both. Development returns the error as thrown, as Nitro does.
+
+### Patch Changes
+
+- [`c0a0385`](https://github.com/HugoRCD/evlog/commit/c0a03855d476224039154aee46064a38da008836) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `useLogger()` from `evlog/eve` no longer throws when it cannot reach the current turn's logger. It warns once for that turn and returns a logger that accepts every call and emits nothing, so a tool is never failed by its own instrumentation.
+
+  Turn state is held per process, while an eve turn is durable and can resume in another process after a step boundary. A tool calling `useLogger(ctx)` after such a resume used to throw, which failed the tool itself — a long-running turn could lose real work to a missing log field. Enrichment for that turn is dropped instead, and the warning names the turn so the gap is visible.
+
+- [#644](https://github.com/HugoRCD/evlog/pull/644) [`c2af424`](https://github.com/HugoRCD/evlog/commit/c2af424256789c0b957325455acbc3d14003cf06) Thanks [@HugoRCD](https://github.com/HugoRCD)! - `evlog/hono` records errors again in apps that register `app.onError`. Hono hands a thrown error to `onError` at the route's own dispatch level, so the middleware resumed as if the request had succeeded and the failure was emitted as an info event with no `error` field. The wide event now carries the error and the status the handler actually returned.
+
 ## 2.27.1
 
 ### Patch Changes
