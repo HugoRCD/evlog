@@ -1,7 +1,7 @@
 import type { FetchError } from 'ofetch'
 import type { ParsedError } from '../../types'
 import { extractErrorStatus } from '../../shared/errors'
-import { EvlogError } from '../../error'
+import { isEvlogError } from '../../shared/error-brand'
 
 export type { ParsedError }
 
@@ -46,7 +46,7 @@ export function parseError(error: unknown): ParsedError {
       why: evlogData?.why,
       fix: evlogData?.fix,
       link: evlogData?.link,
-      data: !EvlogError.isEvlogError(error) && isErrorEnvelope(pickRecord(data))
+      data: !isEvlogError(error) && isErrorEnvelope(pickRecord(data))
         ? pickRecord(data?.data)
         : pickRecord(data),
       raw: error,

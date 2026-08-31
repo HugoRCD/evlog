@@ -1,18 +1,12 @@
 import type { ErrorOptions, EvlogErrorData } from './types'
 import { colors, isServer } from './utils'
+import { evlogErrorBrand, isEvlogError as hasEvlogErrorBrand } from './shared/error-brand'
 
 /** Non-enumerable storage so `JSON.stringify(error)` never exposes internal context */
 const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
 
 /** Non-enumerable storage; the payload reaches the wire through the `data` getter */
 const evlogErrorDataKey = Symbol.for('evlog.error.data')
-
-/**
- * Prototype brand read by {@link EvlogError.isEvlogError}. `instanceof` compares
- * class identity, which differs between duplicate installs of evlog — a
- * registry-shared symbol does not.
- */
-const evlogErrorBrand = Symbol.for('evlog.error.brand')
 
 /**
  * Structured error with context for better debugging
@@ -39,9 +33,7 @@ export class EvlogError extends Error {
    * silently reports `false`, downgrading a structured error to a bare 500.
    */
   static isEvlogError(error: unknown): error is EvlogError {
-    return typeof error === 'object'
-      && error !== null
-      && (error as Record<symbol, unknown>)[evlogErrorBrand] === true
+    return hasEvlogErrorBrand(error)
   }
 
   /** Stable, machine-readable identifier (e.g. `'PAYMENT_DECLINED'`). */
