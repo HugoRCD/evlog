@@ -19,10 +19,18 @@ function pickRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-/** Whether `value` is a response body, which nests the payload under its own `data`. */
-function isErrorEnvelope(value: Record<string, unknown> | undefined): boolean {
-  if (!value) return false
-  return 'statusCode' in value || 'statusMessage' in value || 'statusText' in value || value.error === true
+/** What a serialized error says about itself. Never part of the client payload. */
+const responseMetadataKeys = new Set(['name', 'url', 'message', 'status', 'statusCode', 'statusText', 'statusMessage', 'error', 'cause', 'stack', 'data'])
+
+/**
+ * The payload of a body that carries no nested `data`: its own fields, minus the
+ * metadata every serializer wraps them in. Subtracting beats guessing whether a
+ * body is an envelope, which misreads a payload keyed `statusCode`.
+ */
+function payloadFromBody(body: Record<string, unknown> | undefined): Record<string, unknown> | undefined {
+  if (!body) return undefined
+  const entries = Object.entries(body).filter(([key]) => !responseMetadataKeys.has(key))
+  return entries.length > 0 ? Object.fromEntries(entries) : undefined
 }
 
 function pickString(value: Record<string, unknown> | undefined, key: string): string | undefined {
@@ -50,6 +58,27 @@ function parseEvlogError(error: { message: string, data?: unknown }): ParsedErro
   }
 }
 
+/**
+ * Read any error into the flat shape a UI branches on: `message`, `status`,
+ * `code`, the `why` / `fix` / `link` guidance, and the client `data` payload.
+ *
+ * Accepts what each layer actually hands you: an {@link EvlogError} thrown
+ * server-side, an ofetch `FetchError` whose `data` is the parsed response body,
+ * that body on its own, an h3 error holding its payload on `data`, or any other
+ * `Error`. `raw` always carries the input back for debugging.
+ *
+ * `data` is the payload the server chose to expose, from `createError({ data })`
+ * merged with the guidance fields. It is read from the body's nested `data` when
+ * there is one, otherwise from the body's own fields with the response metadata
+ * (`status`, `message`, `url`, …) removed, so it never echoes the envelope. It is
+ * `undefined` when the error carries no payload. `internal` never appears here.
+ *
+ * @example
+ * ```ts
+ * const { message, why, fix, data } = parseError(error)
+ * if (typeof data?.retryAfter === 'number') scheduleRetry(data.retryAfter)
+ * ```
+ */
 export function parseError(error: unknown): ParsedError {
   if (isEvlogError(error)) {
     return parseEvlogError(error as { message: string, data?: unknown })
@@ -59,9 +88,8 @@ export function parseError(error: unknown): ParsedError {
     const { data, message: fetchMessage, statusCode: fetchStatusCode, status: fetchStatus } = error as FetchError & { status?: number }
 
     // A response body nests the payload under its own `data`. A flat body, or an
-    // h3 error holding the payload directly, is the payload.
-    const body = pickRecord(data)
-    const payload = pickRecord(data?.data) ?? (isErrorEnvelope(body) ? undefined : body)
+    // h3 error holding the payload directly, carries it among its own fields.
+    const payload = pickRecord(data?.data) ?? payloadFromBody(pickRecord(data))
 
     return {
       // Prefer statusText, then statusMessage (or message) for the error message

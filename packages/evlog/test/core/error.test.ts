@@ -536,6 +536,29 @@ describe('parseError', () => {
       expect(parsed.data).toMatchObject({ statusCode: 'upstream-500', data: { value: 1 } })
     })
 
+    it('leaves data undefined for a serialized error that carries no payload', () => {
+      const body = JSON.parse(JSON.stringify(createError({ message: 'Boom', status: 500 })))
+
+      expect(parseError({ data: body }).data).toBeUndefined()
+    })
+
+    it('reads the nested payload of a serialized error', () => {
+      const body = JSON.parse(JSON.stringify(
+        createError({ message: 'Payment failed', status: 402, why: 'Card declined', data: { orderId: 'ord_1' } }),
+      ))
+
+      const parsed = parseError({ data: body })
+
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ orderId: 'ord_1' })
+    })
+
+    it('keeps response metadata out of a flat body payload', () => {
+      const parsed = parseError({ data: { message: 'Payment failed', status: 402, why: 'Card declined' } })
+
+      expect(parsed.data).toEqual({ why: 'Card declined' })
+    })
+
     it('reads the payload an h3 error holds directly', () => {
       const h3Error = { message: 'Boom', statusCode: 402, data: { orderId: 'ord_1', why: 'Card declined' } }
 
