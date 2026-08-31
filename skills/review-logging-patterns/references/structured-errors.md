@@ -69,20 +69,28 @@ Caused by: StripeCardError: card_declined
 
 ### JSON Output (Production)
 
+`EvlogError.toJSON()`, which every framework serializer returns:
+
 ```json
 {
   "name": "EvlogError",
   "message": "Payment failed",
-  "why": "Card declined by issuer",
-  "fix": "Try a different payment method",
-  "link": "https://docs.example.com/payments/declined",
+  "status": 402,
+  "data": {
+    "orderId": "ord_8x2k",
+    "retryAfter": 30,
+    "why": "Card declined by issuer",
+    "fix": "Try a different payment method",
+    "link": "https://docs.example.com/payments/declined"
+  },
   "cause": {
     "name": "StripeCardError",
     "message": "card_declined"
-  },
-  "stack": "..."
+  }
 }
 ```
+
+`why`, `fix`, and `link` are nested under `data`, not at the top level, and neither `internal` nor `stack` is ever included.
 
 ## Field Guidelines
 

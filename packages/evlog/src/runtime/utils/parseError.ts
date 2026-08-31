@@ -1,6 +1,7 @@
 import type { FetchError } from 'ofetch'
 import type { ParsedError } from '../../types'
 import { extractErrorStatus } from '../../shared/errors'
+import { EvlogError } from '../../error'
 
 export type { ParsedError }
 
@@ -18,7 +19,11 @@ function pickRecord(value: unknown): Record<string, unknown> | undefined {
     : undefined
 }
 
-/** An HTTP error body nests the payload under `data`; an error object is the payload. */
+/**
+ * Whether `data` is an HTTP error body rather than the payload itself. A body
+ * nests the payload under its own `data`; an EvlogError never does, so it is
+ * matched first and a payload keyed `statusCode` is not read as an envelope.
+ */
 function isErrorEnvelope(value: Record<string, unknown> | undefined): boolean {
   if (!value) return false
   return 'statusCode' in value || 'statusMessage' in value || 'statusText' in value || value.error === true
@@ -41,7 +46,9 @@ export function parseError(error: unknown): ParsedError {
       why: evlogData?.why,
       fix: evlogData?.fix,
       link: evlogData?.link,
-      data: isErrorEnvelope(pickRecord(data)) ? pickRecord(data?.data) : pickRecord(data),
+      data: !EvlogError.isEvlogError(error) && isErrorEnvelope(pickRecord(data))
+        ? pickRecord(data?.data)
+        : pickRecord(data),
       raw: error,
     }
   }

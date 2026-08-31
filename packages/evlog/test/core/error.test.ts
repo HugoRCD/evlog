@@ -515,6 +515,14 @@ describe('parseError', () => {
     it('leaves data undefined when the response body carries none', () => {
       expect(parseError({ data: { statusCode: 500, message: 'Boom' } }).data).toBeUndefined()
     })
+
+    it('reads a payload whose keys collide with the response body shape', () => {
+      const statusCode = createError({ message: 'x', data: { statusCode: 'upstream-500' } })
+      expect(parseError(statusCode).data).toEqual({ statusCode: 'upstream-500' })
+
+      const flag = createError({ message: 'x', data: { error: true, field: 'email' } })
+      expect(parseError(flag).data).toEqual({ error: true, field: 'email' })
+    })
   })
 
   describe('code extraction', () => {
