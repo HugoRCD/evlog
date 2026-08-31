@@ -126,6 +126,33 @@ describe('evlog/hono', () => {
       orderId: 'ord_1',
       retryable: true,
     })
+
+    const event = defined(
+      findEventViaDrain(drain, e => e.path === '/api/checkout'),
+      'checkout error event',
+    )
+    expect(event.level).toBe('error')
+    expect(event.status).toBe(402)
+    expect(event.error).toMatchObject({
+      name: 'EvlogError',
+      message: 'Payment failed',
+      data: { why: 'Card declined by issuer', orderId: 'ord_1', retryable: true },
+    })
+  })
+
+  it('records the response status onError returned, not the status of the error', async () => {
+    const { drain } = createPipelineSpies()
+    const app = new Hono<EvlogVariables>()
+    app.use(evlog({ drain }))
+    app.get('/api/fail', () => {
+      throw createError({ message: 'Payment failed', status: 402 })
+    })
+    app.onError((_error, c) => c.json({ error: 'handled' }, 500))
+
+    await app.request('/api/fail')
+    await waitForDrainCalls(drain)
+
+    assertHttpEventEmitted(drain, { path: '/api/fail', status: 500, level: 'error' })
   })
 
   it('logs error context set manually by route handler', async () => {
