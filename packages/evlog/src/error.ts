@@ -1,15 +1,12 @@
-import type { ErrorOptions } from './types'
+import type { ErrorOptions, EvlogErrorData } from './types'
 import { colors, isServer } from './utils'
+import { evlogErrorBrand, isEvlogError as hasEvlogErrorBrand } from './shared/error-brand'
 
 /** Non-enumerable storage so `JSON.stringify(error)` never exposes internal context */
 const evlogErrorInternalKey = Symbol.for('evlog.error.internal')
 
-/**
- * Prototype brand read by {@link EvlogError.isEvlogError}. `instanceof` compares
- * class identity, which differs between duplicate installs of evlog — a
- * registry-shared symbol does not.
- */
-const evlogErrorBrand = Symbol.for('evlog.error.brand')
+/** Non-enumerable storage; the payload reaches the wire through the `data` getter */
+const evlogErrorDataKey = Symbol.for('evlog.error.data')
 
 /**
  * Structured error with context for better debugging
@@ -36,9 +33,7 @@ export class EvlogError extends Error {
    * silently reports `false`, downgrading a structured error to a bare 500.
    */
   static isEvlogError(error: unknown): error is EvlogError {
-    return typeof error === 'object'
-      && error !== null
-      && (error as Record<symbol, unknown>)[evlogErrorBrand] === true
+    return hasEvlogErrorBrand(error)
   }
 
   /** Stable, machine-readable identifier (e.g. `'PAYMENT_DECLINED'`). */
@@ -78,6 +73,15 @@ export class EvlogError extends Error {
       })
     }
 
+    if (opts.data !== undefined) {
+      Object.defineProperty(this, evlogErrorDataKey, {
+        value: opts.data,
+        enumerable: false,
+        writable: false,
+        configurable: true,
+      })
+    }
+
     // Maintain proper stack trace in V8
     if (Error.captureStackTrace) {
       Error.captureStackTrace(this, EvlogError)
@@ -99,12 +103,20 @@ export class EvlogError extends Error {
     return this.message
   }
 
-  /** Structured data for serialization */
-  get data(): { code?: string, why?: string, fix?: string, link?: string } | undefined {
-    if (this.code || this.why || this.fix || this.link) {
-      return { code: this.code, why: this.why, fix: this.fix, link: this.link }
+  /**
+   * Structured data for serialization: the guidance fields, merged over the
+   * payload passed as `createError({ data })`.
+   */
+  get data(): EvlogErrorData | undefined {
+    const extra = (this as EvlogError & { [evlogErrorDataKey]?: Record<string, unknown> })[evlogErrorDataKey]
+    if (!extra && !this.code && !this.why && !this.fix && !this.link) return undefined
+    return {
+      ...extra,
+      ...(this.code !== undefined && { code: this.code }),
+      ...(this.why !== undefined && { why: this.why }),
+      ...(this.fix !== undefined && { fix: this.fix }),
+      ...(this.link !== undefined && { link: this.link }),
     }
-    return undefined
   }
 
   override toString(): string {

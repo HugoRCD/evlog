@@ -7,6 +7,7 @@ import {
   resolveEvlogError,
   extractErrorStatus,
   buildPlainNitroErrorBody,
+  isSensitiveNitroError,
   serializeEvlogErrorResponse,
   markH3ErrorHandled,
   shouldSerializeNitroErrorAsJson,
@@ -33,12 +34,15 @@ function endNodeResponse(event: H3Event, body: string): void {
  * This ensures that 'data' (containing 'why', 'fix', 'link') is preserved
  * in the JSON response regardless of the underlying HTTP framework.
  *
- * For non-EvlogError, it preserves Nitro's default response shape while
- * sanitizing internal error details in production for 5xx errors.
+ * For non-EvlogError, it preserves Nitro's default response shape — `data`
+ * from `createError({ data })` included — while withholding the details of
+ * unhandled errors in production.
  */
 export default defineNitroErrorHandler(async (error, event, ctx) => {
   const evlogError = resolveEvlogError(error)
   const requestUrl = getRequestURL(event, { xForwardedHost: true })
+  // Read before `suppressNitroDevOverlay` clears the flags it relies on.
+  const sensitive = isSensitiveNitroError(error)
 
   if (!shouldSerializeNitroErrorAsJson({
     pathname: requestUrl.pathname,
@@ -64,7 +68,7 @@ export default defineNitroErrorHandler(async (error, event, ctx) => {
   const url = requestUrl.pathname
 
   if (!evlogError) {
-    const body = buildPlainNitroErrorBody(error, url, isDev)
+    const body = buildPlainNitroErrorBody(error, url, { isDev, sensitive })
     setResponseStatus(event, body.status as number)
     setResponseHeader(event, 'Content-Type', 'application/json')
     return endNodeResponse(event, JSON.stringify(body))

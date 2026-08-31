@@ -106,6 +106,7 @@ function evlogErrorFromContext(errorData: Record<string, unknown>): EvlogError {
     why: readString('why'),
     fix: readString('fix'),
     link: readString('link'),
+    data: nested,
   })
 }
 

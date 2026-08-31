@@ -4,6 +4,7 @@ import {
   resolveEvlogError,
   extractErrorStatus,
   buildPlainNitroErrorBody,
+  isSensitiveNitroError,
   serializeEvlogErrorResponse,
   shouldSerializeNitroErrorAsJson,
   shouldSuppressNitroDevOverlay,
@@ -37,6 +38,8 @@ function getNitroV3RequestHeader(
 export default defineErrorHandler(async (error, event, ctx: NitroErrorHandlerContext) => {
   const evlogError = resolveEvlogError(error)
   const requestUrl = parseURL(event.req.url)
+  // Read before `suppressNitroDevOverlay` clears the flags it relies on.
+  const sensitive = isSensitiveNitroError(error)
 
   if (!shouldSerializeNitroErrorAsJson({
     pathname: requestUrl.pathname,
@@ -62,7 +65,7 @@ export default defineErrorHandler(async (error, event, ctx: NitroErrorHandlerCon
 
   const body = evlogError
     ? serializeEvlogErrorResponse(evlogError, url)
-    : buildPlainNitroErrorBody(error, url, isDev)
+    : buildPlainNitroErrorBody(error, url, { isDev, sensitive })
   const status = extractErrorStatus(evlogError ?? error)
 
   return new Response(JSON.stringify(body), {

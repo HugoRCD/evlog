@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createWithEvlog } from '../../src/next/handler'
 import { evlogStorage } from '../../src/next/storage'
 import { initLogger } from '../../src/logger'
+import { createError } from '../../src/error'
 import { defined } from '../helpers/defined'
 import { createDeferredStream } from '../helpers/stream'
 
@@ -93,6 +94,28 @@ describe('withEvlog', () => {
     const parsed = JSON.parse(output)
     expect(parsed.user).toEqual({ id: '123', plan: 'enterprise' })
     expect(parsed.cart).toEqual({ items: 5 })
+  })
+
+  it('returns a structured JSON response for a thrown EvlogError', async () => {
+    const withEvlog = createWithEvlog({ pretty: false })
+
+    const handler = withEvlog((_: Request) => {
+      throw createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined by issuer',
+        data: { orderId: 'ord_1', retryable: true },
+      })
+    })
+
+    const response = await handler(new Request('http://localhost/api/checkout', { method: 'POST' }))
+
+    expect(response.status).toBe(402)
+    expect(await response.json()).toMatchObject({
+      message: 'Payment failed',
+      status: 402,
+      data: { why: 'Card declined by issuer', orderId: 'ord_1', retryable: true },
+    })
   })
 
   it('captures errors and re-throws them', async () => {

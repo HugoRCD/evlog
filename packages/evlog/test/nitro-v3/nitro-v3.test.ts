@@ -313,4 +313,17 @@ describe.sequential('Nitro v3 Server with evlog', () => {
       consola.restoreAll()
     }
   })
+
+  it('preserves data and message from a deliberate HTTPError', async () => {
+    const res = await server.fetch(new Request(new URL('/throws-h3-data', server.url)))
+
+    expect(res.status).toBe(500)
+    expect(await res.json()).toMatchObject({
+      statusCode: 500,
+      url: '/throws-h3-data',
+      error: true,
+      message: 'Payment provider rejected the charge',
+      data: { orderId: 'ord_1', retryable: true },
+    })
+  })
 })

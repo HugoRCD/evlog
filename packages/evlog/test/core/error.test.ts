@@ -227,6 +227,46 @@ describe('EvlogError', () => {
     })
   })
 
+  describe('data (client payload)', () => {
+    it('merges the payload into the data getter', () => {
+      const error = createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined',
+        data: { orderId: 'ord_1', retryable: true },
+      })
+
+      expect(error.data).toEqual({ orderId: 'ord_1', retryable: true, why: 'Card declined' })
+    })
+
+    it('returns the payload when no guidance field is set', () => {
+      expect(createError({ message: 'x', data: { key: 'value' } }).data).toEqual({ key: 'value' })
+    })
+
+    it('lets the guidance fields win on a key collision', () => {
+      const error = createError({
+        message: 'x',
+        code: 'PAYMENT_DECLINED',
+        data: { code: 'from-payload' },
+      })
+
+      expect(error.data?.code).toBe('PAYMENT_DECLINED')
+    })
+
+    it('serializes the payload to the client', () => {
+      const error = createError({ message: 'x', status: 402, data: { orderId: 'ord_1' } })
+
+      expect(error.toJSON().data).toEqual({ orderId: 'ord_1' })
+      expect(serializeEvlogErrorResponse(error, '/api/x').data).toEqual({ orderId: 'ord_1' })
+    })
+
+    it('does not duplicate the payload in JSON.stringify(error)', () => {
+      const error = createError({ message: 'x', data: { orderId: 'ord_1' } })
+
+      expect(JSON.parse(JSON.stringify(error)).data).toEqual({ orderId: 'ord_1' })
+    })
+  })
+
   describe('internal (backend-only)', () => {
     it('exposes internal via getter when provided', () => {
       const error = createError({
@@ -258,7 +298,7 @@ describe('EvlogError', () => {
       })
       const body = serializeEvlogErrorResponse(error, '/api/x')
       expect(body.internal).toBeUndefined()
-      expect(body.data).toEqual({ code: undefined, why: 'Reason', fix: undefined, link: undefined })
+      expect(body.data).toEqual({ why: 'Reason' })
     })
   })
 })
@@ -456,6 +496,94 @@ describe('parseError', () => {
       const parsed = parseError(error)
 
       expect(parsed.status).toBe(500)
+    })
+  })
+
+  describe('data payload', () => {
+    it('reads the payload from an EvlogError', () => {
+      const error = createError({ message: 'x', why: 'Card declined', data: { orderId: 'ord_1' } })
+
+      expect(parseError(error).data).toEqual({ orderId: 'ord_1', why: 'Card declined' })
+    })
+
+    it('reads the payload from a response body', () => {
+      const body = { statusCode: 402, message: 'Payment failed', data: { orderId: 'ord_1' } }
+
+      expect(parseError({ data: body }).data).toEqual({ orderId: 'ord_1' })
+    })
+
+    it('leaves data undefined when the response body carries none', () => {
+      expect(parseError({ data: { statusCode: 500, message: 'Boom' } }).data).toBeUndefined()
+    })
+
+    it('reads every field from the error when the payload mimics a response body', () => {
+      const error = createError({
+        message: 'Payment failed',
+        status: 402,
+        why: 'Card declined',
+        data: {
+          statusCode: 'upstream-500',
+          statusMessage: 'payload-message',
+          data: { value: 1 },
+        },
+      })
+
+      const parsed = parseError(error)
+
+      expect(parsed.message).toBe('Payment failed')
+      expect(parsed.status).toBe(402)
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ statusCode: 'upstream-500', data: { value: 1 } })
+    })
+
+    it('leaves data undefined for a serialized error that carries no payload', () => {
+      const body = JSON.parse(JSON.stringify(createError({ message: 'Boom', status: 500 })))
+
+      expect(parseError({ data: body }).data).toBeUndefined()
+    })
+
+    it('reads the nested payload of a serialized error', () => {
+      const body = JSON.parse(JSON.stringify(
+        createError({ message: 'Payment failed', status: 402, why: 'Card declined', data: { orderId: 'ord_1' } }),
+      ))
+
+      const parsed = parseError({ data: body })
+
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ orderId: 'ord_1' })
+    })
+
+    it('keeps response metadata out of a flat body payload', () => {
+      const parsed = parseError({ data: { message: 'Payment failed', status: 402, why: 'Card declined' } })
+
+      expect(parsed.data).toEqual({ why: 'Card declined' })
+    })
+
+    it('reads the payload an h3 error holds directly', () => {
+      const h3Error = { message: 'Boom', statusCode: 402, data: { orderId: 'ord_1', why: 'Card declined' } }
+
+      const parsed = parseError(h3Error)
+
+      expect(parsed.message).toBe('Boom')
+      expect(parsed.status).toBe(402)
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toEqual({ orderId: 'ord_1', why: 'Card declined' })
+    })
+
+    it('reads a flat body that carries the guidance at the top level', () => {
+      const parsed = parseError({ data: { message: 'Payment failed', why: 'Card declined', orderId: 'ord_1' } })
+
+      expect(parsed.message).toBe('Payment failed')
+      expect(parsed.why).toBe('Card declined')
+      expect(parsed.data).toMatchObject({ orderId: 'ord_1' })
+    })
+
+    it('reads a payload whose keys collide with the response body shape', () => {
+      const statusCode = createError({ message: 'x', data: { statusCode: 'upstream-500' } })
+      expect(parseError(statusCode).data).toEqual({ statusCode: 'upstream-500' })
+
+      const flag = createError({ message: 'x', data: { error: true, field: 'email' } })
+      expect(parseError(flag).data).toEqual({ error: true, field: 'email' })
     })
   })
 

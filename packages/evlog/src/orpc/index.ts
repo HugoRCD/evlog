@@ -202,10 +202,8 @@ export function evlog<TContext extends Partial<EvlogOrpcContext> & Context = Evl
 
 function toOrpcError(error: EvlogError): ORPCError<string, Record<string, unknown>> {
   const parsed = parseError(error)
-  const data: Record<string, unknown> = {}
-  if (parsed.why !== undefined) data.why = parsed.why
-  if (parsed.fix !== undefined) data.fix = parsed.fix
-  if (parsed.link !== undefined) data.link = parsed.link
+  // `code` travels as the ORPC error code, the rest of the payload as its data.
+  const { code: _code, ...data } = parsed.data ?? {}
   return new ORPCError(parsed.code ?? 'EVLOG_ERROR', {
     status: parsed.status,
     message: parsed.message,

@@ -231,11 +231,24 @@ describe('errorHandler', () => {
       expect(sentBody.statusMessage).toBe('Internal Server Error')
     })
 
-    it('sanitizes 5xx error messages in production', async () => {
+    it('preserves data from createError, like Nitro does', async () => {
+      const error = Object.assign(new Error('Payment provider rejected the charge'), {
+        statusCode: 500,
+        data: { orderId: 'ord_1', retryable: true },
+      })
+
+      await invokeErrorHandler(error)
+
+      expect(readResponseBody().data).toEqual({ orderId: 'ord_1', retryable: true })
+    })
+
+    it('sanitizes unhandled error messages in production', async () => {
       vi.stubEnv('NODE_ENV', 'production')
 
       const error = Object.assign(new Error('Database connection failed: password invalid'), {
         statusCode: 500,
+        unhandled: true,
+        data: { query: 'select * from users' },
       })
 
       await invokeErrorHandler(error)
@@ -243,6 +256,41 @@ describe('errorHandler', () => {
       const sentBody = readResponseBody()
       expect(sentBody.message).toBe('Internal Server Error')
       expect(sentBody.statusMessage).toBe('Internal Server Error')
+      expect(sentBody.data).toBeUndefined()
+    })
+
+    it('sanitizes statusless error messages in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      await invokeErrorHandler(new Error('Database connection failed: password invalid'))
+
+      expect(readResponseBody().message).toBe('Internal Server Error')
+    })
+
+    it('preserves a deliberate 5xx message and data in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      const error = Object.assign(new Error('Payment provider rejected the charge'), {
+        statusCode: 500,
+        data: { orderId: 'ord_1' },
+      })
+
+      await invokeErrorHandler(error)
+
+      const sentBody = readResponseBody()
+      expect(sentBody.message).toBe('Payment provider rejected the charge')
+      expect(sentBody.data).toEqual({ orderId: 'ord_1' })
+    })
+
+    it('keeps unhandled error details in development', async () => {
+      const error = Object.assign(new Error('Database connection failed: password invalid'), {
+        statusCode: 500,
+        unhandled: true,
+      })
+
+      await invokeErrorHandler(error)
+
+      expect(readResponseBody().message).toBe('Database connection failed: password invalid')
     })
 
     it('preserves 4xx error messages in production', async () => {

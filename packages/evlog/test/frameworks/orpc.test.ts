@@ -77,6 +77,15 @@ function buildRouter(trace?: { sawLogger: boolean, fromUseLogger: boolean }) {
     payNoCode: base.handler(() => {
       throw createError({ message: 'Boom', status: 418, why: 'Just because' })
     }),
+    payWithData: base.handler(() => {
+      throw createError({
+        message: 'Card declined',
+        code: 'PAYMENT_DECLINED',
+        status: 402,
+        why: 'Adhoc card declined',
+        data: { orderId: 'ord_1', retryable: true },
+      })
+    }),
   }
 }
 
@@ -302,6 +311,18 @@ describe('evlog/orpc', () => {
       const event = findEventViaDrain(drain, e => e.path === '/rpc/payAdHoc')
       expect(event!.level).toBe('error')
       expect(event!.status).toBe(402)
+    })
+
+    it('forwards the createError() data payload without the code', async () => {
+      const { client } = buildClient()
+
+      const result = await client.payWithData({}).catch(err => err)
+      expect(result.code).toBe('PAYMENT_DECLINED')
+      expect(result.data).toEqual({
+        why: 'Adhoc card declined',
+        orderId: 'ord_1',
+        retryable: true,
+      })
     })
 
     it('falls back to EVLOG_ERROR code when createError() omits code', async () => {
