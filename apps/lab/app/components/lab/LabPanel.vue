@@ -313,36 +313,13 @@ const CONTAINERS = [
 </script>
 
 <template>
-  <!--
-    A container, so the controls inside can answer the panel's width rather than
-    the window's. This panel is dragged between 240 and 560 pixels: a five-across
-    row of buttons that is comfortable at one end is unreadable at the other, and
-    a media query cannot tell the difference because the window never changed.
-  -->
-  <!-- No left border: the splitter beside it is the divider. -->
   <aside class="@container flex h-full shrink-0 flex-col bg-default">
     <header class="flex items-center justify-between gap-2 border-b border-default px-3 py-3 @min-[280px]:px-4">
-      <!--
-        The title holds one line and gives up characters before it gives up the
-        row. Wrapping "Render labs" onto two lines pushed the help button under
-        the actions and made a tidy header look broken.
-      -->
       <span class="min-w-0 truncate font-pixel text-[11px] uppercase tracking-[0.2em] text-default">
         Render labs
       </span>
 
       <div class="flex shrink-0 items-center gap-1">
-        <!--
-          Out of the menu and into the header. Behind the ellipsis, saving your
-          work was three characters wide and looked like a preference — the one
-          action in the app that decides whether anything survives the tab.
-        -->
-        <!--
-          Beside Projects, and not inside the menu with it. Starting something is
-          the first thing anyone does here and the last thing that should need
-          finding — it was one item down an ellipsis, which is where actions go
-          to be used once and forgotten.
-        -->
         <button
           type="button"
           data-cuelume-press
@@ -363,16 +340,6 @@ const CONTAINERS = [
         >
           <UIcon name="i-lucide-folder" class="size-3" />
         </button>
-        <!--
-          In the header rather than down the menu, for the same reason Projects
-          is: a control nobody can find is a control nobody has. It also has to
-          be visible to be honest — this is the one button whose whole job is to
-          change how everything else looks, and burying it made the panel seem
-          to have no opinion about light at all.
-
-          It shows the destination, not the state. A moon on a dark panel is a
-          badge saying where you already are; a sun says what clicking does.
-        -->
         <button
           type="button"
           data-cuelume-press
@@ -383,13 +350,6 @@ const CONTAINERS = [
         >
           <UIcon :name="isDark ? 'i-lucide-sun' : 'i-lucide-moon'" class="size-3" />
         </button>
-        <!--
-          In the header, beside the light switch, and not behind the ellipsis.
-          This tool is used while its user is recording a screen: a lab that
-          chirps under a take being narrated has to be silenceable without a
-          hunt, and the state has to be readable at a glance before recording
-          starts rather than discovered in the edit.
-        -->
         <button
           type="button"
           data-cuelume-press
@@ -400,10 +360,6 @@ const CONTAINERS = [
         >
           <UIcon :name="cuesEnabled ? 'i-lucide-volume-2' : 'i-lucide-volume-off'" class="size-3" />
         </button>
-        <!--
-          Sized to be found. At sixteen pixels this read as punctuation after the
-          title rather than as the way into the only documentation the tool has.
-        -->
         <button
           type="button"
           data-cuelume-press
@@ -418,23 +374,7 @@ const CONTAINERS = [
       </div>
     </header>
 
-    <!--
-      The strip exists only when there is a choice to make.
-      A permanent "Layer" tab that is disabled most of the time advertises a
-      place you are usually not allowed to go, which reads as something broken
-      rather than as something empty. With nothing selected there is exactly one
-      thing this panel can show, so it shows it and says nothing. The moment a
-      clip is selected a second destination exists — and it is named after the
-      clip, so the panel states what is being edited instead of leaving it to be
-      inferred from the fields.
-    -->
 
-    <!--
-    Above the tabs, not inside them. It is the list of what is in the picture,
-      and everything below it is a way of treating one of these — reaching a
-      layer used to mean finding it on a timeline or in a row of chips at the
-      other end of the window.
-    -->
     <LabSection title="Layers">
       <LabLayers
         :layers
@@ -497,11 +437,6 @@ const CONTAINERS = [
     </div>
 
     <div v-show="activeTab === 'shot' || !selectedLayer" class="min-h-0 flex-1 overflow-y-auto">
-      <!--
-        Named for what it is. "Stage" was a word from the renderer's vocabulary —
-        it meant nothing to anyone opening the panel, and the two pixel fields
-        under it asked for a number without saying what the number decided.
-      -->
       <LabSection title="Viewport">
         <p class="mb-2 font-mono text-[10px] leading-relaxed text-dimmed">
           The window your component is laid out in before it is filmed. Narrow it
@@ -563,10 +498,6 @@ const CONTAINERS = [
       </div>
 
       <LabSection title="Camera">
-        <!--
-          Framing lives with the framing controls. This sat in the stage section
-          next to "replay", where it read as one of three unrelated verbs.
-        -->
         <button
           type="button"
           data-cuelume-press
@@ -585,10 +516,6 @@ const CONTAINERS = [
         <LabNumber v-model="shot.panX" label="Pan X" v-bind="range('panX')" />
         <LabNumber v-model="shot.panY" label="Pan Y" v-bind="range('panY')" />
 
-        <!--
-          Moves on the shot rather than on a layer: dolly travels, slide pans,
-          spin rolls, fade takes the frame to black.
-        -->
         <div class="mt-3 mb-1 font-pixel text-[10px] uppercase tracking-[0.18em] text-dimmed">
           Moves
         </div>
@@ -621,11 +548,6 @@ const CONTAINERS = [
         <LabNumber v-model="shot.aperture" label="Bokeh strength" v-bind="range('aperture')" />
         <LabNumber v-model="shot.blurRadius" label="Max blur" v-bind="range('blurRadius')" />
 
-        <!--
-          The shape of the aperture, which is what separates a photographed
-          highlight from a blur. Only offered once there is blur to shape: at
-          aperture zero these two set the geometry of something with no radius.
-        -->
         <template v-if="shot.aperture > 0">
           <LabNumber v-model="shot.bokehBlades" label="Aperture blades" v-bind="range('bokehBlades')" />
           <LabNumber v-model="shot.bokehCatEye" label="Cat's eye" v-bind="range('bokehCatEye')" />
@@ -633,11 +555,6 @@ const CONTAINERS = [
           <LabNumber v-model="shot.bokehSqueeze" label="Anamorphic bokeh" v-bind="range('bokehSqueeze')" />
         </template>
 
-        <!--
-          The tilt sits with the focal plane rather than with the bokeh, because
-          it moves where the sharpness is rather than what the blur looks like.
-          Its direction only appears once there is a lean to point.
-        -->
         <LabNumber v-model="shot.focusTilt" label="Plane tilt" v-bind="range('focusTilt')" />
         <LabNumber
           v-if="Math.abs(shot.focusTilt) > 0.002"
@@ -652,31 +569,17 @@ const CONTAINERS = [
         </p>
       </LabSection>
 
-      <!--
-        Named for what it is rather than for the pass that makes it. Everything
-        in here is what happens to light too bright for the sensor to hold, and
-        the four things under the glow are the four ways a lens spills it.
-      -->
       <LabSection title="Light">
         <LabNumber v-model="shot.emission" label="Source brightness" v-bind="range('emission')" />
         <LabNumber v-model="shot.bloomIntensity" label="Glow" v-bind="range('bloomIntensity')" />
         <LabNumber v-model="shot.bloomThreshold" label="Threshold" v-bind="range('bloomThreshold')" />
         <LabNumber v-model="shot.bloomRadius" label="Spread" v-bind="range('bloomRadius')" />
-        <!--
-          These three ride the same thresholded mip chain the glow does, so they
-          belong with it: dragging any of them with the glow at zero would appear
-          to do nothing, and there would be nothing on screen to say why.
-        -->
         <LabNumber v-model="shot.bleed" label="Halation" v-bind="range('bleed')" />
         <LabNumber v-model="shot.streaks" label="Anamorphic streak" v-bind="range('streaks')" />
         <LabNumber v-model="shot.ghosts" label="Ghosts" v-bind="range('ghosts')" />
         <LabNumber v-model="shot.diffusion" label="Diffusion" v-bind="range('diffusion')" />
         <LabNumber v-model="shot.starIntensity" label="Star" v-bind="range('starIntensity')" />
 
-        <!--
-          The star's shape, only once there is one. Three numbers that decide
-          nothing are three ways to doubt the panel describes the frame.
-        -->
         <template v-if="shot.starIntensity > 0">
           <LabNumber v-model="shot.starPoints" label="Points" v-bind="range('starPoints')" />
           <LabNumber v-model="shot.starLength" label="Reach" v-bind="range('starLength')" />
@@ -689,13 +592,6 @@ const CONTAINERS = [
         </p>
       </LabSection>
 
-      <!--
-        Its own section, because these are the four things glass does to a
-        picture and they compose: the bulge bends where every channel is read
-        from, and the split, the spectrum and the scatter decide how far apart
-        those reads land. Chromatic aberration sat alone under the grade, where
-        it read as a colour adjustment rather than as a lens.
-      -->
       <LabSection title="Lens">
         <LabNumber v-model="shot.distortion" label="Bulge" v-bind="range('distortion')" />
         <LabNumber v-model="shot.aberration" label="Colour spread" v-bind="range('aberration')" />
@@ -719,11 +615,6 @@ const CONTAINERS = [
         <LabNumber v-model="shot.grain" label="Grain" v-bind="range('grain')" />
         <LabToggle v-model="shot.tonemap" label="Filmic tonemap" />
 
-        <!--
-          No alpha here, and on the two duotone stops below. All three are read
-          by `hexToLinearRgb`, which takes six digits — and the backdrop of a
-          frame is not a thing that can be see-through anyway.
-        -->
         <div class="mt-2">
           <LabColour v-model="shot.background" label="Background" :alpha="false" />
         </div>
@@ -732,10 +623,6 @@ const CONTAINERS = [
           Duotone
         </div>
         <LabNumber v-model="shot.duotone" label="Amount" v-bind="range('duotone')" />
-        <!--
-          Only offered once there is something to colour. Two swatches above a
-          control set to zero are two decisions nobody has been asked to make.
-        -->
         <div v-if="shot.duotone > 0" class="mt-2 flex flex-col gap-2">
           <LabColour v-model="shot.duotoneShadow" label="Shadow" :alpha="false" />
           <LabColour v-model="shot.duotoneHighlight" label="Highlight" :alpha="false" />
@@ -744,12 +631,6 @@ const CONTAINERS = [
       </LabSection>
 
 
-      <!--
-        Last, because it is the last thing that happens to the picture — and
-        because it is the one control here that can throw the rest away. Every
-        screen reads one value per cell, so a shot graded for its highlights and
-        then reduced to five glyphs has spent that grade on nothing.
-      -->
       <LabSection title="Stylize">
         <LabChoice
           label="Screen"
@@ -808,12 +689,6 @@ const CONTAINERS = [
           @update:model-value="setOutput(String($event))"
         />
 
-        <!--
-          Everything about timing, and nothing else in this section. A shot is
-          one frame: it has no rate, no speed, no container and nothing to hold
-          after it ends, and four controls that decide nothing are four ways to
-          doubt that the panel is describing the thing on screen.
-        -->
         <template v-if="mode === 'video'">
           <LabChoice
             label="Frame rate"
@@ -841,12 +716,6 @@ const CONTAINERS = [
           <LabNumber v-model="settings.tail" label="Tail" v-bind="range('tail')" />
         </template>
 
-        <!--
-          The size is here rather than on a control: with the presets doing the
-          setting, this is the only place the pixels are stated, and a shot out of
-          an old link that matches no preset would otherwise never say its own
-          frame size out loud.
-        -->
         <p class="mt-2 font-mono text-[10px] leading-relaxed text-dimmed/70">
           <template v-if="mode === 'video'">
             {{ settings.outputWidth }}×{{ settings.outputHeight }} · {{ frameCount }} frames ·
@@ -862,13 +731,6 @@ const CONTAINERS = [
 
     <footer class="border-t border-default p-3 @min-[280px]:p-4">
       <div v-if="busy" class="mb-2">
-        <!--
-          scaleX rather than an animated width. A width transition is a layout
-          animation driven by the main thread — which spends the whole export
-          blocked in long synchronous captures, so the bar lurches and appears to
-          slip backwards. A transform is composited and set outright, so it only
-          ever moves forward, at exactly the rate progress does.
-        -->
         <div class="h-[3px] w-full overflow-hidden bg-elevated">
           <div
             class="h-full origin-left bg-primary-500"
@@ -889,10 +751,6 @@ const CONTAINERS = [
       </div>
 
       <div v-else class="flex gap-1">
-        <!--
-          A shot exports one frame, so copying it is the whole of what this row
-          does and it takes the width the take's export would have had.
-        -->
         <button
           v-if="mode === 'video'"
           type="button"
@@ -902,13 +760,6 @@ const CONTAINERS = [
         >
           export {{ settings.container }}
         </button>
-        <!--
-          Copying is the wide one because a still off this thing is nearly always
-          on its way into a post or a message, and a file on disk is a detour
-          through the finder to get there. Saving one is still a real errand
-          though, so it keeps a button rather than a menu item — an action behind
-          an ellipsis is an action nobody finds twice.
-        -->
         <button
           type="button"
           data-cuelume-press

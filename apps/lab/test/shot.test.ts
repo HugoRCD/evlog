@@ -12,7 +12,7 @@ import {
   withLayerSpeed,
 } from '../app/utils/lab/layers'
 import { sequenceAtSpeed } from '../app/utils/lab/sequence'
-import { DEFAULT_SETTINGS } from '../app/utils/lab/settings'
+import { DEFAULT_SETTINGS, sanitizeShotSettings, settingsFromQuery } from '../app/utils/lab/settings'
 import { resolveLayerShotSettings, resolveTimelineShot, shotLayerAt, withoutLayerShotSetting } from '../app/utils/lab/shot'
 
 function video(start = 0, duration = 2000) {
@@ -76,6 +76,18 @@ describe('clip shots', () => {
     ])
 
     expect(layer?.shot?.settings).toEqual({ zoom: 4, tonemap: false })
+  })
+
+  it('coerces query and persisted shot settings consistently', () => {
+    expect(settingsFromQuery({ zoom: '99', stylize: 'unknown', tonemap: 'false' })).toMatchObject({
+      zoom: 4,
+      stylize: DEFAULT_SETTINGS.stylize,
+      tonemap: false,
+    })
+    expect(sanitizeShotSettings({ zoom: 99, stylize: 'unknown', tonemap: false })).toEqual({
+      zoom: 4,
+      tonemap: false,
+    })
   })
 
   it('ignores malformed persisted camera overrides', () => {
