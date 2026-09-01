@@ -17,7 +17,13 @@ const site = {
   // is what it does today, stills come out of the same pipeline, and audio is on
   // the list — copy naming one output would need rewriting with every addition.
   description: 'Compose and render shots in the browser. Stage live components, media and type, work them through a camera and lens pipeline — tilt, depth of field, bloom, grade — then render a still, a micro-animation or a full take at any resolution.',
-  imageAlt: 'Render labs by evlog: a composed shot in the frame, with the camera, lens and timeline controls beside it.',
+  // Borrowed from the product site for now: the card generated into `public/`
+  // only resolves on the origin `NUXT_PUBLIC_SITE_URL` names, and the
+  // production deployment is published under one that predates it. An image
+  // that 404s ships a blank card, so the head points at a URL that does not
+  // depend on this app's own origin until the two agree.
+  image: 'https://www.evlog.dev/og.png',
+  imageAlt: 'evlog, a modern TypeScript logger for everything you ship.',
   author: 'Hugo Richard',
   twitter: '@hugorcd',
 }
@@ -70,11 +76,11 @@ const head = {
     { property: 'og:title', content: site.title },
     { property: 'og:description', content: site.description },
     { property: 'og:url', content: `${site.url}/` },
-    // Absolute: every unfurler resolves `og:image` against nothing.
-    { property: 'og:image', content: `${site.url}/og.png` },
+    { property: 'og:image', content: site.image },
     { property: 'og:image:type', content: 'image/png' },
+    // The file's real dimensions, verified against what evlog.dev serves.
     { property: 'og:image:width', content: '1200' },
-    { property: 'og:image:height', content: '630' },
+    { property: 'og:image:height', content: '628' },
     { property: 'og:image:alt', content: site.imageAlt },
     { property: 'og:locale', content: 'en_US' },
 
@@ -83,7 +89,7 @@ const head = {
     { name: 'twitter:creator', content: site.twitter },
     // X falls back to `og:image` but not to `og:image:alt`, so the alt text has
     // to be repeated here or the card ships without one.
-    { name: 'twitter:image', content: `${site.url}/og.png` },
+    { name: 'twitter:image', content: site.image },
     { name: 'twitter:image:alt', content: site.imageAlt },
   ],
   script: [
