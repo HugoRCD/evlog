@@ -976,10 +976,29 @@ export interface ErrorOptions {
   /** The original error that caused this */
   cause?: Error
   /**
+   * Extra payload returned to the client, merged into the response body's
+   * `data` object next to `code`, `why`, `fix` and `link` (those four win on
+   * a key collision). Mirrors h3's `createError({ data })`.
+   *
+   * For context that must never leave the server, use {@link ErrorOptions.internal}.
+   */
+  data?: Record<string, unknown>
+  /**
    * Backend-only diagnostic context (auditing, support, debugging).
    * Never included in HTTP responses or `EvlogError#toJSON`; included in wide events when the error is passed to `log.error()`.
    */
   internal?: Record<string, unknown>
+}
+
+/**
+ * Serialized `data` payload of an {@link import('./error').EvlogError} — the
+ * structured guidance fields plus anything passed as `createError({ data })`.
+ */
+export type EvlogErrorData = Record<string, unknown> & {
+  code?: string
+  why?: string
+  fix?: string
+  link?: string
 }
 
 /**
@@ -1056,5 +1075,10 @@ export interface ParsedError {
   why?: string
   fix?: string
   link?: string
+  /**
+   * The response body's `data` payload — the guidance fields plus anything the
+   * server passed as `createError({ data })`.
+   */
+  data?: Record<string, unknown>
   raw: unknown
 }

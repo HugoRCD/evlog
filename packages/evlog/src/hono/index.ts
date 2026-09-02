@@ -98,13 +98,16 @@ const integration = defineFrameworkIntegration<Context>({
  */
 export function evlog(options: EvlogHonoOptions = {}): MiddlewareHandler {
   return async (c, next) => {
-    const { skipped, finish, finishResponse, runWith } = integration.start(c, options)
+    const { skipped, logger, finish, finishResponse, runWith } = integration.start(c, options)
     if (skipped) {
       await next()
       return
     }
     try {
       await runWith(next)
+      // Hono's compose hands a thrown error to `app.onError` at the route's own
+      // dispatch level, so `next()` returns normally and `c.error` is the only trace.
+      if (c.error) logger.error(c.error)
       if (shouldDeferEmitForResponse(c.res)) {
         // Assign directly — Hono's compose ignores middleware return values when
         // context.finalized is already true, so returning the wrapped response

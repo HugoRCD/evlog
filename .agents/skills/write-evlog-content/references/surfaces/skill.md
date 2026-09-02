@@ -3,7 +3,7 @@
 Two sets, and they are not the same product.
 
 - `.agents/skills/` is internal. It is loaded by agents working in this repository, and it can assume the checkout, the commands, and the conventions.
-- `apps/docs/skills/` is published, served from the docs site under `.well-known/skills`. It is loaded by someone else's agent, in someone else's repository, against evlog as a dependency.
+- `skills/` is published, served from the docs site under `.well-known/skills`. It is loaded by someone else's agent, in someone else's repository, against evlog as a dependency.
 
 A skill written for one and moved to the other is wrong in both directions: the internal one leaks repo paths, the published one is vague about a codebase it should know.
 

@@ -84,6 +84,7 @@ export type {
   EnvironmentContext,
   ErrorCode,
   ErrorOptions,
+  EvlogErrorData,
   FieldContext,
   H3EventContext,
   IngestPayload,

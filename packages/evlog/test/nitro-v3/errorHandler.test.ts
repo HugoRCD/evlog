@@ -197,16 +197,49 @@ describe('nitro-v3 errorHandler', () => {
       expect(body.statusMessage).toBe('Internal Server Error')
     })
 
-    it('sanitizes 5xx error messages in production', async () => {
+    it('preserves data from createError, like Nitro does', async () => {
+      const error = Object.assign(new Error('Payment provider rejected the charge'), {
+        statusCode: 500,
+        data: { orderId: 'ord_1', retryable: true },
+      })
+
+      const body = await readJson(await invokeErrorHandler(error))
+      expect(body.data).toEqual({ orderId: 'ord_1', retryable: true })
+    })
+
+    it('sanitizes unhandled error messages in production', async () => {
       vi.stubEnv('NODE_ENV', 'production')
 
       const error = Object.assign(new Error('Database connection failed: password invalid'), {
         statusCode: 500,
+        unhandled: true,
+        data: { query: 'select * from users' },
       })
 
       const body = await readJson(await invokeErrorHandler(error))
       expect(body.message).toBe('Internal Server Error')
       expect(body.statusMessage).toBe('Internal Server Error')
+      expect(body.data).toBeUndefined()
+    })
+
+    it('sanitizes statusless error messages in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      const body = await readJson(await invokeErrorHandler(new Error('Database connection failed: password invalid')))
+      expect(body.message).toBe('Internal Server Error')
+    })
+
+    it('preserves a deliberate 5xx message and data in production', async () => {
+      vi.stubEnv('NODE_ENV', 'production')
+
+      const error = Object.assign(new Error('Payment provider rejected the charge'), {
+        statusCode: 500,
+        data: { orderId: 'ord_1' },
+      })
+
+      const body = await readJson(await invokeErrorHandler(error))
+      expect(body.message).toBe('Payment provider rejected the charge')
+      expect(body.data).toEqual({ orderId: 'ord_1' })
     })
 
     it('preserves 4xx error messages in production', async () => {

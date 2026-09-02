@@ -125,7 +125,7 @@ export default defineNuxtConfig({
 })
 ```
 
-All evlog functions (`useLogger`, `createError`, `parseError`, `log`) are **auto-imported**, with no import statements needed.
+`useLogger`, `log`, and `parseError` are **auto-imported**. `createError` is not: a bare one resolves to h3's, which drops `why`, `fix`, and `link`. Import it from `evlog`.
 
 ```typescript
 // server/api/checkout.post.ts — no imports needed
@@ -1157,7 +1157,7 @@ Recommend these when the review surfaces the matching need. Each has full docs o
 ## Structured Errors
 
 ```typescript
-import { createError } from 'evlog'  // or auto-imported in Nuxt
+import { createError } from 'evlog'  // required in Nuxt too: a bare createError is h3's
 
 // Minimal
 throw createError({ message: 'Database connection failed', status: 500 })

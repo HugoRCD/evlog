@@ -1,19 +1,18 @@
 import { channelName } from './channel'
 import { environment } from './environment'
 
-/** Scheduled runs answer to nobody in real time; every other surface has someone waiting. */
-function isBatch(kind?: string): boolean {
-  return channelName(kind) === 'schedule'
-}
-
 /**
- * Routing shared by every gateway call: schedules sort on cost, every
- * interactive surface sorts on time to first token.
+ * Routing shared by every gateway call. Schedule turns answer to nobody in
+ * real time, so they sort on cost; every other surface has someone waiting and
+ * sorts on time to first token. `zeroDataRetention` prunes the pool before the
+ * sort sees it — on this model it drops the cheapest deployments, which keep
+ * data — and the sort picks from the rest. Naming providers by hand pins that
+ * choice to a list that rots as deployments, prices and health move.
  */
-export function gatewayRouting(kind?: string) {
+export function gatewayRouting(unattended = false) {
   return {
     caching: 'auto',
-    sort: isBatch(kind) ? 'cost' : 'ttft',
+    sort: unattended ? 'cost' : 'ttft',
     zeroDataRetention: true,
   } as const
 }

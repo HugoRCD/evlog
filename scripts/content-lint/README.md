@@ -47,7 +47,7 @@ Defined in `lib/surfaces.mjs`, not in the caller:
 | --- | --- | --- |
 | `landing` `docs` `reference` `blog` | `apps/docs/content` | everything |
 | `readme` | `packages/*/README.md` | everything |
-| `skill` | `.agents/skills/`, `apps/docs/skills/` | house rules and drift only |
+| `skill` | `.agents/skills/`, `skills/` | house rules and drift only |
 | `agents` | `AGENTS.md`, `apps/*/AGENTS.md` | house rules and drift only |
 
 Rhythm checks are off on the last two. Those files are read by an agent that will act on them, and four parallel imperatives there are a procedure, not a template.

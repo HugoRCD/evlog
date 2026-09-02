@@ -1,9 +1,10 @@
 import { defineAgent } from 'eve'
 import { gatewayRouting, sessionTags } from '../../lib/gateway'
+import { MODEL } from '../../lib/model'
 
 export default defineAgent({
-  model: 'deepseek/deepseek-v4-flash-0731',
-  /** This model honors only `high` and `xhigh`; judging a candidate against its twin is the hardest call in the pass. */
+  model: MODEL,
+  /** Judging a candidate against its twin is the hardest call in the pass. */
   reasoning: 'xhigh',
   modelOptions: {
     providerOptions: { gateway: { ...gatewayRouting(), tags: sessionTags('content') } },

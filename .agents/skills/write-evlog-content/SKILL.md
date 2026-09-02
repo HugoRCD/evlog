@@ -1,6 +1,8 @@
 ---
 name: write-evlog-content
-description: Write, review, and rewrite any evlog content: a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset. Load before drafting or editing prose in apps/docs/content, before writing a blog post, before touching a SKILL.md or an AGENTS.md, and whenever content is reviewed for voice, accuracy, or AI-generated slop. Carries the evlog voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell.
+description: "Write, review, and rewrite any evlog content: a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset. Load before drafting or editing prose in apps/docs/content, before writing a blog post, before touching a SKILL.md or an AGENTS.md, and whenever content is reviewed for voice, accuracy, or AI-generated slop. Carries the evlog voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell."
+metadata:
+  internal: true
 ---
 
 # Writing evlog content
@@ -41,7 +43,7 @@ Everything evlog ships as prose, on both sides of the line:
 | Read by | Surfaces | What decides quality |
 | --- | --- | --- |
 | People | docs pages, the landing, blog posts, the package READMEs | Whether the reader can act, and whether they believe the page |
-| Agents | `.agents/skills/`, `apps/docs/skills/`, the `AGENTS.md` files | Whether an agent does the right thing having read only this |
+| Agents | `.agents/skills/`, `skills/`, the `AGENTS.md` files | Whether an agent does the right thing having read only this |
 
 The house rules cross the line: punctuation, terminology, accuracy, dead links. Rhythm does not. A skill whose four steps read as four parallel imperatives is a procedure, and the scanner leaves rhythm alone there. See `rules/machine.md`.
 

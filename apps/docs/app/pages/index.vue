@@ -4,15 +4,15 @@ definePageMeta({
   layout: false,
 })
 
-const softwareSchema = {
+// The product, the publisher and the site identity come from `seo.schema` in
+// `app.config.ts`; `useSeo` emits them as one linked graph, plus the canonical
+// and the OG tags. Only what that shape cannot carry is added here.
+const identityFacts = {
   '@context': 'https://schema.org',
   '@type': 'SoftwareApplication',
-  name: 'evlog',
-  applicationCategory: 'DeveloperApplication',
-  operatingSystem: 'Node.js, Bun, Deno, Cloudflare Workers, all major browsers',
-  description: 'A modern TypeScript logger for everything you ship. Simple structured logs, wide events, and structured errors in one API across scripts, libraries, jobs, edge, and requests.',
-  url: 'https://www.evlog.dev/',
-  offers: { '@type': 'Offer', price: '0', priceCurrency: 'USD' },
+  // Same `@id` as the node `useSeo` emits, so this merges into it rather than
+  // declaring a second product. Coupled to Docus's `#identity` convention.
+  '@id': 'https://www.evlog.dev/#identity',
   license: 'https://github.com/hugorcd/evlog/blob/main/LICENSE',
   author: { '@type': 'Person', name: 'HugoRCD', url: 'https://hugorcd.com/' },
 }
@@ -20,7 +20,6 @@ const softwareSchema = {
 useHead({
   titleTemplate: '',
   link: [
-    { rel: 'canonical', href: 'https://www.evlog.dev/' },
     {
       rel: 'preload',
       href: '/fonts/GeistPixel-Line.woff2',
@@ -46,21 +45,24 @@ const { data: page } = await useAsyncData('evlog-docs-home', () => {
 const faq = faqSchema(page.value?.body)
 
 useHead({
-  script: [softwareSchema, ...(faq ? [faq] : [])]
+  script: [identityFacts, ...(faq ? [faq] : [])]
     .map(schema => ({ type: 'application/ld+json', innerHTML: JSON.stringify(schema) })),
 })
 
-useSeoMeta({
+useSeo({
   title:
     page.value?.title
     || `evlog — Digging through logs is not observability. It's hope.`,
   description:
     page.value?.description
     || 'A modern TypeScript logger built for everything you ship — scripts, libraries, jobs, edge, requests. Simple logs, wide events, and structured errors in one API.',
+  type: 'website',
   ogImage: '/og.png',
+})
+
+useSeoMeta({
   ogImageWidth: 1200,
   ogImageHeight: 630,
-  ogUrl: 'https://www.evlog.dev/',
   twitterSite: '@hugorcd',
   twitterCreator: '@hugorcd',
 })

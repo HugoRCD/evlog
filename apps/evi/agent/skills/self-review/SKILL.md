@@ -41,7 +41,7 @@ Something is produced and nothing consumes it. For each connection, extension an
 | Root `AGENTS.md` | Every framework integration exposes the same contract: `evlog()`, `useLogger()`, `log.fork()`. `evlog/workers` is the documented exception. |
 | `apps/evi/docs/capability-placement.md` | The two-layer rule: a file under `agent/` outside `agent/lib/` holding logic instead of wiring, an `agent/lib/` module with no colocated `*.test.ts`, or a caller check written inline instead of going through `agent/lib/trust.ts`. |
 | `packages/evlog/test/README.md` | A framework test driving the app by hand instead of through its real request driver. |
-| Root `AGENTS.md` | A behavior change whose matching `.agents/skills/` or `apps/docs/skills/` SKILL.md still describes the old shape. |
+| Root `AGENTS.md` | A behavior change whose matching `.agents/skills/` or `skills/` SKILL.md still describes the old shape. |
 
 ## C. Prose that outran the tools
 

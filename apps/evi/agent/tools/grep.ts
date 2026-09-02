@@ -1,4 +1,4 @@
-import { defineGrepTool } from 'eve/tools'
+import grep from 'eve/tools/grep'
 
-// eve 0.39.0 removed grep from the default tool set; Evi keeps it.
-export default defineGrepTool()
+// Not in eve's default tool set; Evi keeps it.
+export default grep

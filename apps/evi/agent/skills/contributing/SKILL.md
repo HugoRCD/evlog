@@ -18,7 +18,7 @@ What follows is the shape of the answer, so you know what to look for and what t
 - **The scope list is a closed set, and you read it before you write the title.** `.github/workflows/semantic-pull-request.yml` holds the only scopes CI accepts. Anything else fails `Validate PR title`, and a scope that merely sounds plausible (`evlog`, the package name, the app directory) is the usual way that happens. A change confined to `apps/docs` is `docs:`, with no scope: `docs` is already the type.
 - **A bug fix needs a failing regression test first**, then the fix.
 - **New exports** go in `packages/evlog/package.json` (`exports` and `typesVersions`) *and* `tsdown.config.ts`.
-- **Skills must stay in sync.** If a change touches something a skill documents, the SKILL.md changes in the same PR, both the internal `.agents/skills/` and the published `apps/docs/skills/`.
+- **Skills must stay in sync.** If a change touches something a skill documents, the SKILL.md changes in the same PR, both the internal `.agents/skills/` and the published `skills/`.
 
 ## The Definition of Done
 

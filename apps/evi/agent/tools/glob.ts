@@ -1,4 +1,4 @@
-import { defineGlobTool } from 'eve/tools'
+import glob from 'eve/tools/glob'
 
-// eve 0.39.0 removed glob from the default tool set; Evi keeps it.
-export default defineGlobTool()
+// Not in eve's default tool set; Evi keeps it.
+export default glob

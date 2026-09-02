@@ -94,6 +94,19 @@ describe.sequential('Nitro v2 server with evlog error handler', () => {
     })
   }, 15_000)
 
+  it('preserves data and message from a deliberate h3 createError', async () => {
+    const { status, body } = await fetchJson('/throws-h3-data')
+
+    expect(status).toBe(500)
+    expect(body).toMatchObject({
+      statusCode: 500,
+      url: '/throws-h3-data',
+      error: true,
+      message: 'Payment provider rejected the charge',
+      data: { orderId: 'ord_1', retryable: true },
+    })
+  }, 15_000)
+
   it('flushes plain thrown errors with Nitro-compatible JSON', async () => {
     const { status, body } = await fetchJson('/throws-plain')
 
@@ -104,5 +117,6 @@ describe.sequential('Nitro v2 server with evlog error handler', () => {
       error: true,
       message: expect.any(String),
     })
+    expect(body).not.toHaveProperty('data')
   }, 15_000)
 })

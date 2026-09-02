@@ -16,16 +16,20 @@ describe('gatewayRouting', () => {
     expect(gatewayRouting().zeroDataRetention).toBe(true)
   })
 
-  it('sorts an interactive surface on time to first token', async () => {
+  it('sorts a surface with someone waiting on time to first token', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('channel:photon').sort).toBe('ttft')
-    expect(gatewayRouting('http').sort).toBe('ttft')
     expect(gatewayRouting().sort).toBe('ttft')
+    expect(gatewayRouting(false).sort).toBe('ttft')
   })
 
-  it('leaves scheduled runs on the cheapest deployment', async () => {
+  it('sorts an unattended run on cost', async () => {
     const { gatewayRouting } = await loadGateway({})
-    expect(gatewayRouting('schedule').sort).toBe('cost')
+    expect(gatewayRouting(true).sort).toBe('cost')
+  })
+
+  it('names no provider, so the sort is what picks the deployment', async () => {
+    const { gatewayRouting } = await loadGateway({})
+    expect(gatewayRouting()).not.toHaveProperty('order')
   })
 })
 

@@ -33,12 +33,22 @@ throw createError({
   fix: 'Try a different payment method',  // How to fix it
   link: 'https://docs.example.com/...',   // More information
   cause: originalError,                   // Original error
+  data: {                                 // Optional: extra payload for the client
+    orderId: 'ord_8x2k',
+    retryAfter: 30,
+  },
   internal: {                             // Optional: backend / logs only
     correlationId: 'pay_abc',
     processorCode: 'card_declined',
   },
 })
 ```
+
+### `data` (client payload)
+
+- Use `data` for values the client branches on, an order id, a retry deadline, a list of invalid fields. `why`, `fix`, and `link` stay for the strings a human reads.
+- The payload is merged into the response body's `data` object next to `code`, `why`, `fix`, and `link`, and those four win on a key collision. Read it client-side as `parseError(error).data`.
+- Same field name as h3's `createError({ data })`, and evlog's Nitro error handler forwards it for h3 errors too.
 
 ### `internal` (backend-only)
 
@@ -59,20 +69,28 @@ Caused by: StripeCardError: card_declined
 
 ### JSON Output (Production)
 
+`EvlogError.toJSON()`, returned as-is by the Next.js handler:
+
 ```json
 {
   "name": "EvlogError",
   "message": "Payment failed",
-  "why": "Card declined by issuer",
-  "fix": "Try a different payment method",
-  "link": "https://docs.example.com/payments/declined",
+  "status": 402,
+  "data": {
+    "orderId": "ord_8x2k",
+    "retryAfter": 30,
+    "why": "Card declined by issuer",
+    "fix": "Try a different payment method",
+    "link": "https://docs.example.com/payments/declined"
+  },
   "cause": {
     "name": "StripeCardError",
     "message": "card_declined"
-  },
-  "stack": "..."
+  }
 }
 ```
+
+The Nitro, Nuxt, and SvelteKit handlers return a Nitro-shaped body instead, with `url`, `statusCode`, `statusText`, and `error: true` around the same `message`, `status`, and `data`. Every serializer agrees on the part clients read: `why`, `fix`, and `link` sit under `data`, not at the top level, and neither `internal` nor `stack` is ever included. On the client, `parseError()` flattens both shapes.
 
 ## Field Guidelines
 
@@ -322,7 +340,7 @@ Structured errors integrate seamlessly with wide events:
 
 ```typescript
 // server/api/checkout.post.ts
-// Nuxt: useLogger and createError are auto-imported
+// Nuxt: useLogger is auto-imported, createError is not
 // Nitro v3: import { useLogger } from 'evlog/nitro/v3'
 // Nitro v2: import { useLogger } from 'evlog/nitro'
 import { createError } from 'evlog'

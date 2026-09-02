@@ -29,8 +29,8 @@ describe('groupOf', () => {
   it('groups a skill by its own directory, not by the whole tree', () => {
     expect(groupOf(page('.agents/skills/create-adapter/references/test-template.md', 100, 0, 'skill')))
       .toBe('.agents/skills/create-adapter')
-    expect(groupOf(page('apps/docs/skills/analyze-logs/SKILL.md', 100, 0, 'skill')))
-      .toBe('apps/docs/skills/analyze-logs')
+    expect(groupOf(page('skills/analyze-logs/SKILL.md', 100, 0, 'skill')))
+      .toBe('skills/analyze-logs')
   })
 
   it('keeps the flat surfaces in one group each', () => {

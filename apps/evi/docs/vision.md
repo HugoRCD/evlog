@@ -1,25 +1,20 @@
 # Vision
 
-How Evi sees images. The base model (`EVI_MODEL`, DeepSeek V4 Flash) is
-text-only, so vision is not a model swap: the dynamic model resolver in
-`agent/agent.ts` re-evaluates at every step and selects the vision fallback
-(`EVI_VISION_MODEL`, Qwen 3.7 Flash) while the *current turn* carries image
-parts — an inbound attachment, or a screenshot a tool returned during the
-turn. Selection lives in `agent/lib/model.ts` (`modelForMessages`,
-`modelForStep`). Sessions that never see an image never pay for one.
+How Evi sees images. The base model (`EVI_MODEL`, GLM 5.3 Flash) takes image
+parts natively, so there is nothing to select: an inbound attachment or a
+screenshot a tool returned during the turn reaches the model as it is, on the
+same call as the rest of the turn.
 
-The next turn returns to the base model: `modelForStep` wraps it in a
-middleware that replaces earlier turns' visual payloads with text stubs, since
-the base model rejects raw image parts in history. An image is therefore
-readable only during the turn that delivered it; the stub tells the model to
-ask for it again. This also stops a single screenshot from re-billing its
-base64 payload on every later call, and from holding a long-lived thread on
-the fallback model for days.
+The base model must stay one that takes images *and* runs a whole turn, tools
+included, not one that only captions a picture: an image sits in the history
+that every later step reads. A text-only base model would need a second model
+for the turns that carry image parts, and a middleware stubbing those parts
+out of the history afterwards, since it rejects them raw — that machinery is
+what native vision removes.
 
-The fallback must be a model that can run a whole turn, tools included, not
-just caption a picture: while an image sits in the turn, every step runs on
-it. Qwen 3.7 Flash is vision-native, agentic, and in the same price band as
-the base model.
+Image parts are re-sent on every later model call in the session, which is why
+`images__view` caps what it inlines and why eve compacts old payloads away
+(see the limits below).
 
 ## Per channel
 
