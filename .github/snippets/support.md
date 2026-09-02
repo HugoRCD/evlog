@@ -1,2 +1,2 @@
-- **Issues**: [Open an issue](https://github.com/hugorcd/evlog/issues) for bugs or feature requests
-- **Discussions**: [Join the discussion](https://github.com/hugorcd/evlog/discussions) for questions and ideas
+- **Issues**: [Open an issue](https://github.com/evloghq/evlog/issues) for bugs or feature requests
+- **Discussions**: [Join the discussion](https://github.com/evloghq/evlog/discussions) for questions and ideas

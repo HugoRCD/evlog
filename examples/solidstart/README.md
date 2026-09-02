@@ -1,6 +1,6 @@
 # SolidStart Example
 
-Demonstrates [evlog](https://github.com/hugorcd/evlog) integration with [SolidStart](https://start.solidjs.com/) (Nitro v2 via Vinxi).
+Demonstrates [evlog](https://github.com/evloghq/evlog) integration with [SolidStart](https://start.solidjs.com/) (Nitro v2 via Vinxi).
 
 ## Setup
 

@@ -13,7 +13,7 @@ export default defineEventHandler((event) => {
     status: 403,
     why: 'This is a playground-only structured error (safe to show users).',
     fix: 'Use another playground button or ignore this message.',
-    link: 'https://github.com/HugoRCD/evlog',
+    link: 'https://github.com/evloghq/evlog',
     internal: {
       supportRef: 'playground-support-ref-EVL140',
       gatewayCode: 'proc_declined_simulated',

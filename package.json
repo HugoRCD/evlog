@@ -4,7 +4,7 @@
   "type": "module",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/hugorcd/evlog.git"
+    "url": "git+https://github.com/evloghq/evlog.git"
   },
   "author": "HugoRCD",
   "license": "MIT",

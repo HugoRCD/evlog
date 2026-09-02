@@ -2,11 +2,11 @@
 
 [![npm version](https://img.shields.io/npm/v/@evlog/nuxthub?color=black)](https://npmjs.com/package/@evlog/nuxthub)
 [![npm downloads](https://img.shields.io/npm/dm/@evlog/nuxthub?color=black)](https://npm.chart.dev/@evlog/nuxthub)
-[![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/evloghq/evlog/ci.yml?branch=main&color=black)](https://github.com/evloghq/evlog/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Nuxt](https://img.shields.io/badge/Nuxt-black?logo=nuxt&logoColor=white)](https://nuxt.com/)
 [![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev)
-[![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
+[![license](https://img.shields.io/github/license/evloghq/evlog?color=black)](https://github.com/evloghq/evlog/blob/main/LICENSE)
 
 Self-hosted log retention for [evlog](https://evlog.dev) using [NuxtHub](https://hub.nuxt.com) database storage. Store, query, and automatically clean up your structured logs with zero external dependencies.
 
@@ -58,4 +58,4 @@ For Vercel deployments, the module can create a `vercel.json` with the appropria
 
 ## License
 
-[MIT](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
+[MIT](https://github.com/evloghq/evlog/blob/main/LICENSE)

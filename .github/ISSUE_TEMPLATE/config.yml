@@ -4,8 +4,8 @@ contact_links:
     url: https://evlog.dev
     about: Guides, API reference, and framework setup.
   - name: Ask a question
-    url: https://github.com/HugoRCD/evlog/discussions/new?category=q-a
+    url: https://github.com/evloghq/evlog/discussions/new?category=q-a
     about: Q&A and usage help in GitHub Discussions.
   - name: Report a security issue
-    url: https://github.com/HugoRCD/evlog/security/advisories/new
+    url: https://github.com/evloghq/evlog/security/advisories/new
     about: Do not file public issues for security vulnerabilities — use a private GitHub security advisory.

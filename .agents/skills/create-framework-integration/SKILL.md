@@ -238,7 +238,7 @@ navigation:
 links:
   - label: Source Code
     icon: i-simple-icons-github
-    to: https://github.com/HugoRCD/evlog/tree/main/examples/{framework}
+    to: https://github.com/evloghq/evlog/tree/main/examples/{framework}
     color: neutral
     variant: subtle
 ---

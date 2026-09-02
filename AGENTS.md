@@ -49,7 +49,7 @@ apps/*                     Framework playgrounds (next, nitro, nitro-v2, nuxthub
 examples/                  ~22 runnable examples, one per framework — includes the community-*-skeleton dirs used by the create-adapter/enricher/framework skills
 scripts/                   Repo tooling (run-app, cli-sandbox, release-notes, content-lint)
 .agents/skills/            Internal skills for creating adapters, enrichers, and framework integrations, and for writing content — each carries `metadata: internal: true` in its frontmatter so the skills CLI skips them for public installs
-skills/                     Published skills (analyze-logs, build-audit-logs, review-logging-patterns) — served by the docs site via `/.well-known/skills/` and discovered by `npx skills add hugorcd/evlog`
+skills/                     Published skills (analyze-logs, build-audit-logs, review-logging-patterns) — served by the docs site via `/.well-known/skills/` and discovered by `npx skills add evloghq/evlog`
 ```
 
 ## Conventions
@@ -69,7 +69,7 @@ skills/                     Published skills (analyze-logs, build-audit-logs, re
   - `.agents/skills/create-framework-integration/SKILL.md`
   - `.agents/skills/create-map-rule/SKILL.md` (also covers new `evlog map` framework adapters)
 - Writing or reviewing prose, a docs page, the landing, a blog post, a package README, a skill, an AGENTS.md, a changeset? Read `.agents/skills/write-evlog-content/SKILL.md` first, and run `pnpm content:lint <path>` before the review. It carries the voice, the atomic rules, the terminology, the competitor dossiers, and the AI-tell corpus with the legitimate twin for each tell. These files are content too: `pnpm content:lint --surface skill` and `--surface agents` rank them.
-- **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `skills/` at the repo root (served from the docs site via `.well-known/skills`, and discovered by a bare `npx skills add hugorcd/evlog`). When a change touches something a skill documents (an adapter, enricher, integration, API surface, or workflow), update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
+- **Skills must stay in sync with the code.** There are two sets: internal skills in `.agents/skills/` and published skills in `skills/` at the repo root (served from the docs site via `.well-known/skills`, and discovered by a bare `npx skills add evloghq/evlog`). When a change touches something a skill documents (an adapter, enricher, integration, API surface, or workflow), update the affected SKILL.md (and its `references/`) in the same PR. A skill that describes the old behavior is worse than no skill.
 
 ### Code style: no slop
 

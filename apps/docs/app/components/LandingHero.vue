@@ -28,7 +28,7 @@
           label="Fix your logs"
         />
         <UButton
-          to="https://github.com/hugorcd/evlog"
+          to="https://github.com/evloghq/evlog"
           target="_blank"
           size="lg"
           variant="ghost"

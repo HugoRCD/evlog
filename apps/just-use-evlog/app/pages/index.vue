@@ -89,7 +89,7 @@ useSeoMeta({
               Docs
             </NuxtLink>
             <NuxtLink
-              to="https://github.com/hugorcd/evlog"
+              to="https://github.com/evloghq/evlog"
               class="hover:text-highlighted transition-colors"
               target="_blank"
               rel="noopener noreferrer"

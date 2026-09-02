@@ -1,15 +1,15 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/HugoRCD/evlog/main/assets/evlog-banner.gif" width="100%" alt="evlog — Digging through logs is not observability. It's hope" />
+  <img src="https://raw.githubusercontent.com/evloghq/evlog/main/assets/evlog-banner.gif" width="100%" alt="evlog — Digging through logs is not observability. It's hope" />
 </p>
 
 # evlog
 
 [![npm version](https://img.shields.io/npm/v/evlog?color=black)](https://npmjs.com/package/evlog)
 [![npm downloads](https://img.shields.io/npm/dm/evlog?color=black)](https://npm.chart.dev/evlog)
-[![CI](https://img.shields.io/github/actions/workflow/status/HugoRCD/evlog/ci.yml?branch=main&color=black)](https://github.com/HugoRCD/evlog/actions/workflows/ci.yml)
+[![CI](https://img.shields.io/github/actions/workflow/status/evloghq/evlog/ci.yml?branch=main&color=black)](https://github.com/evloghq/evlog/actions/workflows/ci.yml)
 [![TypeScript](https://img.shields.io/badge/TypeScript-black?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![Documentation](https://img.shields.io/badge/Documentation-black?logo=readme&logoColor=white)](https://evlog.dev)
-[![license](https://img.shields.io/github/license/HugoRCD/evlog?color=black)](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
+[![license](https://img.shields.io/github/license/evloghq/evlog?color=black)](https://github.com/evloghq/evlog/blob/main/LICENSE)
 
 **Digging through logs is not observability. It's hope.**
 
@@ -411,7 +411,7 @@ app.get('/api/users', (c) => {
 })
 ```
 
-See the full [hono example](https://github.com/HugoRCD/evlog/tree/main/examples/hono) for a complete working project.
+See the full [hono example](https://github.com/evloghq/evlog/tree/main/examples/hono) for a complete working project.
 
 ## Express
 
@@ -434,7 +434,7 @@ app.get('/api/users', (req, res) => {
 
 Use `useLogger()` to access the logger from anywhere in the call stack without passing `req`.
 
-See the full [express example](https://github.com/HugoRCD/evlog/tree/main/examples/express) for a complete working project.
+See the full [express example](https://github.com/evloghq/evlog/tree/main/examples/express) for a complete working project.
 
 ## Fastify
 
@@ -457,7 +457,7 @@ app.get('/api/users', async (request) => {
 
 `request.log` is the evlog wide-event logger (shadows Fastify's built-in pino logger on the request). Use `useLogger()` to access the logger from anywhere in the call stack.
 
-See the full [fastify example](https://github.com/HugoRCD/evlog/tree/main/examples/fastify) for a complete working project.
+See the full [fastify example](https://github.com/evloghq/evlog/tree/main/examples/fastify) for a complete working project.
 
 ## Elysia
 
@@ -480,7 +480,7 @@ const app = new Elysia()
 
 Use `useLogger()` to access the logger from anywhere in the call stack.
 
-See the full [elysia example](https://github.com/HugoRCD/evlog/tree/main/examples/elysia) for a complete working project.
+See the full [elysia example](https://github.com/evloghq/evlog/tree/main/examples/elysia) for a complete working project.
 
 ## React Router
 
@@ -507,7 +507,7 @@ export async function loader({ params, context }: Route.LoaderArgs) {
 
 Use `context.get(loggerContext)` in loaders/actions, or `useLogger()` from anywhere in the call stack. Requires `v8_middleware: true` in `react-router.config.ts`.
 
-See the full [react-router example](https://github.com/HugoRCD/evlog/tree/main/examples/react-router) for a complete working project.
+See the full [react-router example](https://github.com/evloghq/evlog/tree/main/examples/react-router) for a complete working project.
 
 ## NestJS
 
@@ -529,7 +529,7 @@ log.set({ users: { count: 42 } })
 
 `EvlogModule.forRoot()` registers a global middleware that creates a request-scoped logger for every request. Use `useLogger()` to access it anywhere in the call stack, or `req.log` directly. Supports `forRootAsync()` for async configuration.
 
-See the full [nestjs example](https://github.com/HugoRCD/evlog/tree/main/examples/nestjs) for a complete working project.
+See the full [nestjs example](https://github.com/evloghq/evlog/tree/main/examples/nestjs) for a complete working project.
 
 ## oRPC
 
@@ -561,7 +561,7 @@ export default async function fetch(request: Request) {
 
 `withEvlog()` wraps the handler and emits one wide event per request; `os.use(evlog())` exposes `context.log` to procedures and tags each event with the procedure path as `operation`. Use `useLogger()` from `evlog/orpc` to access the logger off-context.
 
-See the full [orpc example](https://github.com/HugoRCD/evlog/tree/main/examples/orpc) for a complete working project.
+See the full [orpc example](https://github.com/evloghq/evlog/tree/main/examples/orpc) for a complete working project.
 
 ## eve
 
@@ -598,7 +598,7 @@ export default defineEvlogInstrumentation()
 
 Every turn event carries `eve.caller` (`principalId`, `principalType` and `authenticator`), so cost and volume group by who triggered the turn.
 
-See the full [eve example](https://github.com/HugoRCD/evlog/tree/main/examples/eve) for a complete agent layout.
+See the full [eve example](https://github.com/evloghq/evlog/tree/main/examples/eve) for a complete agent layout.
 
 ## Browser
 
@@ -1435,7 +1435,7 @@ try {
 | **Custom** | Build your own with `import { createMiddlewareLogger } from 'evlog/toolkit'` ([guide](https://evlog.dev/extend/custom-framework)) |
 | **Analog** | Nitro v2 module setup |
 | **Vinxi** | Nitro v2 module setup |
-| **SolidStart** | Nitro v2 module setup ([example](https://github.com/HugoRCD/evlog/tree/main/examples/solidstart)) |
+| **SolidStart** | Nitro v2 module setup ([example](https://github.com/evloghq/evlog/tree/main/examples/solidstart)) |
 
 ## CLI
 
@@ -1521,6 +1521,6 @@ Inspired by [Logging Sucks](https://loggingsucks.com/) by [Boris Tane](https://x
 
 ## License
 
-[MIT](https://github.com/HugoRCD/evlog/blob/main/LICENSE)
+[MIT](https://github.com/evloghq/evlog/blob/main/LICENSE)
 
 Made by [@HugoRCD](https://github.com/HugoRCD)

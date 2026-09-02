@@ -6,7 +6,7 @@ body:
   - type: markdown
     attributes:
       value: |
-        **Brainstorming or “what if?” ideas** are welcome in [Discussions](https://github.com/HugoRCD/evlog/discussions) first. Use this template when you have a **concrete** proposal the maintainers can evaluate.
+        **Brainstorming or “what if?” ideas** are welcome in [Discussions](https://github.com/evloghq/evlog/discussions) first. Use this template when you have a **concrete** proposal the maintainers can evaluate.
   - type: textarea
     id: problem
     attributes:

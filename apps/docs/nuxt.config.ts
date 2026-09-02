@@ -9,7 +9,7 @@ export default defineNuxtConfig({
   docus: {
     skills: {
       // The published skills live at the repo root (`skills/`) so a bare
-      // `npx skills add hugorcd/evlog` discovers them: the installer only scans
+      // `npx skills add evloghq/evlog` discovers them: the installer only scans
       // conventional root-level directories. Docus defaults to `skills/` inside
       // the app, so point it back at the shared source of truth.
       dir: '../../skills',
@@ -108,7 +108,7 @@ export default defineNuxtConfig({
           {
             title: 'evlog on GitHub',
             description: 'Source code, issues, and releases.',
-            href: 'https://github.com/hugorcd/evlog',
+            href: 'https://github.com/evloghq/evlog',
           },
           {
             title: 'evlog on npm',
@@ -194,7 +194,7 @@ export default defineNuxtConfig({
       sync: false,
     },
     repository: {
-      owner: 'HugoRCD',
+      owner: 'evloghq',
       repo: 'evlog',
       rootDir: 'apps/docs',
     },
