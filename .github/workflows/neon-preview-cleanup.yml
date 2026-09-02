@@ -30,12 +30,27 @@ jobs:
           # workflow_dispatch carries no pull_request payload
           GIT_BRANCH: ${{ github.event.pull_request.head.ref || inputs.branch }}
         run: |
+          set -euo pipefail
+          : "${NEON_API_KEY:?NEON_API_KEY secret is not set}"
+
           name="preview/$GIT_BRANCH"
           api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches"
           auth="Authorization: Bearer $NEON_API_KEY"
 
-          id=$(curl -sf -H "$auth" --get --data-urlencode "search=$name" "$api" \
-            | jq -r --arg name "$name" '.branches[] | select(.name == $name) | .id')
+          id=""
+          cursor=""
+          while :; do
+            set -- --data-urlencode "search=$name" --data-urlencode "limit=100"
+            if [ -n "$cursor" ]; then
+              set -- "$@" --data-urlencode "cursor=$cursor"
+            fi
+            page=$(curl -sf -H "$auth" --get "$@" "$api")
+            id=$(jq -r --arg name "$name" '[.branches[] | select(.name == $name) | .id][0] // empty' <<< "$page")
+            cursor=$(jq -r '.pagination.next // empty' <<< "$page")
+            if [ -n "$id" ] || [ -z "$cursor" ]; then
+              break
+            fi
+          done
 
           if [ -z "$id" ]; then
             echo "No Neon branch named $name"
