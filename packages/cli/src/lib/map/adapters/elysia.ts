@@ -4,6 +4,7 @@ import type { ParseFn, ParseResult } from '../parse'
 import { nodeLoc, parseFile, walkAst } from '../parse'
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { relativeFromRoot } from '../utils'
+import { elysiaReceiverContext, isElysiaRouteReceiver } from './route-receivers'
 
 /**
  * Elysia route methods → HTTP verb.
@@ -74,13 +75,15 @@ const HANDLER_TYPES = new Set([
 ])
 
 /**
- * Whether the node looks like a route handler (function) rather than an options
- * object. This tells `.get('/users', handler)` apart from HTTP client calls
- * like `axios.get('/users', { headers })`.
+ * Whether the node looks like an Elysia route handler rather than an options
+ * object. Accepts functions, named handlers, and static string responses
+ * (`.get('/ping', 'pong')`). This tells `.get('/users', handler)` apart from
+ * HTTP client calls like `axios.get('/users', { headers })`.
  */
 function looksLikeHandler(node: Node | undefined): boolean {
   if (!node) return false
-  return HANDLER_TYPES.has(node.type)
+  if (HANDLER_TYPES.has(node.type)) return true
+  return node.type === 'Literal' && typeof (node as { value: unknown }).value === 'string'
 }
 
 /**
@@ -93,6 +96,7 @@ function looksLikeHandler(node: Node | undefined): boolean {
  */
 function findElysiaRoutes(parsed: ParseResult): FoundRoute[] {
   const found: FoundRoute[] = []
+  const receivers = elysiaReceiverContext(parsed)
 
   walkAst(parsed.program, (node) => {
     if (node.type !== 'CallExpression') return
@@ -100,12 +104,14 @@ function findElysiaRoutes(parsed: ParseResult): FoundRoute[] {
     const { callee } = call
     if (callee.type !== 'MemberExpression') return
 
-    const { property, computed } = callee as { property: Node, computed?: boolean }
+    const member = callee as { object: Node, property: Node, computed?: boolean }
+    const { property, computed } = member
     if (computed) return
     if (property.type !== 'Identifier') return
 
     const { name } = property
     if (!ROUTE_METHODS.has(name)) return
+    if (!isElysiaRouteReceiver(member.object, receivers)) return
 
     const path = stringLiteral(call.arguments[0])
     if (!path || !isRoutePath(path) || !looksLikeHandler(call.arguments[1])) return

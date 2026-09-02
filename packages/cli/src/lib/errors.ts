@@ -80,8 +80,8 @@ export const cliErrors = defineErrorCatalog('cli', {
     status: 400,
     message: ({ value }: { value: string }) =>
       `Unknown --framework "${value}"`,
-    why: 'init only knows how to wire nuxt, nitro, next, tanstack-start, hono, express, fastify, and elysia',
-    fix: 'Pass one of: nuxt, nitro, next, tanstack-start, hono, express, fastify, elysia — or omit it and let detection decide',
+    why: 'init only knows how to wire nuxt, nitro, next, tanstack-start, and hono',
+    fix: 'Pass one of: nuxt, nitro, next, tanstack-start, hono — or omit it and let detection decide',
     link: 'https://evlog.dev/cli/init',
     tags: ['init'],
   },

@@ -431,6 +431,23 @@ describe('express adapter', () => {
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /proxy'])
   })
 
+  it('does not treat unrelated .get calls as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import express from \'express\'',
+        'const app = express()',
+        'const registry = { get: (_path: string, _handler: () => void) => {} }',
+        'registry.get(\'/fake\', () => {})',
+        'app.get(\'/health\', (_req, res) => res.json({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('express', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
   it('resolves the request logger to ambient once app.use(evlog()) is registered', async () => {
     const root = await project({
       'src/index.ts': [
@@ -509,6 +526,51 @@ describe('fastify adapter', () => {
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['PUT /orders/:id'])
   })
 
+  it('reads routes registered with options.handler', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import Fastify from \'fastify\'',
+        'const app = Fastify()',
+        'app.get(\'/health\', { handler: async () => ({ ok: true }) })',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('fastify', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
+  it('reads routes registered with a third-argument handler', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import Fastify from \'fastify\'',
+        'const app = Fastify()',
+        'app.post(\'/checkout\', { schema: {} }, async () => ({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('fastify', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['POST /checkout'])
+  })
+
+  it('reads app.route({ method, url, handler }) declarations', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import Fastify from \'fastify\'',
+        'const app = Fastify()',
+        'app.route({ method: \'GET\', url: \'/health\', handler: async () => ({ ok: true }) })',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('fastify', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
   it('does not treat HTTP client calls as routes', async () => {
     const root = await project({
       'src/index.ts': [
@@ -526,6 +588,23 @@ describe('fastify adapter', () => {
     const routes = await routesOf('fastify', root)
 
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /proxy'])
+  })
+
+  it('does not treat unrelated .get calls as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import Fastify from \'fastify\'',
+        'const app = Fastify()',
+        'const registry = { get: (_path: string, _handler: () => void) => {} }',
+        'registry.get(\'/fake\', () => {})',
+        'app.get(\'/health\', async () => ({ ok: true }))',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('fastify', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
   })
 
   it('resolves the request logger to ambient once app.register(evlog) is called', async () => {
@@ -604,6 +683,19 @@ describe('elysia adapter', () => {
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['PUT /orders/:id'])
   })
 
+  it('reads static string responses as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Elysia } from \'elysia\'',
+        'export default new Elysia().get(\'/ping\', \'pong\')',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('elysia', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /ping'])
+  })
+
   it('does not treat HTTP client calls as routes', async () => {
     const root = await project({
       'src/index.ts': [
@@ -620,6 +712,21 @@ describe('elysia adapter', () => {
     const routes = await routesOf('elysia', root)
 
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /proxy'])
+  })
+
+  it('does not treat unrelated .get calls as routes', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import { Elysia } from \'elysia\'',
+        'const registry = { get: (_path: string, _handler: () => void) => {} }',
+        'registry.get(\'/fake\', () => {})',
+        'export default new Elysia().get(\'/health\', () => ({ ok: true }))',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('elysia', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
   })
 
   it('resolves the request logger to ambient once .use(evlog()) is registered', async () => {

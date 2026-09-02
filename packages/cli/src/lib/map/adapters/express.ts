@@ -4,6 +4,7 @@ import type { ParseFn, ParseResult } from '../parse'
 import { nodeLoc, parseFile, walkAst } from '../parse'
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { relativeFromRoot } from '../utils'
+import { expressReceiverContext, isExpressRouteReceiver } from './route-receivers'
 
 /**
  * Express route methods → HTTP verb.
@@ -92,6 +93,7 @@ function looksLikeHandler(node: Node | undefined): boolean {
  */
 function findExpressRoutes(parsed: ParseResult): FoundRoute[] {
   const found: FoundRoute[] = []
+  const receivers = expressReceiverContext(parsed)
 
   walkAst(parsed.program, (node) => {
     if (node.type !== 'CallExpression') return
@@ -99,12 +101,14 @@ function findExpressRoutes(parsed: ParseResult): FoundRoute[] {
     const { callee } = call
     if (callee.type !== 'MemberExpression') return
 
-    const { property, computed } = callee as { property: Node, computed?: boolean }
+    const member = callee as { object: Node, property: Node, computed?: boolean }
+    const { property, computed } = member
     if (computed) return
     if (property.type !== 'Identifier') return
 
     const { name } = property
     if (!ROUTE_METHODS.has(name)) return
+    if (!isExpressRouteReceiver(member.object, receivers)) return
 
     const path = stringLiteral(call.arguments[0])
     if (!path || !isRoutePath(path) || !looksLikeHandler(call.arguments[1])) return

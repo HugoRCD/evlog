@@ -477,9 +477,22 @@ function checksFor(app) {
   return checks.filter(({ name }) => MAP_ONLY_CHECKS.has(name))
 }
 
+function smokeHeader(apps) {
+  const mapOnlyCount = checks.filter(({ name }) => MAP_ONLY_CHECKS.has(name)).length
+  const fullCount = checks.length
+  const mapOnlyApps = apps.filter(app => app.mapOnly).length
+  if (mapOnlyApps === apps.length) {
+    return `${mapOnlyCount} checks  ${apps.length} apps`
+  }
+  if (mapOnlyApps === 0) {
+    return `${fullCount} checks  ${apps.length} apps`
+  }
+  return `${mapOnlyCount} checks (map-only) / ${fullCount} checks (full)  ${apps.length} apps`
+}
+
 function smoke(apps) {
   let failed = 0
-  process.stderr.write(`\n${bold('smoke')} ${dim(`${checks.length} checks  ${apps.length} apps`)}\n\n`)
+  process.stderr.write(`\n${bold('smoke')} ${dim(smokeHeader(apps))}\n\n`)
 
   for (const app of apps) {
     const run = checksFor(app)
@@ -490,10 +503,10 @@ function smoke(apps) {
       const dir = createApp(app)
       try {
         fn(dir)
-        process.stderr.write(`  ${green('?')} ${name}\n`)
+        process.stderr.write(`  ${green('ok')} ${name}\n`)
       } catch (error) {
         failed++
-        process.stderr.write(`  ${red('?')} ${name}\n    ${dim(error.message)}\n`)
+        process.stderr.write(`  ${red('fail')} ${name}\n    ${dim(error.message)}\n`)
       }
     }
     process.stderr.write('\n')
@@ -555,7 +568,7 @@ if (args.includes('--smoke')) {
   smoke(apps)
 } else if (args.includes('--reset')) {
   for (const app of apps) resetApp(app)
-  process.stderr.write(`${green('?')} ${dim(`reset ${apps.map(app => app.name).join(', ')}`)}\n`)
+  process.stderr.write(`${green('ok')} ${dim(`reset ${apps.map(app => app.name).join(', ')}`)}\n`)
 } else {
   if (!args.includes('--keep')) for (const app of apps) createApp(app)
   cheatSheet(apps)

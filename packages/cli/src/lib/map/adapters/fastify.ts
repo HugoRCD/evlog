@@ -4,12 +4,13 @@ import type { ParseFn, ParseResult } from '../parse'
 import { nodeLoc, parseFile, walkAst } from '../parse'
 import type { FrameworkAdapter, RawRouteEntry, ScanContext } from '../types'
 import { relativeFromRoot } from '../utils'
+import { fastifyReceiverContext, isFastifyRouteReceiver } from './route-receivers'
 
 /**
  * Fastify route methods → HTTP verb.
  *
  * `all` has no single verb (matches every method), so it lands as `method: null`.
- * `register` / `listen` / `route` are not entry points and are ignored here.
+ * `register` / `listen` are not entry points; `route({ … })` is handled separately.
  */
 const ROUTE_METHODS: ReadonlyMap<string, string | null> = new Map([
   ['get', 'GET'],
@@ -83,6 +84,52 @@ function looksLikeHandler(node: Node | undefined): boolean {
   return HANDLER_TYPES.has(node.type)
 }
 
+/** Fastify options object spelling: `{ handler: fn }`. */
+function handlerFromOptions(node: Node | undefined): Node | undefined {
+  if (!node || node.type !== 'ObjectExpression') return undefined
+  const { properties } = node as { properties: Node[] }
+  for (const prop of properties) {
+    if (prop.type !== 'Property') continue
+    const { key, value } = prop as { key: Node, value: Node }
+    if (key.type !== 'Identifier' || key.name !== 'handler') continue
+    if (!looksLikeHandler(value)) return undefined
+    return value
+  }
+  return undefined
+}
+
+/** Resolve a route handler from Fastify's shorthand overloads. */
+function resolveRouteHandler(args: Node[]): Node | undefined {
+  const [, second, third] = args
+  if (looksLikeHandler(second)) return second
+  const fromOptions = handlerFromOptions(second)
+  if (fromOptions) return fromOptions
+  if (looksLikeHandler(third)) return third
+  return undefined
+}
+
+/** Read a string property from a route options object. */
+function stringProperty(node: Node | undefined, property: string): string | null {
+  if (!node || node.type !== 'ObjectExpression') return null
+  const { properties } = node as { properties: Node[] }
+  for (const prop of properties) {
+    if (prop.type !== 'Property') continue
+    const { key, value } = prop as { key: Node, value: Node }
+    if (key.type !== 'Identifier' || key.name !== property) continue
+    return stringLiteral(value)
+  }
+  return null
+}
+
+/** `app.route({ method, url, handler })` — the full Fastify route declaration. */
+function routeFromOptions(node: Node | undefined): { method: string, path: string } | null {
+  if (!node || node.type !== 'ObjectExpression') return null
+  const url = stringProperty(node, 'url') ?? stringProperty(node, 'path')
+  const method = stringProperty(node, 'method')
+  if (!url || !isRoutePath(url) || !method || !handlerFromOptions(node)) return null
+  return { method: method.toUpperCase(), path: url }
+}
+
 /**
  * Find every `*.get('/path', handler)` / `*.post(…)` call in a parsed file.
  *
@@ -93,6 +140,7 @@ function looksLikeHandler(node: Node | undefined): boolean {
  */
 function findFastifyRoutes(parsed: ParseResult): FoundRoute[] {
   const found: FoundRoute[] = []
+  const receivers = fastifyReceiverContext(parsed)
 
   walkAst(parsed.program, (node) => {
     if (node.type !== 'CallExpression') return
@@ -100,15 +148,31 @@ function findFastifyRoutes(parsed: ParseResult): FoundRoute[] {
     const { callee } = call
     if (callee.type !== 'MemberExpression') return
 
-    const { property, computed } = callee as { property: Node, computed?: boolean }
+    const member = callee as { object: Node, property: Node, computed?: boolean }
+    const { property, computed } = member
     if (computed) return
     if (property.type !== 'Identifier') return
 
     const { name } = property
+
+    if (name === 'route') {
+      if (!isFastifyRouteReceiver(member.object, receivers)) return
+      const route = routeFromOptions(call.arguments[0])
+      if (!route) return
+      const loc = nodeLoc(node, parsed.lines)
+      found.push({
+        method: route.method,
+        path: route.path,
+        line: loc?.line ?? 1,
+      })
+      return
+    }
+
     if (!ROUTE_METHODS.has(name)) return
+    if (!isFastifyRouteReceiver(member.object, receivers)) return
 
     const path = stringLiteral(call.arguments[0])
-    if (!path || !isRoutePath(path) || !looksLikeHandler(call.arguments[1])) return
+    if (!path || !isRoutePath(path) || !resolveRouteHandler(call.arguments)) return
 
     const loc = nodeLoc(node, parsed.lines)
     found.push({
