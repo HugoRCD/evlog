@@ -1,5 +1,11 @@
 # @evlog/nuxthub
 
+## 2.0.2
+
+### Patch Changes
+
+- [#649](https://github.com/evloghq/evlog/pull/649) [`0417784`](https://github.com/evloghq/evlog/commit/0417784dc9e6d3825c10b5d715ff2cb1e7e3acdd) Thanks [@HugoRCD](https://github.com/HugoRCD)! - Point the package metadata (`repository`, `bugs`) and README links at the repository's new home, `evloghq/evlog`.
+
 ## 2.0.1
 
 ### Patch Changes
