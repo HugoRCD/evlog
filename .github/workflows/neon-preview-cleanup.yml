@@ -1,0 +1,46 @@
+name: delete neon preview branch
+
+# Vercel's Neon integration creates preview/<git-branch> on evi-db for every
+# preview deployment and only drops it with the deployment, months later.
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Git branch whose Neon preview branch should be deleted
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  NEON_PROJECT_ID: floral-dawn-93202365
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Delete the Neon preview branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # workflow_dispatch carries no pull_request payload
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref || inputs.branch }}
+        run: |
+          name="preview/$GIT_BRANCH"
+          api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches"
+          auth="Authorization: Bearer $NEON_API_KEY"
+
+          id=$(curl -sf -H "$auth" --get --data-urlencode "search=$name" "$api" \
+            | jq -r --arg name "$name" '.branches[] | select(.name == $name) | .id')
+
+          if [ -z "$id" ]; then
+            echo "No Neon branch named $name"
+            exit 0
+          fi
+
+          curl -sf -X DELETE -H "$auth" "$api/$id" > /dev/null
+          echo "Deleted $name ($id)"
