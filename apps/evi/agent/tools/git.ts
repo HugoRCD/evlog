@@ -12,7 +12,7 @@ import { REPO_DIR, runOutput } from '../lib/workspace'
  * config inside the sandbox is model-writable and must not be able to
  * redirect the brokered credential.
  */
-const PUSH_URL = 'https://github.com/HugoRCD/evlog.git'
+const PUSH_URL = 'https://github.com/evloghq/evlog.git'
 
 // Maintainer and schedule-app turns only; the push is inert (feature
 // branches only). Keep executes inline in the resolver (docs/notes.md).
@@ -20,7 +20,7 @@ const resolvePushTools = (_event: unknown, ctx: DynamicResolveContext) => {
   if (!isMaintainer(ctx.session.auth.current) && !isScheduleAppAuth(ctx.session.auth.current)) return null
   return {
     git__push: defineTool({
-      description: `Push a local branch of the ${REPO_DIR} checkout to origin (HugoRCD/evlog). The branch must already exist there with the work committed and the checks run; main and master are refused. The credential is brokered at the sandbox firewall and never enters the sandbox. After a successful push, open the pull request with github__createPullRequest.`,
+      description: `Push a local branch of the ${REPO_DIR} checkout to origin (evloghq/evlog). The branch must already exist there with the work committed and the checks run; main and master are refused. The credential is brokered at the sandbox firewall and never enters the sandbox. After a successful push, open the pull request with github__createPullRequest.`,
       inputSchema: z.object({
         branch: z.string().min(1).describe('Branch name in /workspace/repo to push, e.g. fix/pipeline-flush'),
       }),
@@ -52,7 +52,7 @@ const resolvePushTools = (_event: unknown, ctx: DynamicResolveContext) => {
             success: true as const,
             branch: input.branch,
             sha,
-            repository: 'HugoRCD/evlog',
+            repository: 'evloghq/evlog',
           }
         } finally {
           // Drop the brokered credential; the channel checkout re-brokers its own when it needs to fetch.

@@ -3,7 +3,7 @@ import { githubCredentials } from './credentials'
 import { mintInstallationToken } from './push'
 
 const GITHUB_API = 'https://api.github.com'
-const OWNER = 'HugoRCD'
+const OWNER = 'evloghq'
 const REPO = 'evlog'
 
 export const ESCALATION_LABEL = 'evi:needs-attention'

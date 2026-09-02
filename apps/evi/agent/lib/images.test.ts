@@ -15,7 +15,7 @@ describe('classifyImageUrl', () => {
   })
 
   it('refuses everything else', () => {
-    expect(classifyImageUrl('https://github.com/HugoRCD/evlog/raw/main/logo.png')).toHaveProperty('error')
+    expect(classifyImageUrl('https://github.com/evloghq/evlog/raw/main/logo.png')).toHaveProperty('error')
     expect(classifyImageUrl('https://xgithubusercontent.com/shot.png')).toHaveProperty('error')
     expect(classifyImageUrl('http://uploads.linear.app/a.png')).toHaveProperty('error')
     expect(classifyImageUrl('https://user:pass@uploads.linear.app/a.png')).toHaveProperty('error')

@@ -112,7 +112,7 @@ export const testConfig = {
               status: 400,
               why: 'This is a demonstration of the EvlogError format',
               fix: 'No fix needed - this is just a demo',
-              link: 'https://github.com/hugorcd/evlog',
+              link: 'https://github.com/evloghq/evlog',
             })
             console.error(String(error))
           },

@@ -19,7 +19,7 @@ export default defineAppConfig({
       price: 0,
       priceCurrency: 'USD',
       sameAs: [
-        'https://github.com/hugorcd/evlog',
+        'https://github.com/evloghq/evlog',
         'https://www.npmjs.com/package/evlog',
         'https://x.com/hugorcd',
       ],

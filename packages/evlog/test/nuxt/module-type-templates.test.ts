@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Regression test for https://github.com/HugoRCD/evlog/issues/435
+// Regression test for https://github.com/evloghq/evlog/issues/435
 //
 // `nuxt typecheck` (vue-tsc -b) type-checks the app tsconfig project *and*
 // the server one. `$fetch`'s return-type inference does

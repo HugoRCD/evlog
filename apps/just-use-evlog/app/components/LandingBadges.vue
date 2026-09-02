@@ -1,5 +1,5 @@
 <script setup lang="ts">
-const { data: repo } = useFetch('https://ungh.cc/repos/hugorcd/evlog', {
+const { data: repo } = useFetch('https://ungh.cc/repos/evloghq/evlog', {
   lazy: true,
   transform: (data: { repo: { stars: number } }) => data.repo,
   default: () => ({ stars: 0 }),
@@ -10,7 +10,7 @@ const { data: repo } = useFetch('https://ungh.cc/repos/hugorcd/evlog', {
 <template>
   <div class="my-4 flex flex-wrap items-center gap-3">
     <NuxtLink
-      to="https://github.com/hugorcd/evlog"
+      to="https://github.com/evloghq/evlog"
       target="_blank"
       rel="noopener noreferrer"
       class="inline-flex items-center gap-1.5 border border-default px-2.5 py-1 text-xs text-muted transition-colors hover:border-highlighted hover:text-highlighted"

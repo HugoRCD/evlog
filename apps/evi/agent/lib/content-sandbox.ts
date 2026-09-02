@@ -19,7 +19,7 @@ export default defineSandbox({
   revalidationKey: () => 'evlog-content-workspace-v2',
   async bootstrap({ use }) {
     const sandbox = await use()
-    await sandbox.run({ command: 'git clone --depth 50 https://github.com/HugoRCD/evlog.git repo' })
+    await sandbox.run({ command: 'git clone --depth 50 https://github.com/evloghq/evlog.git repo' })
     await sandbox.run({ command: 'git config --global user.name "evlogai[bot]" && git config --global user.email "evlogai[bot]@users.noreply.github.com"' })
   },
   async onSession({ use }) {

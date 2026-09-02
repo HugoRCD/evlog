@@ -4,7 +4,7 @@
 
 **Please do not** open a public issue or discussion for security-sensitive bugs.
 
-Use **[GitHub Security Advisories (private report)](https://github.com/HugoRCD/evlog/security/advisories/new)** so maintainers can assess and release a fix responsibly.
+Use **[GitHub Security Advisories (private report)](https://github.com/evloghq/evlog/security/advisories/new)** so maintainers can assess and release a fix responsibly.
 
 Include:
 

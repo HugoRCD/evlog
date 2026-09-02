@@ -13,7 +13,7 @@ const identityFacts = {
   // Same `@id` as the node `useSeo` emits, so this merges into it rather than
   // declaring a second product. Coupled to Docus's `#identity` convention.
   '@id': 'https://www.evlog.dev/#identity',
-  license: 'https://github.com/hugorcd/evlog/blob/main/LICENSE',
+  license: 'https://github.com/evloghq/evlog/blob/main/LICENSE',
   author: { '@type': 'Person', name: 'HugoRCD', url: 'https://hugorcd.com/' },
 }
 

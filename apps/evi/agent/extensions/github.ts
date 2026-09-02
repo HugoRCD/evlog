@@ -93,7 +93,7 @@ function assignPolicy(ctx: ApprovalContext): ApprovalStatus {
 
 export default githubExtension({
   connector: GITHUB_CONNECTOR,
-  context: { owner: 'HugoRCD', repo: 'evlog' },
+  context: { owner: 'evloghq', repo: 'evlog' },
   include: [...TOOLS],
   // Omitted write tools keep the default always(): closeIssue, createPullRequestReview.
   // Connect scopes are derived from `include` (createLabel → issues:write) in sdk ≥ 1.11.1.

@@ -22,7 +22,7 @@ const docsUrl = computed(() => pub.docsUrl || 'https://www.evlog.dev')
       Quick start
     </NuxtLink>
     <NuxtLink
-      to="https://github.com/hugorcd/evlog"
+      to="https://github.com/evloghq/evlog"
       class="text-muted underline decoration-muted underline-offset-4 transition-colors hover:text-highlighted"
       target="_blank"
       rel="noopener noreferrer"

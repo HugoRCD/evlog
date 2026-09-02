@@ -2,7 +2,7 @@
 
 A tiny, self-hostable analytics dashboard for [`@evlog/telemetry`](https://npmjs.com/package/@evlog/telemetry) run events — built to receive run events from anything that reports to it — a CLI someone typed, a GitHub Actions job, a Vercel build, an AI coding agent, a cron script — store them in Postgres via [NuxtHub](https://hub.nuxt.com) + Drizzle ORM, and show what's happening: totals and their trend, where the runs came from, latency, version adoption, and a raw events browser.
 
-[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/HugoRCD/evlog/tree/main/apps/telemetry&project-name=evlog-telemetry&repository-name=evlog-telemetry&products=%5B%7B%22type%22%3A%22integration%22%2C%22group%22%3A%22postgres%22%2C%22protocol%22%3A%22storage%22%7D%5D&env=ANALYTICS_PASSWORD,NUXT_SESSION_PASSWORD&envDescription=Dashboard+password+and+a+32%2B+char+session+secret)
+[![Deploy with Vercel](https://vercel.com/button)](https://vercel.com/new/clone?repository-url=https://github.com/evloghq/evlog/tree/main/apps/telemetry&project-name=evlog-telemetry&repository-name=evlog-telemetry&products=%5B%7B%22type%22%3A%22integration%22%2C%22group%22%3A%22postgres%22%2C%22protocol%22%3A%22storage%22%7D%5D&env=ANALYTICS_PASSWORD,NUXT_SESSION_PASSWORD&envDescription=Dashboard+password+and+a+32%2B+char+session+secret)
 
 ## What you get
 

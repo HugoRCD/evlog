@@ -6,11 +6,11 @@
   "homepage": "https://evlog.dev",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/HugoRCD/evlog.git",
+    "url": "git+https://github.com/evloghq/evlog.git",
     "directory": "packages/cli"
   },
   "bugs": {
-    "url": "https://github.com/HugoRCD/evlog/issues"
+    "url": "https://github.com/evloghq/evlog/issues"
   },
   "license": "MIT",
   "type": "module",
