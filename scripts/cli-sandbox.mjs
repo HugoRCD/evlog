@@ -4,8 +4,8 @@
  *
  * `evlog init` writes files and `evlog map --baseline` wants a git history, so
  * neither can be exercised by hand against a real app without leaving a mess to
- * undo. This builds throwaway copies under `.sandbox/` — one per framework,
- * each a git repo with `evlog` linked in — and `--smoke` drives every
+ * undo. This builds throwaway copies under `.sandbox/` � one per framework,
+ * each a git repo with `evlog` linked in � and `--smoke` drives every
  * non-interactive feature across them and reports what broke.
  *
  *   node scripts/cli-sandbox.mjs            # (re)create the apps, print a cheat sheet
@@ -34,7 +34,7 @@ const dim = text => paint('2', text)
 const bold = text => paint('1', text)
 const cyan = text => paint('36', text)
 
-/* ── the apps ───────────────────────────────────────────────────────────── */
+/* ?? the apps ????????????????????????????????????????????????????????????? */
 
 /**
  * All but one come from the `map` test fixtures rather than being written
@@ -48,6 +48,9 @@ const APPS = [
   { name: 'tanstack', fixture: 'tanstack-basic' },
   { name: 'nitro', generate: generateNitroApp },
   { name: 'hono', fixture: 'hono-basic' },
+  { name: 'express', fixture: 'express-basic', mapOnly: true },
+  { name: 'fastify', fixture: 'fastify-basic', mapOnly: true },
+  { name: 'elysia', fixture: 'elysia-basic', mapOnly: true },
 ]
 
 /**
@@ -79,7 +82,7 @@ export function assertCard(ok: boolean) {
  * Give the Next app a real evlog factory.
  *
  * The fixture ships a re-export barrel, which is a legitimate shape but the one
- * `init` cannot splice into — so every sandbox run ended at "paste this
+ * `init` cannot splice into � so every sandbox run ended at "paste this
  * snippet" and the patch path went untested by hand. A factory call is also
  * what the framework guide tells people to write.
  */
@@ -139,7 +142,7 @@ function write(dir, path, contents) {
   writeFileSync(target, contents, 'utf8')
 }
 
-/* ── setup ──────────────────────────────────────────────────────────────── */
+/* ?? setup ???????????????????????????????????????????????????????????????? */
 
 function ensureCliBuilt() {
   const dist = join(ROOT, 'packages/cli/dist/cli.mjs')
@@ -147,10 +150,10 @@ function ensureCliBuilt() {
     && statSync(dist).mtimeMs > newestSourceTime(join(ROOT, 'packages/cli/src'))
   if (fresh) return
 
-  process.stderr.write(dim('building @evlog/cli…\n'))
+  process.stderr.write(dim('building @evlog/cli�\n'))
   const built = spawnSync('pnpm', ['--filter', '@evlog/cli', 'build'], { cwd: ROOT, stdio: 'inherit' })
   if (built.status !== 0) {
-    process.stderr.write(red('could not build the CLI — run `pnpm --filter @evlog/cli build`\n'))
+    process.stderr.write(red('could not build the CLI � run `pnpm --filter @evlog/cli build`\n'))
     process.exit(1)
   }
 }
@@ -178,7 +181,7 @@ function newestSourceTime(dir) {
  * Build one app.
  *
  * `evlog` is symlinked into `node_modules` so `doctor` resolves a real install
- * and `init` reports "already installed" — the state a user is actually in when
+ * and `init` reports "already installed" � the state a user is actually in when
  * they run these commands. Each app is its own git repo so `--baseline` has a
  * `git:HEAD` to read.
  */
@@ -210,7 +213,7 @@ function git(cwd, ...args) {
  * Roll an app back to how it was created, without rebuilding it.
  *
  * The initial commit is the pristine state and it includes the `evlog` symlink,
- * so a checkout plus a clean restores everything the commands wrote — and puts
+ * so a checkout plus a clean restores everything the commands wrote � and puts
  * the link back rather than leaving the app unable to resolve evlog. Falls back
  * to a full rebuild if the app is not there or its git repo is gone.
  */
@@ -237,7 +240,7 @@ function cli(cwd, args) {
   return { code: result.status ?? -1, stdout: result.stdout ?? '', stderr: result.stderr ?? '' }
 }
 
-/* ── the feature matrix ─────────────────────────────────────────────────── */
+/* ?? the feature matrix ??????????????????????????????????????????????????? */
 
 const checks = []
 const check = (name, fn) => checks.push({ name, fn })
@@ -290,7 +293,7 @@ check('map --baseline catches a regression', (dir) => {
 
   /* Rename the calls rather than gutting the files. Replacing a route with a
      bare `export default` also removes it from the scan, and a deleted entry
-     point is deliberately not a regression — the check would then be asserting
+     point is deliberately not a regression � the check would then be asserting
      the opposite of what it means to. Renaming keeps every route in place and
      valid, and flips its checks from pass to fail. */
   const payload = JSON.parse(before)
@@ -352,7 +355,7 @@ check('init writes .env.example, never .env', (dir) => {
 
   const example = readFileSync(join(dir, '.env.example'), 'utf8')
   expect(example.includes('AXIOM_API_KEY='), 'the adapter keys are missing')
-  expect(!/AXIOM_API_KEY=\S/.test(example), 'a value was filled in — init must never write secrets')
+  expect(!/AXIOM_API_KEY=\S/.test(example), 'a value was filled in � init must never write secrets')
 })
 
 check('init seeds an error catalog from repeated errors', (dir) => {
@@ -388,7 +391,7 @@ check('init verifies with doctor before it finishes', (dir) => {
 
 check('init --drain axiom --extras pipeline', (dir) => {
   /* Set the precondition the check is about: a project with no evlog factory
-     yet. The Next fixture ships one, and `init` rightly refuses to touch it —
+     yet. The Next fixture ships one, and `init` rightly refuses to touch it �
      which would make this assert "does not overwrite" instead of "wires Axiom".
      That gap has its own check below. */
   rmSync(join(dir, 'lib/evlog.ts'), { force: true })
@@ -405,7 +408,7 @@ check('init --drain axiom --extras pipeline', (dir) => {
 
 check('init never overwrites, never silently drops a destination', (dir) => {
   /* The two halves of the same promise: a file somebody wrote is left exactly
-     as it was, and a destination that was asked for still lands somewhere —
+     as it was, and a destination that was asked for still lands somewhere �
      patched in, written beside it, or handed back as a snippet to paste. */
   write(dir, 'lib/evlog.ts', '// pre-existing\n')
   write(dir, 'server/plugins/evlog-drain.ts', '// pre-existing\n')
@@ -459,24 +462,38 @@ check('telemetry status', (dir) => {
   expect(cli(dir, ['telemetry', 'status']).code === 0, 'did not exit 0')
 })
 
-/* ── run ────────────────────────────────────────────────────────────────── */
+/* ?? run ?????????????????????????????????????????????????????????????????? */
+
+const MAP_ONLY_CHECKS = new Set([
+  'doctor --json',
+  'map --json --no-write',
+  'map --all / map <entry>',
+  'map --min-score gates',
+  'telemetry status',
+])
+
+function checksFor(app) {
+  if (!app.mapOnly) return checks
+  return checks.filter(({ name }) => MAP_ONLY_CHECKS.has(name))
+}
 
 function smoke(apps) {
   let failed = 0
-  process.stderr.write(`\n${bold('smoke')} ${dim(`${checks.length} checks × ${apps.length} apps`)}\n\n`)
+  process.stderr.write(`\n${bold('smoke')} ${dim(`${checks.length} checks � ${apps.length} apps`)}\n\n`)
 
   for (const app of apps) {
-    process.stderr.write(`${bold(app.name)}\n`)
-    for (const { name, fn } of checks) {
+    const run = checksFor(app)
+    process.stderr.write(`${bold(app.name)}${app.mapOnly ? dim(' (map only � init not supported yet)') : ''}\n`)
+    for (const { name, fn } of run) {
       /* A fresh copy per check: `init` writes files, and a check that inherits
          the previous one's leftovers passes or fails for the wrong reason. */
       const dir = createApp(app)
       try {
         fn(dir)
-        process.stderr.write(`  ${green('✓')} ${name}\n`)
+        process.stderr.write(`  ${green('?')} ${name}\n`)
       } catch (error) {
         failed++
-        process.stderr.write(`  ${red('✗')} ${name}\n    ${dim(error.message)}\n`)
+        process.stderr.write(`  ${red('?')} ${name}\n    ${dim(error.message)}\n`)
       }
     }
     process.stderr.write('\n')
@@ -492,7 +509,7 @@ function smoke(apps) {
 function cheatSheet(apps) {
   const lines = [
     '',
-    `${bold('sandbox ready')} ${dim(`— ${relative(ROOT, SANDBOX)}/`)}`,
+    `${bold('sandbox ready')} ${dim(`� ${relative(ROOT, SANDBOX)}/`)}`,
     '',
     dim('Interactive (needs a terminal):'),
     ...apps.map(app => `  ${cyan(`pnpm cli init --cwd .sandbox/${app.name}`)}`),
@@ -527,7 +544,7 @@ const only = args.find(arg => !arg.startsWith('--'))
 const apps = only ? APPS.filter(app => app.name === only) : APPS
 
 if (apps.length === 0) {
-  process.stderr.write(`${red(`unknown app "${only}"`)} — try: ${APPS.map(a => a.name).join(', ')}\n`)
+  process.stderr.write(`${red(`unknown app "${only}"`)} � try: ${APPS.map(a => a.name).join(', ')}\n`)
   process.exit(2)
 }
 
@@ -538,7 +555,7 @@ if (args.includes('--smoke')) {
   smoke(apps)
 } else if (args.includes('--reset')) {
   for (const app of apps) resetApp(app)
-  process.stderr.write(`${green('✓')} ${dim(`reset ${apps.map(app => app.name).join(', ')}`)}\n`)
+  process.stderr.write(`${green('?')} ${dim(`reset ${apps.map(app => app.name).join(', ')}`)}\n`)
 } else {
   if (!args.includes('--keep')) for (const app of apps) createApp(app)
   cheatSheet(apps)
