@@ -1,4 +1,4 @@
 {
   "$schema": "https://openapi.vercel.sh/vercel.json",
-  "ignoreCommand": "[ -n \"$VERCEL_GIT_PREVIOUS_SHA\" ] || exit 1; git fetch --unshallow >/dev/null 2>&1; npx turbo query affected --packages render-labs --exit-code --base \"$VERCEL_GIT_PREVIOUS_SHA\" || exit 1"
+  "ignoreCommand": "sh ../../scripts/vercel-ignore-build.sh render-labs"
 }

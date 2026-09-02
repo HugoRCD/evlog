@@ -1,0 +1,61 @@
+name: delete neon preview branch
+
+# Vercel's Neon integration creates preview/<git-branch> on evi-db for every
+# preview deployment and only drops it with the deployment, months later.
+
+on:
+  pull_request:
+    types: [closed]
+  workflow_dispatch:
+    inputs:
+      branch:
+        description: Git branch whose Neon preview branch should be deleted
+        required: true
+        type: string
+
+permissions: {}
+
+env:
+  NEON_PROJECT_ID: floral-dawn-93202365
+
+jobs:
+  cleanup:
+    if: github.event_name == 'workflow_dispatch' || github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-slim
+    timeout-minutes: 5
+    steps:
+      - name: Delete the Neon preview branch
+        env:
+          NEON_API_KEY: ${{ secrets.NEON_API_KEY }}
+          # workflow_dispatch carries no pull_request payload
+          GIT_BRANCH: ${{ github.event.pull_request.head.ref || inputs.branch }}
+        run: |
+          set -euo pipefail
+          : "${NEON_API_KEY:?NEON_API_KEY secret is not set}"
+
+          name="preview/$GIT_BRANCH"
+          api="https://console.neon.tech/api/v2/projects/$NEON_PROJECT_ID/branches"
+          auth="Authorization: Bearer $NEON_API_KEY"
+
+          id=""
+          cursor=""
+          while :; do
+            set -- --data-urlencode "search=$name" --data-urlencode "limit=100"
+            if [ -n "$cursor" ]; then
+              set -- "$@" --data-urlencode "cursor=$cursor"
+            fi
+            page=$(curl -sf -H "$auth" --get "$@" "$api")
+            id=$(jq -r --arg name "$name" '[.branches[] | select(.name == $name) | .id][0] // empty' <<< "$page")
+            cursor=$(jq -r '.pagination.next // empty' <<< "$page")
+            if [ -n "$id" ] || [ -z "$cursor" ]; then
+              break
+            fi
+          done
+
+          if [ -z "$id" ]; then
+            echo "No Neon branch named $name"
+            exit 0
+          fi
+
+          curl -sf -X DELETE -H "$auth" "$api/$id" > /dev/null
+          echo "Deleted $name ($id)"
