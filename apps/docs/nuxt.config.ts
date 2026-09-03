@@ -1,4 +1,5 @@
 import { readContentCommitDates } from './config/content-dates'
+import { uploadDocsSourceMaps } from './config/posthog-sourcemaps'
 import { rawRedirects, redirects } from './config/redirects'
 
 const contentCommitDates = readContentCommitDates(import.meta.dirname)
@@ -20,6 +21,18 @@ export default defineNuxtConfig({
     appManifest: true,
     emitRouteChunkError: 'automatic-immediate',
     checkOutdatedBuildInterval: 60_000,
+  },
+
+  // Hidden client maps stay on disk for the PostHog CLI, without a
+  // sourceMappingURL that would expose them on `/_nuxt/*.js.map`.
+  sourcemap: {
+    client: 'hidden',
+  },
+
+  hooks: {
+    'nitro:build:public-assets': () => {
+      uploadDocsSourceMaps()
+    },
   },
 
   routeRules: {

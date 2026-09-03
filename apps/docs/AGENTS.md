@@ -2,6 +2,20 @@
 
 Read the root `AGENTS.md` first. This file only adds docs-specific rules.
 
+## PostHog source maps
+
+Production builds of this app upload client source maps to PostHog EU project `245589` via `@posthog/cli` (`nitro:build:public-assets`). Preview and local builds skip the upload.
+
+The Vercel project `evlog-docs` needs:
+
+| Variable | Value |
+| --- | --- |
+| `POSTHOG_CLI_API_KEY` | Personal API key with `error_tracking:write` and `organization:read` |
+| `POSTHOG_CLI_PROJECT_ID` | `245589` (defaulted in code if unset) |
+| `POSTHOG_CLI_HOST` | `https://eu.posthog.com` (defaulted in code if unset) |
+
+`NUXT_PUBLIC_POSTHOG_KEY` is the public project key (`phc_…`) used by the browser snippet. It cannot upload maps. Do not commit a personal API key.
+
 ## Nuxt UI components in MDC
 
 Nuxt UI ships the components this site renders inside markdown. Use them as the module exposes them, and never rename or re-skin one from the outside.

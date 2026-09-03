@@ -21,6 +21,7 @@ allowBuilds:
   sharp: true
   maplibre-gl: false
   core-js: false
+  '@posthog/cli': true
 
 overrides:
   # A second @types/react copy makes React.Key incompatible with itself in

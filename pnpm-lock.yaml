@@ -117,6 +117,9 @@ importers:
         specifier: ^2.5.135
         version: 2.5.135(react-dom@19.2.8(react@19.2.8))(react@19.2.8)(solid-js@1.9.12)(svelte@5.55.5(@typescript-eslint/types@8.59.1))(vue@3.5.42(typescript@6.0.3))
     devDependencies:
+      '@posthog/cli':
+        specifier: 0.16.0
+        version: 0.16.0
       eslint:
         specifier: ^9.39.5
         version: 9.39.5(jiti@2.7.0)(supports-color@10.2.2)
@@ -5226,6 +5229,11 @@ packages:
 
   '@posthog/browser-common@0.7.1':
     resolution: {integrity: sha512-JO/5dIVx3NTrbg0W2VciDDmmizsvwaYYHE5cnJE1Gra+UqBnEuVGH9DTE/kBFgVMp+08z5uj/aAprsYD2WG/QQ==}
+
+  '@posthog/cli@0.16.0':
+    resolution: {integrity: sha512-W3di3Oy8jRZ0gUHEP6CG8OFLcKFvR4NNeZ3wqNeiY13pDHFZyXTPxsGTCwYUr5CmrToNvisEnR7KPYIGUzxbLg==}
+    engines: {node: '>=14.14', npm: '>=6'}
+    hasBin: true
 
   '@posthog/core@1.50.2':
     resolution: {integrity: sha512-El7y/ipZ45OFBRTN/+ixat9Nw21bW+pKKnX0G+rG4rWxBtDA47Ub/ZUnHvZNhAufNInQr4AYCUeWQsuJsTcoKg==}
@@ -24084,6 +24092,10 @@ snapshots:
     dependencies:
       '@posthog/core': 1.50.2
       '@posthog/types': 1.407.1
+
+  '@posthog/cli@0.16.0':
+    dependencies:
+      detect-libc: 2.1.2
 
   '@posthog/core@1.50.2':
     dependencies:
