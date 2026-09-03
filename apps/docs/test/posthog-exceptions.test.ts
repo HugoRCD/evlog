@@ -8,11 +8,13 @@ import {
 describe('isExtensionException', () => {
   it('drops a chrome-extension stack frame', () => {
     expect(isExtensionException({
-      $exception_list: [{
-        type: 'Error',
-        value: 'boom',
-        stacktrace: { frames: [{ filename: 'chrome-extension://abc/content.js' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'boom',
+          stacktrace: { frames: [{ filename: 'chrome-extension://abc/content.js' }] },
+        }
+      ],
     })).toBe(true)
   })
 
@@ -24,11 +26,13 @@ describe('isExtensionException', () => {
 
   it('keeps a first-party exception', () => {
     expect(isExtensionException({
-      $exception_list: [{
-        type: 'TypeError',
-        value: 'Cannot read properties of undefined (reading \'id\')',
-        stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'TypeError',
+          value: 'Cannot read properties of undefined (reading \'id\')',
+          stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
+        }
+      ],
     })).toBe(false)
   })
 })
@@ -42,31 +46,37 @@ describe('isCrossOriginException', () => {
 
   it('drops Firefox permission-denied when the only frame is exception-autocapture', () => {
     expect(isCrossOriginException({
-      $exception_list: [{
-        type: 'Error',
-        value: 'Permission denied to access object',
-        stacktrace: { frames: [{ filename: '../src/entrypoints/exception-autocapture.ts' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'Permission denied to access object',
+          stacktrace: { frames: [{ filename: '../src/entrypoints/exception-autocapture.ts' }] },
+        }
+      ],
     })).toBe(true)
   })
 
   it('keeps a first-party exception even if the message mentions permission', () => {
     expect(isCrossOriginException({
-      $exception_list: [{
-        type: 'Error',
-        value: 'Permission denied to write file',
-        stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'Permission denied to write file',
+          stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
+        }
+      ],
     })).toBe(false)
   })
 
   it('keeps Permission denied to access object when a site frame is present', () => {
     expect(isCrossOriginException({
-      $exception_list: [{
-        type: 'Error',
-        value: 'Permission denied to access object',
-        stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'Error',
+          value: 'Permission denied to access object',
+          stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
+        }
+      ],
     })).toBe(false)
   })
 })
@@ -80,11 +90,13 @@ describe('shouldDropCapturedException', () => {
       $exception_list: [{ type: 'Error', value: 'Invalid call to runtime.sendMessage(). Tab not found.' }],
     })).toBe(true)
     expect(shouldDropCapturedException({
-      $exception_list: [{
-        type: 'TypeError',
-        value: 'Cannot read properties of undefined (reading \'id\')',
-        stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
-      }],
+      $exception_list: [
+        {
+          type: 'TypeError',
+          value: 'Cannot read properties of undefined (reading \'id\')',
+          stacktrace: { frames: [{ filename: 'https://www.evlog.dev/_nuxt/app.js' }] },
+        }
+      ],
     })).toBe(false)
   })
 })
