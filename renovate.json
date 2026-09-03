@@ -17,9 +17,9 @@
       "schedule": ["before 3am on Monday"]
     },
     {
-      "description": "eve is patch-pinned in pnpm-workspace.yaml; upgrades are manual and port the patch",
-      "matchPackageNames": ["eve"],
-      "enabled": false
+      "description": "eve and its extensions declare a shared capability contract, so they bump together",
+      "matchPackageNames": ["eve", "@agent-browser/eve", "@github-tools/eve-extension"],
+      "groupName": "eve"
     }
   ],
   "postUpdateOptions": ["pnpmDedupe"]
