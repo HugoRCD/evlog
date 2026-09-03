@@ -40,8 +40,14 @@ export default defineAgent({
   }),
   reasoning: 'high',
   /** Bounds a runaway session, not cost: one real thread runs a few million in. */
+  /**
+   * A million-token window means eve's default (90%) never compacts here, so a
+   * long turn re-sends its whole history on every step. Compacting past 100k
+   * keeps the prefill bounded while a normal turn stays untouched.
+   */
+  compaction: { thresholdPercent: 0.1 },
   limits: {
-    maxInputTokensPerSession: 20_000_000,
+    maxInputTokensPerSession: 40_000_000,
     maxOutputTokensPerSession: 250_000,
   },
 })
