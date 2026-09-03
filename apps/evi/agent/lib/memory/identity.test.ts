@@ -27,7 +27,7 @@ describe('parsePrincipal', () => {
   it('refuses an unknown surface rather than inventing one', async () => {
     const { parsePrincipal } = await loadIdentity({})
     // A wrong identity row is a join key that merges two people.
-    expect(parsePrincipal('slack:U123')).toBeNull()
+    expect(parsePrincipal('discord:U123')).toBeNull()
   })
 
   it.each([
@@ -52,6 +52,7 @@ describe('surfaceOf', () => {
     const { surfaceOf } = await loadIdentity({})
     expect(surfaceOf('github')).toBe('github')
     expect(surfaceOf('linear')).toBe('linear')
+    expect(surfaceOf('slack')).toBe('slack')
     expect(surfaceOf('mcp')).toBe('mcp')
   })
 

@@ -5,7 +5,7 @@ import { sql } from 'drizzle-orm'
 import { index, jsonb, pgTable, text, timestamp, uniqueIndex, uuid } from 'drizzle-orm/pg-core'
 
 /** Where a caller reached Evi from. One per authored channel, plus local dev. */
-export type Surface = 'github' | 'linear' | 'imessage' | 'mcp' | 'cloud' | 'local'
+export type Surface = 'github' | 'linear' | 'slack' | 'imessage' | 'mcp' | 'cloud' | 'local'
 
 export type PersonRole = 'maintainer' | 'member' | 'visitor'
 

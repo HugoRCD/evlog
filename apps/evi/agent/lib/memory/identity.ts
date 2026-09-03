@@ -8,7 +8,7 @@ import { isMaintainer, MAINTAINER_GITHUB_LOGIN, MAINTAINER_PRINCIPALS } from '..
 type Db = NonNullable<ReturnType<typeof getDb>>
 type DbLike = Db | Parameters<Parameters<Db['transaction']>[0]>[0]
 
-const SURFACES: ReadonlySet<string> = new Set<Surface>(['github', 'linear', 'imessage', 'mcp', 'cloud', 'local'])
+const SURFACES: ReadonlySet<string> = new Set<Surface>(['github', 'linear', 'slack', 'imessage', 'mcp', 'cloud', 'local'])
 
 export interface ExternalIdentity {
   surface: Surface
@@ -37,6 +37,7 @@ export function parsePrincipal(principalId: string | undefined): ExternalIdentit
 const CHANNEL_SURFACES: Readonly<Record<string, Surface>> = {
   github: 'github',
   linear: 'linear',
+  slack: 'slack',
   photon: 'imessage',
   mcp: 'mcp',
 }

@@ -131,7 +131,7 @@ Facts only. No summary of what the pass is for, no closing note about improving 
 
 ### 8. Say it in one line
 
-Report to the thread: what group, how many files, the PR link. Two lines maximum. The PR body is where the detail belongs, and iMessage is where it is least readable.
+Report to the thread: what group, how many files, the PR link. Two lines maximum. The PR body is where the detail belongs, and chat is where it is least readable.
 
 ## Enrich
 

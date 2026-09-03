@@ -53,6 +53,26 @@ describe('isMaintainer', () => {
   })
 })
 
+describe('slack workspace members', () => {
+  const slack = (principalId: string, overrides: Partial<SessionAuthContext> = {}) =>
+    auth({ authenticator: 'slack-webhook', principalId, ...overrides })
+
+  it('trusts every human of the configured workspace', async () => {
+    const trust = await loadTrust({ EVI_SLACK_TEAM_ID: 'T0123' })
+    expect(trust.isMaintainer(slack('slack:T0123:U0123'))).toBe(true)
+    expect(trust.isMaintainer(slack('slack:T0123:U9999'))).toBe(true)
+  })
+
+  it('refuses another workspace, a bot, a forged authenticator, and an unconfigured team', async () => {
+    const trust = await loadTrust({ EVI_SLACK_TEAM_ID: 'T0123' })
+    expect(trust.isMaintainer(slack('slack:T9999:U0123'))).toBe(false)
+    expect(trust.isMaintainer(slack('slack:T0123:bot:B0123', { principalType: 'service' }))).toBe(false)
+    expect(trust.isMaintainer(auth({ principalId: 'slack:T0123:U0123' }))).toBe(false)
+    const unconfigured = await loadTrust({ EVI_SLACK_TEAM_ID: undefined })
+    expect(unconfigured.isMaintainer(slack('slack:T0123:U0123'))).toBe(false)
+  })
+})
+
 describe('local dev grant', () => {
   const oidc = (claims: Record<string, unknown>) =>
     `h.${Buffer.from(JSON.stringify(claims)).toString('base64url')}.s`

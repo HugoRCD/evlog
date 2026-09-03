@@ -7,6 +7,11 @@ import { environment } from './environment'
  * channel from the trusted set, so its writes fall back to asking.
  */
 export const { MAINTAINER_PHONE, MAINTAINER_GITHUB_ID } = process.env
+/**
+ * The one Slack workspace the connector is installed in. Private, and only
+ * Hugo can install or invite there, so every human in it is trusted as him.
+ */
+export const { EVI_SLACK_TEAM_ID } = process.env
 /** Hugo's GitHub login, used to assign escalated issues to him. Public handle, not a credential. */
 export const MAINTAINER_GITHUB_LOGIN = 'hugorcd'
 
@@ -50,9 +55,18 @@ function isTrustedLocalDev(): boolean {
   return team === undefined || claims.owner_id === team
 }
 
+/** eve mints `slack:<team>:<member>` for humans and `slack:<team>:bot:<id>` for bots. */
+function isWorkspaceMember(auth: SessionAuthContext): boolean {
+  return EVI_SLACK_TEAM_ID !== undefined
+    && auth.authenticator === 'slack-webhook'
+    && auth.principalType === 'user'
+    && auth.principalId.startsWith(`slack:${EVI_SLACK_TEAM_ID}:`)
+}
+
 export function isMaintainer(auth: SessionAuthContext | null): boolean {
   if (isTrustedLocalDev()) return true
-  return auth !== null && MAINTAINER_PRINCIPALS.has(auth.principalId)
+  if (auth === null) return false
+  return MAINTAINER_PRINCIPALS.has(auth.principalId) || isWorkspaceMember(auth)
 }
 
 /**
