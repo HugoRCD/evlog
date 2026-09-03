@@ -15,6 +15,11 @@
       "description": "Same weekly window as the repo (nuxt preset uses a broader schedule for framework packages)",
       "matchPackagePatterns": ["^@nuxt/", "^nuxt"],
       "schedule": ["before 3am on Monday"]
+    },
+    {
+      "description": "eve is patch-pinned in pnpm-workspace.yaml; upgrades are manual and port the patch",
+      "matchPackageNames": ["eve"],
+      "enabled": false
     }
   ],
   "postUpdateOptions": ["pnpmDedupe"]
