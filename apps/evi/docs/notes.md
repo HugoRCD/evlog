@@ -72,9 +72,10 @@ iMessage delivery did for every run: one long-lived session, stale context
 and pending requests included, hence the epilogue every task used to carry.
 
 **The Slack principal is `slack:<team>:<member>`.** `defaultSlackAuth` mints
-it from the event's `team_id` and the actor's user id, so the maintainer
-allowlist needs both `EVI_SLACK_TEAM_ID` and `MAINTAINER_SLACK_ID`, and a
-member id alone never matches. Replies in a thread Evi owns need the
+it from the event's `team_id` and the actor's user id, and `trust.ts` trusts
+every human principal of `EVI_SLACK_TEAM_ID` rather than one member: the
+workspace is private and only Hugo can install the connector or invite into
+it, so the workspace is the allowlist. Replies in a thread Evi owns need the
 connector's trigger to subscribe `message.channels` with `channels:history`
 (plus `message.groups` and `groups:history` for a private channel); without
 them, only mentions and DMs reach the agent.

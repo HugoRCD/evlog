@@ -5,8 +5,9 @@ import { isMaintainer } from '../lib/trust'
 
 /**
  * A valid signature proves Slack sent the event, not who typed it. Every
- * inbound path admits the maintainer only, so a Slack Connect guest or a
- * second workspace member gets silence rather than a turn.
+ * inbound path goes through `isMaintainer`, which admits the humans of the
+ * one configured workspace and nobody else: bots and Slack Connect guests
+ * from another workspace get silence rather than a turn.
  */
 async function admitMaintainer(ctx: SlackInboundMessageContext, message: SlackMessage): Promise<SlackMentionResult> {
   const auth = defaultSlackAuth(message, ctx)

@@ -1,8 +1,9 @@
 import type { SlackInitialMessage, SlackReceiveTarget } from 'eve/channels/slack'
 import { Card, CardText } from 'eve/channels/slack'
+import { EVI_SLACK_TEAM_ID } from './trust'
 
-/** The Slack channel every scheduled run posts into, and its workspace. */
-export const { EVI_SLACK_CHANNEL_ID, EVI_SLACK_TEAM_ID } = process.env
+/** The Slack channel every scheduled run posts into. */
+export const { EVI_SLACK_CHANNEL_ID } = process.env
 
 /**
  * The message a scheduled run posts before the agent starts. It becomes the

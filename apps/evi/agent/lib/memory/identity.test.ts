@@ -69,14 +69,11 @@ describe('maintainerIdentities', () => {
       MAINTAINER_GITHUB_ID: '4271224',
       MAINTAINER_LINEAR_ID: 'lin-1',
       MAINTAINER_PHONE: '+33600000000',
-      MAINTAINER_SLACK_ID: 'U0123',
-      EVI_SLACK_TEAM_ID: 'T0123',
       EVI_MCP_TOKEN: 'token',
     })
     expect(maintainerIdentities()).toEqual(expect.arrayContaining([
       { surface: 'github', externalId: '4271224' },
       { surface: 'linear', externalId: 'lin-1' },
-      { surface: 'slack', externalId: 'T0123:U0123' },
       { surface: 'imessage', externalId: '+33600000000' },
       { surface: 'mcp', externalId: 'hugo' },
     ]))
