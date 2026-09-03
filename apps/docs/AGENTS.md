@@ -4,7 +4,7 @@ Read the root `AGENTS.md` first. This file only adds docs-specific rules.
 
 ## PostHog source maps
 
-Production builds of this app upload client source maps to PostHog EU project `245589` from `nitro:build:public-assets` via `@posthog/cli`. Preview and local builds skip the upload.
+Production Vercel builds of this app upload client source maps to PostHog EU project `245589` from `nitro:build:public-assets` via `@posthog/cli`. Vercel preview and development deploys skip the upload. A local `nuxt build` uploads only when `POSTHOG_CLI_API_KEY` is set.
 
 Set `POSTHOG_CLI_API_KEY` on the Vercel project `evlog-docs`. It is a personal API key with `error_tracking:write` and `organization:read`, not the public `phc_` key. Optional: `POSTHOG_CLI_PROJECT_ID` (defaults to `245589`) and `POSTHOG_CLI_HOST` (defaults to `https://eu.posthog.com`).
 
