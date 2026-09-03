@@ -6,7 +6,7 @@ import { environment } from './environment'
  * repo carries no personal identifiers. A missing variable removes that
  * channel from the trusted set, so its writes fall back to asking.
  */
-export const { MAINTAINER_PHONE, MAINTAINER_GITHUB_ID } = process.env
+export const { MAINTAINER_PHONE, MAINTAINER_GITHUB_ID, MAINTAINER_SLACK_ID, EVI_SLACK_TEAM_ID } = process.env
 /** Hugo's GitHub login, used to assign escalated issues to him. Public handle, not a credential. */
 export const MAINTAINER_GITHUB_LOGIN = 'hugorcd'
 
@@ -16,6 +16,8 @@ export const MAINTAINER_PRINCIPALS: ReadonlySet<string> = new Set(
     MAINTAINER_GITHUB_ID && `github:${MAINTAINER_GITHUB_ID}`,
     process.env.MAINTAINER_LINEAR_ID && `linear:${process.env.MAINTAINER_LINEAR_ID}`,
     MAINTAINER_PHONE && `imessage:${MAINTAINER_PHONE}`,
+    // The Slack channel mints `slack:<team>:<member>`, so both ids are needed.
+    MAINTAINER_SLACK_ID && EVI_SLACK_TEAM_ID && `slack:${EVI_SLACK_TEAM_ID}:${MAINTAINER_SLACK_ID}`,
     // The MCP channel only mints this principal after verifying the bearer
     // token, so configuring the token is what admits the external harness.
     process.env.EVI_MCP_TOKEN && 'mcp:hugo',

@@ -61,12 +61,23 @@ its tools inline in a single block-bodied `turn.started` resolver.
 
 ## Schedules
 
-**Chat-sdk channels target a provider-native `threadId` from a schedule.**
-`to(photon, target).send(...)` takes `{ adapterName: 'imessage', threadId }`, not
-a session handle. For a direct chat the id is derivable, no capture needed:
-Spectrum direct-chat guids are `any;-;<address>`, so the thread is
-`imessage:any;-;<phone>`. The optional `~<phone>` suffix in the full format
-selects the sending line; irrelevant while the Photon project has one number.
+**A schedule sent to Slack with `initialMessage` gets its own thread and its
+own session.** `to(slack, { channelId, initialMessage }).send(...)` posts the
+card first, anchors the session to that message, and threads the turn under
+it. Without `initialMessage` (and without `threadTs`) the first agent post
+becomes the anchor instead, which puts a bare reply in the channel before any
+context. `threadTs` and `initialMessage` are mutually exclusive. Sending to an
+existing `threadTs` resumes that thread's session, which is what the old
+iMessage delivery did for every run: one long-lived session, stale context
+and pending requests included, hence the epilogue every task used to carry.
+
+**The Slack principal is `slack:<team>:<member>`.** `defaultSlackAuth` mints
+it from the event's `team_id` and the actor's user id, so the maintainer
+allowlist needs both `EVI_SLACK_TEAM_ID` and `MAINTAINER_SLACK_ID`, and a
+member id alone never matches. Replies in a thread Evi owns need the
+connector's trigger to subscribe `message.channels` with `channels:history`
+(plus `message.groups` and `groups:history` for a private channel); without
+them, only mentions and DMs reach the agent.
 
 **Vercel evaluates schedule cron in UTC.** `0 5 * * *` fires 06:00 London in
 summer (BST) and drifts to 05:00 in winter (GMT). `eve dev` never fires crons;

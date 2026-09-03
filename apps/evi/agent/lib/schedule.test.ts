@@ -1,9 +1,9 @@
-import type { ChatSdkChannel } from 'eve/channels/chat-sdk'
+import type { SlackChannel } from 'eve/channels/slack'
 import type { ScheduleHandlerArgs } from 'eve/schedules'
 import type { SessionAuthContext } from 'eve/context'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-const channel = { __kind: 'eve:channel' } as ChatSdkChannel
+const channel = { __kind: 'eve:channel' } as unknown as SlackChannel
 
 const appAuth: SessionAuthContext = {
   attributes: {},
@@ -19,9 +19,9 @@ function scheduleArgs() {
   return { args: { to, waitUntil, appAuth } as unknown as ScheduleHandlerArgs, send, to, waitUntil }
 }
 
-async function loadSchedule(phone: string | undefined) {
+async function loadSchedule(env: Record<string, string | undefined>) {
   vi.resetModules()
-  vi.stubEnv('MAINTAINER_PHONE', phone)
+  for (const [key, value] of Object.entries(env)) vi.stubEnv(key, value)
   return await import('./schedule')
 }
 
@@ -30,29 +30,28 @@ beforeEach(() => {
 })
 
 describe('maintainerRun', () => {
-  it('sends the task with the shared epilogue to the derived thread, as the app principal', async () => {
-    const { maintainerRun, SCHEDULED_TASK_EPILOGUE } = await loadSchedule('+33600000000')
+  it('sends the task to the configured channel under a fresh anchor, as the app principal', async () => {
+    const { maintainerRun } = await loadSchedule({ EVI_SLACK_CHANNEL_ID: 'C0123', EVI_SLACK_TEAM_ID: 'T0123' })
     const { args, send, to, waitUntil } = scheduleArgs()
 
-    maintainerRun(channel, 'Load the daily-digest skill and follow it.')(args)
+    maintainerRun(channel, 'Daily digest', 'Load the daily-digest skill and follow it.')(args)
 
-    expect(to).toHaveBeenCalledWith(channel, {
-      adapterName: 'imessage',
-      threadId: 'imessage:any;-;+33600000000',
-    })
-    expect(send).toHaveBeenCalledWith(
-      `Load the daily-digest skill and follow it. ${SCHEDULED_TASK_EPILOGUE}`,
-      { auth: appAuth },
-    )
+    expect(to).toHaveBeenCalledWith(channel, expect.objectContaining({
+      channelId: 'C0123',
+      installationTeamId: 'T0123',
+      initialMessage: expect.objectContaining({ card: expect.objectContaining({ title: 'Daily digest' }) }),
+    }))
+    expect(to.mock.calls[0]![1]).not.toHaveProperty('threadTs')
+    expect(send).toHaveBeenCalledWith('Load the daily-digest skill and follow it.', { auth: appAuth })
     expect(waitUntil).toHaveBeenCalledTimes(1)
   })
 
   it('logs the accepted send with its session id', async () => {
     const log = vi.spyOn(console, 'log').mockImplementation(() => {})
-    const { maintainerRun } = await loadSchedule('+33600000000')
+    const { maintainerRun } = await loadSchedule({ EVI_SLACK_CHANNEL_ID: 'C0123' })
     const { args, waitUntil } = scheduleArgs()
 
-    maintainerRun(channel, 'anything')(args)
+    maintainerRun(channel, 'Daily digest', 'anything')(args)
     await waitUntil.mock.calls[0]![0]
 
     expect(log).toHaveBeenCalledWith('[schedule] send accepted, session sess_123')
@@ -61,23 +60,23 @@ describe('maintainerRun', () => {
 
   it('logs and rethrows when the send fails, so the task still settles as failed', async () => {
     const error = vi.spyOn(console, 'error').mockImplementation(() => {})
-    const { maintainerRun } = await loadSchedule('+33600000000')
+    const { maintainerRun } = await loadSchedule({ EVI_SLACK_CHANNEL_ID: 'C0123' })
     const { args, send, waitUntil } = scheduleArgs()
     const failure = new Error('handoff refused')
     send.mockRejectedValue(failure)
 
-    maintainerRun(channel, 'anything')(args)
+    maintainerRun(channel, 'Daily digest', 'anything')(args)
 
     await expect(waitUntil.mock.calls[0]![0]).rejects.toThrow('handoff refused')
     expect(error).toHaveBeenCalledWith('[schedule] send failed', failure)
     error.mockRestore()
   })
 
-  it('throws when the maintainer phone is missing or empty', async () => {
-    for (const phone of [undefined, '']) {
-      const { maintainerRun } = await loadSchedule(phone)
+  it('throws when the Slack channel is missing or empty', async () => {
+    for (const channelId of [undefined, '']) {
+      const { maintainerRun } = await loadSchedule({ EVI_SLACK_CHANNEL_ID: channelId })
       const { args } = scheduleArgs()
-      expect(() => maintainerRun(channel, 'anything')(args)).toThrow('MAINTAINER_PHONE')
+      expect(() => maintainerRun(channel, 'Daily digest', 'anything')(args)).toThrow('EVI_SLACK_CHANNEL_ID')
     }
   })
 })

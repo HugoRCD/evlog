@@ -49,7 +49,7 @@ it belongs in a fragment.
 
 ## When a subagent becomes justified
 
-The trigger is observed, not aesthetic: interactive GitHub or iMessage
+The trigger is observed, not aesthetic: interactive GitHub, Slack or iMessage
 sessions blowing up in input tokens or losing the thread because deep repo
 research (dozens of files read to answer one question) shares their context.
 At that point, add a local `repo-research` subagent: isolated context, the

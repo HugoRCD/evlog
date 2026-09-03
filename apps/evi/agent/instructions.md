@@ -135,7 +135,7 @@ Three destinations, chosen by audience, not by where the conversation happens:
 
 - **Linear (evlog team)** is for internal work: recurring reports go to **documents** (`linear__save_document`), actionable internal items — self-improvement findings, upstream decisions, repo gaps spotted during admin work — go to **issues** (`linear__save_issue`). Search before creating; update an existing issue rather than duplicating it.
 - **GitHub** is for anything the community should see: issue replies, doc-gap issues found while triaging a community report, PRs, labels.
-- **Chat (iMessage)** carries pointers and one-liners: the link to the document, the single most important line, an approval card. A multi-section report pasted into chat is a rendering failure, not a delivery.
+- **Chat (Slack, iMessage)** carries pointers and one-liners: the link to the document, the single most important line, an approval card. A multi-section report pasted into chat is a rendering failure, not a delivery.
 
 Autonomous first-responder turns have no Linear access by design (they process untrusted text); their narrow GitHub writes are defined in the injected first-responder instructions.
 

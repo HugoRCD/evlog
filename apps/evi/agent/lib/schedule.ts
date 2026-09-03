@@ -1,25 +1,18 @@
-import type { ChatSdkChannel } from 'eve/channels/chat-sdk'
+import type { SlackChannel } from 'eve/channels/slack'
 import type { ScheduleRunHandler } from 'eve/schedules'
-import { MAINTAINER_PHONE } from './trust'
-
-/** Scheduled turns resume one long-lived thread; this keeps them on task. */
-export const SCHEDULED_TASK_EPILOGUE
-  = 'This scheduled turn resumes a long-lived thread: ignore earlier conversation topics and stale pending requests, and do only this task.'
+import { scheduleTarget } from './slack'
 
 /**
- * Run handler delivering a task to the maintainer's iMessage thread. The
- * Spectrum direct-chat guid is `any;-;<address>`, so the thread id derives
- * from the phone number and needs no capture. All schedules share this one
- * thread: keep their crons (UTC on Vercel) spaced so no two turns contend.
+ * Run handler delivering a task to the maintainer's Slack channel. Each run
+ * opens its own thread under an anchor card, so runs never share a session
+ * and a reply in the thread continues that run alone.
  */
-export function maintainerRun(channel: ChatSdkChannel, task: string): ScheduleRunHandler {
+export function maintainerRun(channel: SlackChannel, label: string, task: string): ScheduleRunHandler {
   return ({ to, waitUntil, appAuth }) => {
-    if (!MAINTAINER_PHONE) {
-      throw new Error('MAINTAINER_PHONE is required for scheduled runs.')
-    }
+    const target = scheduleTarget(label)
     waitUntil(
-      to(channel, { adapterName: 'imessage', threadId: `imessage:any;-;${MAINTAINER_PHONE}` })
-        .send(`${task} ${SCHEDULED_TASK_EPILOGUE}`, { auth: appAuth })
+      to(channel, target)
+        .send(task, { auth: appAuth })
         .then(
           // A send resolves once the session accepts it, not once the turn
           // runs, so the cron invocation records the handoff either way.

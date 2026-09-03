@@ -33,10 +33,14 @@ describe('isMaintainer', () => {
       MAINTAINER_GITHUB_ID: '12345',
       MAINTAINER_LINEAR_ID: 'abc-def',
       MAINTAINER_PHONE: '+33600000000',
+      MAINTAINER_SLACK_ID: 'U0123',
+      EVI_SLACK_TEAM_ID: 'T0123',
     })
     expect(trust.isMaintainer(auth({ principalId: 'github:12345' }))).toBe(true)
     expect(trust.isMaintainer(auth({ principalId: 'linear:abc-def' }))).toBe(true)
     expect(trust.isMaintainer(auth({ principalId: 'imessage:+33600000000' }))).toBe(true)
+    expect(trust.isMaintainer(auth({ principalId: 'slack:T0123:U0123' }))).toBe(true)
+    expect(trust.isMaintainer(auth({ principalId: 'slack:T9999:U0123' }))).toBe(false)
     expect(trust.isMaintainer(auth({ principalId: 'github:99999' }))).toBe(false)
     expect(trust.isMaintainer(null)).toBe(false)
   })
@@ -46,10 +50,14 @@ describe('isMaintainer', () => {
       MAINTAINER_GITHUB_ID: '12345',
       MAINTAINER_LINEAR_ID: undefined,
       MAINTAINER_PHONE: undefined,
+      MAINTAINER_SLACK_ID: 'U0123',
+      EVI_SLACK_TEAM_ID: undefined,
     })
     expect(trust.isMaintainer(auth({ principalId: 'github:12345' }))).toBe(true)
     expect(trust.isMaintainer(auth({ principalId: 'linear:abc-def' }))).toBe(false)
     expect(trust.isMaintainer(auth({ principalId: 'imessage:+33600000000' }))).toBe(false)
+    expect(trust.isMaintainer(auth({ principalId: 'slack:T0123:U0123' }))).toBe(false)
+    expect(trust.isMaintainer(auth({ principalId: 'slack:U0123' }))).toBe(false)
   })
 })
 
