@@ -1,6 +1,6 @@
 ---
 name: before-after
-description: Produce a before/after visual comparison of an evlog surface (landing, docs, telemetry, playgrounds) and share it as public Blob URLs. Load when a change is visual, when someone asks for screenshots or a visual diff, or when a shipped PR touches apps/docs or apps/telemetry and deserves visual evidence.
+description: Produce a before/after visual comparison of an evlog surface (landing, docs, telemetry, playgrounds) and share it as public Blob URLs. Load when a change is visual, when someone asks for screenshots, a recording, or a visual diff, or when a shipped PR touches apps/docs or apps/telemetry and deserves visual evidence.
 ---
 
 # Before/after captures
@@ -40,6 +40,40 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 - Capturing `evlog.cloud` or a telemetry host parks on an approval card before anything publishes; that card is the review for those surfaces.
 - Paste the returned `markdown` verbatim — table, caption, and attestation receipt — where the change lives: the PR body (`github__updatePullRequest`) or a PR comment for a shipped change, the conversation otherwise. The receipt is the proof of what was compared; never strip it.
 
-## 4. Precise checks, when they earn their keep
+## 4. Motion evidence: record a flow
+
+A still freezes a state. Some changes are only visible in motion: an animation, a hover state, a scroll reveal, a multi-step interaction, a CLI walkthrough. When the timing or the path through the flow is the evidence, record it with the sandbox's `agent-browser` and attach a short clip next to the table.
+
+**Install ffmpeg only if it is missing.** `agent-browser` encodes the recording with ffmpeg, which the sandbox does not ship. The static build installs without root, and the guard makes the step free when the binary is already there:
+
+```
+test -x ~/bin/ffmpeg || (mkdir -p ~/bin && cd "$(mktemp -d)" && npm init -y >/dev/null && npm i ffmpeg-static >/dev/null 2>&1 && cp node_modules/ffmpeg-static/ffmpeg ~/bin/)
+```
+
+The download is the only slow part (~78 MB, a few seconds); `~/.npm` caches the package, so a reinstall is faster than the first one.
+
+**Record, convert, upload:**
+
+```
+agent-browser open https://evlog.dev
+agent-browser record start ./flow.webm --fps 30
+agent-browser wait 500
+agent-browser scroll down 600
+agent-browser wait 500
+agent-browser record stop
+
+~/bin/ffmpeg -y -i flow.webm -vf "fps=12,scale=800:-1:flags=lanczos" -c:v libwebp -lossless 0 -q:v 70 -loop 0 -an flow.webp
+```
+
+then `blob__upload_image` on the `.webp`.
+
+- **The same rules as a capture, to the letter.** Recording runs against the approved origins of step 1 only, and the sensitive-surface rule of step 2 applies to video the same as to a frame: real user data is demo or sanitized first, or the surface is not recorded.
+- **Convert to animated WebP before uploading.** Blob upload takes png/jpg/webp/gif only, so a raw `.webm` cannot go public as-is. Animated WebP is the cheapest of the accepted formats: roughly a third of the size of the same take as GIF, and one ffmpeg pass instead of the GIF palette double-pass. GIF stays the fallback when the reader cannot render WebP.
+- `record stop` before closing the session, or the file is not flushed.
+- Frame rate: 30 is the default and right for most takes; 60 for drag and animation polish on short clips; 10 for a long session where the video is a timeline. When a human will watch, put small `agent-browser wait 500` pauses between steps so the motion reads as a walkthrough.
+- Keep clips short. A ten-second scroll at 800px and 12 fps is a few hundred KB; 60 fps roughly doubles the size. Stay well under the 8 MB upload limit.
+- Still and clip answer different questions: the screenshot proves the end state, the video proves the timing and how the flow got there. When both matter, attach both. A recording never replaces the before/after table, and the table's attestation receipt is never stripped.
+
+## 5. Precise checks, when they earn their keep
 
 The `before-and-after` CLI is installed in the sandbox as a diff engine for the frames the tool already saved under `/workspace/screenshots/`: `before-and-after '<before.png>' '<after.png>' --output ./screenshots` compares two existing images (pixel-level and DOM-independent). Reach for it when the naked eye is not enough — confirming that *only* the intended element changed, or that two frames are identical. Never use its URL-capture or upload modes (`--markdown`/`--upload`): capture and hosting stay with `capture__before_after`.
