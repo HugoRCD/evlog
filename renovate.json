@@ -3,6 +3,7 @@
   "extends": [
     "github>nuxt/renovate-config-nuxt"
   ],
+  "minimumReleaseAge": "2 days",
   "schedule": ["before 3am on Monday"],
   "timezone": "UTC",
   "packageRules": [
