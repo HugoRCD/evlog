@@ -92,6 +92,66 @@ function loadLogger(): Promise<LoggerModule> {
   return loggerPromise
 }
 
+type AfterFn = (task: () => unknown) => void
+
+let cachedAfter: AfterFn | null | undefined
+
+/**
+ * Resolve Next's `after()` once. Returns `null` outside a Next runtime or on
+ * Next versions without `after()`. The Next equivalent of a serverless
+ * `waitUntil`: work registered with it runs once the response has been sent,
+ * outside the render's async context.
+ */
+async function resolveAfter(): Promise<AfterFn | null> {
+  if (cachedAfter !== undefined) return cachedAfter
+  try {
+    const mod = (await import('next/server')) as { after?: AfterFn }
+    cachedAfter = typeof mod.after === 'function' ? mod.after : null
+  } catch {
+    cachedAfter = null
+  }
+  return cachedAfter
+}
+
+/**
+ * Wrap the global drain so its work starts through Next's `after()` lifecycle
+ * instead of inside the emitting async context.
+ *
+ * `emitWideEvent` invokes the global drain synchronously in whatever context
+ * emitted the event. Under Next.js Cache Components, a `fetch()` started
+ * during a prerender pass is tracked as hanging work and rejected with
+ * `HANGING_PROMISE_REJECTION` once the prerender completes, so the delivery
+ * never happens and the rejection surfaces as a spurious delivery failure.
+ * Registering the work with `after()` moves its start to after the render,
+ * where fetches are no longer tracked. When `after()` is unavailable or
+ * throws (no active request scope, e.g. boot or background work), the drain
+ * runs inline as before.
+ */
+function createLifecycleSafeDrain(
+  drain: (ctx: DrainContext) => void | Promise<void>,
+  after: AfterFn | null,
+): (ctx: DrainContext) => Promise<void> {
+  if (!after) return ctx => Promise.resolve(drain(ctx))
+  return (ctx: DrainContext): Promise<void> => {
+    return new Promise<void>((resolve, reject) => {
+      const runInline = (): void => {
+        Promise.resolve(drain(ctx)).then(resolve, reject)
+      }
+      try {
+        after(() => {
+          try {
+            runInline()
+          } catch (error) {
+            reject(error)
+          }
+        })
+      } catch {
+        runInline()
+      }
+    })
+  }
+}
+
 function resolveCaptureOutputOptions(
   captureOutput: InstrumentationOptions['captureOutput'],
 ): CaptureOutputOptions | undefined {
@@ -194,6 +254,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
     if (registerPromise) return registerPromise
 
     registerPromise = loadLogger().then(async ({ initLogger, lockLogger, log }) => {
+      const after = await resolveAfter()
       initLogger({
         enabled: options.enabled,
         env: {
@@ -205,7 +266,7 @@ export function createInstrumentation(options: InstrumentationOptions = {}): Ins
         sampling: options.sampling,
         minLevel: options.minLevel,
         stringify: options.stringify,
-        drain: options.drain,
+        drain: options.drain ? createLifecycleSafeDrain(options.drain, after) : undefined,
         redact: options.redact,
       })
       lockLogger()
