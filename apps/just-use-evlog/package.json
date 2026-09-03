@@ -11,24 +11,24 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@comark/nuxt": "^0.5.1",
-    "@nuxt/content": "^3.15.0",
+    "@comark/nuxt": "^0.6.2",
+    "@nuxt/content": "^3.16.0",
     "@nuxt/fonts": "0.14.0",
-    "@nuxt/icon": "^2.3.1",
-    "@nuxt/ui": "^4.9.0",
+    "@nuxt/icon": "^2.5.1",
+    "@nuxt/ui": "^4.11.0",
     "@nuxtjs/color-mode": "^4.0.1",
-    "@nuxtjs/mdc": "^0.22.1",
-    "@nuxtjs/sitemap": "^8.2.2",
+    "@nuxtjs/mdc": "^0.23.1",
+    "@nuxtjs/sitemap": "^8.5.0",
     "@vercel/analytics": "^2.0.1",
     "better-sqlite3": "^12.11.1",
     "nostics": "^1.2.0",
     "nuxt": "^4.4.2",
-    "shiki": "4.3.1",
-    "tailwindcss": "^4.3.2"
+    "shiki": "4.4.3",
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
     "typescript": "^6.0.3",
-    "vue-tsc": "^3.3.7"
+    "vue-tsc": "^3.3.11"
   }
 }

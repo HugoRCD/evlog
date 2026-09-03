@@ -12,14 +12,14 @@
     "typecheck": "vue-tsc --noEmit"
   },
   "dependencies": {
-    "@nuxt/icon": "^2.3.1",
-    "@nuxt/ui": "^4.9.0",
+    "@nuxt/icon": "^2.5.1",
+    "@nuxt/ui": "^4.11.0",
     "@nuxtjs/color-mode": "^4.0.1",
-    "better-auth": "^1.6.23",
+    "better-auth": "^1.7.2",
     "better-sqlite3": "^12.11.1",
     "evlog": "workspace:*",
     "nuxt": "^4.4.2",
-    "tailwindcss": "^4.3.2"
+    "tailwindcss": "^4.3.3"
   },
   "devDependencies": {
     "@types/better-sqlite3": "^7.6.13"

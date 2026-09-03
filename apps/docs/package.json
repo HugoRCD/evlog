@@ -14,26 +14,26 @@
   "dependencies": {
     "@number-flow/vue": "^0.5.2",
     "@nuxt/fonts": "0.14.0",
-    "@nuxt/icon": "^2.3.1",
-    "@nuxt/ui": "^4.10.0",
+    "@nuxt/icon": "^2.5.1",
+    "@nuxt/ui": "^4.11.0",
     "@nuxtjs/color-mode": "^4.0.1",
     "@resvg/resvg-js": "^2.6.2",
     "@vercel/analytics": "^2.0.1",
     "@vercel/speed-insights": "^2.0.0",
-    "@vueuse/core": "^14.3.0",
+    "@vueuse/core": "^14.4.0",
     "better-sqlite3": "^12.11.1",
     "docus": "^5.13.0",
-    "motion-v": "^2.3.0",
+    "motion-v": "^2.4.0",
     "nostics": "^1.2.0",
     "nuxt": "^4.4.4",
     "nuxt-studio": "^1.7.0",
-    "posthog-js": "^1.414.0",
-    "satori": "^0.28.0",
+    "posthog-js": "^1.424.1",
+    "satori": "^0.33.4",
     "shaders": "^2.5.135"
   },
   "devDependencies": {
     "eslint": "^9.39.5",
-    "nuxt-site-config": "4.1.1",
-    "vitest": "^4.1.10"
+    "nuxt-site-config": "4.2.3",
+    "vitest": "^4.1.11"
   }
 }
