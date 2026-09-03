@@ -44,11 +44,13 @@ The tool's URLs go public the instant it runs. Landing, docs, and playground pag
 
 A still freezes a state. Some changes are only visible in motion: an animation, a hover state, a scroll reveal, a multi-step interaction, a CLI walkthrough. When the timing or the path through the flow is the evidence, record it with the sandbox's `agent-browser` and attach a short clip next to the table.
 
-**Install ffmpeg once per session.** `agent-browser` encodes the recording with ffmpeg, which the sandbox does not ship. The static build installs without root:
+**Install ffmpeg only if it is missing.** `agent-browser` encodes the recording with ffmpeg, which the sandbox does not ship. The static build installs without root, and the guard makes the step free when the binary is already there:
 
 ```
-mkdir -p ~/bin && cd "$(mktemp -d)" && npm init -y >/dev/null && npm i ffmpeg-static >/dev/null 2>&1 && cp node_modules/ffmpeg-static/ffmpeg ~/bin/ && export PATH="$HOME/bin:$PATH"
+test -x ~/bin/ffmpeg || (mkdir -p ~/bin && cd "$(mktemp -d)" && npm init -y >/dev/null && npm i ffmpeg-static >/dev/null 2>&1 && cp node_modules/ffmpeg-static/ffmpeg ~/bin/)
 ```
+
+The download is the only slow part (~78 MB, a few seconds); `~/.npm` caches the package, so a reinstall is faster than the first one.
 
 **Record, convert, upload:**
 
@@ -60,13 +62,13 @@ agent-browser scroll down 600
 agent-browser wait 500
 agent-browser record stop
 
-~/bin/ffmpeg -y -i flow.webm -vf "fps=12,scale=800:-1:flags=lanczos,split[a][b];[a]palettegen[p];[b][p]paletteuse" -loop 0 flow.gif
+~/bin/ffmpeg -y -i flow.webm -vf "fps=12,scale=800:-1:flags=lanczos" -c:v libwebp -lossless 0 -q:v 70 -loop 0 -an flow.webp
 ```
 
-then `blob__upload_image` on the `.gif`.
+then `blob__upload_image` on the `.webp`.
 
 - **The same rules as a capture, to the letter.** Recording runs against the approved origins of step 1 only, and the sensitive-surface rule of step 2 applies to video the same as to a frame: real user data is demo or sanitized first, or the surface is not recorded.
-- **Blob upload takes png/jpg/webp/gif only.** A raw `.webm` cannot go public as-is, so the GIF conversion is not optional.
+- **Convert to animated WebP before uploading.** Blob upload takes png/jpg/webp/gif only, so a raw `.webm` cannot go public as-is. Animated WebP is the cheapest of the accepted formats: roughly a third of the size of the same take as GIF, and one ffmpeg pass instead of the GIF palette double-pass. GIF stays the fallback when the reader cannot render WebP.
 - `record stop` before closing the session, or the file is not flushed.
 - Frame rate: 30 is the default and right for most takes; 60 for drag and animation polish on short clips; 10 for a long session where the video is a timeline. When a human will watch, put small `agent-browser wait 500` pauses between steps so the motion reads as a walkthrough.
 - Keep clips short. A ten-second scroll at 800px and 12 fps is a few hundred KB; 60 fps roughly doubles the size. Stay well under the 8 MB upload limit.
