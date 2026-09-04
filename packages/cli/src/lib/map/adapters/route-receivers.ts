@@ -133,11 +133,41 @@ export function elysiaReceiverContext(parsed: ParseResult): ElysiaReceiverContex
   }
 }
 
-/** Whether a member call targets an Express app or Router. */
+/**
+ * HTTP methods Express chains after `app.route('/path')`.
+ *
+ * Kept local so this module does not import the adapter's ROUTE_METHODS map.
+ */
+const EXPRESS_ROUTE_CHAIN = new Set([
+  'get',
+  'post',
+  'put',
+  'patch',
+  'delete',
+  'options',
+  'head',
+  'all',
+])
+
+/**
+ * Whether a member call targets an Express app, Router, or route builder.
+ *
+ * Accepts `app` / `router` bindings, factory calls (`express()`, `Router()`),
+ * and `app.route('/path')` / `router.route('/path').get(…)` chains so chained
+ * handlers can be mapped.
+ */
 export function isExpressRouteReceiver(node: Node, ctx: ExpressReceiverContext): boolean {
   if (node.type === 'Identifier') return ctx.receivers.has(node.name)
-  if (node.type === 'CallExpression') {
-    return isExpressFactory((node as { callee: Node }).callee, ctx.imports)
+  if (node.type !== 'CallExpression') return false
+
+  const { callee } = node as { callee: Node }
+  if (isExpressFactory(callee, ctx.imports)) return true
+  if (callee.type !== 'MemberExpression') return false
+
+  const member = callee as { object: Node, property: Node, computed?: boolean }
+  if (member.computed || member.property.type !== 'Identifier') return false
+  if (member.property.name === 'route' || EXPRESS_ROUTE_CHAIN.has(member.property.name)) {
+    return isExpressRouteReceiver(member.object, ctx)
   }
   return false
 }

@@ -108,26 +108,53 @@ function resolveRouteHandler(args: Node[]): Node | undefined {
   return undefined
 }
 
-/** Read a string property from a route options object. */
-function stringProperty(node: Node | undefined, property: string): string | null {
-  if (!node || node.type !== 'ObjectExpression') return null
+/** Read a property value from a route options object. */
+function objectProperty(node: Node | undefined, property: string): Node | undefined {
+  if (!node || node.type !== 'ObjectExpression') return undefined
   const { properties } = node as { properties: Node[] }
   for (const prop of properties) {
     if (prop.type !== 'Property') continue
     const { key, value } = prop as { key: Node, value: Node }
     if (key.type !== 'Identifier' || key.name !== property) continue
-    return stringLiteral(value)
+    return value
   }
-  return null
+  return undefined
 }
 
-/** `app.route({ method, url, handler })` — the full Fastify route declaration. */
-function routeFromOptions(node: Node | undefined): { method: string, path: string } | null {
-  if (!node || node.type !== 'ObjectExpression') return null
+/** Read a string property from a route options object. */
+function stringProperty(node: Node | undefined, property: string): string | null {
+  return stringLiteral(objectProperty(node, property))
+}
+
+/**
+ * String literals from a node: `'GET'` or `['GET', 'POST']`.
+ *
+ * Fastify accepts both spellings on `method`. Anything non-literal is dropped.
+ */
+function stringLiterals(node: Node | undefined): string[] {
+  if (!node) return []
+  if (node.type === 'ArrayExpression') {
+    const { elements } = node as { elements: (Node | null)[] }
+    return elements
+      .map(element => stringLiteral(element ?? undefined))
+      .filter((value): value is string => value !== null)
+  }
+  const single = stringLiteral(node)
+  return single === null ? [] : [single]
+}
+
+/**
+ * `app.route({ method, url, handler })` — the full Fastify route declaration.
+ *
+ * `method` may be a string or an array of strings; each value becomes its own
+ * entry so multi-method routes are scored separately.
+ */
+function routesFromOptions(node: Node | undefined): Array<{ method: string, path: string }> {
+  if (!node || node.type !== 'ObjectExpression') return []
   const url = stringProperty(node, 'url') ?? stringProperty(node, 'path')
-  const method = stringProperty(node, 'method')
-  if (!url || !isRoutePath(url) || !method || !handlerFromOptions(node)) return null
-  return { method: method.toUpperCase(), path: url }
+  const methods = stringLiterals(objectProperty(node, 'method')).map(method => method.toUpperCase())
+  if (!url || !isRoutePath(url) || methods.length === 0 || !handlerFromOptions(node)) return []
+  return methods.map(method => ({ method, path: url }))
 }
 
 /**
@@ -157,14 +184,16 @@ function findFastifyRoutes(parsed: ParseResult): FoundRoute[] {
 
     if (name === 'route') {
       if (!isFastifyRouteReceiver(member.object, receivers)) return
-      const route = routeFromOptions(call.arguments[0])
-      if (!route) return
+      const routes = routesFromOptions(call.arguments[0])
+      if (routes.length === 0) return
       const loc = nodeLoc(node, parsed.lines)
-      found.push({
-        method: route.method,
-        path: route.path,
-        line: loc?.line ?? 1,
-      })
+      for (const route of routes) {
+        found.push({
+          method: route.method,
+          path: route.path,
+          line: loc?.line ?? 1,
+        })
+      }
       return
     }
 

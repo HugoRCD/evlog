@@ -412,6 +412,29 @@ describe('express adapter', () => {
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['PUT /orders/:id'])
   })
 
+  it('reads app.route(path).get(handler) and router.route chains', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import express, { Router } from \'express\'',
+        'const app = express()',
+        'app.route(\'/health\').get((_req, res) => res.json({ ok: true }))',
+        'const router = Router()',
+        'router.route(\'/orders/:id\')',
+        '  .put((_req, res) => res.json({ ok: true }))',
+        '  .delete((_req, res) => res.status(204).end())',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('express', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`).sort()).toEqual([
+      'DELETE /orders/:id',
+      'GET /health',
+      'PUT /orders/:id',
+    ])
+  })
+
   it('does not treat HTTP client calls as routes', async () => {
     const root = await project({
       'src/index.ts': [
@@ -569,6 +592,24 @@ describe('fastify adapter', () => {
     const routes = await routesOf('fastify', root)
 
     expect(routes.map(route => `${route.method} ${route.path}`)).toEqual(['GET /health'])
+  })
+
+  it('reads app.route method arrays as one entry per method', async () => {
+    const root = await project({
+      'src/index.ts': [
+        'import Fastify from \'fastify\'',
+        'const app = Fastify()',
+        'app.route({ method: [\'GET\', \'HEAD\'], url: \'/health\', handler: async () => ({ ok: true }) })',
+        'export default app',
+      ].join('\n'),
+    })
+
+    const routes = await routesOf('fastify', root)
+
+    expect(routes.map(route => `${route.method} ${route.path}`).sort()).toEqual([
+      'GET /health',
+      'HEAD /health',
+    ])
   })
 
   it('does not treat HTTP client calls as routes', async () => {

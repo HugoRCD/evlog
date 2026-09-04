@@ -85,11 +85,34 @@ function looksLikeHandler(node: Node | undefined): boolean {
 }
 
 /**
+ * Path from an Express route builder: `app.route('/path')` or a chain on top of
+ * it (`app.route('/path').get(…).post(…)`). Returns null when the node is not a
+ * route-builder call.
+ */
+function pathFromRouteBuilder(node: Node): string | null {
+  let current: Node | null = node
+  while (current?.type === 'CallExpression') {
+    const call = current as { callee: Node, arguments: Node[] }
+    if (call.callee.type !== 'MemberExpression') return null
+    const member = call.callee as { object: Node, property: Node, computed?: boolean }
+    if (member.computed || member.property.type !== 'Identifier') return null
+    if (member.property.name === 'route') {
+      const path = stringLiteral(call.arguments[0])
+      return path && isRoutePath(path) ? path : null
+    }
+    if (!ROUTE_METHODS.has(member.property.name)) return null
+    current = member.object
+  }
+  return null
+}
+
+/**
  * Find every `*.get('/path', handler)` / `*.post(…)` call in a parsed file.
  *
- * The receiver name does not matter (`app`, `router`, `api`): Express sub-routers
- * register the same way. Two cheap shape checks keep unrelated `.get()` calls out:
- * the first argument must look like a path, and there must be a handler after it.
+ * Also maps Express route builders: `app.route('/path').get(handler)` and
+ * `router.route('/path').put(…).delete(…)`. The receiver must derive from an
+ * Express app or Router; path + handler shape checks keep unrelated `.get()`
+ * calls out.
  */
 function findExpressRoutes(parsed: ParseResult): FoundRoute[] {
   const found: FoundRoute[] = []
@@ -109,6 +132,18 @@ function findExpressRoutes(parsed: ParseResult): FoundRoute[] {
     const { name } = property
     if (!ROUTE_METHODS.has(name)) return
     if (!isExpressRouteReceiver(member.object, receivers)) return
+
+    const builderPath = pathFromRouteBuilder(member.object)
+    if (builderPath !== null) {
+      if (!looksLikeHandler(call.arguments[0])) return
+      const loc = nodeLoc(node, parsed.lines)
+      found.push({
+        method: ROUTE_METHODS.get(name) ?? null,
+        path: builderPath,
+        line: loc?.line ?? 1,
+      })
+      return
+    }
 
     const path = stringLiteral(call.arguments[0])
     if (!path || !isRoutePath(path) || !looksLikeHandler(call.arguments[1])) return
