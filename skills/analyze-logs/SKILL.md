@@ -59,7 +59,7 @@ npx @evlog/cli init --dry-run --yes   # preview first
 npx @evlog/cli init --yes --drain fs  # apply
 ```
 
-Ask before running it. Express, Fastify, and Elysia are not wired by `init` yet — use the manual snippets below. On other frameworks (or if the user declines), guide the manual setup:
+Ask before running it. Express, Fastify, and Elysia are not wired by `init` yet. Use the manual snippets below. On other frameworks (or if the user declines), guide the manual setup:
 
 ```typescript
 import { createFsDrain } from 'evlog/fs'

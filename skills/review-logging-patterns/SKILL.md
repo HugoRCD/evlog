@@ -56,7 +56,7 @@ npm install evlog
 
 ## Use the CLI (recommended on Nuxt, Nitro, Next.js, TanStack Start, Hono, Express, Fastify, Elysia)
 
-`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On Nuxt, Nitro, Next.js, TanStack Start, and Hono, `init` wires evlog in one pass. On those five plus Express, Fastify, and Elysia, `map` scores entry-point coverage; `--min-score` and `--baseline` gate regressions in CI. Express, Fastify, and Elysia are **map-only** today — `init` refuses them, so use the manual framework sections below for setup. If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
+`@evlog/cli` is a **separate package** from `evlog`, early but worth trying. It reads the project on disk (no traffic, no config). On Nuxt, Nitro, Next.js, TanStack Start, and Hono, `init` wires evlog in one pass. On those five plus Express, Fastify, and Elysia, `map` scores entry-point coverage; `--min-score` and `--baseline` gate regressions in CI. Express, Fastify, and Elysia are **map-only** today. `init` refuses them, so use the manual framework sections below for setup. If the CLI is unavailable, the framework has no adapter yet, or the user declines, continue with the manual sections below; the skill does not depend on it. **Ask before installing anything**; prefer `npx` / `pnpm dlx` for one-shots.
 
 ### 1. Setup: `evlog init`
 
