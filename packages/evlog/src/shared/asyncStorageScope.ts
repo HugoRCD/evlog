@@ -19,12 +19,15 @@ export interface AsyncLocalStorageLike<T> {
  * Whether this runtime provides a working native `AsyncLocalStorage.enterWith()`.
  *
  * Cloudflare Workers expose `enterWith` on the prototype but throw when it is
- * called, so a `typeof` check alone is not enough — we probe with a call.
+ * called, so a `typeof` check alone is not enough. Bun implements it natively,
+ * but probing changes `bun:test`'s active async context, so Bun is detected
+ * without invoking the method.
  */
 export function supportsAsyncLocalStorageEnterWith(
   storage: { enterWith?: unknown },
 ): boolean {
   if (typeof storage.enterWith !== 'function') return false
+  if ('Bun' in globalThis) return true
   try {
     // Must call as a method — unbound enterWith loses `this` and throws on Node.
     const probe = storage as { enterWith: (store: undefined) => void }
