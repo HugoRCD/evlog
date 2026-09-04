@@ -1,6 +1,8 @@
 import type { SessionAuthContext } from 'eve/context'
 import { defineAgent, defineDynamic } from 'eve'
 import { gatewayRouting, sessionTags } from './lib/gateway'
+import { wrapGlmXmlModel } from './lib/glm-xml-middleware'
+import { usesGlmXmlProtocol } from './lib/glm-xml'
 import { MODEL } from './lib/model'
 import { isScheduleAppAuth } from './lib/trust'
 
@@ -29,6 +31,17 @@ function selectModel(_event: unknown, ctx: ModelContext) {
   return { model: MODEL, modelOptions: modelOptions(ctx) }
 }
 
+/**
+ * Session/turn selections must stay model-id strings. A live LanguageModel
+ * (the GLM XML recovery wrap) is only legal on step.started.
+ */
+function selectStepModel(_event: unknown, ctx: ModelContext) {
+  return {
+    model: usesGlmXmlProtocol(MODEL) ? wrapGlmXmlModel(MODEL) : MODEL,
+    modelOptions: modelOptions(ctx),
+  }
+}
+
 export default defineAgent({
   // Also on turn.started: a session whose process died before the selection
   // committed resumes with none, and eve fails the turn rather than guess.
@@ -36,6 +49,7 @@ export default defineAgent({
     events: {
       'session.started': selectModel,
       'turn.started': selectModel,
+      'step.started': selectStepModel,
     },
   }),
   reasoning: 'high',

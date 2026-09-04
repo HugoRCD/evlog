@@ -104,6 +104,16 @@ rather than routing elsewhere. A hand-written `order` cannot fix this — a
 provider it names that ZDR has dropped is skipped silently, which reads as
 vetted while doing nothing.
 
+**GLM 5.x tool calls are XML, and some Gateway deployments leak that XML
+as text.** The model emits
+`<tool_call>name<arg_key>k</arg_key><arg_value>v</arg_value></tool_call>`.
+A working parser turns that into `tool_calls`; a miss returns
+`finish_reason: stop` and the XML as `content`. Slack then posts the tags,
+and eats the opening ones as mrkdwn, which is why a thread showed fragments.
+`agent/lib/glm-xml.ts` recovers complete blocks into tool-call parts and
+strips leftovers. The wrap is applied at `step.started` because session/turn
+selections cannot be live LanguageModel objects.
+
 **`GET /v1/models` returns the real rate card**, including `input_cache_read`.
 Reconstructing an observed turn from it matched eve's reported `costUsd` to four
 decimals, which is how the overspend was found.
