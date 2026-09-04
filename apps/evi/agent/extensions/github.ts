@@ -2,6 +2,7 @@ import githubExtension from '@github-tools/eve-extension'
 import type { ApprovalContext, ApprovalStatus } from 'eve/tools/approval'
 import { GITHUB_CONNECTOR, GITHUB_INSTALLATION_ID } from '../lib/github/credentials'
 import { createLabelPolicy, writePolicy } from '../lib/github/label-approval'
+import { threadCommentPolicy } from '../lib/github/thread-comment'
 import { isAutonomous, isScheduleAppAuth, MAINTAINER_GITHUB_LOGIN } from '../lib/trust'
 
 /**
@@ -113,7 +114,8 @@ export default githubExtension({
     updatePullRequest: policy,
     createIssue: autonomousWrite,
     updateIssue: policy,
-    addIssueComment: policy,
+    addIssueComment: (ctx: ApprovalContext) =>
+      threadCommentPolicy(ctx.session.auth.current, ctx.toolInput),
     updateIssueComment: policy,
     addPullRequestComment: policy,
     updatePullRequestComment: policy,

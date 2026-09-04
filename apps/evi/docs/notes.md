@@ -126,6 +126,14 @@ name.
 **`*Context` tools collapse round-trips.** `getIssueContext` returns the issue,
 its labels and recent comments in one call.
 
+**`addIssueComment` on the current thread is a second comment.** The channel's
+`message.completed` handler posts the final reply unless `finishReason` is
+`tool-calls` (progress is the eyes reaction). A maintainer mention that also
+calls `github__addIssueComment` therefore lands two comments, which is what
+happened on #654. `threadCommentPolicy` denies that tool on `github-webhook`
+sessions targeting this thread; Slack and a comment on a different issue still
+go through `writePolicy`.
+
 ## Vercel Connect
 
 **Connector types are not interchangeable.** The Linear channel is type `Linear`
