@@ -10,7 +10,6 @@ Nuxt UI ships the components this site renders inside markdown. Use them as the 
 - **Only pass props the prose wrapper declares.** The wrappers are thin and expose a small set (`ProseAccordion` takes `type`, `class`, `ui`). Anything else lands on the underlying component through attribute fall-through, which happens to work until the wrapper grows a root element. Read the component in `node_modules/@nuxt/ui/dist/runtime/components/prose/` before inventing an attribute.
 - **Style a component through its own `ui` prop or `app.config.ts`**, never by wrapping it in a bordered box. An accordion already draws its dividers; a parent that adds a border and a background is fighting the theme and will drift from it.
 - **A component carries meaning, not texture.** An accordion holds answers the reader chooses between. Do not fold prose that already reads fine into a component, and never restate on a page something the same page says a few paragraphs above.
-- **A local override of a prose component must be global.** Nuxt UI registers its prose components with `global: true` so MDC can resolve them by name at runtime in a production build. An override at `app/components/prose/Prompt.vue` wins the name dedupe but drops that flag, and with no static reference anywhere the build omits it entirely: the tag renders as an unknown element with the slot content visible in plain text. Keep the `.global` suffix on the file (`Prompt.global.vue`); the suffix is stripped from the component name.
 
 ## Structured data
 
