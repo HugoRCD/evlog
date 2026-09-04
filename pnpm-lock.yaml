@@ -10,7 +10,7 @@ overrides:
   tsdown@0.22.8>rolldown: 1.2.6
   minimark: 0.2.0
   '@nuxtjs/mcp-toolkit': ^0.19.0
-  eve>ai: ^7.0.89
+  ai: ^7.0.89
   '@unhead/vue': ^3.4.0
 
 importers:
@@ -89,6 +89,9 @@ importers:
       '@vueuse/core':
         specifier: ^14.4.0
         version: 14.4.0(vue@3.5.42(typescript@6.0.3))
+      ai:
+        specifier: ^7.0.89
+        version: 7.0.92(zod@4.5.4)
       better-sqlite3:
         specifier: ^12.11.1
         version: 12.11.1
@@ -583,7 +586,7 @@ importers:
         specifier: 0.2.2
         version: 0.2.2(@ai-sdk/mcp@2.0.39(zod@4.5.4))(ai@7.0.92(zod@4.5.4))(better-auth@1.7.2(16b4261850166391abcc3a98a924a0f2))(eve@0.30.8(@electric-sql/pglite@0.5.8)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(ai@7.0.92(zod@4.5.4))(better-sqlite3@12.11.1)(dotenv@17.4.2)(drizzle-orm@0.45.2(@cloudflare/workers-types@4.20260503.1)(@electric-sql/pglite@0.5.8)(@libsql/client@0.17.4)(@opentelemetry/api@1.9.1)(@types/better-sqlite3@7.6.13)(better-sqlite3@12.11.1)(bun-types@1.4.0)(kysely@0.28.17)(postgres@3.4.9))(giget@3.3.0)(jiti@2.7.0)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.13)(yaml@2.9.0)))
       ai:
-        specifier: ^7.0.0
+        specifier: ^7.0.89
         version: 7.0.92(zod@4.5.4)
       class-variance-authority:
         specifier: 0.7.1
@@ -9231,12 +9234,6 @@ packages:
     resolution: {integrity: sha512-MnA+YT8fwfJPgBx3m60MNqakm30XOkyIoH1y6huTQvC0PwZG7ki8NacLBcrPbNoo8vEZy7Jpuk7+jMO+CUovTQ==}
     engines: {node: '>= 14'}
 
-  ai@6.0.228:
-    resolution: {integrity: sha512-3TXPF+meV/B0ObVWqLZDfTo0UjT9eKQX+QO5B8n7TSyLxnU3U9FHKxRp7U9mGuTVh7fdo2OtU0J8uGFR4EStsg==}
-    engines: {node: '>=18'}
-    peerDependencies:
-      zod: ^3.25.76 || ^4.1.8
-
   ai@7.0.92:
     resolution: {integrity: sha512-9xb8Xo6aw7YMxuROznR02q4Hpne1DJ7JbKurpcOsabSSY3sd3xGoTANSqEs4gYLRpIz27MmT3IMfH8X3+oK1CQ==}
     engines: {node: '>=22'}
@@ -17069,7 +17066,7 @@ snapshots:
   '@ai-sdk/vue@3.0.228(vue@3.5.42(typescript@6.0.3))(zod@4.5.4)':
     dependencies:
       '@ai-sdk/provider-utils': 4.0.39(zod@4.5.4)
-      ai: 6.0.228(zod@4.5.4)
+      ai: 7.0.92(zod@4.5.4)
       swrv: 1.2.0(vue@3.5.42(typescript@6.0.3))
       vue: 3.5.42(typescript@6.0.3)
     transitivePeerDependencies:
@@ -28715,14 +28712,6 @@ snapshots:
 
   agent-base@7.1.4: {}
 
-  ai@6.0.228(zod@4.5.4):
-    dependencies:
-      '@ai-sdk/gateway': 3.0.151(zod@4.5.4)
-      '@ai-sdk/provider': 3.0.14
-      '@ai-sdk/provider-utils': 4.0.39(zod@4.5.4)
-      '@opentelemetry/api': 1.9.1
-      zod: 4.5.4
-
   ai@7.0.92(zod@3.25.76):
     dependencies:
       '@ai-sdk/gateway': 4.0.74(zod@3.25.76)
@@ -35190,7 +35179,7 @@ snapshots:
       '@iconify-json/lucide': 1.2.126
       '@nuxtjs/mdc': 0.21.1(magic-string@1.2.3)(magicast@0.5.4)(oxc-parser@0.143.0)(rolldown@1.2.7)(supports-color@10.2.2)(unplugin@3.3.0(esbuild@0.28.0)(rolldown@1.2.7)(rollup@4.60.2)(vite@8.2.2(@types/node@25.9.5)(esbuild@0.28.0)(jiti@2.7.0)(terser@5.46.2)(tsx@4.23.13)(yaml@2.9.0)))
       '@vueuse/core': 14.4.0(vue@3.5.42(typescript@6.0.3))
-      ai: 6.0.228(zod@4.5.4)
+      ai: 7.0.92(zod@4.5.4)
       defu: 6.1.7
       destr: 2.0.5
       js-yaml: 4.3.0
