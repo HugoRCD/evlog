@@ -123,12 +123,12 @@ export function frameworkSeries(framework: string): string {
 /** Band the tail folds into — matches `OTHER_VERSION` in `adoption-shape`. */
 export const OTHER_SERIES = 'other'
 
-/* Nitro has no simple-icons glyph (`simple-icons:nitro` 404s), so it falls
-   through to the local bolt — closer to its own mark than a generic box. */
+/* Nitro has no simple-icons glyph (`simple-icons:nitro` 404s); its official
+   mark lives in the UnJS collection instead. */
 const FRAMEWORK_ICONS: Record<string, string> = {
   'nuxt': 'i-simple-icons-nuxt',
   'next': 'i-simple-icons-nextdotjs',
-  'nitro': 'i-nucleo-bolt',
+  'nitro': 'i-unjs-nitro',
   'tanstack-start': 'i-simple-icons-tanstack',
   'hono': 'i-simple-icons-hono',
 }
